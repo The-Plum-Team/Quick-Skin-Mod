@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "किरदार को यह लबादा पहने दिखाता है",
   "quickskin.cape.adjust_view_elytra_tip": "किरदार को इस लबादे की बनावट वाले एलिट्रा के साथ दिखाता है",
   "quickskin.cape.adjust_section_animation": "एनिमेशन",
-  "quickskin.cape.adjust_frames": "%2$s में से %1$s फ़्रेम",
+  "quickskin.cape.adjust_frames": "%s फ़्रेम · अधिकतम %s",
   "quickskin.cape.adjust_frames_over": "बहुत ज़्यादा फ़्रेम: एनिमेशन छोटा करें",
   "quickskin.cape.adjust_trim_start": "शुरुआत: %s",
   "quickskin.cape.adjust_trim_end": "अंत: %s",

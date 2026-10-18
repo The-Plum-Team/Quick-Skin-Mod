@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "Karakteri bu pelerinle gösterir",
   "quickskin.cape.adjust_view_elytra_tip": "Karakteri bu pelerinin dokusuyla elitra takmış gösterir",
   "quickskin.cape.adjust_section_animation": "Animasyon",
-  "quickskin.cape.adjust_frames": "%2$s karenin %1$s tanesi",
+  "quickskin.cape.adjust_frames": "%s kare · en fazla %s",
   "quickskin.cape.adjust_frames_over": "Çok fazla kare: animasyonu kısalt",
   "quickskin.cape.adjust_trim_start": "Başlangıç: %s",
   "quickskin.cape.adjust_trim_end": "Bitiş: %s",

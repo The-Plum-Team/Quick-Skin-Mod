@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "Mostra a personagem com esta capa",
   "quickskin.cape.adjust_view_elytra_tip": "Mostra a personagem com élitros com a textura desta capa",
   "quickskin.cape.adjust_section_animation": "Animação",
-  "quickskin.cape.adjust_frames": "%s de %s fotogramas",
+  "quickskin.cape.adjust_frames": "%s fotogramas · máx. %s",
   "quickskin.cape.adjust_frames_over": "Demasiados fotogramas: corta a animação",
   "quickskin.cape.adjust_trim_start": "Início: %s",
   "quickskin.cape.adjust_trim_end": "Fim: %s",

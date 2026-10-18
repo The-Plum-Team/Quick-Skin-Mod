@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "このマントを着たキャラクターを表示します",
   "quickskin.cape.adjust_view_elytra_tip": "このマントの模様のエリトラを着けたキャラクターを表示します",
   "quickskin.cape.adjust_section_animation": "アニメーション",
-  "quickskin.cape.adjust_frames": "%1$s / %2$s フレーム",
+  "quickskin.cape.adjust_frames": "%s フレーム · 最大 %s",
   "quickskin.cape.adjust_frames_over": "フレームが多すぎます: アニメーションを短くしてください",
   "quickskin.cape.adjust_trim_start": "開始: %s",
   "quickskin.cape.adjust_trim_end": "終了: %s",

@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "Montre le personnage avec cette cape",
   "quickskin.cape.adjust_view_elytra_tip": "Montre le personnage avec des élytres à la texture de cette cape",
   "quickskin.cape.adjust_section_animation": "Animation",
-  "quickskin.cape.adjust_frames": "%s images sur %s",
+  "quickskin.cape.adjust_frames": "%s images · max. %s",
   "quickskin.cape.adjust_frames_over": "Trop d'images : raccourcis l'animation",
   "quickskin.cape.adjust_trim_start": "Début : %s",
   "quickskin.cape.adjust_trim_end": "Fin : %s",

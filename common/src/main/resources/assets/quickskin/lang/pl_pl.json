@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "Pokazuje postać w tej pelerynie",
   "quickskin.cape.adjust_view_elytra_tip": "Pokazuje postać z elytrą w teksturze tej peleryny",
   "quickskin.cape.adjust_section_animation": "Animacja",
-  "quickskin.cape.adjust_frames": "%s z %s klatek",
+  "quickskin.cape.adjust_frames": "%s klatek · maks. %s",
   "quickskin.cape.adjust_frames_over": "Za dużo klatek: skróć animację",
   "quickskin.cape.adjust_trim_start": "Początek: %s",
   "quickskin.cape.adjust_trim_end": "Koniec: %s",

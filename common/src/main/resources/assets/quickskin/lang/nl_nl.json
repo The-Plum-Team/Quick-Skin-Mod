@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "Toont het personage met deze cape",
   "quickskin.cape.adjust_view_elytra_tip": "Toont het personage met dekschilden in de textuur van deze cape",
   "quickskin.cape.adjust_section_animation": "Animatie",
-  "quickskin.cape.adjust_frames": "%s van %s frames",
+  "quickskin.cape.adjust_frames": "%s frames · max. %s",
   "quickskin.cape.adjust_frames_over": "Te veel frames: kort de animatie in",
   "quickskin.cape.adjust_trim_start": "Begin: %s",
   "quickskin.cape.adjust_trim_end": "Einde: %s",

@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "Mostra il personaggio con questo mantello",
   "quickskin.cape.adjust_view_elytra_tip": "Mostra il personaggio con le elitre con la texture di questo mantello",
   "quickskin.cape.adjust_section_animation": "Animazione",
-  "quickskin.cape.adjust_frames": "%s di %s fotogrammi",
+  "quickskin.cape.adjust_frames": "%s fotogrammi · max %s",
   "quickskin.cape.adjust_frames_over": "Troppi fotogrammi: accorcia l'animazione",
   "quickskin.cape.adjust_trim_start": "Inizio: %s",
   "quickskin.cape.adjust_trim_end": "Fine: %s",

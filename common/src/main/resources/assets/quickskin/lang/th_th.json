@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "แสดงตัวละครที่สวมผ้าคลุมนี้",
   "quickskin.cape.adjust_view_elytra_tip": "แสดงตัวละครที่สวมปีกด้วยลายของผ้าคลุมนี้",
   "quickskin.cape.adjust_section_animation": "แอนิเมชัน",
-  "quickskin.cape.adjust_frames": "%s จาก %s เฟรม",
+  "quickskin.cape.adjust_frames": "%s เฟรม · สูงสุด %s",
   "quickskin.cape.adjust_frames_over": "เฟรมมากเกินไป: ตัดแอนิเมชันให้สั้นลง",
   "quickskin.cape.adjust_trim_start": "เริ่ม: %s",
   "quickskin.cape.adjust_trim_end": "จบ: %s",

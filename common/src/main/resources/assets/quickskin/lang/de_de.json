@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "Zeigt die Figur mit diesem Umhang",
   "quickskin.cape.adjust_view_elytra_tip": "Zeigt die Figur mit Elytren in der Textur dieses Umhangs",
   "quickskin.cape.adjust_section_animation": "Animation",
-  "quickskin.cape.adjust_frames": "%s von %s Bildern",
+  "quickskin.cape.adjust_frames": "%s Bilder · max. %s",
   "quickskin.cape.adjust_frames_over": "Zu viele Bilder: kürze die Animation",
   "quickskin.cape.adjust_trim_start": "Anfang: %s",
   "quickskin.cape.adjust_trim_end": "Ende: %s",

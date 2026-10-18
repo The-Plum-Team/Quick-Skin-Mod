@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "Показать персонажа в этом плаще",
   "quickskin.cape.adjust_view_elytra_tip": "Показать персонажа с элитрами в текстуре этого плаща",
   "quickskin.cape.adjust_section_animation": "Анимация",
-  "quickskin.cape.adjust_frames": "%s из %s кадров",
+  "quickskin.cape.adjust_frames": "%s кадров · макс. %s",
   "quickskin.cape.adjust_frames_over": "Слишком много кадров: обрежьте анимацию",
   "quickskin.cape.adjust_trim_start": "Начало: %s",
   "quickskin.cape.adjust_trim_end": "Конец: %s",

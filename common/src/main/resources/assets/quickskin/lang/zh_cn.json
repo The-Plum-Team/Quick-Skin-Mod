@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "显示穿着这件披风的角色",
   "quickskin.cape.adjust_view_elytra_tip": "显示带有此披风纹理鞘翅的角色",
   "quickskin.cape.adjust_section_animation": "动画",
-  "quickskin.cape.adjust_frames": "%s / %s 帧",
+  "quickskin.cape.adjust_frames": "%s 帧 · 最多 %s",
   "quickskin.cape.adjust_frames_over": "帧数过多：请裁剪动画",
   "quickskin.cape.adjust_trim_start": "开始：%s",
   "quickskin.cape.adjust_trim_end": "结束：%s",

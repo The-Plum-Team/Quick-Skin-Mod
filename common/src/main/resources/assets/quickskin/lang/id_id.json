@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "Tampilkan karakter memakai jubah ini",
   "quickskin.cape.adjust_view_elytra_tip": "Tampilkan karakter memakai elytra dengan tekstur jubah ini",
   "quickskin.cape.adjust_section_animation": "Animasi",
-  "quickskin.cape.adjust_frames": "%s dari %s bingkai",
+  "quickskin.cape.adjust_frames": "%s bingkai · maks. %s",
   "quickskin.cape.adjust_frames_over": "Terlalu banyak bingkai: potong animasinya",
   "quickskin.cape.adjust_trim_start": "Awal: %s",
   "quickskin.cape.adjust_trim_end": "Akhir: %s",

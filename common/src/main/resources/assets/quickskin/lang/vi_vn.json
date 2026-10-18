@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "Hiển thị nhân vật mặc áo choàng này",
   "quickskin.cape.adjust_view_elytra_tip": "Hiển thị nhân vật đeo cánh cứng với họa tiết của áo choàng này",
   "quickskin.cape.adjust_section_animation": "Hoạt ảnh",
-  "quickskin.cape.adjust_frames": "%s/%s khung hình",
+  "quickskin.cape.adjust_frames": "%s khung hình · tối đa %s",
   "quickskin.cape.adjust_frames_over": "Quá nhiều khung hình: hãy cắt bớt hoạt ảnh",
   "quickskin.cape.adjust_trim_start": "Đầu: %s",
   "quickskin.cape.adjust_trim_end": "Cuối: %s",

@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "Muestra al personaje con esta capa",
   "quickskin.cape.adjust_view_elytra_tip": "Muestra al personaje con élitros con la textura de esta capa",
   "quickskin.cape.adjust_section_animation": "Animación",
-  "quickskin.cape.adjust_frames": "%s de %s cuadros",
+  "quickskin.cape.adjust_frames": "%s cuadros · máx. %s",
   "quickskin.cape.adjust_frames_over": "Demasiados cuadros: recorta la animación",
   "quickskin.cape.adjust_trim_start": "Inicio: %s",
   "quickskin.cape.adjust_trim_end": "Fin: %s",

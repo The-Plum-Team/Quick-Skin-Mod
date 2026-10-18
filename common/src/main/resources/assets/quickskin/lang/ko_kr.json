@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "이 망토를 입은 캐릭터를 보여줍니다",
   "quickskin.cape.adjust_view_elytra_tip": "이 망토 텍스처의 겉날개를 단 캐릭터를 보여줍니다",
   "quickskin.cape.adjust_section_animation": "애니메이션",
-  "quickskin.cape.adjust_frames": "%1$s / %2$s 프레임",
+  "quickskin.cape.adjust_frames": "%s 프레임 · 최대 %s",
   "quickskin.cape.adjust_frames_over": "프레임이 너무 많습니다: 애니메이션을 줄이세요",
   "quickskin.cape.adjust_trim_start": "시작: %s",
   "quickskin.cape.adjust_trim_end": "끝: %s",

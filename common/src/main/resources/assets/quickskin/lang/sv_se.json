@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "Visar figuren med den här manteln",
   "quickskin.cape.adjust_view_elytra_tip": "Visar figuren med täckvingar i mantelns textur",
   "quickskin.cape.adjust_section_animation": "Animation",
-  "quickskin.cape.adjust_frames": "%s av %s bildrutor",
+  "quickskin.cape.adjust_frames": "%s bildrutor · max %s",
   "quickskin.cape.adjust_frames_over": "För många bildrutor: korta animationen",
   "quickskin.cape.adjust_trim_start": "Början: %s",
   "quickskin.cape.adjust_trim_end": "Slut: %s",

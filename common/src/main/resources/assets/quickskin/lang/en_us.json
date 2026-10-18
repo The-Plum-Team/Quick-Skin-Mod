@@ -191,7 +191,7 @@
   "quickskin.cape.adjust_view_cape_tip": "Show the player wearing this cape",
   "quickskin.cape.adjust_view_elytra_tip": "Show the player wearing elytra with this cape's texture",
   "quickskin.cape.adjust_section_animation": "Animation",
-  "quickskin.cape.adjust_frames": "%s of %s frames",
+  "quickskin.cape.adjust_frames": "%s frames · max %s",
   "quickskin.cape.adjust_frames_over": "Too many frames: trim the animation",
   "quickskin.cape.adjust_trim_start": "Start: %s",
   "quickskin.cape.adjust_trim_end": "End: %s",
