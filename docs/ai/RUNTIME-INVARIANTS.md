@@ -262,6 +262,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   preview and move and enlarge the pause preview.
 - Compatibility failures must degrade locally; they must not break base mod initialization or
   dedicated-server startup.
+- A release JAR holds only Quick Skin's own packages, so no other mod's copy of a library can
+  stop the game at module resolution. Bundled libraries are pure Java, relocated below
+  `com.quickskin.mod.shadow` and called directly; never nest a library JAR, ship a native library
+  or register a global Java service such as an ImageIO reader. `SafeImageReader` decodes WebP with
+  the relocated TwelveMonkeys reader and leaves PNG and JPEG to ImageIO. `verify_release.py`
+  enforces the JAR layout; see `DEPENDENCY-SECURITY.md`.
 - The latest look choice between Quick Skin and CPM is the local player's look, for every other
   player as well and across relogs and restarts (`CpmLook`). It is derived from CPM's persisted
   `selectedModel`, Quick Skin's selection and, per connection, a model the server assigned: a CPM

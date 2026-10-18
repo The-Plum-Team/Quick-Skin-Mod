@@ -1,7 +1,10 @@
 package com.quickskin.mod.common.util;
 
+import com.twelvemonkeys.imageio.plugins.webp.WebPImageReaderSpi;
+
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
+import javax.imageio.spi.ImageReaderSpi;
 import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.MemoryCacheImageInputStream;
 import java.awt.image.BufferedImage;
@@ -10,6 +13,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Set;
 
@@ -18,6 +23,10 @@ import java.util.Set;
  *
  * <p>ImageIO normally allocates during {@code read}. This boundary inspects dimensions first,
  * caps both encoded and decoded size, and only then performs the full decode.</p>
+ *
+ * <p>WebP skins and capes are decoded by the bundled pure-Java reader, called directly rather than through
+ * the ImageIO registry: it is relocated into Quick Skin's package and registers nothing globally,
+ * so it never meets another mod's copy of a WebP library.</p>
  */
 public final class SafeImageReader {
     public static final long MAX_ENCODED_BYTES = 32L * 1024L * 1024L;
@@ -25,8 +34,11 @@ public final class SafeImageReader {
     public static final int MAX_HEIGHT = 32 * 1024;
     public static final long MAX_PIXELS = 16L * 1024L * 1024L;
     private static final Set<String> PNG_FORMAT = Set.of("png");
-    private static final Set<String> SKIN_FORMATS = Set.of("png", "jpeg", "jpg", "webp");
-    private static final Set<String> STILL_CAPE_FORMATS = Set.of("png", "webp");
+    private static final Set<String> SKIN_FORMATS = Set.of("png", "jpeg", "jpg");
+    private static final Set<String> STILL_CAPE_FORMATS = PNG_FORMAT;
+    private static final byte[] RIFF = "RIFF".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] WEBP = "WEBP".getBytes(StandardCharsets.US_ASCII);
+    private static final ImageReaderSpi WEBP_READER = new WebPImageReaderSpi();
 
     private SafeImageReader() {
     }
@@ -44,7 +56,7 @@ public final class SafeImageReader {
         }
         try (ImageInputStream input =
                      new MemoryCacheImageInputStream(new ByteArrayInputStream(encoded))) {
-            return decode(input, PNG_FORMAT, MAX_WIDTH, MAX_HEIGHT, MAX_PIXELS);
+            return decode(input, registeredReader(input, PNG_FORMAT), MAX_WIDTH, MAX_HEIGHT, MAX_PIXELS);
         } catch (RuntimeException exception) {
             throw new IOException("Invalid PNG image", exception);
         }
@@ -74,7 +86,10 @@ public final class SafeImageReader {
         }
         try (ImageInputStream input =
                      new MemoryCacheImageInputStream(new ByteArrayInputStream(encoded))) {
-            return decode(input, STILL_CAPE_FORMATS, MAX_WIDTH, MAX_HEIGHT, MAX_PIXELS);
+            ImageReader reader = isWebP(encoded)
+                    ? WEBP_READER.createReaderInstance(null)
+                    : registeredReader(input, STILL_CAPE_FORMATS);
+            return decode(input, reader, MAX_WIDTH, MAX_HEIGHT, MAX_PIXELS);
         } catch (RuntimeException exception) {
             throw new IOException("Invalid cape image", exception);
         }
@@ -94,19 +109,23 @@ public final class SafeImageReader {
         }
         try (ImageInputStream input =
                      new MemoryCacheImageInputStream(new ByteArrayInputStream(encoded))) {
-            return decode(input, SKIN_FORMATS, 2048, 2048, 2048L * 2048L);
+            ImageReader reader = isWebP(encoded)
+                    ? WEBP_READER.createReaderInstance(null)
+                    : registeredReader(input, SKIN_FORMATS);
+            return decode(input, reader, 2048, 2048, 2048L * 2048L);
         } catch (RuntimeException exception) {
             throw new IOException("Invalid skin image", exception);
         }
     }
 
-    private static BufferedImage decode(
-            ImageInputStream input,
-            Set<String> allowedFormats,
-            int maxWidth,
-            int maxHeight,
-            long maxPixels
-    ) throws IOException {
+    private static boolean isWebP(byte[] encoded) {
+        return encoded.length >= 12
+                && Arrays.equals(encoded, 0, 4, RIFF, 0, 4)
+                && Arrays.equals(encoded, 8, 12, WEBP, 0, 4);
+    }
+
+    private static ImageReader registeredReader(ImageInputStream input, Set<String> allowedFormats)
+            throws IOException {
         if (input == null) {
             throw new IOException("Could not open PNG image");
         }
@@ -115,11 +134,22 @@ public final class SafeImageReader {
             throw new IOException("Invalid PNG image");
         }
         ImageReader reader = readers.next();
+        String format = reader.getFormatName().toLowerCase(Locale.ROOT);
+        if (!allowedFormats.contains(format)) {
+            reader.dispose();
+            throw new IOException("Unsupported image format: " + format);
+        }
+        return reader;
+    }
+
+    private static BufferedImage decode(
+            ImageInputStream input,
+            ImageReader reader,
+            int maxWidth,
+            int maxHeight,
+            long maxPixels
+    ) throws IOException {
         try {
-            String format = reader.getFormatName().toLowerCase(Locale.ROOT);
-            if (!allowedFormats.contains(format)) {
-                throw new IOException("Unsupported image format: " + format);
-            }
             reader.setInput(input, true, true);
             int width = reader.getWidth(0);
             int height = reader.getHeight(0);
