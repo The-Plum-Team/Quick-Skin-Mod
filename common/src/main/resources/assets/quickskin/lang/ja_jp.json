@@ -38,6 +38,8 @@
   "quickskin.tooltip.sorting": "並び替え: %s",
   "quickskin.tooltip.view_list": "リスト表示",
   "quickskin.tooltip.view_grid": "グリッド表示",
+  "quickskin.screen.delete_many.title": "スキンを削除しますか?",
+  "quickskin.dialog.confirm_delete_many": "%s 個のスキンを削除してもよろしいですか?",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "新しい順",

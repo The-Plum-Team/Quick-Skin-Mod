@@ -38,6 +38,8 @@
   "quickskin.tooltip.sorting": "الترتيب: %s",
   "quickskin.tooltip.view_list": "عرض كقائمة",
   "quickskin.tooltip.view_grid": "عرض كشبكة",
+  "quickskin.screen.delete_many.title": "حذف المظاهر؟",
+  "quickskin.dialog.confirm_delete_many": "هل أنت متأكد من حذف %s مظاهر؟",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "الأحدث أولاً",

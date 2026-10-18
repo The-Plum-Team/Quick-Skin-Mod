@@ -89,7 +89,8 @@ import java.util.stream.Collectors;
  * Cape selection menu for QuickSkin with grid-based layout
  */
 @Environment(EnvType.CLIENT)
-public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.client.gui.RestylableScreen {
+public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.client.gui.RestylableScreen,
+        MenuGuiScale.Scaled {
     @Override
     public Screen recreateForStyleChange() {
         return new PlayerCapeMenuScreen(null);

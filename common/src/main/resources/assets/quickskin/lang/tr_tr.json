@@ -38,6 +38,8 @@
   "quickskin.tooltip.sorting": "Sıralama: %s",
   "quickskin.tooltip.view_list": "Liste olarak göster",
   "quickskin.tooltip.view_grid": "Izgara olarak göster",
+  "quickskin.screen.delete_many.title": "Skinler Silinsin mi?",
+  "quickskin.dialog.confirm_delete_many": "%s skini silmek istediğinden emin misin?",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Önce En Yeni",

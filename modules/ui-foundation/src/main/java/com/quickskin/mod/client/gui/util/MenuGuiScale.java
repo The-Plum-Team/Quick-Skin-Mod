@@ -1,6 +1,12 @@
 package com.quickskin.mod.client.gui.util;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Collections;
+import java.util.Set;
+import java.util.WeakHashMap;
 
 /**
  * Gives a menu its own GUI scale, chosen from the window size, so it looks the same whatever GUI
@@ -11,6 +17,9 @@ import net.minecraft.client.Minecraft;
  * resize and option change other mods react to. Rendering, the mouse and scissoring all read the
  * window's scale, so they follow the menu's scale together; {@link #restore} puts back the scale
  * the player's options give when the menu goes away.
+ *
+ * <p>A dialog drawn over a menu ({@link #follow}) takes the menu's scale too, so the menu behind
+ * it keeps its size and layout instead of being drawn again at the player's scale.
  */
 public final class MenuGuiScale {
     /** The menus are laid out for a GUI canvas of at least about this size... */
@@ -22,7 +31,40 @@ public final class MenuGuiScale {
     private static final int MIN_GUI_WIDTH = 320;
     private static final int MIN_GUI_HEIGHT = 240;
 
+    /** Dialogs drawn at a menu's scale, so a dialog opened over one of them follows it too. */
+    private static final Set<Screen> FOLLOWERS = Collections.newSetFromMap(new WeakHashMap<>());
+
     private MenuGuiScale() {
+    }
+
+    /** A screen drawn at a menu's own scale, whose dialogs {@link #follow} it. */
+    public interface Scaled {
+    }
+
+    /**
+     * Gives a dialog the menu's scale when the screen it is drawn over has it. Call first in the
+     * dialog's {@code init()}, which runs after the menu's {@code removed()} put back the player's
+     * scale, and call {@link #leave} from its {@code removed()}.
+     *
+     * @return whether the dialog follows the menu's scale
+     */
+    public static boolean follow(Minecraft minecraft, Screen dialog, @Nullable Screen parent) {
+        if (!(parent instanceof Scaled) && !FOLLOWERS.contains(parent)) {
+            FOLLOWERS.remove(dialog);
+            return false;
+        }
+        FOLLOWERS.add(dialog);
+        apply(minecraft);
+        dialog.width = minecraft.getWindow().getGuiScaledWidth();
+        dialog.height = minecraft.getWindow().getGuiScaledHeight();
+        return true;
+    }
+
+    /** Puts back the player's scale when a dialog that {@link #follow followed} a menu goes away. */
+    public static void leave(Minecraft minecraft, Screen dialog) {
+        if (FOLLOWERS.contains(dialog)) {
+            restore(minecraft);
+        }
     }
 
     /**

@@ -427,7 +427,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   break when the option changes or the display resizes under them. The skin and cape menus draw
   at their own scale, chosen from the window size so they look the same at any option, by setting
   only the window's scale while they are shown (`MenuGuiScale`), and put back the option's scale
-  in `removed()`, so every dialog, other screen and the world open at the player's own scale. The
+  in `removed()`, so every other screen and the world open at the player's own scale. A Quick
+  Skin dialog drawn over a menu (Delete, Rename, Settings, Upload to Mojang) takes the menu's
+  scale instead (`MenuGuiScale.follow`), so the menu behind it keeps its size, and puts back the
+  player's scale when it goes away. The
   skin menu's packaged checkpoint asserts both the menu's scale on the window and the unchanged
   option.
 - GUI cape import evidence must go through `CapeImportWorkflow` from the real drop entry point:

@@ -38,6 +38,8 @@
   "quickskin.tooltip.sorting": "Ordenar: %s",
   "quickskin.tooltip.view_list": "Ver como lista",
   "quickskin.tooltip.view_grid": "Ver como cuadrícula",
+  "quickskin.screen.delete_many.title": "¿Eliminar aspectos?",
+  "quickskin.dialog.confirm_delete_many": "¿Seguro que quieres eliminar %s aspectos?",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Más recientes primero",

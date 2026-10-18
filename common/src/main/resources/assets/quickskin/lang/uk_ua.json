@@ -38,6 +38,8 @@
   "quickskin.tooltip.sorting": "Сортування: %s",
   "quickskin.tooltip.view_list": "Показати списком",
   "quickskin.tooltip.view_grid": "Показати сіткою",
+  "quickskin.screen.delete_many.title": "Видалити скіни?",
+  "quickskin.dialog.confirm_delete_many": "Видалити скіни (%s)?",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Спочатку нові",

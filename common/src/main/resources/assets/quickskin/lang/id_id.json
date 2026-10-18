@@ -38,6 +38,8 @@
   "quickskin.tooltip.sorting": "Urutan: %s",
   "quickskin.tooltip.view_list": "Tampilkan sebagai daftar",
   "quickskin.tooltip.view_grid": "Tampilkan sebagai kisi",
+  "quickskin.screen.delete_many.title": "Hapus Skin?",
+  "quickskin.dialog.confirm_delete_many": "Yakin ingin menghapus %s skin?",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Terbaru Dulu",

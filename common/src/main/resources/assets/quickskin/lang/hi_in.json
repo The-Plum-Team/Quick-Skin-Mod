@@ -38,6 +38,8 @@
   "quickskin.tooltip.sorting": "क्रमबद्ध: %s",
   "quickskin.tooltip.view_list": "सूची के रूप में दिखाएँ",
   "quickskin.tooltip.view_grid": "ग्रिड के रूप में दिखाएँ",
+  "quickskin.screen.delete_many.title": "स्किन डिलीट करें?",
+  "quickskin.dialog.confirm_delete_many": "क्या आप वाकई %s स्किन डिलीट करना चाहते हैं?",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "नवीनतम पहले",

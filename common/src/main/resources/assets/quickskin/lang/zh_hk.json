@@ -38,6 +38,8 @@
   "quickskin.tooltip.sorting": "排序：%s",
   "quickskin.tooltip.view_list": "以列表顯示",
   "quickskin.tooltip.view_grid": "以網格顯示",
+  "quickskin.screen.delete_many.title": "刪除皮膚？",
+  "quickskin.dialog.confirm_delete_many": "確定要刪除 %s 個皮膚嗎？",
 
   "_comment_sort": "=== 排序模式 ===",
   "quickskin.sort.latest_first": "最新優先",

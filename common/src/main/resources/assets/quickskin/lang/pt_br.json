@@ -38,6 +38,8 @@
   "quickskin.tooltip.sorting": "Ordenação: %s",
   "quickskin.tooltip.view_list": "Mostrar em lista",
   "quickskin.tooltip.view_grid": "Mostrar em grade",
+  "quickskin.screen.delete_many.title": "Excluir Skins?",
+  "quickskin.dialog.confirm_delete_many": "Tem certeza de que deseja excluir %s skins?",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Mais Recentes Primeiro",

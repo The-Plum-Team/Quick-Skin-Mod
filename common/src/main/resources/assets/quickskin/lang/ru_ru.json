@@ -38,6 +38,8 @@
   "quickskin.tooltip.sorting": "Сортировка: %s",
   "quickskin.tooltip.view_list": "Показать списком",
   "quickskin.tooltip.view_grid": "Показать сеткой",
+  "quickskin.screen.delete_many.title": "Удалить скины?",
+  "quickskin.dialog.confirm_delete_many": "Удалить скины (%s)?",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Сначала новые",

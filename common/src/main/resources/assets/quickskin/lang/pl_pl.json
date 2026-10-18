@@ -38,6 +38,8 @@
   "quickskin.tooltip.sorting": "Sortowanie: %s",
   "quickskin.tooltip.view_list": "Pokaż jako listę",
   "quickskin.tooltip.view_grid": "Pokaż jako siatkę",
+  "quickskin.screen.delete_many.title": "Usunąć skórki?",
+  "quickskin.dialog.confirm_delete_many": "Czy na pewno chcesz usunąć skórki (%s)?",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Najpierw najnowsze",

@@ -38,6 +38,8 @@
   "quickskin.tooltip.sorting": "การเรียงลำดับ: %s",
   "quickskin.tooltip.view_list": "แสดงเป็นรายการ",
   "quickskin.tooltip.view_grid": "แสดงเป็นตาราง",
+  "quickskin.screen.delete_many.title": "ลบสกิน?",
+  "quickskin.dialog.confirm_delete_many": "แน่ใจหรือไม่ว่าต้องการลบสกิน %s รายการ?",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "ล่าสุดก่อน",

@@ -38,6 +38,8 @@
   "quickskin.tooltip.sorting": "Ordenação: %s",
   "quickskin.tooltip.view_list": "Mostrar em lista",
   "quickskin.tooltip.view_grid": "Mostrar em grelha",
+  "quickskin.screen.delete_many.title": "Eliminar Peles?",
+  "quickskin.dialog.confirm_delete_many": "Tens a certeza de que queres eliminar %s peles?",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Mais Recentes Primeiro",

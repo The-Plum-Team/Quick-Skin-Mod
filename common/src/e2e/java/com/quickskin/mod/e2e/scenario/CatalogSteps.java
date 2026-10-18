@@ -736,8 +736,8 @@ final class CatalogSteps {
      * exactly like every other skin-menu checkpoint.
      *
      * <p>These catalog checkpoints deliberately run on the menu instance a user keeps open across
-     * the Rename and Delete dialogs, which return to that same instance: each dialog opens at the
-     * player's scale, and the menu must take its own scale back when it returns.</p>
+     * the Rename and Delete dialogs, which return to that same instance: each dialog follows the
+     * menu's scale, and the menu must still have its own scale when it returns.</p>
      */
     private boolean menuLayoutStable(Minecraft mc) {
         return owner.skinMenuLayoutSettled(mc);

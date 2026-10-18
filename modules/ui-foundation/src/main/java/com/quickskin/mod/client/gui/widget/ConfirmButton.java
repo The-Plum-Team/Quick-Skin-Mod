@@ -21,7 +21,8 @@ import net.minecraft.resources.Identifier;
 import java.util.Locale;
 
 /**
- * The skin menu's Confirm button, drawn like a Bedrock Edition button in dark-mode greys: a flat
+ * The skin menu's Confirm button, and the buttons of Quick Skin's dialogs, drawn like a Bedrock
+ * Edition button in dark-mode greys: a flat
  * charcoal face inside a thin light-grey border and a black outline, on a darker lip that gives it
  * depth. The face lightens
  * under the mouse and sinks onto the lip while pressed; a selected button, such as one whose menu
@@ -44,6 +45,12 @@ public class ConfirmButton extends Button {
     private static final int BORDER_SELECTED = 0xFFC6C7CC;
     private static final int LIP = 0xFF1C1D1F;
     private static final int LIP_DISABLED = 0xFF161617;
+    // A dangerous action, such as deleting: the same button in reds
+    private static final int DANGER_FACE = 0xFFB83030;
+    private static final int DANGER_FACE_HOVER = 0xFFD84040;
+    private static final int DANGER_BORDER = 0xFFE06060;
+    private static final int DANGER_BORDER_HOVER = 0xFFFF9090;
+    private static final int DANGER_LIP = 0xFF5A1414;
     /** Height of the darker lip under the face; the face sinks by this much when pressed. */
     private static final int LIP_HEIGHT = 3;
     private static final int MAX_LABEL_SCALE = 3;
@@ -82,6 +89,8 @@ public class ConfirmButton extends Button {
 //?}
 
     private boolean selected;
+    private boolean danger;
+    private float labelScale = 1.0f;
 
     public ConfirmButton(int x, int y, int width, int height, Component label, OnPress onPress) {
         super(x, y, width, height, label, onPress, DEFAULT_NARRATION);
@@ -90,6 +99,32 @@ public class ConfirmButton extends Button {
     /** Keeps the border bright, as while the menu this button opens is showing. */
     public void setSelected(boolean selected) {
         this.selected = selected;
+    }
+
+    /**
+     * Height of the darker lip under the face, which the face sinks onto while pressed. A small
+     * button, such as an {@link IconButton}, can stand on a thinner one.
+     */
+    protected int lipHeight() {
+        return LIP_HEIGHT;
+    }
+
+    /** Draws the button in reds, for an action such as deleting. A disabled button stays grey. */
+    public void setDanger(boolean danger) {
+        this.danger = danger;
+    }
+
+    public boolean isDanger() {
+        return danger;
+    }
+
+    /**
+     * Draws the label smaller, by this share of its usual size rounded to whole screen pixels per
+     * font pixel so it stays crisp, for a button whose label would otherwise nearly touch its
+     * border, such as a dialog's.
+     */
+    public void setLabelScale(float labelScale) {
+        this.labelScale = labelScale;
     }
 
     /** The width at which a button of the given height shows the label at its full size. */
@@ -129,6 +164,16 @@ public class ConfirmButton extends Button {
         return Math.max(1.0, scale);
     }
 
+    /** Text in the label's pixel font, in upper case, as Quick Skin's dialogs title themselves. */
+    public static Component pixelText(Component text) {
+        return labelText(text);
+    }
+
+    /** Distance from the pixel font's text origin to the middle of its capitals, in font pixels. */
+    public static float pixelCapitalsMiddle() {
+        return CAPITALS_MIDDLE;
+    }
+
     private static Component labelText(Component label) {
         return Component.literal(label.getString().toUpperCase(Locale.ROOT)).withStyle(style -> style.withFont(FONT));
     }
@@ -149,7 +194,8 @@ public class ConfirmButton extends Button {
         int bottom = y + this.height;
         boolean hovered = this.active && this.isHovered();
         boolean pressed = hovered && isLeftMouseDown();
-        int sink = pressed ? LIP_HEIGHT : 0;
+        int lip = lipHeight();
+        int sink = pressed ? lip : 0;
 
         // Outline, then the lip along the bottom, then the face resting on it
         graphics.fill(x, y, right, bottom, OUTLINE);
@@ -157,13 +203,23 @@ public class ConfirmButton extends Button {
         int innerRight = right - 1;
         int innerBottom = bottom - 1;
         int faceTop = y + 1 + sink;
-        int faceBottom = innerBottom - LIP_HEIGHT + sink;
+        int faceBottom = innerBottom - lip + sink;
         if (!pressed) {
-            graphics.fill(innerLeft, faceBottom, innerRight, innerBottom, this.active ? LIP : LIP_DISABLED);
+            graphics.fill(innerLeft, faceBottom, innerRight, innerBottom,
+                    !this.active ? LIP_DISABLED : this.danger ? DANGER_LIP : LIP);
         }
-        int face = !this.active ? FACE_DISABLED : hovered ? FACE_HOVER : FACE;
-        int border = !this.active ? BORDER_DISABLED : this.selected ? BORDER_SELECTED
-                : hovered ? BORDER_HOVER : BORDER;
+        int face;
+        int border;
+        if (!this.active) {
+            face = FACE_DISABLED;
+            border = BORDER_DISABLED;
+        } else if (this.danger) {
+            face = hovered ? DANGER_FACE_HOVER : DANGER_FACE;
+            border = hovered ? DANGER_BORDER_HOVER : DANGER_BORDER;
+        } else {
+            face = hovered ? FACE_HOVER : FACE;
+            border = this.selected ? BORDER_SELECTED : hovered ? BORDER_HOVER : BORDER;
+        }
         // A thin border all round the face, then the face inside it
         graphics.fill(innerLeft, faceTop, innerRight, faceBottom, border);
         graphics.fill(innerLeft + 1, faceTop + 1, innerRight - 1, faceBottom - 1, face);
@@ -185,6 +241,10 @@ public class ConfirmButton extends Button {
         double guiScale = guiScale();
         int smallest = (int) Math.round(guiScale);
         int pixels = labelPixels(faceHeight - 2, guiScale);
+        if (labelScale < 1.0f) {
+            pixels = Math.max(1, Math.round(pixels * labelScale));
+            smallest = Math.min(smallest, pixels);
+        }
         while (pixels > smallest && textWidth * pixels / guiScale > room) {
             pixels--;
         }

@@ -1,5 +1,6 @@
 package com.quickskin.mod.client.gui.widget;
 
+import com.quickskin.mod.client.gui.util.UiText;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -11,22 +12,24 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 
+/**
+ * A tab of the settings dialog's sidebar: a row with a pixel icon and the tab's name, left-aligned.
+ * The selected tab has a slate highlight with a brighter bar along its left edge, matching the
+ * dialog's header; an unselected tab is plain, lightening under the mouse.
+ */
 @Environment(EnvType.CLIENT)
 public class TabButton extends Button {
     private boolean selected;
+    private String[] icon = new String[0];
 
-    // Tab styling - matches the frosted glass theme
-    private static final int SELECTED_BG = 0xB0000000;      // Darker semi-transparent background
-    private static final int UNSELECTED_BG = 0x60000000;    // Lighter semi-transparent background
-    private static final int SELECTED_OUTLINE = 0xFFFFFFFF; // White outline for selected
-    private static final int UNSELECTED_OUTLINE = 0x40FFFFFF; // Faint outline for unselected
-    //? if <1.21.9 {
-    private static final int SELECTED_TEXT = 0xFFFFFFFF;    // Opaque white text
-    private static final int UNSELECTED_TEXT = 0xFF999999;  // Opaque gray text
-    //?} else {
-    private static final int SELECTED_TEXT = 0xFFFFFFFF;    // Opaque white text
-    private static final int UNSELECTED_TEXT = 0xFF999999;  // Opaque gray text
-    //?}
+    private static final int SELECTED_BG = 0xFF4E6078;
+    private static final int HOVER_BG = 0xFF444549;
+    private static final int SELECTED_BAR = 0xFF6F8FB0;
+    private static final int SELECTED_TEXT = 0xFFFFFFFF;
+    private static final int HOVER_TEXT = 0xFFCCCCCC;
+    private static final int UNSELECTED_TEXT = 0xFFB0B0B0;
+    private static final int ICON_SHADOW = 0xFF2A2A2A;
+    private static final int BAR_WIDTH = 2;
 
     public TabButton(int x, int y, int width, int height, Component label, boolean selected, OnPress onPress) {
         super(x, y, width, height, label, onPress, DEFAULT_NARRATION);
@@ -41,6 +44,11 @@ public class TabButton extends Button {
         return this.selected;
     }
 
+    /** The icon before the name, as rows of {@code '#'} and {@code '.'}. */
+    public void setIcon(String[] icon) {
+        this.icon = icon;
+    }
+
     @Override
     //? if <1.21.11 {
     public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
@@ -51,60 +59,37 @@ public class TabButton extends Button {
     protected void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTicks) {
         //?}
     //?}
-        // Determine colors based on selected state
-        int bgColor = this.selected ? SELECTED_BG : UNSELECTED_BG;
-        int outlineColor = this.selected ? SELECTED_OUTLINE : UNSELECTED_OUTLINE;
-        int textColor = this.selected ? SELECTED_TEXT : UNSELECTED_TEXT;
+        int x = this.getX();
+        int y = this.getY();
+        boolean hovered = !this.selected && this.isHovered();
+        if (this.selected) {
+            graphics.fill(x, y, x + this.width, y + this.height, SELECTED_BG);
+            graphics.fill(x, y, x + BAR_WIDTH, y + this.height, SELECTED_BAR);
+        } else if (hovered) {
+            graphics.fill(x, y, x + this.width, y + this.height, HOVER_BG);
+        }
+        int color = this.selected ? SELECTED_TEXT : hovered ? HOVER_TEXT : UNSELECTED_TEXT;
 
-        // Add hover effect for unselected tabs
-        if (!this.selected && this.isHovered()) {
-            bgColor = 0x80000000; // Slightly darker on hover
-            //? if <1.21.9 {
-            textColor = 0xFFCCCCCC;  // Slightly brighter opaque text on hover
-            //?} else {
-            textColor = 0xFFCCCCCC;  // Slightly brighter opaque text on hover
-            //?}
+        int textX = x + 8;
+        if (icon.length > 0) {
+            int iconY = y + (this.height - icon.length) / 2;
+            for (int pass = 0; pass < 2; pass++) {
+                int offset = pass == 0 ? 1 : 0;
+                for (int row = 0; row < icon.length; row++) {
+                    for (int column = 0; column < icon[row].length(); column++) {
+                        if (icon[row].charAt(column) == '#') {
+                            int px = textX + column + offset;
+                            int py = iconY + row + offset;
+                            graphics.fill(px, py, px + 1, py + 1, pass == 0 ? ICON_SHADOW : color);
+                        }
+                    }
+                }
+            }
+            textX += icon[0].length() + 5;
         }
 
-        // Draw tab background
-        graphics.fill(this.getX(), this.getY(),
-                     this.getX() + this.width,
-                     this.getY() + this.height,
-                     bgColor);
-
-        // Draw outline
-        // Top
-        graphics.fill(this.getX(), this.getY(),
-                     this.getX() + this.width, this.getY() + 1,
-                     outlineColor);
-        // Left
-        graphics.fill(this.getX(), this.getY(),
-                     this.getX() + 1, this.getY() + this.height,
-                     outlineColor);
-        // Right
-        graphics.fill(this.getX() + this.width - 1, this.getY(),
-                     this.getX() + this.width, this.getY() + this.height,
-                     outlineColor);
-
-        // For selected tab, don't draw bottom border (connects to content area)
-        if (!this.selected) {
-            graphics.fill(this.getX(), this.getY() + this.height - 1,
-                         this.getX() + this.width, this.getY() + this.height,
-                         outlineColor);
-        }
-
-        // Draw centered text
-        //? if <26.1 {
-        graphics.drawCenteredString(
-        //?} else {
-        graphics.centeredText(
-        //?}
-            net.minecraft.client.Minecraft.getInstance().font,
-            this.getMessage(),
-            this.getX() + this.width / 2,
-            this.getY() + (this.height - 8) / 2,
-            textColor
-        );
+        UiText.draw(graphics, net.minecraft.client.Minecraft.getInstance().font, this.getMessage(),
+                textX, y + (this.height - 8) / 2, color);
     }
 
     @Override

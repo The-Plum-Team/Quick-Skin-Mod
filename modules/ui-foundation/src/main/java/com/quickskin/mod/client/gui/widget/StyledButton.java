@@ -1,8 +1,11 @@
 package com.quickskin.mod.client.gui.widget;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.quickskin.mod.client.gui.util.UiText;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 //? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
 //?} else {
@@ -11,20 +14,34 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 
+/**
+ * Quick Skin's text button, like Confirm and the dialogs' buttons: a charcoal face inside a thin
+ * grey border and a black outline, on a darker lip that gives it depth. It lightens under the
+ * mouse and darkens while inactive. The label uses Minecraft's font with the icons' shadow.
+ */
 @Environment(EnvType.CLIENT)
 public class StyledButton extends Button {
-    // Styled button with frosted glass theme - matches the overall GUI aesthetic
-    private static final int NORMAL_BG = 0xB0000000;         // Dark semi-transparent background
-    private static final int HOVER_BG = 0xC0202020;          // Slightly lighter on hover
-    private static final int OUTLINE = 0x80FFFFFF;           // White outline
-    //? if <1.21.9 {
-    private static final int TEXT_COLOR = 0xFFFFFFFF;        // Opaque white text
-    //?} else {
-    private static final int TEXT_COLOR = 0xFFFFFFFF;        // Opaque white text
-    //?}
+    private static final int OUTLINE = 0xFF0E0E0F;
+    /** Height of the darker lip under the face. */
+    private static final int LIP_HEIGHT = 3;
+    private static final int LABEL_MARGIN = 6;
+    private static final int TEXT = 0xFFFFFFFF;
+    private static final int TEXT_DISABLED = 0xFF8A8A8A;
 
     public StyledButton(int x, int y, int width, int height, Component label, OnPress onPress) {
         super(x, y, width, height, label, onPress, DEFAULT_NARRATION);
+    }
+
+    protected int faceColor(boolean hovered) {
+        return hovered ? 0xFF4A4B4F : 0xFF3A3B3E;
+    }
+
+    protected int borderColor(boolean hovered) {
+        return hovered ? 0xFF8D8E93 : 0xFF6E6F73;
+    }
+
+    protected int lipColor() {
+        return 0xFF1C1D1F;
     }
 
     @Override
@@ -37,70 +54,34 @@ public class StyledButton extends Button {
     protected void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTicks) {
         //?}
     //?}
-        // Determine background color based on hover and active state
-        int bgColor = this.isHovered() && this.active ? HOVER_BG : NORMAL_BG;
+        boolean hovered = this.active && this.isHovered();
+        int x = this.getX();
+        int y = this.getY();
+        int right = x + this.width;
+        int bottom = y + this.height;
+        graphics.fill(x, y, right, bottom, OUTLINE);
+        graphics.fill(x + 1, bottom - 1 - LIP_HEIGHT, right - 1, bottom - 1, this.active ? lipColor() : 0xFF161617);
+        graphics.fill(x + 1, y + 1, right - 1, bottom - 1 - LIP_HEIGHT, this.active ? borderColor(hovered) : 0xFF46474A);
+        graphics.fill(x + 2, y + 2, right - 2, bottom - 2 - LIP_HEIGHT, this.active ? faceColor(hovered) : 0xFF2B2C2E);
 
-        // Dim the button if not active
-        if (!this.active) {
-            bgColor = 0x80000000; // More transparent when disabled
+        Font font = Minecraft.getInstance().font;
+        String label = this.getMessage().getString();
+        int room = this.width - 2 * LABEL_MARGIN;
+        if (font.width(label) > room) {
+            label = font.plainSubstrByWidth(label, Math.max(0, room - font.width("..."))) + "...";
         }
-
-        // Draw button background
-        graphics.fill(this.getX(), this.getY(),
-                     this.getX() + this.width,
-                     this.getY() + this.height,
-                     bgColor);
-
-        // Draw outline
-        int outlineColor = this.active ? OUTLINE : 0x40FFFFFF;
-
-        // Top
-        graphics.fill(this.getX(), this.getY(),
-                     this.getX() + this.width, this.getY() + 1,
-                     outlineColor);
-        // Bottom
-        graphics.fill(this.getX(), this.getY() + this.height - 1,
-                     this.getX() + this.width, this.getY() + this.height,
-                     outlineColor);
-        // Left
-        graphics.fill(this.getX(), this.getY(),
-                     this.getX() + 1, this.getY() + this.height,
-                     outlineColor);
-        // Right
-        graphics.fill(this.getX() + this.width - 1, this.getY(),
-                     this.getX() + this.width, this.getY() + this.height,
-                     outlineColor);
-
-        // Draw centered text
-        //? if <1.21.9 {
-        int textColor = this.active ? TEXT_COLOR : 0xFF666666;
-        //?} else {
-        int textColor = this.active ? TEXT_COLOR : 0xFF666666;
-        //?}
-        //? if <26.1 {
-        graphics.drawCenteredString(
-        //?} else {
-        graphics.centeredText(
-        //?}
-            net.minecraft.client.Minecraft.getInstance().font,
-            this.getMessage(),
-            this.getX() + this.width / 2,
-            this.getY() + (this.height - 8) / 2,
-            textColor
-        );
+        int faceHeight = this.height - LIP_HEIGHT;
+        UiText.drawCentered(graphics, font, label, x + this.width / 2, y + (faceHeight - 8) / 2,
+                this.active ? TEXT : TEXT_DISABLED);
     }
 
     @Override
     //? if <1.21.9 {
     protected boolean isValidClickButton(int button) {
+        return button == InputConstants.MOUSE_BUTTON_LEFT;
     //?} else {
     protected boolean isValidClickButton(net.minecraft.client.input.MouseButtonInfo buttonInfo) {
-    //?}
-        // Only allow left-click
-        //? if <1.21.9 {
-        return button == InputConstants.MOUSE_BUTTON_LEFT;
-        //?} else {
         return buttonInfo.button() == InputConstants.MOUSE_BUTTON_LEFT;
-        //?}
+    //?}
     }
 }

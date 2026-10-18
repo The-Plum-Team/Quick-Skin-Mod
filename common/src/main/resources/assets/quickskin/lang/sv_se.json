@@ -38,6 +38,8 @@
   "quickskin.tooltip.sorting": "Sortering: %s",
   "quickskin.tooltip.view_list": "Visa som lista",
   "quickskin.tooltip.view_grid": "Visa som rutnät",
+  "quickskin.screen.delete_many.title": "Ta bort skins?",
+  "quickskin.dialog.confirm_delete_many": "Vill du verkligen ta bort %s skins?",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Nyaste först",

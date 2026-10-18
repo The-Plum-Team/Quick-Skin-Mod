@@ -38,6 +38,8 @@
   "quickskin.tooltip.sorting": "Sorting: %s",
   "quickskin.tooltip.view_list": "Show as a list",
   "quickskin.tooltip.view_grid": "Show as a grid",
+  "quickskin.screen.delete_many.title": "Delete Skins?",
+  "quickskin.dialog.confirm_delete_many": "Are you sure you want to delete %s skins?",
 
   "_comment_sort": "=== Sort Modes ===",
   "quickskin.sort.latest_first": "Latest First",
