@@ -92,6 +92,35 @@ class WebpPackagingTest(unittest.TestCase):
                 with self.assertRaises(verify_release.VerificationError):
                     self.verify("forge", entries)
 
+    def test_any_loader_accepts_the_relocated_self_contained_decoder(self) -> None:
+        relocated = {
+            verify_release.WEBP_READER_CLASS: b"class",
+            "META-INF/licenses/TwelveMonkeys-LICENSE.txt": b"license",
+            "META-INF/MANIFEST.MF": b"",
+            "com/quickskin/mod/QuickSkin.class": b"class",
+            "assets/quickskin/lang/en_us.json": b"{}",
+        }
+        for loader in ("fabric", "forge", "neoforge"):
+            with self.subTest(loader=loader):
+                self.verify(loader, relocated)
+
+    def test_the_relocated_layout_must_hold_only_quick_skin_packages(self) -> None:
+        base = {
+            verify_release.WEBP_READER_CLASS: b"class",
+            "META-INF/licenses/TwelveMonkeys-LICENSE.txt": b"license",
+        }
+        broken = {
+            "upstream package": {**base, "com/twelvemonkeys/imageio/Spi.class": b"class"},
+            "nested jar": {**base, "META-INF/jarjar/webp.jar": b"jar"},
+            "global service": {**base, "META-INF/services/javax.imageio.spi.ImageReaderSpi": b""},
+            "native library": {**base, "com/quickskin/native/libwebp.so": b""},
+            "missing license": {verify_release.WEBP_READER_CLASS: b"class"},
+        }
+        for label, entries in broken.items():
+            with self.subTest(label=label):
+                with self.assertRaises(verify_release.VerificationError):
+                    self.verify("neoforge", entries)
+
 
 if __name__ == "__main__":
     unittest.main()
