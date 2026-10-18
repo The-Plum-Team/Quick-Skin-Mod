@@ -848,6 +848,18 @@
       "impact": "propagate"
     },
     {
+    {
+      "id": "uploaded-skin-adoption",
+      "api": "skin-upload",
+      "providers": [
+        "skin-import"
+      ],
+      "consumers": [
+        "skin-upload"
+      ],
+      "composition": "common",
+      "impact": "propagate"
+    },
       "id": "gif-decoder",
       "api": "image-core",
       "providers": [

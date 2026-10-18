@@ -28,6 +28,24 @@ public class MojangSkinUploader {
     private static final String UPLOAD_URL = "https://api.minecraftservices.com/minecraft/profile/skins";
     static final int MAX_SKIN_BYTES = (int) SafeImageReader.MAX_ENCODED_BYTES;
     static final int MAX_ERROR_BODY_BYTES = 64 * 1024;
+    static final int MAX_PROFILE_BODY_BYTES = 64 * 1024;
+
+    /**
+     * Told about every skin Mojang accepted, with the address of the texture Mojang keeps for it
+     * and its model ("slim" or "default"). Mojang may retouch an uploaded skin (it filled the
+     * fully transparent faces of one skin's left arm and leg from the right ones), so the
+     * listener can fetch the skin other players actually see.
+     */
+    public interface UploadListener {
+        void skinUploaded(String textureUrl, String model, AssetMetadata uploaded);
+    }
+
+    private static volatile UploadListener uploadListener;
+
+    /** Installed by the client composition root. */
+    public static void setUploadListener(UploadListener listener) {
+        uploadListener = listener;
+    }
 
     public static class UploadResult {
         public final boolean success;
@@ -101,6 +119,7 @@ public class MojangSkinUploader {
             int responseCode = connection.getResponseCode();
 
             if (responseCode == 200) {
+                notifyUploaded(connection, metadata);
                 return new UploadResult(true, Component.translatable("quickskin.error.upload_success").getString(), responseCode);
             } else if (responseCode == 400) {
                 String error = readErrorStream(connection);
@@ -123,6 +142,50 @@ public class MojangSkinUploader {
                 connection.disconnect();
             }
         }
+    }
+
+    /** Passes the active skin of Mojang's reply to the listener; a reply it cannot read is skipped. */
+    private static void notifyUploaded(HttpURLConnection connection, AssetMetadata metadata) {
+        UploadListener listener = uploadListener;
+        if (listener == null) return;
+        try (InputStream body = connection.getInputStream()) {
+            String[] active = activeSkin(BoundedFileReader.readBytes(body, MAX_PROFILE_BODY_BYTES));
+            if (active != null) {
+                listener.skinUploaded(active[0], active[1], metadata);
+            }
+        } catch (IOException | RuntimeException unreadable) {
+            com.quickskin.mod.platform.QuickSkinInfo.LOGGER.warn(
+                    "Could not read the skin Mojang kept after the upload: {}", unreadable.toString());
+        }
+    }
+
+    /**
+     * The address and model ("slim" or "default") of the active skin in Mojang's profile reply,
+     * or null when it lists none.
+     */
+    static String[] activeSkin(byte[] body) {
+        com.google.gson.JsonElement root = com.google.gson.JsonParser.parseString(
+                new String(body, StandardCharsets.UTF_8));
+        if (!root.isJsonObject() || !root.getAsJsonObject().has("skins")
+                || !root.getAsJsonObject().get("skins").isJsonArray()) {
+            return null;
+        }
+        for (com.google.gson.JsonElement entry : root.getAsJsonObject().getAsJsonArray("skins")) {
+            if (!entry.isJsonObject()) continue;
+            com.google.gson.JsonObject skin = entry.getAsJsonObject();
+            if (!"ACTIVE".equals(string(skin, "state"))) continue;
+            String url = string(skin, "url");
+            if (url == null || url.isEmpty() || url.length() > 512) return null;
+            String model = "slim".equalsIgnoreCase(string(skin, "variant")) ? "slim" : "default";
+            return new String[] {url, model};
+        }
+        return null;
+    }
+
+    private static String string(com.google.gson.JsonObject object, String key) {
+        com.google.gson.JsonElement value = object.get(key);
+        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()
+                ? value.getAsString() : null;
     }
 
     static byte[] readSkinData(Path path) throws IOException {
