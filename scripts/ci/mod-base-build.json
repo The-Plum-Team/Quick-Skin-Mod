@@ -52,7 +52,7 @@
       },
       {
         "path": "scripts/release/verify_release.py",
-        "sha256": "3a0c0681c2193b112ebd3c490fac3af2b65fffffcfae3a31a7fa5e2d3fb582d0"
+        "sha256": "efc7fd70699dfb112bfccef5ce67cfb284392d5ecd15acd6ac5d807c2fe00e42"
       }
     ],
     "path": "scripts/ci/mod_base_build_adapter.py",

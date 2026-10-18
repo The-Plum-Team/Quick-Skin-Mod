@@ -49,11 +49,18 @@ checksum change, never by relaxing the mode: see
   `release/release-matrix.json`. `e2e/packaged_runtime.py` also resolves from this file the exact
   primary SHA-256 it pins for each packaged-runtime download.
 - `gradle/dependency-locks/` strictly locks only `shadowBundle`, the external graph physically
-  embedded in each release JAR. Fabric merges it into the mod JAR; Forge and NeoForge nest each
-  library unmodified under `META-INF/jarjar/`, because FML loads the mod JAR as one Java module
-  and a merged library would collide with another mod's copy. Locking Loom's generated
-  configurations is deliberately avoided; their external inputs remain pinned by
-  coordinate-specific verification metadata.
+  embedded in each release JAR. Locking Loom's generated configurations is deliberately avoided;
+  their external inputs remain pinned by coordinate-specific verification metadata.
+- A release JAR holds only Quick Skin's own packages. FML loads a mod JAR as one Java module, and
+  the game stops at startup when two modules export the same package, so a library kept under its
+  upstream package collides with every other mod that ships it, whether merged or nested as its
+  own module. `gradle/bundled-library-conventions.gradle.kts` relocates every `shadowBundle`
+  library below `com.quickskin.mod.shadow`, leaves out its global ImageIO service registrations
+  and Maven metadata, and adds its license from `licenses/` under `META-INF/licenses/`. A bundled
+  library must therefore be pure Java: a JNI binding cannot be relocated, because its native
+  symbols name the original classes. `scripts/release/verify_release.py` rejects a production JAR
+  with any class or resource directory outside Quick Skin's namespaces, a nested JAR, a native
+  library, a `META-INF/services` registration or a module descriptor.
 - `scripts/release/generate_sbom.py` converts that exact per-lane embedded graph into one
   deterministic CycloneDX document. Every production JAR is represented by its staged hashes and
   depends only on coordinates present in its strict lock; every listed library carries the exact
@@ -168,7 +175,9 @@ all resolved (`<minecraft>` is a matrix `artifact_version`):
 ```
 
 Add `--write-locks` only when a shaded `shadowBundle` dependency changed (see
-[gradle/dependency-locks/README.md](gradle/dependency-locks/README.md)). Writing metadata adds
+[gradle/dependency-locks/README.md](gradle/dependency-locks/README.md)); a new bundled library also
+needs its relocation in `gradle/bundled-library-conventions.gradle.kts` and its license in
+`licenses/`. Writing metadata adds
 entries but never removes them, and it is a maintainer action: CI and release automation never run
 it. Gradle also rewrites the whole file in its own order and may raise the schema version, which
 buries the new values in a reordering diff. Commit only the added or changed entries in the

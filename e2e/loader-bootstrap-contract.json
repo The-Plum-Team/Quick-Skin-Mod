@@ -21,8 +21,8 @@
     }
   },
   "build_scripts": {
-    "fabric": "82f326727deec969fa8280d337613c6ad065f6cdef707a43cc8d8e39e88c8025",
-    "forge": "401d55e59677944419a2c9a58fcfd2fc435c91dd21d3ea0a3f87fb66a85b8c16",
-    "neoforge": "5d2f2c9460c28b2d0eac9fb275d4e1fb25252d2f642fe9eb9d0a797b3531b01a"
+    "fabric": "7ccdba7161e50ccb08f81415f742d4e231843f2c08ed23db9589fae0e1863a12",
+    "forge": "55626a219345f16f8a95f41e50f2603643780a378c43d0b562e5718beeda4048",
+    "neoforge": "2514927ba9c664c35d0a55b07dbe60682c018dfc4a4e9512fac83dbf0b07a02c"
   }
 }
