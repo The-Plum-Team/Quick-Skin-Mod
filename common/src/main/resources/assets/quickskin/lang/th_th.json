@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": "หากจะนำเข้าไฟล์ .cpmmodel ต้องมีม็อด Customizable Player Models",
   "quickskin.error.cpm_select_failed": "สวมโมเดล CPM นี้ไม่ได้ ตรวจดูว่า Customizable Player Models ทำงานอยู่",
   "quickskin.error.import_failed": "นำเข้าไฟล์นี้เป็นสกินไม่ได้ ตรวจดูว่าเป็นภาพ PNG, WebP หรือ JPG ที่เปิดได้ปกติ",
-  "quickskin.error.delete_own_skin": "ลบสกินของบัญชีคุณไม่ได้: Quick Skin เก็บไว้ในรายการเสมอ",
+  "quickskin.error.delete_own_skin": "ลบสกินของบัญชีคุณไม่ได้ ตราบใดที่เป็นสกินเดียวในรายการ",
   "quickskin.error.delete_failed": "ลบ \"%s\" ไม่ได้ ตรวจดูว่าไฟล์ไม่ได้เปิดอยู่ในโปรแกรมอื่น",
   "quickskin.error.rename_exists": "มีสกินชื่อนี้อยู่แล้ว เลือกชื่ออื่น",
   "quickskin.error.rename_invalid": "ชื่อว่างหรือมีอักขระที่ใช้ในชื่อไฟล์ไม่ได้ เช่น / \\ : * ? \" < > |",

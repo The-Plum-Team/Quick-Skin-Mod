@@ -530,7 +530,7 @@ REAL_SELECT = feature_evidence.select
 def whole_scenario_select(contract: Any, graph: Any, paths: Any, profile: str) -> Any:
     """The hud-preview selection, re-capturing every capture of each scenario it runs.
 
-    Today's only selective module (``hud-preview``) re-captures 2 of the 63 ``full`` checkpoints,
+    Today's only selective module (``hud-preview``) re-captures 2 of the 64 ``full`` checkpoints,
     so its composed lanes mix both epochs (``test_partially_recaptured_lane_passes_r3``); this
     whole-scenario variant exercises the other shape, lanes wholly from the selected generation."""
 
@@ -665,7 +665,7 @@ class ComposedEvidenceTest(unittest.TestCase):
         self.assertIn("compose", self.host.calls)
 
     def test_partially_recaptured_lane_passes_r3(self) -> None:
-        """Quick Skin's real selection re-captures individual checkpoints (hud-preview: 2 of the 63
+        """Quick Skin's real selection re-captures individual checkpoints (hud-preview: 2 of the 64
         ``full`` captures). Each such lane is the selected execution's record and keeps the
         baseline execution of its older frames as ``baseline_run``; every frame keeps the run and
         JAR its pixels came from, and R3 re-verified both epochs."""

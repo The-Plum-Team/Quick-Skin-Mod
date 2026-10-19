@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": "Щоб імпортувати файли .cpmmodel, потрібен мод Customizable Player Models",
   "quickskin.error.cpm_select_failed": "Не вдалося вдягнути цю модель CPM. Перевірте, чи працює Customizable Player Models",
   "quickskin.error.import_failed": "Не вдалося імпортувати цей файл як скін. Перевірте, що це зображення PNG, WebP або JPG, яке нормально відкривається",
-  "quickskin.error.delete_own_skin": "Скін вашого акаунта не можна видалити: Quick Skin завжди тримає його в списку",
+  "quickskin.error.delete_own_skin": "Скін твого облікового запису не можна видалити, поки він єдиний у списку",
   "quickskin.error.delete_failed": "Не вдалося видалити «%s». Перевірте, чи не відкритий файл в іншій програмі",
   "quickskin.error.rename_exists": "Скін з такою назвою вже є. Виберіть іншу",
   "quickskin.error.rename_invalid": "Назва порожня або містить символи, неприпустимі в назві файлу, як-от / \\ : * ? \" < > |",

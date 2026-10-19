@@ -29,7 +29,7 @@ class E2EReadmeTest(unittest.TestCase):
         for artifact in self.matrix["artifacts"]:
             self.assertIn(f"`{artifact['artifact_node']}`", rendered)
         self.assertIn("`concurrent-two-client`", rendered)
-        self.assertIn("Contract totals: `128` ordered steps, `97` captures.", rendered)
+        self.assertIn("Contract totals: `129` ordered steps, `98` captures.", rendered)
         self.assertIn("| `server-policy` | `pr`, `release` |", rendered)
         self.assertIn("| `session` | `pr`, `release` |", rendered)
         self.assertIn("| Scenario | Profiles | Orchestration |", rendered)

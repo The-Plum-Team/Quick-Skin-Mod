@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": "Do importowania plików .cpmmodel potrzebny jest mod Customizable Player Models",
   "quickskin.error.cpm_select_failed": "Nie udało się założyć tego modelu CPM. Sprawdź, czy Customizable Player Models działa",
   "quickskin.error.import_failed": "Nie udało się zaimportować tego pliku jako skórki. Sprawdź, czy to obraz PNG, WebP lub JPG, który się poprawnie otwiera",
-  "quickskin.error.delete_own_skin": "Skórki twojego konta nie można usunąć: Quick Skin zawsze trzyma ją na liście",
+  "quickskin.error.delete_own_skin": "Nie można usunąć skina twojego konta, dopóki jest jedynym skinem na liście",
   "quickskin.error.delete_failed": "Nie udało się usunąć „%s”. Sprawdź, czy plik nie jest otwarty w innym programie",
   "quickskin.error.rename_exists": "Jest już skórka o tej nazwie. Wybierz inną",
   "quickskin.error.rename_invalid": "Nazwa jest pusta albo ma znaki niedozwolone w nazwie pliku, takie jak / \\ : * ? \" < > |",

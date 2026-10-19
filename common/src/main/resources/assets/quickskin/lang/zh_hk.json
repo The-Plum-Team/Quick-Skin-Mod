@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": "匯入 .cpmmodel 檔案需要 Customizable Player Models 模組",
   "quickskin.error.cpm_select_failed": "無法穿上這個 CPM 模型。請確認 Customizable Player Models 是否正常運作",
   "quickskin.error.import_failed": "無法將此檔案匯入為外觀。請確認它是能正常開啟的 PNG、WebP 或 JPG 圖片",
-  "quickskin.error.delete_own_skin": "無法刪除你帳號的外觀：Quick Skin 會一直把它留在清單裡",
+  "quickskin.error.delete_own_skin": "當列表中只有你帳戶的皮膚時，無法刪除它",
   "quickskin.error.delete_failed": "無法刪除「%s」。請確認檔案沒有在其他程式中開啟",
   "quickskin.error.rename_exists": "已經有同名的外觀了。請換一個名稱",
   "quickskin.error.rename_invalid": "名稱是空的，或含有檔名不能使用的字元，例如 / \\ : * ? \" < > |",

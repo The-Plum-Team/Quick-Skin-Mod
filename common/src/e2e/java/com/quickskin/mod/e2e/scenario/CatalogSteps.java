@@ -410,14 +410,14 @@ final class CatalogSteps {
                             + " entries, importer task idle); entries=" + describeEntries(list));
                 }));
 
-        // 2g. deleting the own skin is refused with a toast -----------------------------------
-        steps.add(Step.of("catalog_delete_protected")
+        // 2g. deleting the own skin while another skin is listed hides it --------------------
+        steps.add(Step.of("catalog_hide_own_skin")
                 .action(() -> {
                     setupFailure.set(null);
                     protectedDeleteConfirmed.set(false);
                     PlayerSkinMenuScreen screen = openMenu(mc);
                     if (screen == null) {
-                        setupFailure.set("skin menu not open before protected delete: "
+                        setupFailure.set("skin menu not open before hiding the own skin: "
                                 + FullScenario.screenName(mc));
                         return;
                     }
@@ -432,59 +432,58 @@ final class CatalogSteps {
                         return;
                     }
                     screen.showDeleteConfirmation(own);
-                    E2ELog.info("catalog_delete_protected: opened DeletionConfirmScreen for own skin");
+                    E2ELog.info("catalog_hide_own_skin: opened DeletionConfirmScreen for own skin");
                 })
                 .minTicks(10)
                 .ready(() -> {
                     if (setupFailure.get() != null) return true;
                     if (confirmDeleteDialog(mc, protectedDeleteConfirmed)) return false;
                     PlayerSkinMenuScreen screen = openMenu(mc);
-                    return screen != null
+                    SkinListWidget list = screen == null ? null : listWidget(screen);
+                    return list != null
                             && protectedDeleteConfirmed.get()
-                            && !toasts(screen).isEmpty()
+                            && indexOf(list, owner.skinHash) < 0
                             && menuLayoutStable(mc);
                 })
-                // Short: the toast lives 3000 ms and the capture must land while it is drawn.
-                .settleTicks(6)
+                .settleTicks(10)
                 .timeoutTicks(300)
-                .screenshot(prefix + "full_02g_catalog_delete_protected" + suffix)
+                .screenshot(prefix + "full_02g_catalog_hide_own_skin" + suffix)
                 .assertion(() -> {
                     String failure = setupFailure.get();
                     if (failure != null) return Step.Result.fail(failure);
                     PlayerSkinMenuScreen screen = openMenu(mc);
                     if (screen == null) {
-                        return Step.Result.fail("skin menu not open after refused delete: "
+                        return Step.Result.fail("skin menu not open after hiding the own skin: "
                                 + FullScenario.screenName(mc));
                     }
-                    List<?> toasts = toasts(screen);
-                    if (toasts.isEmpty()) return Step.Result.fail("no error toast is visible");
-                    String expected = Component.translatable(OWN_SKIN_ERROR_KEY).getString();
-                    String actual = toastText(toasts.get(0));
-                    if (!expected.equals(actual)) {
-                        return Step.Result.fail("toast text is '" + actual + "', expected '"
-                                + expected + "'");
+                    ClientConfig config = ClientConfig.getInstance();
+                    if (!config.playerOwnSkinHidden) {
+                        return Step.Result.fail("the own skin is not recorded as hidden");
                     }
                     LocalAssetManager assets = LocalAssetManager.getInstance();
                     AssetMetadata own = assets.getMetadata(owner.skinHash);
-                    if (own == null) return Step.Result.fail("own skin was deleted despite protection");
+                    if (own == null) return Step.Result.fail("the hidden own skin was deleted from the catalog");
                     if (own.path() == null || !Files.exists(own.path())) {
-                        return Step.Result.fail("own skin file is gone: " + own.path());
+                        return Step.Result.fail("the hidden own skin's file is gone: " + own.path());
+                    }
+                    if (!isPlayerOwnSkin(own)) {
+                        return Step.Result.fail("the hidden skin is no longer the own skin");
                     }
                     SkinListWidget list = listWidget(screen);
                     if (list == null) return Step.Result.fail("skin list widget not built");
-                    if (indexOf(list, owner.skinHash) != 0) {
-                        return Step.Result.fail("own skin no longer pinned first: "
-                                + describeEntries(list));
+                    if (indexOf(list, owner.skinHash) >= 0) {
+                        return Step.Result.fail("the hidden own skin is still listed: " + describeEntries(list));
                     }
-                    SkinEntry selected = list.getSelected();
-                    if (selected == null || !own.hash().equals(selected.getMetadata().hash())) {
-                        return Step.Result.fail("own skin is not the selected row: "
-                                + (selected == null ? "<none>" : selected.getMetadata().hash()));
+                    if (indexOf(list, owner.externalSkinHash) < 0) {
+                        return Step.Result.fail("the external skin left the list too: " + describeEntries(list));
                     }
-                    return Step.Result.pass("real Delete confirmation on the own skin was refused: "
-                            + toasts.size() + " toast(s), first reads '" + actual + "'; own skin "
+                    if (!toasts(screen).isEmpty()) {
+                        return Step.Result.fail("hiding the own skin showed a toast: '"
+                                + toastText(toasts(screen).get(0)) + "'");
+                    }
+                    return Step.Result.pass("real Delete confirmation on the own skin hid it: "
                             + own.hash() + " still catalogued at " + own.path().getFileName()
-                            + ", pinned first and selected; entries=" + describeEntries(list));
+                            + ", playerOwnSkinHidden=true, not listed; entries=" + describeEntries(list));
                 }));
 
         // 2h. real deletion of the renamed external skin ---------------------------------------
@@ -527,76 +526,166 @@ final class CatalogSteps {
                 .timeoutTicks(400)
                 .screenshot(prefix + "full_02h_catalog_delete" + suffix)
                 .assertion(() -> {
+                    String failure = setupFailure.get();
+                    if (failure != null) return Step.Result.fail(failure);
+                    PlayerSkinMenuScreen screen = openMenu(mc);
+                    if (screen == null) {
+                        return Step.Result.fail("skin menu not open after delete: "
+                                + FullScenario.screenName(mc));
+                    }
+                    LocalAssetManager assets = LocalAssetManager.getInstance();
+                    String externalPrimary = externalPrimaryBeforeDelete.get();
+                    if (assets.getMetadata(owner.externalSkinHash) != null
+                            || (externalPrimary != null && assets.getMetadata(externalPrimary) != null)) {
+                        return Step.Result.fail("external skin " + externalPrimary + " (alias "
+                                + owner.externalSkinHash + ") is still catalogued");
+                    }
+                    Path skinsDirectory = assets.getSkinsDirectory();
+                    if (skinsDirectory == null) return Step.Result.fail("skins directory is null");
+                    Path leftover = findFileStartingWith(skinsDirectory, RENAMED_NAME);
+                    if (leftover != null) {
+                        return Step.Result.fail("deleted skin file still on disk: " + leftover);
+                    }
+                    if (Files.exists(skinsDirectory.resolve(DROPPED_FILE_NAME))) {
+                        return Step.Result.fail(DROPPED_FILE_NAME + " reappeared on disk");
+                    }
+                    AssetMetadata own = assets.getMetadata(owner.skinHash);
+                    if (own == null || own.path() == null || !Files.exists(own.path())) {
+                        return Step.Result.fail("own skin is missing after deleting the other one");
+                    }
+                    if (ClientConfig.getInstance().playerOwnSkinHidden) {
+                        return Step.Result.fail("the own skin is still recorded as hidden with no other skin left");
+                    }
+                    SkinListWidget list = listWidget(screen);
+                    if (list == null) return Step.Result.fail("skin list widget not built");
+                    int count = list.children().size();
+                    if (count != 1) {
+                        return Step.Result.fail("expected exactly one remaining entry, found "
+                                + count + ": " + describeEntries(list));
+                    }
+                    SkinEntry only = list.children().get(0);
+                    if (!own.hash().equals(only.getMetadata().hash())) {
+                        return Step.Result.fail("remaining entry is not the own skin " + own.hash()
+                                + ": " + describeEntries(list));
+                    }
+                    if (externalPrimary != null && indexOf(list, externalPrimary) >= 0) {
+                        return Step.Result.fail("deleted skin is still listed: " + describeEntries(list));
+                    }
+                    if (!isPlayerOwnSkin(only.getMetadata())) {
+                        return Step.Result.fail("remaining entry lost its own-skin protection");
+                    }
+                    SkinEntry selected = list.getSelected();
+                    if (selected == null || !own.hash().equals(selected.getMetadata().hash())) {
+                        return Step.Result.fail("own skin is not the selected row after delete: "
+                                + (selected == null ? "<none>" : selected.getMetadata().hash()));
+                    }
+                    Object tile = FullScenario.screenField(screen, "importTile");
+                    if (!(tile instanceof Button importTile) || !importTile.visible) {
+                        return Step.Result.fail("the skin column's import tile is not built");
+                    }
+                    // The tile closes the skin column, below the grid however few skins it holds.
+                    int listBottom = list.getY() + list.getHeight();
+                    if (importTile.getY() < listBottom) {
+                        return Step.Result.fail("import tile at y=" + importTile.getY()
+                                + " overlaps the skin grid (grid ends at y=" + listBottom + ")");
+                    }
+                    if (!toasts(screen).isEmpty()) {
+                        return Step.Result.fail("an error toast is still visible: '"
+                                + toastText(toasts(screen).get(0)) + "'");
+                    }
+                    return Step.Result.pass("real Delete confirmation removed '" + RENAMED_NAME
+                            + "' (" + externalPrimary + ", alias " + owner.externalSkinHash
+                            + "): metadata null, no " + RENAMED_NAME + "* file in uploads/skins; "
+                            + "the hidden own skin " + own.hash() + " is back as the only entry, "
+                            + "selected, no longer hidden, with the import tile below the grid; "
+                            + "no toast visible");
+                }));
+
+        // 2i. deleting the own skin while it is the only skin is refused with a toast -----
+        steps.add(Step.of("catalog_delete_protected")
+                .action(() -> {
+                    setupFailure.set(null);
+                    protectedDeleteConfirmed.set(false);
+                    PlayerSkinMenuScreen screen = openMenu(mc);
+                    if (screen == null) {
+                        setupFailure.set("skin menu not open before protected delete: "
+                                + FullScenario.screenName(mc));
+                        return;
+                    }
+                    AssetMetadata own = LocalAssetManager.getInstance().getMetadata(owner.skinHash);
+                    if (own == null) {
+                        setupFailure.set("own skin " + owner.skinHash + " is not catalogued");
+                        return;
+                    }
+                    if (!isPlayerOwnSkin(own)) {
+                        setupFailure.set("plaid skin " + own.hash() + " is not flagged as the own skin "
+                                + "(playerOwnSkinHash=" + ClientConfig.getInstance().playerOwnSkinHash + ")");
+                        return;
+                    }
+                    SkinListWidget list = listWidget(screen);
+                    if (list == null || list.children().size() != 1) {
+                        setupFailure.set("the own skin is not the only listed skin: "
+                                + (list == null ? "<no list>" : describeEntries(list)));
+                        return;
+                    }
+                    screen.showDeleteConfirmation(own);
+                    E2ELog.info("catalog_delete_protected: opened DeletionConfirmScreen for the only skin, the own skin");
+                })
+                .minTicks(10)
+                .ready(() -> {
+                    if (setupFailure.get() != null) return true;
+                    if (confirmDeleteDialog(mc, protectedDeleteConfirmed)) return false;
+                    PlayerSkinMenuScreen screen = openMenu(mc);
+                    return screen != null
+                            && protectedDeleteConfirmed.get()
+                            && !toasts(screen).isEmpty()
+                            && menuLayoutStable(mc);
+                })
+                // Short: the toast lives 3000 ms and the capture must land while it is drawn.
+                .settleTicks(6)
+                .timeoutTicks(300)
+                .screenshot(prefix + "full_02i_catalog_delete_protected" + suffix)
+                .assertion(() -> {
                     try {
                         String failure = setupFailure.get();
                         if (failure != null) return Step.Result.fail(failure);
                         PlayerSkinMenuScreen screen = openMenu(mc);
                         if (screen == null) {
-                            return Step.Result.fail("skin menu not open after delete: "
+                            return Step.Result.fail("skin menu not open after refused delete: "
                                     + FullScenario.screenName(mc));
                         }
+                        List<?> toasts = toasts(screen);
+                        if (toasts.isEmpty()) return Step.Result.fail("no error toast is visible");
+                        String expected = Component.translatable(OWN_SKIN_ERROR_KEY).getString();
+                        String actual = toastText(toasts.get(0));
+                        if (!expected.equals(actual)) {
+                            return Step.Result.fail("toast text is '" + actual + "', expected '"
+                                    + expected + "'");
+                        }
                         LocalAssetManager assets = LocalAssetManager.getInstance();
-                        String externalPrimary = externalPrimaryBeforeDelete.get();
-                        if (assets.getMetadata(owner.externalSkinHash) != null
-                                || (externalPrimary != null && assets.getMetadata(externalPrimary) != null)) {
-                            return Step.Result.fail("external skin " + externalPrimary + " (alias "
-                                    + owner.externalSkinHash + ") is still catalogued");
-                        }
-                        Path skinsDirectory = assets.getSkinsDirectory();
-                        if (skinsDirectory == null) return Step.Result.fail("skins directory is null");
-                        Path leftover = findFileStartingWith(skinsDirectory, RENAMED_NAME);
-                        if (leftover != null) {
-                            return Step.Result.fail("deleted skin file still on disk: " + leftover);
-                        }
-                        if (Files.exists(skinsDirectory.resolve(DROPPED_FILE_NAME))) {
-                            return Step.Result.fail(DROPPED_FILE_NAME + " reappeared on disk");
-                        }
                         AssetMetadata own = assets.getMetadata(owner.skinHash);
-                        if (own == null || own.path() == null || !Files.exists(own.path())) {
-                            return Step.Result.fail("own skin is missing after deleting the other one");
+                        if (own == null) return Step.Result.fail("own skin was deleted despite protection");
+                        if (own.path() == null || !Files.exists(own.path())) {
+                            return Step.Result.fail("own skin file is gone: " + own.path());
                         }
                         SkinListWidget list = listWidget(screen);
                         if (list == null) return Step.Result.fail("skin list widget not built");
-                        int count = list.children().size();
-                        if (count != 1) {
-                            return Step.Result.fail("expected exactly one remaining entry, found "
-                                    + count + ": " + describeEntries(list));
-                        }
-                        SkinEntry only = list.children().get(0);
-                        if (!own.hash().equals(only.getMetadata().hash())) {
-                            return Step.Result.fail("remaining entry is not the own skin " + own.hash()
-                                    + ": " + describeEntries(list));
-                        }
-                        if (externalPrimary != null && indexOf(list, externalPrimary) >= 0) {
-                            return Step.Result.fail("deleted skin is still listed: " + describeEntries(list));
-                        }
-                        if (!isPlayerOwnSkin(only.getMetadata())) {
-                            return Step.Result.fail("remaining entry lost its own-skin protection");
+                        if (indexOf(list, owner.skinHash) != 0) {
+                            return Step.Result.fail("own skin no longer pinned first: "
+                                    + describeEntries(list));
                         }
                         SkinEntry selected = list.getSelected();
                         if (selected == null || !own.hash().equals(selected.getMetadata().hash())) {
-                            return Step.Result.fail("own skin is not the selected row after delete: "
+                            return Step.Result.fail("own skin is not the selected row: "
                                     + (selected == null ? "<none>" : selected.getMetadata().hash()));
                         }
-                        Object tile = FullScenario.screenField(screen, "importTile");
-                        if (!(tile instanceof Button importTile) || !importTile.visible) {
-                            return Step.Result.fail("the skin column's import tile is not built");
+                        if (ClientConfig.getInstance().playerOwnSkinHidden) {
+                            return Step.Result.fail("the refused own skin was recorded as hidden");
                         }
-                        // The tile closes the skin column, below the grid however few skins it holds.
-                        int listBottom = list.getY() + list.getHeight();
-                        if (importTile.getY() < listBottom) {
-                            return Step.Result.fail("import tile at y=" + importTile.getY()
-                                    + " overlaps the skin grid (grid ends at y=" + listBottom + ")");
-                        }
-                        if (!toasts(screen).isEmpty()) {
-                            return Step.Result.fail("an error toast is still visible: '"
-                                    + toastText(toasts(screen).get(0)) + "'");
-                        }
-                        return Step.Result.pass("real Delete confirmation removed '" + RENAMED_NAME
-                                + "' (" + externalPrimary + ", alias " + owner.externalSkinHash
-                                + "): metadata null, no " + RENAMED_NAME + "* file in uploads/skins; "
-                                + "list has exactly 1 entry (protected own skin " + own.hash()
-                                + ", selected) with the import tile below the grid; no toast visible");
+                        return Step.Result.pass("real Delete confirmation on the only skin, the own skin, was "
+                                + "refused: " + toasts.size() + " toast(s), first reads '" + actual
+                                + "'; own skin " + own.hash() + " still catalogued at " + own.path().getFileName()
+                                + ", listed, not hidden and selected; entries=" + describeEntries(list));
                     } finally {
                         // Later steps expect the defaults: no own-skin protection, LATEST_LAST
                         // sort, and the plaid skin persisted as the active one (primary form, as
@@ -604,12 +693,14 @@ final class CatalogSteps {
                         ClientConfig config = ClientConfig.getInstance();
                         config.enablePlayerOwnSkinSystem = false;
                         config.playerOwnSkinHash = "";
+                        config.playerOwnSkinHidden = false;
                         String plaid = primaryOrAlias(owner.skinHash);
                         if (plaid != null) config.activeSkinHash = plaid;
                         config.save();
                         config.setSkinSortMode(SkinSortMode.LATEST_LAST);
                     }
                 }));
+
 
         return steps;
     }

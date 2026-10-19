@@ -104,7 +104,8 @@ public class ClientConfig {
     @Deprecated // Now using per-skin model preferences stored in skin-preferences.json
     public String activeModelType = "auto"; // "auto", "classic", "slim" (deprecated - kept for compatibility)
     public String activeCapeHash = ""; // Active cape hash
-    public String playerOwnSkinHash = ""; // Hash of the player's own Mojang skin (protected from deletion)
+    public String playerOwnSkinHash = ""; // Hash of the player's own Mojang skin (never deleted, only hidden)
+    public boolean playerOwnSkinHidden = false; // The own skin is left out of the skin list while other skins are listed
     public String playerOwnSkinTexture = ""; // Mojang texture address the own skin was downloaded from
     public String playerOwnSkinAccount = ""; // Launcher account that playerOwnSkinHash was downloaded for
     public AccountSkinPreferences accountSkins = new AccountSkinPreferences(); // Skin selection per launcher account
@@ -380,6 +381,7 @@ public class ClientConfig {
             playerOwnSkinTexture = "";
         }
         if (!AccountSkinPreferences.isKey(playerOwnSkinAccount)) playerOwnSkinAccount = "";
+        if (playerOwnSkinHash.isEmpty()) playerOwnSkinHidden = false;
         if (accountSkins == null) accountSkins = new AccountSkinPreferences();
         accountSkins.normalize();
     }
