@@ -173,7 +173,18 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
         )
         self.assertIn("? E2E_FIXED_ANIMATION_TIME_MS", source)
         self.assertIn(": System.currentTimeMillis()", source)
-        self.assertIn("DETERMINISTIC_E2E_RENDER ? 1.0f : 0.15f", source)
+        # The preview poses are functions of a clock that E2E holds still, and E2E always shows
+        # the calm idle rather than a randomly picked one.
+        self.assertRegex(
+            source,
+            r"private static double previewSeconds\(\) \{\s*"
+            r"return DETERMINISTIC_E2E_RENDER\s*\?\s*E2E_FIXED_ANIMATION_TIME_MS / 1000\.0\s*:",
+        )
+        self.assertRegex(
+            source,
+            r"DETERMINISTIC_E2E_RENDER\s*\?\s*PreviewLoops\.idle\(PreviewLoops\.Idle\.CALM, seconds\)"
+            r"\s*:\s*playerData\.idlePose\(seconds\)",
+        )
 
     def test_preview_pins_the_previous_tick_rotation_for_the_draw(self) -> None:
         source = PLAYER.read_text(encoding="utf-8")
