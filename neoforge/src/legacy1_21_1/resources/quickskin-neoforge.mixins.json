@@ -10,7 +10,8 @@
     "CapeLayerMixin",
     "PlayerRendererMixin",
     "SkinManagerMixin",
-    "PreviewEquipmentMixin"
+    "PreviewEquipmentMixin",
+    "PreviewSkinSwapPoseMixin"
   ],
   "mixins": [
   ],

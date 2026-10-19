@@ -692,6 +692,51 @@ public class PlayerModelRenderer {
             int mouseY,
             boolean followMouse
     ) {
+        // The skin menu's model makes a short move when another skin is picked. Its turn applies
+        // here and its bones where the model is posed; its lift and scale are kept fractional, so
+        // the model glides instead of stepping a pixel or a scale unit at a time. Packaged E2E pins
+        // every preview pose, so the move never plays there.
+        SkinSwapAnimation.Pose swap = DETERMINISTIC_E2E_RENDER
+                ? SkinSwapAnimation.Pose.REST
+                : playerData.advanceSkinSwap(System.nanoTime());
+        float turnedRotation = yRotation + swap.get(SkinSwapAnimation.Whole.TURN);
+//? if <1.21.6 {
+        // Lift and scale about the feet through the GUI pose, which every draw below inherits.
+        // The draw is inline, so the model's pose hook finds the move for exactly this call.
+        float swapScale = swap.get(SkinSwapAnimation.Whole.SCALE);
+        PoseStack guiPose = graphics.pose();
+        guiPose.pushPose();
+        guiPose.translate((double) x, y - swap.get(SkinSwapAnimation.Whole.LIFT) * scale, 0.0);
+        guiPose.scale(swapScale, swapScale, swapScale);
+        guiPose.translate((double) -x, (double) -y, 0.0);
+        SkinSwapPoser.beginInline(swap);
+        try {
+            renderPosedPlayerModel(graphics, x, y, scale, turnedRotation, playerData, mouseX, mouseY, followMouse);
+        } finally {
+            SkinSwapPoser.endInline();
+            guiPose.popPose();
+        }
+//?} else {
+        // The picture-in-picture draws below take the lift and scale from the preview data.
+        renderPosedPlayerModel(graphics, x, y, scale, turnedRotation, playerData, mouseX, mouseY, followMouse);
+//?}
+    }
+
+    private static void renderPosedPlayerModel(
+//? if <26.1 {
+            GuiGraphics graphics,
+//?} else {
+            GuiGraphicsExtractor graphics,
+//?}
+            int x,
+            int y,
+            float scale,
+            float yRotation,
+            PreviewPlayerData playerData,
+            int mouseX,
+            int mouseY,
+            boolean followMouse
+    ) {
         if (playerData.getSkinLocation() == null) {
             return; // No skin to render
         }
@@ -915,13 +960,18 @@ public class PlayerModelRenderer {
             // The picture-in-picture pass renders this state after the frame is extracted, so the
             // preview cape is keyed by the state itself and released by the cape layer that reads it.
             bindPreviewCape(renderState, playerData);
+            // The skin-change move is keyed the same way, for the model's pose hook.
+            SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
+            SkinSwapPoser.bind(renderState, swap);
 
-            // Compute offset: center entity vertically (bbHeight/2 + small offset)
-            org.joml.Vector3f offset = new org.joml.Vector3f(0, renderState.boundingBoxHeight / 2.0f + 0.0625f, 0);
+            // Compute offset: center entity vertically (bbHeight/2 + small offset). A positive
+            // offset moves the model down the box, so the move's lift is taken off it.
+            org.joml.Vector3f offset = new org.joml.Vector3f(0, renderState.boundingBoxHeight / 2.0f + 0.0625f
+                    - swap.get(SkinSwapAnimation.Whole.LIFT), 0);
 
             graphics.submitEntityRenderState(
                     renderState,
-                    (float)(int) scale,
+                    (float)(int) scale * swap.get(SkinSwapAnimation.Whole.SCALE),
                     offset,
 //?} else if <26.2 {
             ensureModelsLoaded();
@@ -959,13 +1009,18 @@ public class PlayerModelRenderer {
             // The picture-in-picture pass renders this state after the frame is extracted, so the
             // preview cape is keyed by the state itself and released by the cape layer that reads it.
             bindPreviewCape(renderState, playerData);
+            // The skin-change move is keyed the same way, for the model's pose hook.
+            SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
+            SkinSwapPoser.bind(renderState, swap);
 
-            // Compute offset: center entity vertically (bbHeight/2 + small offset)
-            org.joml.Vector3f offset = new org.joml.Vector3f(0, renderState.boundingBoxHeight / 2.0f + 0.0625f, 0);
+            // Compute offset: center entity vertically (bbHeight/2 + small offset). A positive
+            // offset moves the model down the box, so the move's lift is taken off it.
+            org.joml.Vector3f offset = new org.joml.Vector3f(0, renderState.boundingBoxHeight / 2.0f + 0.0625f
+                    - swap.get(SkinSwapAnimation.Whole.LIFT), 0);
 
             graphics.entity(
                     renderState,
-                    (float)(int) scale,
+                    (float)(int) scale * swap.get(SkinSwapAnimation.Whole.SCALE),
                     offset,
 //?} else {
             // 1.21.11: renderEntityInInventory removed. We call submitEntityRenderState directly
@@ -1002,13 +1057,18 @@ public class PlayerModelRenderer {
             // The picture-in-picture pass renders this state after the frame is extracted, so the
             // preview cape is keyed by the state itself and released by the cape layer that reads it.
             bindPreviewCape(renderState, playerData);
+            // The skin-change move is keyed the same way, for the model's pose hook.
+            SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
+            SkinSwapPoser.bind(renderState, swap);
 
-            // Compute offset: center entity vertically (bbHeight/2 + small offset)
-            org.joml.Vector3f offset = new org.joml.Vector3f(0, renderState.boundingBoxHeight / 2.0f + 0.0625f, 0);
+            // Compute offset: center entity vertically (bbHeight/2 + small offset). A positive
+            // offset moves the model down the box, so the move's lift is taken off it.
+            org.joml.Vector3f offset = new org.joml.Vector3f(0, renderState.boundingBoxHeight / 2.0f + 0.0625f
+                    - swap.get(SkinSwapAnimation.Whole.LIFT), 0);
 
             graphics.entity(
                     renderState,
-                    (float)(int) scale,
+                    (float)(int) scale * swap.get(SkinSwapAnimation.Whole.SCALE),
                     offset,
 //?}
                     quaternionXZ,
@@ -1346,6 +1406,10 @@ public class PlayerModelRenderer {
         // Submit to PiP system - cape rendering injected by GuiSkinRendererMixin
         int boxHeight = (int)(scale * 2.3f);
         int boxHalfWidth = (int)(scale * 1.0f);
+        // The skin-change move's scale and lift; the box sits on whole GUI pixels.
+        SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
+        float swapScale = swap.get(SkinSwapAnimation.Whole.SCALE);
+        y -= Math.round(swap.get(SkinSwapAnimation.Whole.LIFT) * scale);
 //?}
 
 //? if <1.21 {
@@ -1358,7 +1422,7 @@ public class PlayerModelRenderer {
         // Lighting.setupFor3DItems();
         Lighting.setupFor3DItems();
 //?} else if <26.1 {
-        float submittedScale = (float)(int) scale + scaleNudge;
+        float submittedScale = (float)(int) scale * swapScale + scaleNudge;
         float submittedRotationY = -45.0f + yRotation;
         graphics.submitSkinRenderState(
                 model,
@@ -1377,7 +1441,7 @@ public class PlayerModelRenderer {
                 x + boxHalfWidth, y, submittedScale, capeTexture, capeModel,
                 playerData.isElytraPreview() ? elytraModel : null);
 //?} else if <26.2 {
-        float submittedScale = (float)(int) scale + scaleNudge;
+        float submittedScale = (float)(int) scale * swapScale + scaleNudge;
         float submittedRotationY = -45.0f + yRotation;
         graphics.skin(
                 model,
@@ -1401,7 +1465,7 @@ public class PlayerModelRenderer {
         graphics.skin(
                 renderModel,
                 playerData.getSkinLocation(),
-                (float)(int) scale + scaleNudge,
+                (float)(int) scale * swapScale + scaleNudge,
                 0.0f,
                 -45.0f + yRotation,
                 -1.0625f,
@@ -2115,9 +2179,12 @@ public class PlayerModelRenderer {
             animation = "idle";
         }
 
-        // CHECK: Should we update animation this frame? (30 FPS instead of 60+)
+        // CHECK: Should we update animation this frame? (30 FPS instead of 60+, except while the
+        // skin-change move plays, which would stutter at that rate)
+        SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
         long now = animationTimeMillis();
         boolean shouldUpdate = DETERMINISTIC_E2E_RENDER
+                || !swap.isRest()
                 || (now - lastAnimationUpdate) >= ANIMATION_UPDATE_INTERVAL_MS;
 
         if (!shouldUpdate) {
@@ -2141,6 +2208,9 @@ public class PlayerModelRenderer {
         if (!DETERMINISTIC_E2E_RENDER) {
             lastAnimationUpdate = now;
         }
+
+        // The idle poses below leave the parts' pivots alone, so put back those a move shifted.
+        SkinSwapPoser.restore(model);
 
         // Get elapsed time using Minecraft's tick counter
 //? if <26.2 {
@@ -2174,6 +2244,11 @@ public class PlayerModelRenderer {
                     setupIdlePose(model, t, lerpFactor);
                 }
                 break;
+        }
+
+        // The skin-change move, on top of the animation's own pose.
+        if (!swap.isRest()) {
+            SkinSwapPoser.apply(model, swap);
         }
 
 //? if <1.21.2 {

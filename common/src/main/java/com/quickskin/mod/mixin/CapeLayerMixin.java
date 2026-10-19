@@ -155,6 +155,10 @@ import com.quickskin.mod.platform.CapeRenderTypes;
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.PreviewCapeBindings;
+//? if <1.21.6 {
+import com.quickskin.mod.client.rendering.SkinSwapAnimation;
+import com.quickskin.mod.client.rendering.SkinSwapPoser;
+//?}
 import com.quickskin.mod.client.services.CapeAnimationHelper;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.util.TextureAlphaDetector;
@@ -441,6 +445,11 @@ public class CapeLayerMixin {
         // Replicate the vanilla cape rendering logic with our custom render type
 //? if <1.21.6 {
         poseStack.pushPose();
+        // A preview's skin-change move bends the body; the cape hangs from it.
+        SkinSwapAnimation.Pose skinSwap = SkinSwapPoser.poseFor(player);
+        if (skinSwap != null) {
+            SkinSwapPoser.transformCape(poseStack, skinSwap);
+        }
         poseStack.translate(0.0D, 0.0D, 0.125D);
         double d0 = Mth.lerp(partialTicks, player.xCloakO, player.xCloak) - Mth.lerp(partialTicks, player.xo, player.getX());
         double d1 = Mth.lerp(partialTicks, player.yCloakO, player.yCloak) - Mth.lerp(partialTicks, player.yo, player.getY());
