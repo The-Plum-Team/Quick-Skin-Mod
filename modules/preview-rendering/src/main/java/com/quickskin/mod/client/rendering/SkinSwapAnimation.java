@@ -144,6 +144,34 @@ public final class SkinSwapAnimation {
             return values;
         }
 
+        /** {@code amount} of the way from one pose to another, channel by channel. */
+        static Pose mix(Pose from, Pose to, float amount) {
+            float[] values = new float[CHANNELS];
+            for (int channel = 0; channel < CHANNELS; channel++) {
+                values[channel] = from.values[channel] + (to.values[channel] - from.values[channel]) * amount;
+            }
+            return new Pose(values);
+        }
+
+        /** A pose built channel by channel, from rest: for the preview's looping poses. */
+        static final class Builder {
+            private final float[] values = restValues();
+
+            Builder set(Bone bone, Axis axis, float value) {
+                values[index(bone, axis)] = value;
+                return this;
+            }
+
+            Builder add(Bone bone, Axis axis, float value) {
+                values[index(bone, axis)] += value;
+                return this;
+            }
+
+            Pose build() {
+                return new Pose(values.clone());
+            }
+        }
+
         @Override
         public String toString() {
             StringBuilder text = new StringBuilder("Pose[");
