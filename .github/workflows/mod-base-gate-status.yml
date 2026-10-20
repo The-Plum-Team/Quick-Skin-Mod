@@ -423,7 +423,7 @@ jobs:
       actions: read
       contents: read
       pull-requests: read
-    uses: The-Plum-Team/mod-base/.github/workflows/gate-status.yml@acb01ca4f625a5d27f1c1a709a416d9725bef64f # v1.7.0
+    uses: The-Plum-Team/mod-base/.github/workflows/gate-status.yml@d938d8bc404aec629e925ba57d8a4f4a8ada9f07 # v1.7.1
     with:
       kit-sha: ${{ needs.guard.outputs.kit-sha }}
       pr-number: ${{ needs.locate.outputs.pr-number }}
