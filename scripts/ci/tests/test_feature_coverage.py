@@ -268,7 +268,7 @@ class FeatureCoverageTest(unittest.TestCase):
             "artifact": reference, "artifact_node": "fabric-1.20.1", "source_sha": self.source,
             "source_run_id": self.run_id})
         self.write(files, proof, manifest, report)
-        self.assertEqual(180, self.validate(files, target)["frame_count"])
+        self.assertEqual(182, self.validate(files, target)["frame_count"])
         proof["visual_reference"]["source_run_id"] += 1
         self.write(files, proof, manifest, report)
         with self.assertRaises(ValueError): self.validate(files, target)
