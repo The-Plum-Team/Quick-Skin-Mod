@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "या 'स्किन इम्पोर्ट करें' पर क्लिक करें",
   "quickskin.dropzone.skins.click": "या आयात करने के लिए क्लिक करें",
   "quickskin.dropzone.capes.main": "केप फ़ाइलें यहां ड्रॉप करें",
-  "quickskin.dropzone.capes.sub": "या 'केप इम्पोर्ट करें' पर क्लिक करें",
+  "quickskin.dropzone.capes.click": "या आयात करने के लिए क्लिक करें",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "क्या आप वाकई \"%s\" को डिलीट करना चाहते हैं?",
@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": ".cpmmodel फ़ाइलें आयात करने के लिए Customizable Player Models मॉड चाहिए",
   "quickskin.error.cpm_select_failed": "यह CPM मॉडल पहना नहीं जा सका। जाँचें कि Customizable Player Models काम कर रहा है",
   "quickskin.error.import_failed": "यह फ़ाइल स्किन के रूप में आयात नहीं हो सकी। जाँचें कि यह ठीक से खुलने वाली PNG, WebP या JPG छवि है",
-  "quickskin.error.delete_own_skin": "आपके खाते की स्किन हटाई नहीं जा सकती: Quick Skin इसे हमेशा सूची में रखता है",
+  "quickskin.error.delete_own_skin": "आपके खाते की स्किन तब तक हटाई नहीं जा सकती जब तक वह सूची में अकेली स्किन है",
   "quickskin.error.delete_failed": "\"%s\" हटाई नहीं जा सकी। जाँचें कि फ़ाइल किसी दूसरे प्रोग्राम में खुली तो नहीं है",
   "quickskin.error.rename_exists": "इस नाम की स्किन पहले से है। कोई दूसरा नाम चुनें",
   "quickskin.error.rename_invalid": "नाम खाली है या उसमें ऐसे अक्षर हैं जो फ़ाइल नाम में नहीं हो सकते, जैसे / \\ : * ? \" < > |",

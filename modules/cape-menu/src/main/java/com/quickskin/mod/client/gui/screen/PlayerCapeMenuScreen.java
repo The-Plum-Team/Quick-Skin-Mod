@@ -49,6 +49,7 @@ import com.quickskin.mod.common.util.SafeImageReader;
 //?}
 import com.quickskin.mod.common.util.UserFacingIOException;
 import com.quickskin.mod.client.gui.widget.ErrorToast;
+import com.quickskin.mod.client.gui.widget.ImportZone;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -161,6 +162,9 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     private double scrollbarClickOffset = 0.0;
     private int totalContentHeight = 0;
     private int gridX, gridY, gridWidth, gridHeight;
+    /** Where the last frame drew the My Capes import zone; a click there opens the file dialog. */
+    private boolean importZoneShown;
+    private int importZoneX, importZoneY, importZoneWidth, importZoneHeight;
     private int bottomButtonY;
     private static final int STATUS_BAND_FRAME = 5;
     private static final int STATUS_BAND_MARGIN = 2;
@@ -1206,6 +1210,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     private void renderCapeGrid(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
 //?}
         int currentY = gridY - (int) scrollOffset;
+        importZoneShown = false;
 
         // --- SECTION 1: MY CAPES ---
         if (!localCapes.isEmpty()) {
@@ -1253,7 +1258,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             renderCapeEntry(graphics, cape, x, y, mouseX, mouseY);
         }
 
-        // For "My Capes", if the first row isn't full, render a drop zone in the remaining space
+        // For "My Capes", if the first row isn't full, the rest of it is the import zone
         if (isLocalSection && capes.size() < capesPerRow) {
             int col = capes.size() % capesPerRow;
             int dropZoneX = gridX + capePadding + col * (capeDisplaySize + capePadding);
@@ -1263,6 +1268,11 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
             if (dropZoneWidth > capePadding) {
                 renderDropZone(graphics, dropZoneX, dropZoneY, dropZoneWidth, dropZoneHeight, mouseX, mouseY);
+                importZoneShown = true;
+                importZoneX = dropZoneX;
+                importZoneY = dropZoneY;
+                importZoneWidth = dropZoneWidth;
+                importZoneHeight = dropZoneHeight;
             }
         }
 
@@ -1270,6 +1280,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         return currentY + rows * (capeDisplaySize + capePadding);
     }
 
+    /** The import zone, drawn as the skin menu's: it lightens under the mouse inside the grid. */
 //? if <26.1 {
     private void renderDropZone(GuiGraphics graphics, int x, int y, int width, int height, int mouseX, int mouseY) {
 //?} else {
@@ -1277,77 +1288,9 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
         boolean isHovering = isMouseOver(mouseX, mouseY, x, y, width, height) &&
                 mouseY >= gridY && mouseY < gridY + gridHeight;
-
-        int bgColor = isHovering ? 0x2AFFFFFF : 0x1AFFFFFF;
-        graphics.fill(x, y, x + width, y + height, bgColor);
-
-        // Draw dashed border
-        drawDashedBorder(graphics, x, y, width, height, isHovering);
-
-        // Draw text
-        int centerX = x + width / 2;
-        int centerY = y + height / 2;
-        Component mainMessage = Component.translatable("quickskin.dropzone.capes.main");
-        Component subMessage = Component.translatable("quickskin.dropzone.capes.sub");
-
-//? if <1.21.9 {
-        int mainColor = isHovering ? 0xFFFFFFFF : 0xFFE0E0E0;
-        int subColor = isHovering ? 0xFFB0B0B0 : 0xFF909090;
-//?} else {
-        int mainColor = isHovering ? 0xFFFFFFFF : 0xFFE0E0E0;
-        int subColor = isHovering ? 0xFFB0B0B0 : 0xFF909090;
-//?}
-
-        if (height > font.lineHeight * 2.5 && width > font.width(subMessage)) {
-//? if <26.1 {
-            graphics.drawCenteredString(this.font, mainMessage, centerX, centerY - font.lineHeight / 2 - 1, mainColor);
-            graphics.drawCenteredString(this.font, subMessage, centerX, centerY + font.lineHeight / 2 + 1, subColor);
-//?} else {
-            graphics.centeredText(this.font, mainMessage, centerX, centerY - font.lineHeight / 2 - 1, mainColor);
-            graphics.centeredText(this.font, subMessage, centerX, centerY + font.lineHeight / 2 + 1, subColor);
-//?}
-        } else if (width > font.width(mainMessage)) {
-//? if <26.1 {
-            graphics.drawCenteredString(this.font, mainMessage, centerX, centerY - font.lineHeight / 2, mainColor);
-//?} else {
-            graphics.centeredText(this.font, mainMessage, centerX, centerY - font.lineHeight / 2, mainColor);
-//?}
-        }
-    }
-
-//? if <26.1 {
-    private void drawDashedBorder(GuiGraphics graphics, int x, int y, int width, int height, boolean highlight) {
-//?} else {
-    private void drawDashedBorder(GuiGraphicsExtractor graphics, int x, int y, int width, int height, boolean highlight) {
-//?}
-        int color = highlight ? 0xFFFFFFFF : 0x80FFFFFF;
-        int dashLength = 8;
-        int gapLength = 4;
-        int totalLength = dashLength + gapLength;
-
-        // Top border
-        for (int i = 0; i < width; i += totalLength) {
-            int segmentLength = Math.min(dashLength, width - i);
-            graphics.fill(x + i, y, x + i + segmentLength, y + 1, color);
-        }
-
-        // Bottom border
-        for (int i = 0; i < width; i += totalLength) {
-            int segmentLength = Math.min(dashLength, width - i);
-            graphics.fill(x + i, y + height - 1, x + i + segmentLength, y + height, color);
-        }
-
-        // Left border
-        for (int i = 0; i < height; i += totalLength) {
-            int segmentLength = Math.min(dashLength, height - i);
-            graphics.fill(x, y + i, x + 1, y + i + segmentLength, color);
-        }
-
-        // Right border
-        for (int i = 0; i < height; i += totalLength) {
-            int segmentLength = Math.min(dashLength, height - i);
-            graphics.fill(x + width - 1, y + i, x + width, y + i + segmentLength, color);
-        }
+        ImportZone.draw(graphics, this.font, x, y, width, height,
+                Component.translatable("quickskin.dropzone.capes.main"),
+                Component.translatable("quickskin.dropzone.capes.click"), isHovering);
     }
 
 //? if <26.1 {
@@ -1674,6 +1617,19 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                 }
                 return true;
             }
+        }
+
+        // The import zone opens the file dialog, as the Import Cape button does
+        if (button == InputConstants.MOUSE_BUTTON_LEFT && importZoneShown
+                && isMouseOverGrid((int) mouseX, (int) mouseY)
+                && isMouseOver((int) mouseX, (int) mouseY, importZoneX, importZoneY, importZoneWidth, importZoneHeight)) {
+            if (minecraft != null && minecraft.getSoundManager() != null) {
+                minecraft.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                    net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.value(), 1.0f
+                ));
+            }
+            importCape();
+            return true;
         }
 
         // Handle cape selection

@@ -9,6 +9,38 @@
     900
   ],
   "review_regions": {
+    "feature-navigation.client_a.cape_menu_settings_return": [
+      [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ]
+    ],
+    "feature-navigation.client_a.open_skin_menu_using_key": [
+      [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ]
+    ],
+    "feature-navigation.client_a.open_skin_menu_using_vanilla_button": [
+      [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ]
+    ],
+    "feature-navigation.client_a.skin_menu_settings_return": [
+      [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ]
+    ],
     "full.client_a.adjusted_bmo_cape": [
       [
         0.4,
@@ -371,6 +403,14 @@
         1.0
       ]
     ],
+    "full.client_a.catalog_hide_own_skin": [
+      [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ]
+    ],
     "full.client_a.catalog_own_skin": [
       [
         0.0,
@@ -433,6 +473,14 @@
         0.34,
         0.58,
         0.86
+      ]
+    ],
+    "full.client_a.hud_preview_disabled": [
+      [
+        0.82,
+        0.72,
+        0.96,
+        0.99
       ]
     ],
     "full.client_a.hud_preview_overlay": [
@@ -857,46 +905,6 @@
         0.0,
         0.75,
         0.25
-      ]
-    ],
-    "feature-navigation.client_a.open_skin_menu_using_key": [
-      [
-        0.0,
-        0.0,
-        1.0,
-        1.0
-      ]
-    ],
-    "feature-navigation.client_a.skin_menu_settings_return": [
-      [
-        0.0,
-        0.0,
-        1.0,
-        1.0
-      ]
-    ],
-    "feature-navigation.client_a.cape_menu_settings_return": [
-      [
-        0.0,
-        0.0,
-        1.0,
-        1.0
-      ]
-    ],
-    "feature-navigation.client_a.open_skin_menu_using_vanilla_button": [
-      [
-        0.0,
-        0.0,
-        1.0,
-        1.0
-      ]
-    ],
-    "full.client_a.hud_preview_disabled": [
-      [
-        0.82,
-        0.72,
-        0.96,
-        0.99
       ]
     ]
   },
@@ -1815,12 +1823,12 @@
               }
             },
             {
-              "id": "catalog_delete_protected",
+              "id": "catalog_hide_own_skin",
               "assertion_required": true,
               "capture": {
-                "title": "Own skin deletion refused",
-                "review_tier": "all",
-                "expectation": "An error toast with a red strip and cross icon, reading Cannot delete your own skin!, is visible in the bottom-right corner of the skin menu while the protected purple own-skin tile remains in the skin column.",
+                "title": "Own skin hidden",
+                "review_tier": "key",
+                "expectation": "After the real delete confirmation on the purple own-skin tile, the skin column no longer lists it and shows only the renamed external skin's tile; no toast is shown. That the own skin's file and catalogue entry are kept, only hidden, is proven by the runtime evidence.",
                 "probes": []
               },
               "requires": [
@@ -1830,6 +1838,7 @@
               "covers": {
                 "modules": [
                   "asset-catalog",
+                  "configuration",
                   "skin-menu"
                 ],
                 "bindings": []
@@ -1841,16 +1850,39 @@
               "capture": {
                 "title": "External skin deleted",
                 "review_tier": "key",
-                "expectation": "After the real delete confirmation, the renamed external skin's tile is gone; the skin column shows only the protected purple own-skin tile, with the import zone filling the column below it.",
+                "expectation": "After the real delete confirmation, the renamed external skin's tile is gone and the hidden own skin is back: the skin column shows only the purple own-skin tile, with the import zone filling the column below it.",
                 "probes": []
               },
               "requires": [
-                "catalog_delete_protected"
+                "catalog_hide_own_skin"
               ],
               "requires_captures": [],
               "covers": {
                 "modules": [
                   "asset-catalog",
+                  "configuration",
+                  "skin-menu"
+                ],
+                "bindings": []
+              }
+            },
+            {
+              "id": "catalog_delete_protected",
+              "assertion_required": true,
+              "capture": {
+                "title": "Own skin deletion refused",
+                "review_tier": "all",
+                "expectation": "An error toast with a red strip and cross icon, saying that the account's skin can't be deleted while it is the only skin in the list, is visible over the skin menu while the purple own-skin tile, the only skin, remains in the skin column.",
+                "probes": []
+              },
+              "requires": [
+                "catalog_delete"
+              ],
+              "requires_captures": [],
+              "covers": {
+                "modules": [
+                  "asset-catalog",
+                  "configuration",
                   "skin-menu"
                 ],
                 "bindings": []
@@ -2119,7 +2151,7 @@
               "capture": {
                 "title": "Cape menu",
                 "review_tier": "all",
-                "expectation": "The Quick Skin cape menu is open with readable My Capes and Default Capes section headings, the drop-zone instructions Drop cape files here or click 'Import Cape' beside the My Capes tiles, the grid of built-in cape tiles, a rear 3D player preview and the Import Cape, Remove Cape and Done buttons. A hover tooltip for the built-in tile under the resting mouse (such as BMO Cape) may be shown.",
+                "expectation": "The Quick Skin cape menu is open with readable My Capes and Default Capes section headings, the import zone beside the My Capes tiles (corner marks and a tray icon beside Drop cape files here / or click to import), the grid of built-in cape tiles, a rear 3D player preview and the Import Cape, Remove Cape and Done buttons. A hover tooltip for the built-in tile under the resting mouse (such as BMO Cape) may be shown.",
                 "probes": [
                   {
                     "kind": "required-gui-text",

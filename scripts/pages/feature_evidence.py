@@ -225,7 +225,7 @@ def compose(*, selected_root: Path, baseline_root: Path, output_root: Path, key:
     other frame from the baseline, each with the ``epoch`` and ``tested`` run (and that epoch's
     lane JAR) its pixels came from. A lane the selection re-tested is the selected generation's
     record; when the selection re-captured only some of its checkpoints (``hud-preview``
-    re-captures 2 of the 63 ``full`` ones), it also carries ``baseline_run``: the baseline lane's
+    re-captures 2 of the 64 ``full`` ones), it also carries ``baseline_run``: the baseline lane's
     ``profile``, ``status``, ``elapsed_s`` and ``jars`` its older frames were tested with. Every
     other lane is the baseline's record, and a comparison comes from the generation that holds its
     frames (it never spans two generations, because a selection always captures both partners).

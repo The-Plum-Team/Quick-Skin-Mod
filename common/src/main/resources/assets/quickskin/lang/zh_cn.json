@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "或点击导入皮肤",
   "quickskin.dropzone.skins.click": "或点击导入",
   "quickskin.dropzone.capes.main": "拖入披风文件",
-  "quickskin.dropzone.capes.sub": "或点击导入披风",
+  "quickskin.dropzone.capes.click": "或点击导入",
 
   "_comment_dialogs": "=== 对话框消息 ===",
   "quickskin.dialog.confirm_delete": "确定要删除「%s」吗？",
@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": "导入 .cpmmodel 文件需要 Customizable Player Models 模组",
   "quickskin.error.cpm_select_failed": "无法穿上这个 CPM 模型。请检查 Customizable Player Models 是否正常运行",
   "quickskin.error.import_failed": "无法将此文件导入为皮肤。请检查它是能正常打开的 PNG、WebP 或 JPG 图片",
-  "quickskin.error.delete_own_skin": "无法删除你账号的皮肤：Quick Skin 会一直把它留在列表里",
+  "quickskin.error.delete_own_skin": "当列表里只有你账号的皮肤时，无法删除它",
   "quickskin.error.delete_failed": "无法删除“%s”。请检查文件是否在其他程序中打开",
   "quickskin.error.rename_exists": "已经有同名的皮肤了。请换一个名字",
   "quickskin.error.rename_invalid": "名字为空，或含有文件名不能用的字符，例如 / \\ : * ? \" < > |",

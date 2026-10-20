@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "of klik op 'Skin importeren'",
   "quickskin.dropzone.skins.click": "of klik om te importeren",
   "quickskin.dropzone.capes.main": "Sleep capebestanden hier naartoe",
-  "quickskin.dropzone.capes.sub": "of klik op 'Cape importeren'",
+  "quickskin.dropzone.capes.click": "of klik om te importeren",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Weet je zeker dat je \"%s\" wilt verwijderen?",
@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": "Om .cpmmodel-bestanden te importeren heb je de mod Customizable Player Models nodig",
   "quickskin.error.cpm_select_failed": "Dit CPM-model kon niet worden aangetrokken. Controleer of Customizable Player Models werkt",
   "quickskin.error.import_failed": "Dit bestand kon niet als skin worden geïmporteerd. Controleer of het een PNG-, WebP- of JPG-afbeelding is die goed opent",
-  "quickskin.error.delete_own_skin": "De skin van je account kan niet worden verwijderd: Quick Skin houdt hem altijd in de lijst",
+  "quickskin.error.delete_own_skin": "De skin van je account kan niet worden verwijderd zolang het de enige skin in de lijst is",
   "quickskin.error.delete_failed": "\"%s\" kon niet worden verwijderd. Controleer of het bestand niet in een ander programma open staat",
   "quickskin.error.rename_exists": "Er is al een skin met die naam. Kies een andere",
   "quickskin.error.rename_invalid": "De naam is leeg of bevat tekens die niet in een bestandsnaam mogen, zoals / \\ : * ? \" < > |",

@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "or click 'Import Skin'",
   "quickskin.dropzone.skins.click": "or click to import",
   "quickskin.dropzone.capes.main": "Drop cape files here",
-  "quickskin.dropzone.capes.sub": "or click 'Import Cape'",
+  "quickskin.dropzone.capes.click": "or click to import",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Are you sure you want to delete \"%s\"?",
@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": "To import .cpmmodel files you need the Customizable Player Models mod",
   "quickskin.error.cpm_select_failed": "This CPM model couldn't be put on. Check that Customizable Player Models is working",
   "quickskin.error.import_failed": "This file couldn't be imported as a skin. Check that it's a PNG, WebP or JPG image that opens correctly",
-  "quickskin.error.delete_own_skin": "Your account's skin can't be deleted: Quick Skin always keeps it in the list",
+  "quickskin.error.delete_own_skin": "Your account's skin can't be deleted while it is the only skin in the list",
   "quickskin.error.delete_failed": "Couldn't delete \"%s\". Check that the file isn't open in another program",
   "quickskin.error.rename_exists": "There's already a skin with that name. Choose another one",
   "quickskin.error.rename_invalid": "The name is empty or has characters a file name can't have, like / \\ : * ? \" < > |",

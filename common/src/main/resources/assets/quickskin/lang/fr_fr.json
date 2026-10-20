@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "ou clique sur 'Importer un skin'",
   "quickskin.dropzone.skins.click": "ou clique pour importer",
   "quickskin.dropzone.capes.main": "Dépose des fichiers de cape ici",
-  "quickskin.dropzone.capes.sub": "ou clique sur 'Importer une cape'",
+  "quickskin.dropzone.capes.click": "ou clique pour importer",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Es-tu sûr de vouloir supprimer \"%s\" ?",
@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": "Pour importer des fichiers .cpmmodel, il te faut le mod Customizable Player Models",
   "quickskin.error.cpm_select_failed": "Ce modèle CPM n'a pas pu être porté. Vérifie que Customizable Player Models fonctionne",
   "quickskin.error.import_failed": "Ce fichier n'a pas pu être importé comme skin. Vérifie que c'est une image PNG, WebP ou JPG qui s'ouvre bien",
-  "quickskin.error.delete_own_skin": "Le skin de ton compte ne peut pas être supprimé : Quick Skin le garde toujours dans la liste",
+  "quickskin.error.delete_own_skin": "Le skin de ton compte ne peut pas être supprimé tant qu'il est le seul skin de la liste",
   "quickskin.error.delete_failed": "« %s » n'a pas pu être supprimé. Vérifie que le fichier n'est pas ouvert dans un autre programme",
   "quickskin.error.rename_exists": "Il y a déjà un skin avec ce nom. Choisis-en un autre",
   "quickskin.error.rename_invalid": "Le nom est vide ou contient des caractères interdits dans un nom de fichier, comme / \\ : * ? \" < > |",

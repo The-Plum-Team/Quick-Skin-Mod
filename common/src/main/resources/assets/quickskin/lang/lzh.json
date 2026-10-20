@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "或點入膚",
   "quickskin.dropzone.skins.click": "或擊以入之",
   "quickskin.dropzone.capes.main": "投披風檔於此",
-  "quickskin.dropzone.capes.sub": "或點入披風",
+  "quickskin.dropzone.capes.click": "或擊以入之",
 
   "_comment_dialogs": "=== 對話訊 ===",
   "quickskin.dialog.confirm_delete": "確刪「%s」乎？",
@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": "欲納 .cpmmodel 之檔，須 Customizable Player Models 之模組",
   "quickskin.error.cpm_select_failed": "此 CPM 之模不能衣。宜察 Customizable Player Models 之行",
   "quickskin.error.import_failed": "此檔不能納為皮。宜察其為可啟之 PNG、WebP、JPG 圖",
-  "quickskin.error.delete_own_skin": "汝帳之皮不可除：Quick Skin 恆存之於列",
+  "quickskin.error.delete_own_skin": "列中唯存爾賬之皮時，不可刪之",
   "quickskin.error.delete_failed": "「%s」不能除。宜察其檔未啟於他程式",
   "quickskin.error.rename_exists": "已有同名之皮。宜擇他名",
   "quickskin.error.rename_invalid": "名空，或含檔名不容之字，如 / \\ : * ? \" < > |",

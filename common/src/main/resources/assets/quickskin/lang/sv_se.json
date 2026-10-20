@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "eller klicka på 'Importera skin'",
   "quickskin.dropzone.skins.click": "eller klicka för att importera",
   "quickskin.dropzone.capes.main": "Släpp mantelfiler här",
-  "quickskin.dropzone.capes.sub": "eller klicka på 'Importera mantel'",
+  "quickskin.dropzone.capes.click": "eller klicka för att importera",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Är du säker på att du vill ta bort \"%s\"?",
@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": "För att importera .cpmmodel-filer behöver du moddet Customizable Player Models",
   "quickskin.error.cpm_select_failed": "Den här CPM-modellen kunde inte tas på. Kontrollera att Customizable Player Models fungerar",
   "quickskin.error.import_failed": "Filen kunde inte importeras som skin. Kontrollera att det är en PNG-, WebP- eller JPG-bild som går att öppna",
-  "quickskin.error.delete_own_skin": "Ditt kontos skin kan inte tas bort: Quick Skin behåller den alltid i listan",
+  "quickskin.error.delete_own_skin": "Ditt kontos skin kan inte tas bort så länge det är det enda skinnet i listan",
   "quickskin.error.delete_failed": "\"%s\" kunde inte tas bort. Kontrollera att filen inte är öppen i ett annat program",
   "quickskin.error.rename_exists": "Det finns redan en skin med det namnet. Välj ett annat",
   "quickskin.error.rename_invalid": "Namnet är tomt eller har tecken som inte får finnas i ett filnamn, som / \\ : * ? \" < > |",

@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "oder auf 'Skin importieren' klicken",
   "quickskin.dropzone.skins.click": "oder klicke zum Importieren",
   "quickskin.dropzone.capes.main": "Umhang-Dateien hier ablegen",
-  "quickskin.dropzone.capes.sub": "oder auf 'Umhang importieren' klicken",
+  "quickskin.dropzone.capes.click": "oder klicke zum Importieren",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Möchtest du \"%s\" wirklich löschen?",
@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": "Zum Importieren von .cpmmodel-Dateien brauchst du die Mod Customizable Player Models",
   "quickskin.error.cpm_select_failed": "Dieses CPM-Modell konnte nicht angelegt werden. Prüfe, ob Customizable Player Models funktioniert",
   "quickskin.error.import_failed": "Diese Datei konnte nicht als Skin importiert werden. Prüfe, ob sie ein PNG-, WebP- oder JPG-Bild ist, das sich öffnen lässt",
-  "quickskin.error.delete_own_skin": "Der Skin deines Kontos kann nicht gelöscht werden: Quick Skin behält ihn immer in der Liste",
+  "quickskin.error.delete_own_skin": "Der Skin deines Kontos kann nicht gelöscht werden, solange er der einzige Skin in der Liste ist",
   "quickskin.error.delete_failed": "„%s“ konnte nicht gelöscht werden. Prüfe, ob die Datei in einem anderen Programm geöffnet ist",
   "quickskin.error.rename_exists": "Es gibt schon einen Skin mit diesem Namen. Wähle einen anderen",
   "quickskin.error.rename_invalid": "Der Name ist leer oder enthält Zeichen, die in Dateinamen nicht erlaubt sind, wie / \\ : * ? \" < > |",

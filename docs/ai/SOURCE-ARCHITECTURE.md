@@ -94,7 +94,8 @@ report, even when that selection happens to contain all authored steps.
 `PlayerOwnSkinBootstrap` belongs to `skin-import`, including its bounded async startup task,
 closed-state guard, and persisted own-skin selection. It checks the account's Mojang texture on
 every start, recognising the listed own skin by that texture's address, and lists a new one as the
-own skin, which whoever wore the previous one then wears; the previous one stays in the list.
+own skin, which whoever wore the previous one then wears; the previous one stays in the list,
+and the new one is listed even when the player had hidden the previous one.
 `skin-upload` reports every accepted upload with the active texture of Mojang's reply
 (`MojangSkinUploader.UploadListener`), which `ClientFeatureBindings` hands to the bootstrap, since
 Mojang may retouch an uploaded skin (the `uploaded-skin-adoption` binding). `SavedAppearanceRestorer` belongs to
@@ -479,7 +480,7 @@ Quick Skin's sources below own the scenarios, the adapter and the review semanti
   generation, the authenticated selection). Both import the kit lazily, so modules that do not
   touch Pages need no kit. Every verified selection is handed off. `feature_evidence.compose`
   works per frame: a re-tested lane is the selected execution's record, and when the selection
-  re-captured only some of its checkpoints (the `hud-preview` selection re-captures 2 of the 63
+  re-captured only some of its checkpoints (the `hud-preview` selection re-captures 2 of the 64
   `full` ones) it also carries `baseline_run`, the baseline lane's `profile`, `status`,
   `elapsed_s` and `jars` its older frames were tested with. The kit's R3 re-verifies both epochs
   against their sources.

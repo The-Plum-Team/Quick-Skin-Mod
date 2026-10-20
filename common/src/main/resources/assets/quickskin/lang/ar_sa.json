@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "أو انقر على 'استيراد مظهر'",
   "quickskin.dropzone.skins.click": "أو انقر للاستيراد",
   "quickskin.dropzone.capes.main": "اسحب ملفات العباءة هنا",
-  "quickskin.dropzone.capes.sub": "أو انقر على 'استيراد عباءة'",
+  "quickskin.dropzone.capes.click": "أو انقر للاستيراد",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "هل أنت متأكد من حذف \"%s\"؟",
@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": "لاستيراد ملفات .cpmmodel تحتاج إلى تعديل Customizable Player Models",
   "quickskin.error.cpm_select_failed": "تعذّر ارتداء نموذج CPM هذا. تأكد أن Customizable Player Models يعمل",
   "quickskin.error.import_failed": "تعذّر استيراد هذا الملف كسكن. تأكد أنه صورة PNG أو WebP أو JPG تُفتح بشكل سليم",
-  "quickskin.error.delete_own_skin": "لا يمكن حذف سكن حسابك: يحتفظ به Quick Skin دائمًا في القائمة",
+  "quickskin.error.delete_own_skin": "لا يمكن حذف سكن حسابك ما دام السكن الوحيد في القائمة",
   "quickskin.error.delete_failed": "تعذّر حذف \"%s\". تأكد أن الملف غير مفتوح في برنامج آخر",
   "quickskin.error.rename_exists": "يوجد سكن بهذا الاسم بالفعل. اختر اسمًا آخر",
   "quickskin.error.rename_invalid": "الاسم فارغ أو فيه أحرف لا تُستخدم في أسماء الملفات، مثل / \\ : * ? \" < > |",

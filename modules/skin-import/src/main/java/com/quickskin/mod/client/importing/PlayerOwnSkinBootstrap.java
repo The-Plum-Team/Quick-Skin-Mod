@@ -79,6 +79,7 @@ public final class PlayerOwnSkinBootstrap {
             if (!config.playerOwnSkinAccount.isEmpty()) {
                 config.playerOwnSkinHash = "";
                 config.playerOwnSkinTexture = "";
+                config.playerOwnSkinHidden = false;
             }
             config.playerOwnSkinAccount = config.playerOwnSkinHash.isEmpty() ? "" : account;
         }
@@ -178,7 +179,11 @@ public final class PlayerOwnSkinBootstrap {
             }
 
             // Now that the skin is guaranteed to be in the asset manager, set its hash in the config.
-            // A previous own skin stays in the list as an ordinary skin.
+            // A previous own skin stays in the list as an ordinary skin, and a new own skin is
+            // listed even when the player had hidden the previous one.
+            if (!finalHash.equals(config.playerOwnSkinHash)) {
+                config.playerOwnSkinHidden = false;
+            }
             config.playerOwnSkinHash = finalHash;
             config.playerOwnSkinTexture = skinData.textureUrl;
             config.playerOwnSkinAccount = account != null ? account : "";

@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "atau klik 'Impor Skin'",
   "quickskin.dropzone.skins.click": "atau klik untuk mengimpor",
   "quickskin.dropzone.capes.main": "Letakkan file jubah di sini",
-  "quickskin.dropzone.capes.sub": "atau klik 'Impor Jubah'",
+  "quickskin.dropzone.capes.click": "atau klik untuk mengimpor",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Apakah Anda yakin ingin menghapus \"%s\"?",
@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": "Untuk mengimpor berkas .cpmmodel kamu perlu mod Customizable Player Models",
   "quickskin.error.cpm_select_failed": "Model CPM ini tidak bisa dipakai. Pastikan Customizable Player Models berjalan",
   "quickskin.error.import_failed": "Berkas ini tidak bisa diimpor sebagai skin. Pastikan itu gambar PNG, WebP, atau JPG yang bisa dibuka",
-  "quickskin.error.delete_own_skin": "Skin akunmu tidak bisa dihapus: Quick Skin selalu menyimpannya di daftar",
+  "quickskin.error.delete_own_skin": "Skin akunmu tidak bisa dihapus selama itu satu-satunya skin di daftar",
   "quickskin.error.delete_failed": "\"%s\" tidak bisa dihapus. Pastikan berkasnya tidak terbuka di program lain",
   "quickskin.error.rename_exists": "Sudah ada skin dengan nama itu. Pilih nama lain",
   "quickskin.error.rename_invalid": "Nama kosong atau berisi karakter yang tidak boleh ada di nama berkas, seperti / \\ : * ? \" < > |",

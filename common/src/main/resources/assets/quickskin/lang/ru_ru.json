@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "или нажмите 'Импортировать скин'",
   "quickskin.dropzone.skins.click": "или нажмите, чтобы импортировать",
   "quickskin.dropzone.capes.main": "Перетащите файлы плащей сюда",
-  "quickskin.dropzone.capes.sub": "или нажмите 'Импортировать плащ'",
+  "quickskin.dropzone.capes.click": "или нажмите, чтобы импортировать",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Вы уверены, что хотите удалить \"%s\"?",
@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": "Чтобы импортировать файлы .cpmmodel, нужен мод Customizable Player Models",
   "quickskin.error.cpm_select_failed": "Не удалось надеть эту модель CPM. Проверьте, работает ли Customizable Player Models",
   "quickskin.error.import_failed": "Не удалось импортировать этот файл как скин. Проверьте, что это изображение PNG, WebP или JPG, которое нормально открывается",
-  "quickskin.error.delete_own_skin": "Скин вашего аккаунта нельзя удалить: Quick Skin всегда держит его в списке",
+  "quickskin.error.delete_own_skin": "Скин твоего аккаунта нельзя удалить, пока он единственный в списке",
   "quickskin.error.delete_failed": "Не удалось удалить «%s». Проверьте, не открыт ли файл в другой программе",
   "quickskin.error.rename_exists": "Скин с таким именем уже есть. Выберите другое",
   "quickskin.error.rename_invalid": "Имя пустое или содержит символы, недопустимые в имени файла, например / \\ : * ? \" < > |",

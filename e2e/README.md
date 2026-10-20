@@ -55,15 +55,15 @@ This `master` shared source exercises the following exact packaged lanes:
 | `fabric-26.3` | `26.3` | Fabric | `25` | `11` |
 | `neoforge-26.3` | `26.3` | NeoForge | `25` | `11` |
 
-Scenario contract SHA-256: `a6994ffc6d278762c9f0a6c0ddb3e69a9c4b35c2503a08f1bdac5a4eebe5c583`
-Contract totals: `128` ordered steps, `97` captures.
+Scenario contract SHA-256: `f6802cb668c5b5daa0d63bdc7d2f4519606aa458c4b46edbbde40823ed0d1ab9`
+Contract totals: `129` ordered steps, `98` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
 | `phase0-smoke` | `runtime-default`, `pr`, `release` | `single-client` | `client_a` | `2` | `2` |
 | `propagation` | `pr`, `release` | `sequential-two-client` | `client_a`, `client_b` | `6` | `4` |
 | `propagation-live` | `pr`, `release` | `concurrent-two-client` | `client_a`, `client_b` | `17` | `9` |
-| `full` | `pr`, `release` | `single-client` | `client_a` | `70` | `63` |
+| `full` | `pr`, `release` | `single-client` | `client_a` | `71` | `64` |
 | `server-policy` | `pr`, `release` | `single-client` | `client_a` | `4` | `4` |
 | `session` | `pr`, `release` | `single-client` | `client_a` | `5` | `4` |
 | `mod-compatibility` | `compatibility` | `single-client` | `client_a` | `3` | `2` |
@@ -827,7 +827,7 @@ lossless anchor `mb-anchor--mc<TARGET>--<commit>--<run_id>--a<attempt>`, which t
 and the Pages side can compose a selected handoff with its authenticated full baseline archive.
 The composition works per frame, so every verified selection is handed off, including one that
 re-captures only some checkpoints of a lane (today's `hud-preview` selection re-captures 2 of the
-63 `full` ones). Such a lane is the selected execution's record and keeps the baseline execution
+64 `full` ones). Such a lane is the selected execution's record and keeps the baseline execution
 of its older frames as `baseline_run` (see
 [ADR 0010](../docs/architecture/decisions/0010-delegate-public-evidence-to-mod-base.md)).
 Each frame keeps its original tested commit/run/JAR and separate coverage provenance, and a partial

@@ -54,9 +54,9 @@ class ModBaseConformanceTest(unittest.TestCase):
         self.assertEqual(set(KEYS), set(keys))
         for key in KEYS:
             with self.subTest(key=key):
-                self.assertEqual({"key": key, "lanes": 14, "frames": 180, "comparisons": 76, "scope": "complete",
+                self.assertEqual({"key": key, "lanes": 14, "frames": 182, "comparisons": 76, "scope": "complete",
                                   "anchor": key == "mc1.20.1"}, keys[key])
-        self.assertEqual(360, sum(entry["frames"] for entry in keys.values()))
+        self.assertEqual(364, sum(entry["frames"] for entry in keys.values()))
         self.assertEqual("The-Plum-Team/Quick-Skin-Mod", self.report["repository"])
 
     def test_the_compatibility_family_is_available_and_carried_across_documentation_commits(self) -> None:
@@ -93,7 +93,7 @@ class ModBaseConformanceTest(unittest.TestCase):
                          "verify_publication"} <= set(self.report["hooks"]))
         site = self.report["site"]
         self.assertTrue(site["node_check"])
-        self.assertEqual(360, site["frames"])
+        self.assertEqual(364, site["frames"])
         self.assertLessEqual(site["max_job_reads"], 160)
         self.assertEqual([2, 3, 4], [generation["generation"] for generation in site["generations"]])
         self.assertGreater(self.report["checks"], 0)

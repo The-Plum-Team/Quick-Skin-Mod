@@ -1152,8 +1152,27 @@ public class LocalAssetManager {
         };
     }
 
-    /** Get all selectable skin entries, including optional CPM models. */
+    /**
+     * Get all selectable skin entries, including optional CPM models, as the skin list shows them:
+     * the player's own skin is left out while the player has hidden it and another entry is listed.
+     */
     public List<AssetMetadata> getAllSkins() {
+        ClientConfig config = ClientConfig.getInstance();
+        List<AssetMetadata> skins = getSelectableSkins();
+        if (!config.enablePlayerOwnSkinSystem || !config.playerOwnSkinHidden) {
+            return skins;
+        }
+        return withoutOwnSkin(skins, catalog.resolve(config.playerOwnSkinHash));
+    }
+
+    /** Whether any selectable skin or CPM model other than the player's own skin is catalogued. */
+    public boolean hasSkinsBesidesOwnSkin() {
+        String ownSkin = catalog.resolve(ClientConfig.getInstance().playerOwnSkinHash);
+        return getSelectableSkins().stream().anyMatch(meta -> !meta.hash().equals(ownSkin));
+    }
+
+    /** Every selectable skin and CPM model, the own skin included, in the list's order. */
+    private List<AssetMetadata> getSelectableSkins() {
         CatalogSnapshot snapshot = catalog;
         String playerOwnSkinHash = snapshot.resolve(ClientConfig.getInstance().playerOwnSkinHash);
         SkinSortMode sortMode = ClientConfig.getInstance().getSkinSortMode();
@@ -1165,6 +1184,18 @@ public class LocalAssetManager {
 //?}
                 .sorted(getSortComparator(sortMode, playerOwnSkinHash))
                 .toList();
+    }
+
+    /**
+     * The skins without the own skin, unless it is the only one: a list never runs empty because
+     * the own skin is hidden.
+     */
+    static List<AssetMetadata> withoutOwnSkin(List<AssetMetadata> skins, @Nullable String ownSkinHash) {
+        if (ownSkinHash == null) {
+            return skins;
+        }
+        List<AssetMetadata> others = skins.stream().filter(meta -> !meta.hash().equals(ownSkinHash)).toList();
+        return others.isEmpty() ? skins : others;
     }
 
     /**

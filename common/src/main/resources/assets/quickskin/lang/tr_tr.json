@@ -54,7 +54,7 @@
   "quickskin.dropzone.skins.sub": "veya 'Skin İçe Aktar'a tıkla",
   "quickskin.dropzone.skins.click": "veya içe aktarmak için tıkla",
   "quickskin.dropzone.capes.main": "Pelerin dosyalarını buraya sürükle",
-  "quickskin.dropzone.capes.sub": "veya 'Pelerin İçe Aktar'a tıkla",
+  "quickskin.dropzone.capes.click": "veya içe aktarmak için tıkla",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "\"%s\" dosyasını silmek istediğinden emin misin?",
@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": ".cpmmodel dosyalarını içe aktarmak için Customizable Player Models modu gerekir",
   "quickskin.error.cpm_select_failed": "Bu CPM modeli giyilemedi. Customizable Player Models'ın çalıştığını kontrol et",
   "quickskin.error.import_failed": "Bu dosya skin olarak içe aktarılamadı. Düzgün açılan bir PNG, WebP veya JPG görseli olduğunu kontrol et",
-  "quickskin.error.delete_own_skin": "Hesabının skini silinemez: Quick Skin onu her zaman listede tutar",
+  "quickskin.error.delete_own_skin": "Hesabının skini, listedeki tek skin olduğu sürece silinemez",
   "quickskin.error.delete_failed": "\"%s\" silinemedi. Dosyanın başka bir programda açık olmadığını kontrol et",
   "quickskin.error.rename_exists": "Bu isimde bir skin zaten var. Başka bir isim seç",
   "quickskin.error.rename_invalid": "İsim boş ya da dosya adında kullanılamayan karakterler içeriyor, örneğin / \\ : * ? \" < > |",

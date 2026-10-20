@@ -55,8 +55,9 @@ EXPECTED_STEPS = {
         "catalog_rename",
         "catalog_sort",
         "catalog_own_skin",
-        "catalog_delete_protected",
+        "catalog_hide_own_skin",
         "catalog_delete",
+        "catalog_delete_protected",
         "model_slim",
         "model_classic",
         "slim_skin_auto_detect",
@@ -231,7 +232,7 @@ EXPECTED_CAPTURES = {
     ),
 }
 
-EXPECTED_CAPTURE_COUNT = 97
+EXPECTED_CAPTURE_COUNT = 98
 
 # The scenario index the mutation cases below address. Mutations must target the intended
 # scenario even after the contract grows, so these are named rather than inlined.
