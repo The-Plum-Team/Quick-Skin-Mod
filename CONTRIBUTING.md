@@ -247,8 +247,9 @@ GitHub once.
 
 Kit bumps are their own draft pull request. On a fresh branch run
 `python scripts/ci/mod_base_kit.py bump --to vX.Y.Z`, review the whole diff, commit it as
-`ci: bump mod-base to vX.Y.Z` and open it as a draft to `master`; maintainers land it through a
-batch pull request. A bump runs every Build and Packaged E2E lane. Dependabot is configured to
+`ci: bump mod-base to vX.Y.Z` and open it as a draft to `master`; maintainers mark it ready on
+its own, because a batch refuses a change to the kit pin and the managed files. A bump runs every
+Build and Packaged E2E lane. Dependabot is configured to
 ignore the kit, `actions/deploy-pages`, which the managed `pages.yml` pins, and
 `actions/create-github-app-token`, which the managed `mod-base-gate-status.yml` caller pins; close
 any Dependabot pull request that touches a mod-base reference, the managed part of `pages.yml` or a

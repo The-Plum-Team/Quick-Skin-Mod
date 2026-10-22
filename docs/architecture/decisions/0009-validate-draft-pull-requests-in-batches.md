@@ -6,7 +6,8 @@ Date: 2026-09-18
 
 Accepted. Amended by [ADR 0013](0013-require-the-gate-app-for-the-default-branch.md), which
 requires both contexts from the mod-base gate App and renames the ready native gate jobs of a
-pull request to `master`.
+pull request to `master`, and by [ADR 0014](0014-batch-ordinary-changes-only.md), which limits a
+batch to ordinary paths and binds settlement to the merged commits.
 
 ## Context
 

@@ -6,6 +6,14 @@ temporary worktree, pushes the result as `batch/<name>` and opens one ordinary P
 PRs start no Build or Minecraft work, so a set of drafts costs one complete gate instead of one
 per PR. `settle` closes the included PRs after that batch PR has merged, but only those whose
 head is still the exact commit that was batched. See ADR 0009 and docs/ci/PR-BATCHES.md.
+
+A batch carries ordinary changes only (ADR 0014). `prepare` reads the allowed-path list
+`scripts/ci/mod-base-batch-paths.json` from the `master` commit it builds on, never from a member,
+and refuses a member whose own patch touches any other path: the control plane of the shared
+pipeline, kit bumps, the release matrix, governance, and the Gradle wrapper and dependency policy
+take their own pull request. The list has the format of mod-base's `ci batch-prepare
+--allowed-paths`. `paths` derives it from the tracked tree and `BATCH_PROTECTED_PATHS`.
+`settle` believes the batch marker only where the merged pull request's own commits say the same.
 """
 
 from __future__ import annotations
@@ -34,6 +42,46 @@ SHA = re.compile(r"[0-9a-f]{40}")
 REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 NAME = re.compile(r"[a-z0-9][a-z0-9._-]{0,62}")
 MARKER = re.compile(r"<!-- quick-skin-batch (\{[^\n]*\}) -->")
+BATCH_PATHS = "scripts/ci/mod-base-batch-paths.json"
+MAX_BATCH_PATHS = 4096
+# Paths no batch may change, each with everything below it. A change to any of them takes its own
+# reviewed pull request (ADR 0014): the shared pipeline's managed callers, adapter and policy
+# files that `mod-base-build.json` pins, the kit pin and config, the activation manifest, the
+# release matrix and governance, the Gradle wrapper and dependency policy, the plan input
+# `gradle.properties`, the Pages adapter of `site/mod-base.json`, and this tool with its own list.
+BATCH_PROTECTED_PATHS = (
+    ".gitattributes",
+    ".github",
+    "docs/ai/shared",
+    "e2e/scenario-contract.json",
+    "e2e/scenario_contract.py",
+    "gradle.properties",
+    "gradle/dependency-locks",
+    "gradle/repository-policy.gradle.kts",
+    "gradle/verification-metadata.xml",
+    "gradle/wrapper",
+    "gradlew",
+    "gradlew.bat",
+    "release",
+    "scripts/ci/mod-base-batch-paths.json",
+    "scripts/ci/mod-base-build.json",
+    "scripts/ci/mod_base_build_adapter.py",
+    "scripts/ci/mod_base_build_candidate.py",
+    "scripts/ci/mod_base_build_dispatch.py",
+    "scripts/ci/mod_base_build_policy.py",
+    "scripts/ci/mod_base_kit.py",
+    "scripts/ci/pr_batch.py",
+    "scripts/pages/mod_base_adapter.py",
+    "scripts/release/artifact_manifest.py",
+    "scripts/release/generate_sbom.py",
+    "scripts/release/github_governance.py",
+    "scripts/release/matrix.py",
+    "scripts/release/release_identity.py",
+    "scripts/release/verify_release.py",
+    "site",
+)
+# What a member's patch may give a path: a regular or executable file or a symbolic link, or none.
+PATCH_MODES = {"000000", "100644", "100755", "120000"}
 
 
 class BatchError(ValueError):
@@ -93,6 +141,90 @@ def remote_for(repository: Path, name: str) -> str:
     return matches[0]
 
 
+def is_repo_path(path: Any) -> bool:
+    """A canonical repository-relative path: no empty, `.`, `..` or `.git` component."""
+    return (isinstance(path, str) and 0 < len(path) <= 4096 and path.isprintable() and "\\" not in path
+            and all(part not in ("", ".", "..") and part.lower() != ".git" for part in path.split("/")))
+
+
+def ancestors(path: str) -> list[str]:
+    """The path and every directory above it, shortest first."""
+    parts = path.split("/")
+    return ["/".join(parts[:count]) for count in range(1, len(parts) + 1)]
+
+
+def is_protected(path: str) -> bool:
+    return any(prefix in BATCH_PROTECTED_PATHS for prefix in ancestors(path))
+
+
+def batch_paths_policy(files: Iterable[str]) -> list[str]:
+    """The allowed-path list for a tree: everything but `BATCH_PROTECTED_PATHS`, as few entries as
+    possible. A directory that holds no protected path is one entry, which admits whatever is
+    later added below it; a new path anywhere else needs the list regenerated first."""
+    tracked = sorted(set(files))
+    require(all(is_repo_path(path) for path in tracked), "the tree has a path outside the path grammar")
+    allowed: set[str] = set()
+    for path in tracked:
+        if is_protected(path):
+            continue
+        # The shortest ancestor that neither is nor holds a protected path admits this file.
+        for prefix in ancestors(path):
+            if not any(protected == prefix or protected.startswith(prefix + "/")
+                       for protected in BATCH_PROTECTED_PATHS):
+                allowed.add(prefix)
+                break
+    return sorted(allowed)
+
+
+def validate_allowed_paths(value: Any) -> frozenset[str]:
+    """Check a list read from `master` the way `ci batch-prepare --allowed-paths` does, and refuse
+    any entry that is, holds or lies inside a protected path."""
+    require(isinstance(value, list) and 0 < len(value) <= MAX_BATCH_PATHS,
+            f"{BATCH_PATHS} must be a non-empty JSON array of at most {MAX_BATCH_PATHS} paths")
+    previous = ""
+    for path in value:
+        require(is_repo_path(path) and path > previous,
+                f"{BATCH_PATHS} must hold canonical repository paths in strictly ascending order")
+        require(not is_protected(path) and not any(protected.startswith(path + "/")
+                                                   for protected in BATCH_PROTECTED_PATHS),
+                f"{BATCH_PATHS} allows the protected path {path}")
+        previous = path
+    return frozenset(value)
+
+
+def allowed_paths_at(checkout: Path, commit: str) -> frozenset[str]:
+    shown = git(checkout, "show", f"{commit}:{BATCH_PATHS}", check=False)
+    require(shown.returncode == 0, f"{BASE} at {commit[:12]} has no {BATCH_PATHS}; it cannot be batched")
+    try:
+        value = json.loads(shown.stdout)
+    except json.JSONDecodeError as exc:
+        raise BatchError(f"{BATCH_PATHS} is not JSON: {exc}") from exc
+    return validate_allowed_paths(value)
+
+
+def member_paths(checkout: Path, pull: "Pull", fork_point: str) -> list[str]:
+    """Every path of the member's own patch, from its merge base with `master` to its head."""
+    raw = git(checkout, "diff", "--raw", "-z", "--no-renames", "--no-abbrev", "--no-ext-diff",
+              fork_point, pull.head_sha).stdout
+    fields = raw.split("\0")
+    paths = []
+    for index in range(0, len(fields) - 1, 2):
+        header, path = fields[index], fields[index + 1]
+        modes = header.lstrip(":").split(" ")[:2]
+        require(len(modes) == 2 and is_repo_path(path), f"#{pull.number} changes an unreadable path")
+        require("160000" not in modes, f"#{pull.number} changes a submodule entry: {path}")
+        require(set(modes) <= PATCH_MODES, f"#{pull.number} changes an entry of an unsupported mode: {path}")
+        paths.append(path)
+    return paths
+
+
+def require_ordinary(checkout: Path, pull: "Pull", fork_point: str, allowed: frozenset[str]) -> None:
+    refused = [path for path in member_paths(checkout, pull, fork_point)
+               if not any(prefix in allowed for prefix in ancestors(path))]
+    require(not refused, f"#{pull.number} changes paths a batch may not carry; mark it ready on its own: "
+                         + ", ".join(refused[:20]))
+
+
 @dataclass(frozen=True)
 class Pull:
     number: int
@@ -141,7 +273,10 @@ def commit_message(pull: Pull, commits: list[str], branch: str) -> str:
     return f"{pull.title} (#{pull.number})\n\nSquashed from {pull.head_sha} for {branch}:\n" + "\n".join(listed) + "\n"
 
 
-def squash(checkout: Path, pull: Pull, base_sha: str, branch: str) -> str:
+def squash(checkout: Path, pull: Pull, base_sha: str, branch: str, allowed: frozenset[str]) -> str:
+    bases = git(checkout, "merge-base", "--all", base_sha, pull.head_sha, check=False).stdout.split()
+    require(len(bases) == 1, f"#{pull.number} needs exactly one merge base with {BASE}; rebase it")
+    require_ordinary(checkout, pull, bases[0], allowed)
     merge = git(checkout, "merge", "--squash", pull.head_sha, check=False)
     conflicts = sorted({line.split("\t", 1)[1] for line in
                         git(checkout, "ls-files", "--unmerged").stdout.splitlines() if "\t" in line})
@@ -150,8 +285,7 @@ def squash(checkout: Path, pull: Pull, base_sha: str, branch: str) -> str:
     require(merge.returncode == 0, f"#{pull.number} could not be squashed: {merge.stderr.strip()[:300]}")
     require(git(checkout, "diff-index", "--cached", "--quiet", "HEAD", check=False).returncode == 1,
             f"#{pull.number} adds nothing on top of master and earlier batch entries")
-    fork_point = git(checkout, "merge-base", base_sha, pull.head_sha).stdout.strip()
-    commits = git(checkout, "log", "--no-decorate", "--format=- %h %s", f"{fork_point}..{pull.head_sha}").stdout
+    commits = git(checkout, "log", "--no-decorate", "--format=- %h %s", f"{bases[0]}..{pull.head_sha}").stdout
     author = git(checkout, "log", "-1", "--format=%an <%ae>", pull.head_sha).stdout.strip()
     git(checkout, "-c", "core.hooksPath=/dev/null", "commit", "--quiet", "--no-verify",
         f"--author={author}", "--file=-", stdin=commit_message(pull, commits.splitlines(), branch))
@@ -216,8 +350,10 @@ def prepare(api: GitHub, repository: Path, remote: str, numbers: Iterable[int], 
             checkout = Path(temporary) / "checkout"
             git(repository, "worktree", "add", "--quiet", "--detach", str(checkout), base_sha)
             try:
+                # The list comes from the master commit the batch is built on, never from a member.
+                allowed = allowed_paths_at(checkout, base_sha)
                 for pull in pulls:
-                    commits.append(squash(checkout, pull, base_sha, branch))
+                    commits.append(squash(checkout, pull, base_sha, branch, allowed))
             finally:
                 # Only this tool's own temporary checkout is reset; the caller's worktree is untouched.
                 git(checkout, "reset", "--quiet", "--hard", check=False)
@@ -246,6 +382,11 @@ def prepare(api: GitHub, repository: Path, remote: str, numbers: Iterable[int], 
 
 
 def batch_marker(body: Any, branch: str) -> list[dict[str, Any]]:
+    return read_marker(body, branch)[1]
+
+
+def read_marker(body: Any, branch: str) -> tuple[str, list[dict[str, Any]]]:
+    """The base and the entries of the one well-formed batch marker for `branch`."""
     found = MARKER.findall(body) if isinstance(body, str) else []
     require(len(found) == 1, "the batch PR body has no single batch marker")
     marker = json.loads(found[0])
@@ -261,7 +402,34 @@ def batch_marker(body: Any, branch: str) -> list[dict[str, Any]]:
                 and all(isinstance(entry[key], str) and SHA.fullmatch(entry[key]) is not None
                         for key in ("head_sha", "commit")), "the batch marker has a malformed entry")
     require(len({entry["number"] for entry in pulls}) == len(pulls), "the batch marker repeats a pull request")
-    return pulls
+    return marker["base_sha"], pulls
+
+
+def require_marker_commits(api: GitHub, number: int, record: dict[str, Any], base_sha: str, branch: str,
+                           entries: list[dict[str, Any]]) -> None:
+    """Bind the marker, which anyone who can edit the body can edit, to the commits that merged.
+
+    The batch pull request's commits must be exactly the marker's, in order, on the marker's base,
+    ending at the merged head, and each commit's own message must name its pull request and the
+    batched head. A commit id covers its message and parent, so an edited marker that names
+    another pull request or head no longer matches."""
+    listed = api.request("GET", f"pulls/{number}/commits?per_page=100")
+    require(isinstance(listed, list) and len(listed) == len(entries),
+            f"batch #{number} has other commits than its batch marker lists")
+    require((record.get("head") or {}).get("sha") == entries[-1]["commit"],
+            f"batch #{number} did not merge the last commit of its batch marker")
+    parent = base_sha
+    for entry, commit in zip(entries, listed):
+        detail = commit.get("commit") if isinstance(commit, dict) else None
+        message = detail.get("message") if isinstance(detail, dict) else None
+        parents = [item.get("sha") for item in commit.get("parents") or [] if isinstance(item, dict)] \
+            if isinstance(commit, dict) else []
+        require(commit.get("sha") == entry["commit"] and parents == [parent] and isinstance(message, str)
+                and message.split("\n", 1)[0].endswith(f" (#{entry['number']})")
+                and f"\n\nSquashed from {entry['head_sha']} for {branch}:\n" in message,
+                f"batch #{number}: commit {str(entry['commit'])[:12]} does not carry #{entry['number']} "
+                "as its batch marker says")
+        parent = entry["commit"]
 
 
 def settle(api: GitHub, number: int, *, delete_branches: bool = False) -> dict[str, list[int]]:
@@ -274,8 +442,10 @@ def settle(api: GitHub, number: int, *, delete_branches: bool = False) -> dict[s
             and base.get("ref") == BASE and (base.get("repo") or {}).get("full_name") == api.repository,
             f"#{number} is not a batch pull request to {BASE}")
     require(record.get("merged") is True and record.get("merged_at"), f"batch #{number} has not merged")
+    base_sha, entries = read_marker(record.get("body"), branch)
+    require_marker_commits(api, number, record, base_sha, branch, entries)
     report: dict[str, list[int]] = {"closed": [], "changed": [], "already_closed": [], "deleted": []}
-    for entry in batch_marker(record.get("body"), branch):
+    for entry in entries:
         pull = api.request("GET", f"pulls/{entry['number']}")
         require(isinstance(pull, dict) and pull.get("number") == entry["number"],
                 f"#{entry['number']} is not a pull request")
@@ -302,6 +472,33 @@ def settle(api: GitHub, number: int, *, delete_branches: bool = False) -> dict[s
     return report
 
 
+def render_batch_paths(paths: list[str]) -> str:
+    return json.dumps(paths, indent=2) + "\n"
+
+
+def tracked_files(repository: Path) -> list[str]:
+    return [path for path in git(repository, "ls-files", "-z").stdout.split("\0") if path]
+
+
+def paths_command(*, write: bool) -> int:
+    try:
+        expected = render_batch_paths(batch_paths_policy(tracked_files(ROOT)))
+        validate_allowed_paths(json.loads(expected))
+    except (BatchError, OSError, ValueError, subprocess.SubprocessError) as exc:
+        print(f"pr_batch: {exc}", file=sys.stderr)
+        return 1
+    target = ROOT / BATCH_PATHS
+    if write:
+        target.write_text(expected, encoding="utf-8", newline="\n")
+        return 0
+    current = target.read_text(encoding="utf-8") if target.is_file() else ""
+    if current.replace("\r\n", "\n") != expected:
+        print(f"pr_batch: {BATCH_PATHS} is stale; run python3 scripts/ci/pr_batch.py paths --write",
+              file=sys.stderr)
+        return 1
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--repository", default=None, help="GitHub owner/name (default: governance repository)")
@@ -317,7 +514,11 @@ def main(argv: list[str] | None = None) -> int:
     close.add_argument("batch", type=int, help="the merged batch PR number")
     close.add_argument("--delete-branches", action="store_true",
                        help="also delete each closed PR's branch while it still points at the batched head")
+    listing = commands.add_parser("paths", help=f"check {BATCH_PATHS} against the tracked tree")
+    listing.add_argument("--write", action="store_true", help="rewrite the list instead of checking it")
     args = parser.parse_args(argv)
+    if args.command == "paths":
+        return paths_command(write=args.write)
     try:
         api = GitHub(args.repository or default_repository())
         if args.command == "prepare":
