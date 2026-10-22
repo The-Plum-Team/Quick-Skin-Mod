@@ -266,5 +266,7 @@
 
   "_comment_upload_limit": "=== 上传大小限制 ===",
   "quickskin.network.upload_too_large.skin": "[快速皮肤] 你的皮肤（%s）超过了此服务器的上传限制（%s）。它只显示在你自己的屏幕上，其他玩家看不到。",
-  "quickskin.network.upload_too_large.cape": "[快速皮肤] 你的披风（%s）超过了此服务器的上传限制（%s）。它只显示在你自己的屏幕上，其他玩家看不到。"
+  "quickskin.network.upload_too_large.cape": "[快速皮肤] 你的披风（%s）超过了此服务器的上传限制（%s）。它只显示在你自己的屏幕上，其他玩家看不到。",
+  "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
+  "quickskin.server.missing_mod_notice": "[Quick Skin] 此服务器使用 Quick Skin 提供自定义皮肤和披风。安装此模组即可看到它们并穿上你自己的。"
 }

@@ -3,6 +3,7 @@ package com.quickskin.mod.event;
 //? if >=1.21 {
 import com.quickskin.mod.networking.ServerNetworkHandler;
 //?}
+import com.quickskin.mod.networking.MissingModNotice;
 import com.quickskin.mod.networking.NetworkTransport;
 import com.quickskin.mod.networking.ProtocolNetwork;
 //? if <1.21 {
@@ -87,6 +88,11 @@ public class CommonEvents {
                 }
             }
 
+            if (!hasQuickSkin) {
+                // Tell them the server uses Quick Skin if their client still shows none later
+                MissingModNotice.playerJoined(serverPlayer);
+            }
+
             // CRITICAL FIX: Send THIS player's appearance to all OTHER players that have QuickSkin
             // This ensures that existing players (like the host) see the joining player's appearance
             // (sendAppearanceToAllPlayers internally checks canReceiveQuickSkin for each recipient)
@@ -127,6 +133,7 @@ public class CommonEvents {
         });
 
         TickEvent.SERVER_POST.register(ServerNetworkHandler::tickTextureResponses);
+        TickEvent.SERVER_POST.register(MissingModNotice::tick);
 
         // Server starting
         LifecycleEvent.SERVER_STARTING.register(server -> {

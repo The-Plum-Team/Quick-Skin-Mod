@@ -266,5 +266,7 @@
 
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[المظهر السريع] مظهرك (%s) يتجاوز حد الرفع لهذا الخادم البالغ %s. يظهر على شاشتك فقط؛ ولا يراه اللاعبون الآخرون.",
-  "quickskin.network.upload_too_large.cape": "[المظهر السريع] عباءتك (%s) تتجاوز حد الرفع لهذا الخادم البالغ %s. تظهر على شاشتك فقط؛ ولا يراها اللاعبون الآخرون."
+  "quickskin.network.upload_too_large.cape": "[المظهر السريع] عباءتك (%s) تتجاوز حد الرفع لهذا الخادم البالغ %s. تظهر على شاشتك فقط؛ ولا يراها اللاعبون الآخرون.",
+  "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
+  "quickskin.server.missing_mod_notice": "[Quick Skin] يستخدم هذا الخادم Quick Skin للأشكال والعباءات المخصصة. ثبّت التعديل لتراها ولترتدي ما يخصك."
 }

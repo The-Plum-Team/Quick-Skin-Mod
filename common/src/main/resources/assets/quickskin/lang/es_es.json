@@ -274,5 +274,7 @@
   "quickskin.tooltip.import_skin": "Importar una skin (o suelta archivos en cualquier parte)",
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[Aspecto rápido] Tu aspecto (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no lo ven.",
-  "quickskin.network.upload_too_large.cape": "[Aspecto rápido] Tu capa (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no la ven."
+  "quickskin.network.upload_too_large.cape": "[Aspecto rápido] Tu capa (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no la ven.",
+  "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
+  "quickskin.server.missing_mod_notice": "[Quick Skin] Este servidor usa Quick Skin para aspectos y capas personalizados. Instala el mod para verlos y llevar los tuyos."
 }

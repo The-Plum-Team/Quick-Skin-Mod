@@ -160,6 +160,16 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   and Quick Skin observers keep their own path. The synchronized server configuration carries the
   computed `accountSkinVisibility`, which is never persisted. Capes, HD skins and CPM models are
   never shared, and no third-party signing service is called.
+- A player whose exact connection still has no protocol and registers no Quick Skin receiver a
+  minute after the join is told, once per world, that the server uses Quick Skin
+  (`MissingModNotice`, on by default as `notifyPlayersWithoutQuickSkin`). The join itself proves
+  nothing, since the hello follows the client's channel discovery. Bedrock players (a Floodgate
+  UUID, upper half zero) are never told. Their game lacks Quick Skin's translations, so the server
+  sends plain text from its own bundled language files in the language the client reported (kept
+  by `ServerPlayerLanguageMixin` on 1.20.1, where vanilla discards it), falling back to English.
+  The record of who was told is one empty file per UUID in `<world>/quickskin/missing_mod_notices`
+  (`MissingModNoticeLedger`), written on the cache-I/O worker; an unusable folder tells nobody.
+  These settings never travel in the synchronized server configuration.
 
 ## Files, images, and persistence
 

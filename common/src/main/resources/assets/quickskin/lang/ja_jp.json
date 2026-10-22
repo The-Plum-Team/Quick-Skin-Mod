@@ -266,5 +266,7 @@
 
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[クイックスキン] スキン(%s)がこのサーバーのアップロード上限(%s)を超えています。あなたの画面にのみ表示され、他のプレイヤーには見えません。",
-  "quickskin.network.upload_too_large.cape": "[クイックスキン] マント(%s)がこのサーバーのアップロード上限(%s)を超えています。あなたの画面にのみ表示され、他のプレイヤーには見えません。"
+  "quickskin.network.upload_too_large.cape": "[クイックスキン] マント(%s)がこのサーバーのアップロード上限(%s)を超えています。あなたの画面にのみ表示され、他のプレイヤーには見えません。",
+  "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
+  "quickskin.server.missing_mod_notice": "[Quick Skin] このサーバーはカスタムスキンとマントにQuick Skinを使用しています。それらを見たり自分のものを着たりするには、このModを導入してください。"
 }

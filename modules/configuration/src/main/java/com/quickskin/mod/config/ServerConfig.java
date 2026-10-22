@@ -68,6 +68,24 @@ public class ServerConfig {
      */
     public boolean shareAccountSkinWithVanillaClients = false;
 
+    /** Longest {@link #playersWithoutQuickSkinMessage} and {@link #playersWithoutQuickSkinLink}. */
+    public static final int MAX_NOTICE_TEXT_LENGTH = 512;
+    /** The default {@link #playersWithoutQuickSkinLink}: Quick Skin's Modrinth page. */
+    public static final String DEFAULT_NOTICE_LINK = "https://modrinth.com/mod/quick-skin";
+
+    /**
+     * Tell a player who joins without Quick Skin, once per player and world, that this server
+     * uses it and where to get it. Never read by clients and never sent to them.
+     */
+    public boolean notifyPlayersWithoutQuickSkin = true;
+    /**
+     * Replaces the built-in text of that message, which is in each player's own language; the
+     * link follows it. Empty uses the built-in text.
+     */
+    public String playersWithoutQuickSkinMessage = "";
+    /** The http(s) address the message links to; empty sends the message without a link. */
+    public String playersWithoutQuickSkinLink = DEFAULT_NOTICE_LINK;
+
     /**
      * Runtime fact the server sends to Quick Skin clients, never read from or written to the
      * file: what players without Quick Skin on this server see after an upload to Mojang. One of
@@ -223,10 +241,14 @@ public class ServerConfig {
     /**
      * Convert to JSON for network transmission, together with what players without Quick Skin
      * see after an upload to Mojang on this server ({@code ACCOUNT_SKIN_*}, or {@code null}).
+     * The message for players without Quick Skin stays on the server.
      */
     public synchronized String toJson(String accountSkinVisibility) {
         normalize();
         JsonObject json = GSON.toJsonTree(this).getAsJsonObject();
+        json.remove("notifyPlayersWithoutQuickSkin");
+        json.remove("playersWithoutQuickSkinMessage");
+        json.remove("playersWithoutQuickSkinLink");
         String visibility = knownVisibility(accountSkinVisibility);
         if (visibility == null) {
             json.remove("accountSkinVisibility");
@@ -263,6 +285,14 @@ public class ServerConfig {
         maxTextureUploadKilobytes = Math.max(MIN_TEXTURE_UPLOAD_KILOBYTES,
                 Math.min(maxTextureUploadKilobytes, MAX_TEXTURE_UPLOAD_KILOBYTES));
         accountSkinVisibility = knownVisibility(accountSkinVisibility);
+        playersWithoutQuickSkinMessage = boundedText(playersWithoutQuickSkinMessage);
+        playersWithoutQuickSkinLink = playersWithoutQuickSkinLink == null
+                ? DEFAULT_NOTICE_LINK : boundedText(playersWithoutQuickSkinLink.trim());
+    }
+
+    private static String boundedText(String value) {
+        if (value == null) return "";
+        return value.length() > MAX_NOTICE_TEXT_LENGTH ? value.substring(0, MAX_NOTICE_TEXT_LENGTH) : value;
     }
 
     /** The configured per-texture upload limit in bytes. */

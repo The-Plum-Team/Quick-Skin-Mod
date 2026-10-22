@@ -266,5 +266,7 @@
 
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[Skin Nhanh] Skin của bạn (%s) vượt quá giới hạn tải lên của máy chủ này (%s). Nó chỉ hiển thị trên màn hình của bạn; người chơi khác không nhìn thấy.",
-  "quickskin.network.upload_too_large.cape": "[Skin Nhanh] Áo choàng của bạn (%s) vượt quá giới hạn tải lên của máy chủ này (%s). Nó chỉ hiển thị trên màn hình của bạn; người chơi khác không nhìn thấy."
+  "quickskin.network.upload_too_large.cape": "[Skin Nhanh] Áo choàng của bạn (%s) vượt quá giới hạn tải lên của máy chủ này (%s). Nó chỉ hiển thị trên màn hình của bạn; người chơi khác không nhìn thấy.",
+  "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
+  "quickskin.server.missing_mod_notice": "[Quick Skin] Máy chủ này dùng Quick Skin cho skin và áo choàng tùy chỉnh. Hãy cài mod để thấy chúng và mặc của riêng bạn."
 }
