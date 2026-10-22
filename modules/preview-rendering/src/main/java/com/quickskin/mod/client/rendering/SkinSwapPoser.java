@@ -21,6 +21,7 @@ import org.joml.Matrix4f;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.WeakHashMap;
 
 /**
  * Puts the skin-change move on a vanilla player model, and tells the models' pose hooks which
@@ -36,6 +37,9 @@ import java.util.Map;
  * <p>The move moves the parts' pivots as well as their angles, and neither vanilla before 1.21.2
  * nor the preview's idle resets every one of them each frame, so each part's pose before the move
  * is kept and put back before the model is posed again.
+ *
+ * <p>The preview's looping walk and sit ({@link PreviewLoops}) use the same skeleton on the
+ * preview's own model, laid over the pose the model was baked with.
  */
 @Environment(EnvType.CLIENT)
 public final class SkinSwapPoser {
@@ -48,6 +52,12 @@ public final class SkinSwapPoser {
     private static int nextBinding;
     /** Each moved part's pose before the move, until it is put back. */
     private static final Map<ModelPart, PartPose> unmoved = new IdentityHashMap<>();
+    /**
+     * The pose each preview model part was baked with, taken the first time it is posed, before
+     * anything has moved it. A part has no {@code equals}, so this is keyed by identity, and a
+     * model baked again on a resource reload leaves its old parts to be collected.
+     */
+    private static final Map<ModelPart, PartPose> baked = new WeakHashMap<>();
 
     private SkinSwapPoser() {
     }
@@ -115,19 +125,48 @@ public final class SkinSwapPoser {
         }
     }
 
+    /**
+     * Puts the pivots of the preview's own model back where it was baked, so a pose that sets
+     * only the angles starts from a straight stance after a loop moved them.
+     */
+//? if <1.21.2 {
+    public static void standStraight(PlayerModel<?> model) {
+//?} else {
+    public static void standStraight(PlayerModel model) {
+//?}
+        for (ModelPart part : parts(model)) {
+            PartPose pose = baked(part);
+            part.x = pose.x;
+            part.y = pose.y;
+            part.z = pose.z;
+        }
+    }
+
+    /** Poses the preview's own model in a frame of one of its loops, from the pose it was baked with. */
+//? if <1.21.2 {
+    public static void loop(PlayerModel<?> model, SkinSwapAnimation.Pose pose) {
+//?} else {
+    public static void loop(PlayerModel model, SkinSwapAnimation.Pose pose) {
+//?}
+        ModelPart[] parts = parts(model);
+        PartPose[] poses = new PartPose[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            PartPose rest = baked(parts[i]);
+            poses[i] = new PartPose().set(rest.x, rest.y, rest.z, rest.xRot, rest.yRot, rest.zRot);
+        }
+        SkinSwapSkeleton.pose(pose, poses);
+        for (int i = 0; i < parts.length; i++) {
+            write(poses[i], parts[i]);
+        }
+    }
+
     /** Lays the move over a posed model. */
 //? if <1.21.2 {
     public static void apply(PlayerModel<?> model, SkinSwapAnimation.Pose pose) {
 //?} else {
     public static void apply(PlayerModel model, SkinSwapAnimation.Pose pose) {
 //?}
-        ModelPart[] parts = new ModelPart[Part.values().length];
-        parts[Part.HEAD.ordinal()] = model.head;
-        parts[Part.BODY.ordinal()] = model.body;
-        parts[Part.RIGHT_ARM.ordinal()] = model.rightArm;
-        parts[Part.LEFT_ARM.ordinal()] = model.leftArm;
-        parts[Part.RIGHT_LEG.ordinal()] = model.rightLeg;
-        parts[Part.LEFT_LEG.ordinal()] = model.leftLeg;
+        ModelPart[] parts = parts(model);
         PartPose[] poses = new PartPose[parts.length];
         for (int i = 0; i < parts.length; i++) {
             poses[i] = read(parts[i]);
@@ -174,6 +213,26 @@ public final class SkinSwapPoser {
     }
 
 //?}
+    /** The model's six parts, indexed by {@link Part}. */
+//? if <1.21.2 {
+    private static ModelPart[] parts(PlayerModel<?> model) {
+//?} else {
+    private static ModelPart[] parts(PlayerModel model) {
+//?}
+        ModelPart[] parts = new ModelPart[Part.values().length];
+        parts[Part.HEAD.ordinal()] = model.head;
+        parts[Part.BODY.ordinal()] = model.body;
+        parts[Part.RIGHT_ARM.ordinal()] = model.rightArm;
+        parts[Part.LEFT_ARM.ordinal()] = model.leftArm;
+        parts[Part.RIGHT_LEG.ordinal()] = model.rightLeg;
+        parts[Part.LEFT_LEG.ordinal()] = model.leftLeg;
+        return parts;
+    }
+
+    private static PartPose baked(ModelPart part) {
+        return baked.computeIfAbsent(part, SkinSwapPoser::read);
+    }
+
     private static PartPose read(ModelPart part) {
         return new PartPose().set(part.x, part.y, part.z, part.xRot, part.yRot, part.zRot);
     }
