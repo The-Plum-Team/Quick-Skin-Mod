@@ -63,8 +63,14 @@ public class SkinImporter {
                 return null;
             }
 
-            // Copy file to skins directory (always save as PNG since content is converted to PNG)
+            // A skin already catalogued is not copied a second time
             LocalAssetManager assetManager = LocalAssetManager.getInstance();
+            AssetMetadata existing = catalogued(processedImageBytes);
+            if (existing != null) {
+                return existing;
+            }
+
+            // Copy file to skins directory (always save as PNG since content is converted to PNG)
             String nameWithoutExt = sanitizeBaseName(
                     fileName.substring(0, fileName.lastIndexOf('.')), "skin");
             writeUnique(assetManager.getSkinsDirectory(), nameWithoutExt, ".png", processedImageBytes);
@@ -175,6 +181,11 @@ public class SkinImporter {
             LocalAssetManager assetManager = LocalAssetManager.getInstance();
             byte[] encoded = HDTextureProcessor.imageToPng(image);
             if (encoded == null) return null;
+            // A skin already catalogued, such as the player's own, is not saved a second time
+            AssetMetadata existing = catalogued(encoded);
+            if (existing != null && existing.path() != null) {
+                return existing.path();
+            }
             return writeUnique(assetManager.getSkinsDirectory(),
                     sanitizeBaseName(username, "skin"), ".png", encoded);
 
@@ -182,6 +193,14 @@ public class SkinImporter {
             QuickSkinInfo.LOGGER.warn("Unable to save downloaded skin for {}", username, e);
             return null;
         }
+    }
+
+    /** The catalogued skin with exactly these PNG bytes, or null. */
+    private static AssetMetadata catalogued(byte[] png) {
+        String hash = HashUtil.computeAssetContentId(png, "skin");
+        if (hash == null) return null;
+        AssetMetadata metadata = LocalAssetManager.getInstance().getMetadata(hash);
+        return metadata != null && !metadata.isCpmModel() ? metadata : null;
     }
 
     private static Path writeUnique(

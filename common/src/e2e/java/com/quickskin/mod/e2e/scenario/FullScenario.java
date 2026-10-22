@@ -340,7 +340,7 @@ public final class FullScenario implements Scenario {
                             + "face texture: " + externalSkinHash);
                 }));
 
-        // 2d-2h. catalog operations through the real rename/sort/own-skin/delete paths --------------
+        // 2d-2i. catalog operations through the real rename/sort/own-skin/delete paths --------------
         steps.addAll(catalog.buildCatalogOperations(mc, uuid, svc, prefix, suffix));
 
         // 3. model slim / classic -----------------------------------------------------------------

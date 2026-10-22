@@ -1165,6 +1165,16 @@ public class LocalAssetManager {
         return withoutOwnSkin(skins, catalog.resolve(config.playerOwnSkinHash));
     }
 
+    /** Whether deleting these skins or CPM models leaves at least one entry in the skin list. */
+    public boolean keepsAListedSkin(Collection<String> hashes) {
+        return keepsAListedSkin(getAllSkins(), hashes);
+    }
+
+    /** Whether the listed entries keep one that is not among the hashes to delete. */
+    static boolean keepsAListedSkin(List<AssetMetadata> listed, Collection<String> hashes) {
+        return listed.stream().anyMatch(meta -> !hashes.contains(meta.hash()));
+    }
+
     /** Whether any selectable skin or CPM model other than the player's own skin is catalogued. */
     public boolean hasSkinsBesidesOwnSkin() {
         String ownSkin = catalog.resolve(ClientConfig.getInstance().playerOwnSkinHash);
