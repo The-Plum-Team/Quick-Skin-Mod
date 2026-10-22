@@ -277,7 +277,9 @@ public class SettingsScreen extends Screen {
         }
         return checkbox;
         //?} else {
-        Checkbox.Builder builder = Checkbox.builder(label, this.font)
+        // The vanilla checkbox draws the text it was built with, on one line that can run past the
+        // row's right edge, so it is built without one; its message is the row's label
+        Checkbox.Builder builder = Checkbox.builder(Component.empty(), this.font)
                 .pos(x, y)
                 .selected(selected)
                 .onValueChange((box, value) -> onChange.run());
@@ -285,6 +287,7 @@ public class SettingsScreen extends Screen {
             builder.tooltip(Tooltip.create(Component.translatable(tooltipKey)));
         }
         Checkbox checkbox = builder.build();
+        checkbox.setMessage(label);
         // The whole row toggles it, as drawToggleRow shows
         checkbox.setWidth(contentWidth);
         return checkbox;
