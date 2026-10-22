@@ -1,6 +1,6 @@
 {
   "coverage_sha": "f1e4fffaa0b034a450467c25c1c550e37b934496",
-  "observed_at": "2026-10-22T22:41:52Z",
+  "observed_at": "2026-10-22T22:47:36Z",
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "schema_version": 1,
   "targets": [
@@ -67,10 +67,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883132,
             "name": "compile / Compile Minecraft 26.3",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883132"
           }
         ],
@@ -167,10 +167,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883294,
             "name": "compile / Compile Minecraft 26.2",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883294"
           }
         ],
@@ -267,10 +267,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883140,
             "name": "compile / Compile Minecraft 26.1.2",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883140"
           }
         ],
@@ -367,10 +367,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883049,
             "name": "compile / Compile Minecraft 26.1.1",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883049"
           }
         ],
@@ -467,10 +467,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883084,
             "name": "compile / Compile Minecraft 26.1",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883084"
           }
         ],
@@ -567,10 +567,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883178,
             "name": "compile / Compile Minecraft 1.21.11",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883178"
           }
         ],
@@ -667,10 +667,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883152,
             "name": "compile / Compile Minecraft 1.21.10",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883152"
           }
         ],
@@ -767,10 +767,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883066,
             "name": "compile / Compile Minecraft 1.21.9",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883066"
           }
         ],
@@ -867,10 +867,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883150,
             "name": "compile / Compile Minecraft 1.21.8",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883150"
           }
         ],
@@ -967,10 +967,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883036,
             "name": "compile / Compile Minecraft 1.21.7",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883036"
           }
         ],
@@ -1067,10 +1067,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883160,
             "name": "compile / Compile Minecraft 1.21.6",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883160"
           }
         ],
@@ -1167,10 +1167,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883138,
             "name": "compile / Compile Minecraft 1.21.5",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883138"
           }
         ],
@@ -1267,10 +1267,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883083,
             "name": "compile / Compile Minecraft 1.21.4",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883083"
           }
         ],
@@ -1367,10 +1367,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883052,
             "name": "compile / Compile Minecraft 1.21.3",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883052"
           }
         ],
@@ -1467,10 +1467,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883022,
             "name": "compile / Compile Minecraft 1.21.2",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883022"
           }
         ],
@@ -1567,10 +1567,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883680,
             "name": "compile / Compile Minecraft 1.21.1",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883680"
           }
         ],
@@ -1667,10 +1667,10 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130825054"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 120130883079,
             "name": "compile / Compile Minecraft 1.20.1",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/39866741972/job/120130883079"
           }
         ],
