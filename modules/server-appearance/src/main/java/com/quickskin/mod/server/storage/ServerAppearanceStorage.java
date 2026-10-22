@@ -12,11 +12,17 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.DirectoryIteratorException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -31,6 +37,9 @@ import java.util.UUID;
  */
 public class ServerAppearanceStorage {
     private static final int MAX_APPEARANCE_FILE_BYTES = 64 * 1024;
+    /** Files looked at when the server starts; a directory with more is read only this far. */
+    private static final int MAX_SCANNED_APPEARANCE_FILES = 16 * 1024;
+    private static final String FILE_SUFFIX = ".json";
     private static ServerAppearanceStorage instance;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
@@ -80,8 +89,83 @@ public class ServerAppearanceStorage {
             return null;
         }
 
-        Path file = storageDirectory.resolve(playerId.toString() + ".json");
+        PlayerAppearance appearance = readAppearance(playerId, storageDirectory.resolve(playerId + FILE_SUFFIX));
+        if (appearance == null) {
+            return null;
+        }
 
+        // Update the repository with loaded data
+        PlayerAppearance restored = restore(appearance);
+        if (restored == null) {
+            QuickSkinInfo.LOGGER.warn(
+                    "Refusing saved appearance for {} because its active texture pins are unavailable or over budget",
+                    playerId);
+            return null;
+        }
+        return restored;
+    }
+
+    /**
+     * Brings back the saved appearances of players who are not connected, so that players who
+     * join see them before their owners come back. Only the most recently saved ones are read,
+     * {@link ServerPlayerAppearanceRepository#MAX_OFFLINE_APPEARANCES} at most, and their textures
+     * are not pinned.
+     * @return how many were kept
+     */
+    public synchronized int loadOfflineAppearances() {
+        if (storageDirectory == null) {
+            return 0;
+        }
+        List<SavedFile> files = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(storageDirectory, "*" + FILE_SUFFIX)) {
+            for (Path file : stream) {
+                if (files.size() >= MAX_SCANNED_APPEARANCE_FILES) {
+                    QuickSkinInfo.LOGGER.warn("Read only the first {} saved player appearances of {}",
+                            MAX_SCANNED_APPEARANCE_FILES, storageDirectory);
+                    break;
+                }
+                UUID playerId = playerIdOf(file);
+                if (playerId != null && Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
+                    files.add(new SavedFile(playerId, file,
+                            Files.getLastModifiedTime(file, LinkOption.NOFOLLOW_LINKS).toMillis()));
+                }
+            }
+        } catch (IOException | DirectoryIteratorException e) {
+            QuickSkinInfo.LOGGER.warn("Unable to list saved player appearances in {}", storageDirectory, e);
+            return 0;
+        }
+
+        // Newest last, so the repository drops the oldest first
+        files.sort(Comparator.comparingLong(SavedFile::savedAt));
+        int from = Math.max(0, files.size() - ServerPlayerAppearanceRepository.MAX_OFFLINE_APPEARANCES);
+        int kept = 0;
+        for (SavedFile saved : files.subList(from, files.size())) {
+            PlayerAppearance appearance = readAppearance(saved.playerId(), saved.file());
+            if (appearance != null
+                    && ServerPlayerAppearanceRepository.getInstance().keepOfflineAppearance(appearance)) {
+                kept++;
+            }
+        }
+        return kept;
+    }
+
+    private record SavedFile(UUID playerId, Path file, long savedAt) {}
+
+    @Nullable
+    private static UUID playerIdOf(Path file) {
+        String name = file.getFileName().toString();
+        try {
+            UUID playerId = UUID.fromString(name.substring(0, name.length() - FILE_SUFFIX.length()));
+            // Only the canonical spelling, the one this storage writes
+            return (playerId + FILE_SUFFIX).equals(name) ? playerId : null;
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /** Reads and validates one saved appearance file, or null when it is missing or invalid. */
+    @Nullable
+    private static PlayerAppearance readAppearance(UUID playerId, Path file) {
         if (!Files.isRegularFile(file)) {
             return null;
         }
@@ -100,17 +184,7 @@ public class ServerAppearanceStorage {
                 QuickSkinInfo.LOGGER.warn("Ignoring invalid player appearance file {}", file);
                 return null;
             }
-
-            // Update the repository with loaded data
-            PlayerAppearance restored = restore(appearance);
-            if (restored == null) {
-                QuickSkinInfo.LOGGER.warn(
-                        "Refusing saved appearance for {} because its active texture pins are unavailable or over budget",
-                        playerId);
-                return null;
-            }
-
-            return restored;
+            return appearance;
         } catch (IOException | RuntimeException e) {
             QuickSkinInfo.LOGGER.warn("Unable to load player appearance {}", file, e);
             return null;
@@ -129,8 +203,9 @@ public class ServerAppearanceStorage {
     private static PlayerAppearance restore(PlayerAppearance saved) {
         ServerPlayerAppearanceRepository repository = ServerPlayerAppearanceRepository.getInstance();
         if (repository.trySetAppearance(saved)) return saved;
-        String skinId = heldTextureOrEmpty(saved.getSkinId(), "local_skin:");
-        String capeId = heldTextureOrEmpty(saved.getCapeId(), "local_cape:");
+        ServerTextureCache textures = ServerTextureCache.getInstance();
+        String skinId = textures.heldTextureOrEmpty(saved.getSkinId(), "local_skin:");
+        String capeId = textures.heldTextureOrEmpty(saved.getCapeId(), "local_cape:");
         boolean skinKept = Objects.equals(skinId, saved.getSkinId());
         boolean capeKept = Objects.equals(capeId, saved.getCapeId());
         if (skinKept && capeKept) return null;
@@ -141,14 +216,6 @@ public class ServerAppearanceStorage {
                         + " no longer holds that texture (over maxTextureUploadKilobytes or removed)",
                 saved.getPlayerId(), skinKept ? "cape" : capeKept ? "skin" : "skin and cape");
         return partial;
-    }
-
-    /** The id unchanged, or empty when it names a local texture the cache does not hold. */
-    private static String heldTextureOrEmpty(String appearanceId, String prefix) {
-        if (appearanceId == null || !appearanceId.startsWith(prefix)) return appearanceId;
-        String contentId = appearanceId.substring(prefix.length());
-        return ServerTextureCache.getInstance().resolveContentId(contentId) == null
-                ? "" : appearanceId;
     }
 
     /**
@@ -215,7 +282,7 @@ public class ServerAppearanceStorage {
     }
 
     private void writeAppearance(UUID playerId, byte[] encoded) {
-        Path file = storageDirectory.resolve(playerId.toString() + ".json");
+        Path file = storageDirectory.resolve(playerId + FILE_SUFFIX);
 
         Path temporary = file.resolveSibling(file.getFileName() + ".tmp");
         try {

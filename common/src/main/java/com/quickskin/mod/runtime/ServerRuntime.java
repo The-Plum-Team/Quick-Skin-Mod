@@ -91,6 +91,11 @@ public final class ServerRuntime implements AutoCloseable {
         textureCache.init(worldPath);
         animationCache.init(worldPath);
         appearanceStorage.init(worldPath);
+        int offlineAppearances = appearanceStorage.loadOfflineAppearances();
+        if (offlineAppearances > 0) {
+            QuickSkinInfo.LOGGER.info("Quick Skin shares the saved appearance of {} players who are"
+                    + " not connected", offlineAppearances);
+        }
         ServerTextureIngressExecutor.getInstance().start();
         AccountSkinProfileTarget accountSkinTarget = new AccountSkinProfileTarget(server);
         AccountSkinShareService.getInstance().start(accountSkinTarget);
@@ -148,7 +153,8 @@ public final class ServerRuntime implements AutoCloseable {
             return false;
         }
         appearanceStorage.savePlayerAppearance(playerId);
-        appearanceRepository.removeAppearance(playerId);
+        // Players who join later still see this player's appearance, now without pins
+        appearanceRepository.playerLeft(playerId);
         cooldownManager.removePlayer(playerId);
         ServerNetworkHandler.onPlayerDisconnected(playerId, connection);
         AccountSkinShareService.getInstance().playerDisconnected(playerId, connection);
