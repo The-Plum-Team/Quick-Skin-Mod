@@ -46,6 +46,7 @@ public class PreviewPlayerData {
     private SkinSwapAnimation.Variant skinSwapVariant;
     private long skinSwapStartNanos;
     private SkinSwapAnimation.Pose skinSwapPose = SkinSwapAnimation.Pose.REST;
+    private final IdleShuffle idles = new IdleShuffle();
 
     public PreviewPlayerData() {
         this.modelType = "classic";
@@ -102,8 +103,8 @@ public class PreviewPlayerData {
     }
 
     /**
-     * Starts the skin-change move on the skin menu's model. The skin a menu is opened with is set
-     * before its first draw and starts nothing, and a pick made while a move plays lets that move
+     * Starts the skin-change move on the skin menu's model, and another idle under it. The skin a
+     * menu is opened with is set before its first draw and starts nothing, and a pick made while a move plays lets that move
      * finish, so browsing quickly never stacks moves.
      */
     private void startSkinSwap() {
@@ -112,6 +113,7 @@ public class PreviewPlayerData {
         }
         skinSwapVariant = SkinSwapAnimation.next(ThreadLocalRandom.current()::nextInt);
         skinSwapStartNanos = System.nanoTime();
+        idles.shuffle();
     }
 
     /**
@@ -132,6 +134,11 @@ public class PreviewPlayerData {
             skinSwapPose = SkinSwapAnimation.sample(skinSwapVariant, seconds);
         }
         return skinSwapPose;
+    }
+
+    /** The preview's idle {@code seconds} on the preview clock: one of several, changing with the skin. */
+    public SkinSwapAnimation.Pose idlePose(double seconds) {
+        return idles.sample(seconds, ThreadLocalRandom.current()::nextInt);
     }
 
     /** The skin-change offsets of the current draw; {@link SkinSwapAnimation.Pose#REST} when none plays. */

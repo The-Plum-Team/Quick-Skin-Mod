@@ -55,7 +55,7 @@ This `master` shared source exercises the following exact packaged lanes:
 | `fabric-26.3` | `26.3` | Fabric | `25` | `11` |
 | `neoforge-26.3` | `26.3` | NeoForge | `25` | `11` |
 
-Scenario contract SHA-256: `f6802cb668c5b5daa0d63bdc7d2f4519606aa458c4b46edbbde40823ed0d1ab9`
+Scenario contract SHA-256: `e13db634527898100bd9f86e4f59ea89e49a07b98116b48b33a10c99ddeda119`
 Contract totals: `129` ordered steps, `98` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
