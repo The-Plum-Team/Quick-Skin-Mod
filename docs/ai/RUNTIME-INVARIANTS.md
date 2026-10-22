@@ -215,12 +215,17 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Opaque-fill, import fallback, local/network presentation, and animation processing must share
   the same structural mask; content-addressed source bytes remain immutable when only presentation
   requires normalization.
-- The player's own skin is never deleted. Deleting it from the skin menu sets
+- The skin menu's list always keeps at least one skin or CPM model: marking or deleting the last
+  listed entry, the own skin or a custom one, is refused with a toast
+  (`LocalAssetManager.keepsAListedSkin`), and a deletion that would empty the list is refused
+  whole. The player's own skin is never deleted. Deleting it sets
   `ClientConfig.playerOwnSkinHidden`, and `LocalAssetManager.getAllSkins` then leaves it out of
-  the list, but only while another skin or CPM model is listed: the list never runs empty because
-  of it, deleting the last other skin clears the flag, and deleting it while it is the only skin
-  is refused. A hidden own skin is still the fallback look when the worn skin is deleted, and a
-  new own skin (the account's skin changed) is listed again.
+  the list; deleting another skin never lists it again, and only if no other entry is left (its
+  files removed outside the game) does it rejoin the list and the flag clear. It is listed again
+  when the player imports or searches it again, and when a new own skin (the account's skin
+  changed) arrives. Deleting the worn skin wears the first listed skin (the own skin, pinned
+  first, when it is listed). An import or search whose content is already catalogued writes no
+  second file and selects the catalogued skin.
 - A cape saved through the cape editor keeps its original PNG, WebP or GIF in
   `quickskin_cache/cape_editor_sources/<cape content ID>.<ext>` (`CapeEditorSources`). That file
   only reopens `CapeAdjustScreen`: it is never scanned, registered as a texture or animation, or
@@ -466,9 +471,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   restores the plaid classic skin before any cape checkpoint.
 - Catalog evidence drives the real rename, sort, own-skin, and delete paths of the skin menu,
   never the service alone. The own-skin row must be pinned first and highlighted purple;
-  deleting it while another skin is listed must only hide it, keeping its file, deleting the last
-  other skin must list it again, and deleting it as the only skin must be refused with the real
-  error toast; a stale saved skin id whose file vanished must
+  deleting it while another skin is listed must only hide it, keeping its file; deleting the last
+  listed skin, a custom one, must be refused with the real error toast, keeping its file and the
+  own skin hidden; and a real deletion, beside a dropped spare skin, must remove the file without
+  listing the hidden own skin again; a stale saved skin id whose file vanished must
   fall back to the vanilla default without a manual reset. The catalog checkpoints run on the
   menu instance that the Rename and Delete dialogs return to.
 - No Quick Skin screen writes the player's GUI Scale option or calls `resizeDisplay()`: other mods

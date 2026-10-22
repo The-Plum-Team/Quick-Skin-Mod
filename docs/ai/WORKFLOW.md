@@ -183,11 +183,15 @@ deltas.
 - Several changes can be validated together: open them as drafts, which start no Build or
   Minecraft work, then land them through one batch PR created by `scripts/ci/pr_batch.py` and
   close them with its `settle` command. A batch squashes one commit per PR onto current `master`
-  and accepts only same-repository PRs; never place fork code on a same-repository branch. See
+  and accepts only same-repository PRs; never place fork code on a same-repository branch. It
+  carries ordinary changes only: a PR that changes a path outside
+  `scripts/ci/mod-base-batch-paths.json` (workflows, kit config and pin, adapter and policy files,
+  release matrix, governance, Gradle wrapper and dependency policy) is marked ready on its own
+  ([ADR 0014](../architecture/decisions/0014-batch-ordinary-changes-only.md)). See
   [PR batches](../ci/PR-BATCHES.md).
 - A mod-base kit bump is Quick Skin's control-plane route for managed files: on a fresh
   `chore/mod-base-vX.Y.Z` branch run `python scripts/ci/mod_base_kit.py bump --to vX.Y.Z`,
-  review the complete diff, open it as a draft and land it through a batch PR. It edits
+  review the complete diff, open it as a draft and mark it ready on its own; a batch refuses it. It edits
   `.github/workflows/*`, so it runs the complete Build, every Packaged E2E lane and the optional-mod
   wave its impact classifiers select; there is no selection-policy exception
   ([ADR 0010](../architecture/decisions/0010-delegate-public-evidence-to-mod-base.md)). Never edit

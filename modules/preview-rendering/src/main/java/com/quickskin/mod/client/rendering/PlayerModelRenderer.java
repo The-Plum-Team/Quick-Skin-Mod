@@ -92,6 +92,18 @@ public class PlayerModelRenderer {
                 : System.currentTimeMillis();
     }
 
+    private static final long PREVIEW_CLOCK_ORIGIN_NANOS = System.nanoTime();
+
+    /**
+     * Seconds on the preview poses' clock. It runs smoothly, unlike the GUI's ticks, which come 20
+     * times a second and would hold a fast pose such as the walk for several frames.
+     */
+    private static double previewSeconds() {
+        return DETERMINISTIC_E2E_RENDER
+                ? E2E_FIXED_ANIMATION_TIME_MS / 1000.0
+                : (System.nanoTime() - PREVIEW_CLOCK_ORIGIN_NANOS) / 1.0e9;
+    }
+
     /**
      * Vanilla's elytra wings, folded as a standing player wears them: the layer's default pose,
      * never animated. A preview that asks for them draws them with the cape's texture instead of
@@ -102,10 +114,6 @@ public class PlayerModelRenderer {
 //? if <1.21 {
     private static PlayerModel<?> classicModel;
     private static PlayerModel<?> slimModel;
-
-    // Animation frequency optimization - update at 30 FPS instead of 60+ FPS
-    private static long lastAnimationUpdate = 0;
-    private static final long ANIMATION_UPDATE_INTERVAL_MS = 33; // ~30 FPS (1000/30)
 
     // Lighting optimization - only setup lighting once
     private static boolean lightingSetup = false;
@@ -633,16 +641,6 @@ public class PlayerModelRenderer {
     }
 //?}
 
-    // Previous rotation/position values for smooth lerping in idle animation
-    private static float prevHeadRotZ = 0.0f;
-    private static float prevRightArmRotX = 0.0f;
-    private static float prevRightArmRotZ = 0.0f;
-    private static float prevLeftArmRotX = 0.0f;
-    private static float prevLeftArmRotZ = 0.0f;
-    private static float prevRightLegRotX = 0.0f;
-    private static float prevLeftLegRotX = 0.0f;
-    private static float prevBodyRotX = 0.0f;
-
     // Fixed offset for positioning the model to match InventoryScreen rendering
     // The manual rendering uses additional X/Y rotations that shift the model position
     // These offsets compensate for that shift to match the InventoryScreen position
@@ -657,13 +655,6 @@ public class PlayerModelRenderer {
     private static double dragStartOffsetX = 0;
     private static double dragStartOffsetY = 0;
 
-//? if <1.21 {
-//?} else {
-    // Animation frequency throttling (30 FPS instead of 60+)
-    private static long lastAnimationUpdate = 0;
-    private static final long ANIMATION_UPDATE_INTERVAL_MS = 33; // ~30 FPS
-
-//?}
     /**
      * Render a player model in GUI using vanilla InventoryScreen method
      *
@@ -1579,17 +1570,6 @@ public class PlayerModelRenderer {
 //?} else {
 //?}
 
-    /**
-     * Smoothly lerp (linear interpolate) between current and target value
-     * @param current Current value
-     * @param target Target value
-     * @param factor Interpolation factor (0-1, higher = faster)
-     * @return Interpolated value
-     */
-    private static float smoothLerp(float current, float target, float factor) {
-        return current + (target - current) * factor;
-    }
-
 //? if <1.21.11 {
     /**
      * Render cape layer similar to vanilla CapeLayer
@@ -2179,70 +2159,26 @@ public class PlayerModelRenderer {
             animation = "idle";
         }
 
-        // CHECK: Should we update animation this frame? (30 FPS instead of 60+, except while the
-        // skin-change move plays, which would stutter at that rate)
+        String mode = animation.toLowerCase(Locale.ROOT);
         SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
-        long now = animationTimeMillis();
-        boolean shouldUpdate = DETERMINISTIC_E2E_RENDER
-                || !swap.isRest()
-                || (now - lastAnimationUpdate) >= ANIMATION_UPDATE_INTERVAL_MS;
 
-        if (!shouldUpdate) {
-//? if <1.21.2 {
-            // Keep previous pose, just update hat/sleeves to match
-            model.hat.copyFrom(model.head);
-            model.leftSleeve.copyFrom(model.leftArm);
-            model.rightSleeve.copyFrom(model.rightArm);
-            model.leftPants.copyFrom(model.leftLeg);
-            model.rightPants.copyFrom(model.rightLeg);
-            model.jacket.copyFrom(model.body);
-//?} else {
-            // In MC 1.21.2+, outer layers are children of their corresponding body parts and
-            // inherit every transform. Keep their local pose at its baked value so a reused
-            // preview model can never apply the parent's pivot or rotation twice.
-            resetOuterLayerTransforms(model);
-//?}
-            return; // EXIT EARLY - saves 40-60% CPU time
-        }
-
-        if (!DETERMINISTIC_E2E_RENDER) {
-            lastAnimationUpdate = now;
-        }
-
-        // The idle poses below leave the parts' pivots alone, so put back those a move shifted.
+        // Put back the parts a move or a loop shifted, so each pose starts from the baked stance.
         SkinSwapPoser.restore(model);
+        SkinSwapPoser.standStraight(model);
 
-        // Get elapsed time using Minecraft's tick counter
-//? if <26.2 {
-        int tickCount = DETERMINISTIC_E2E_RENDER
-                ? E2E_FIXED_PREVIEW_TICK
-                : mc != null ? mc.gui.getGuiTicks() : 0;
-//?} else {
-        int tickCount = DETERMINISTIC_E2E_RENDER
-                ? E2E_FIXED_PREVIEW_TICK
-                : mc != null ? mc.gui.hud.getGuiTicks() : 0;
-//?}
-        float elapsedTime = tickCount / 20.0f; // Convert ticks to seconds
-        float t = elapsedTime * 0.8f; // Slower, more relaxed pace
-
-        // Lerp factor for smooth transitions
-        float lerpFactor = DETERMINISTIC_E2E_RENDER ? 1.0f : 0.15f;
+        double seconds = previewSeconds();
 
         // Apply animation based on type
-        switch (animation.toLowerCase(Locale.ROOT)) {
+        switch (mode) {
             case "walk":
-                setupWalkingPose(model, t, lerpFactor);
+                setupWalkingPose(model, seconds);
                 break;
             case "sit":
-                setupSittingPose(model, t, lerpFactor);
+                setupSittingPose(model, seconds);
                 break;
             case "idle":
             default:
-                if (playerData.isShowcaseIdle()) {
-                    setupShowcaseIdlePose(model, elapsedTime);
-                } else {
-                    setupIdlePose(model, t, lerpFactor);
-                }
+                setupIdlePose(model, playerData, seconds);
                 break;
         }
 
@@ -2284,244 +2220,35 @@ public class PlayerModelRenderer {
     }
 
     /**
-     * Setup idle pose with subtle bounce animation
+     * The idle: one of several, picked at random and changed every so often (see
+     * {@link IdleShuffle}). Deterministic E2E renders always show the calm one at the fixed time.
      */
-//? if <1.21.11 {
-    private static void setupIdlePose(PlayerModel model, float t, float lerpFactor) {
-//?} else {
-    private static void setupIdlePose(PlayerModel model, float t, float lerpFactor) {
-//?}
-        // Set model state flags
-//? if <1.21 {
+    private static void setupIdlePose(PlayerModel model, PreviewPlayerData playerData, double seconds) {
         MinecraftCompat.INSTANCE.setYoung(model, false);
         MinecraftCompat.INSTANCE.setCrouching(model, false);
         MinecraftCompat.INSTANCE.setRiding(model, false);
         MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
-//?} else if <1.21.11 {
-        MinecraftCompat.INSTANCE.setYoung(model, false);
-        MinecraftCompat.INSTANCE.setCrouching(model, false);
-        MinecraftCompat.INSTANCE.setRiding(model, false);
-        MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
-//?} else {
-        MinecraftCompat.INSTANCE.setYoung(model, false);
-        MinecraftCompat.INSTANCE.setCrouching(model, false);
-        MinecraftCompat.INSTANCE.setRiding(model, false);
-        MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
-//?}
-
-        // HEAD: Bouncy up/down with head tilt
-        float targetHeadRotZ = (float)Math.sin(t * 1.2) * 0.04f;
-        prevHeadRotZ = smoothLerp(prevHeadRotZ, targetHeadRotZ, lerpFactor);
-
-        model.head.xRot = 0.0f;
-        model.head.yRot = 0.0f;
-        model.head.zRot = prevHeadRotZ;
-
-        // BODY: Bounce effect
-        float targetBodyBounce = (float)Math.abs(Math.sin(t * 0.8)) * 0.12f;
-        prevBodyRotX = smoothLerp(prevBodyRotX, targetBodyBounce * 0.2f, lerpFactor);
-
-        model.body.xRot = -prevBodyRotX;
-        model.body.yRot = 0.0f;
-        model.body.zRot = 0.0f;
-
-        // RIGHT ARM: Swing forward/back with rotation
-        float targetRightArmRotX = (float)Math.sin(t * 0.8) * 0.12f;
-        float targetRightArmRotZ = (float)Math.sin(t) * 0.04f;
-        prevRightArmRotX = smoothLerp(prevRightArmRotX, targetRightArmRotX, lerpFactor);
-        prevRightArmRotZ = smoothLerp(prevRightArmRotZ, targetRightArmRotZ, lerpFactor);
-
-        model.rightArm.xRot = prevRightArmRotX;
-        model.rightArm.yRot = 0.0f;
-        model.rightArm.zRot = prevRightArmRotZ;
-
-        // LEFT ARM: Opposite swing
-        float targetLeftArmRotX = (float)Math.sin(t * 0.8 + Math.PI) * 0.12f;
-        float targetLeftArmRotZ = (float)Math.sin(t + Math.PI) * -0.04f;
-        prevLeftArmRotX = smoothLerp(prevLeftArmRotX, targetLeftArmRotX, lerpFactor);
-        prevLeftArmRotZ = smoothLerp(prevLeftArmRotZ, targetLeftArmRotZ, lerpFactor);
-
-        model.leftArm.xRot = prevLeftArmRotX;
-        model.leftArm.yRot = 0.0f;
-        model.leftArm.zRot = prevLeftArmRotZ;
-
-        // RIGHT LEG: Subtle swing
-        float targetRightLegRotX = (float)Math.sin(t * 0.5) * 0.05f;
-        prevRightLegRotX = smoothLerp(prevRightLegRotX, targetRightLegRotX, lerpFactor);
-
-        model.rightLeg.xRot = prevRightLegRotX;
-        model.rightLeg.yRot = 0.0f;
-        model.rightLeg.zRot = 0.0f;
-
-        // LEFT LEG: Opposite subtle swing
-        float targetLeftLegRotX = (float)Math.sin(t * 0.5 + Math.PI) * 0.05f;
-        prevLeftLegRotX = smoothLerp(prevLeftLegRotX, targetLeftLegRotX, lerpFactor);
-
-        model.leftLeg.xRot = prevLeftLegRotX;
-        model.leftLeg.yRot = 0.0f;
-        model.leftLeg.zRot = 0.0f;
+        SkinSwapPoser.loop(model, DETERMINISTIC_E2E_RENDER
+                ? PreviewLoops.idle(PreviewLoops.Idle.CALM, seconds)
+                : playerData.idlePose(seconds));
     }
 
-    /**
-     * The skin menu's idle: the player stands squarely facing the viewer with the arms and legs a
-     * little apart, so the whole skin shows, and breathes slowly. The breath lifts the arms a
-     * touch away from the body and lets the head drift, each on its own slow period, so the
-     * motion never looks mechanical. Every angle is a smooth function of time, with no lerped
-     * state, so the stance is the same on every frame for the same time.
-     */
-    private static void setupShowcaseIdlePose(PlayerModel model, float seconds) {
+    /** The walk: a stride in place (see {@link PreviewLoops#walk}). */
+    private static void setupWalkingPose(PlayerModel model, double seconds) {
         MinecraftCompat.INSTANCE.setYoung(model, false);
         MinecraftCompat.INSTANCE.setCrouching(model, false);
         MinecraftCompat.INSTANCE.setRiding(model, false);
         MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
-
-        // One breath every ~4 seconds; the head and arm sway drift on slower periods.
-        float breath = (float) Math.sin(seconds * (2.0 * Math.PI / 4.0));
-        float drift = (float) Math.sin(seconds * (2.0 * Math.PI / 7.0));
-        float sway = (float) Math.sin(seconds * (2.0 * Math.PI / 5.5) + 1.3);
-
-        model.head.xRot = -0.02f + breath * 0.02f;
-        model.head.yRot = drift * 0.08f;
-        model.head.zRot = sway * 0.025f;
-
-        model.body.xRot = breath * 0.012f;
-        model.body.yRot = 0.0f;
-        model.body.zRot = 0.0f;
-
-        // Arms held a little away from the body, opening slightly on each breath. Outward is
-        // +zRot for the right arm and -zRot for the left.
-        float armOut = 0.13f + (breath * 0.5f + 0.5f) * 0.035f;
-        model.rightArm.xRot = sway * 0.035f;
-        model.rightArm.yRot = 0.0f;
-        model.rightArm.zRot = armOut;
-        model.leftArm.xRot = -sway * 0.035f;
-        model.leftArm.yRot = 0.0f;
-        model.leftArm.zRot = -armOut;
-
-        // Feet planted apart, in the same outward sense as the arms.
-        model.rightLeg.xRot = 0.0f;
-        model.rightLeg.yRot = 0.0f;
-        model.rightLeg.zRot = 0.07f;
-        model.leftLeg.xRot = 0.0f;
-        model.leftLeg.yRot = 0.0f;
-        model.leftLeg.zRot = -0.07f;
+        SkinSwapPoser.loop(model, PreviewLoops.walk(seconds));
     }
 
-    /**
-     * Setup walking pose with natural body movements
-     */
-//? if <1.21 {
-    private static void setupWalkingPose(PlayerModel model, float t, float lerpFactor) {
-        MinecraftCompat.INSTANCE.setYoung(model, false);
-        MinecraftCompat.INSTANCE.setCrouching(model, false);
-        MinecraftCompat.INSTANCE.setRiding(model, false);
-        MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
-//?} else if <1.21.11 {
-    private static void setupWalkingPose(PlayerModel model, float t, float lerpFactor) {
-        MinecraftCompat.INSTANCE.setYoung(model, false);
-        MinecraftCompat.INSTANCE.setCrouching(model, false);
-        MinecraftCompat.INSTANCE.setRiding(model, false);
-        MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
-//?} else {
-    private static void setupWalkingPose(PlayerModel model, float t, float lerpFactor) {
-        MinecraftCompat.INSTANCE.setYoung(model, false);
-        MinecraftCompat.INSTANCE.setCrouching(model, false);
-        MinecraftCompat.INSTANCE.setRiding(model, false);
-        MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
-//?}
-
-        // ARMS and LEGS: Swinging motion (arms opposite to legs) - faster animation
-        float limbSwing = (float)Math.sin(t * 8.0) * 0.6f;
-
-        // HEAD: Natural bobbing and slight side-to-side movement while walking
-        float headBobY = (float)Math.abs(Math.sin(t * 8.0)) * 0.05f; // Up and down bob matching stride
-        float headTiltZ = (float)Math.sin(t * 8.0) * 0.03f; // Slight tilt side to side
-        model.head.xRot = -headBobY; // Nod slightly with each step
-        model.head.yRot = 0.0f;
-        model.head.zRot = headTiltZ;
-
-        // BODY: Dynamic movement - sway and lean
-        float bodySway = (float)Math.sin(t * 8.0) * 0.04f; // Side-to-side sway
-        float bodyBob = (float)Math.abs(Math.sin(t * 8.0)) * 0.02f; // Up/down movement
-        model.body.xRot = 0.05f + bodyBob; // Forward lean plus bob
-        model.body.yRot = bodySway; // Torso rotation
-        model.body.zRot = bodySway * 0.5f; // Slight roll
-
-        // ARMS: Natural swing with slight outward motion
-        float armSwingOut = (float)Math.abs(Math.sin(t * 8.0)) * 0.05f;
-        model.rightArm.xRot = -limbSwing;
-        model.rightArm.yRot = 0.0f;
-        model.rightArm.zRot = armSwingOut;
-
-        model.leftArm.xRot = limbSwing;
-        model.leftArm.yRot = 0.0f;
-        model.leftArm.zRot = -armSwingOut;
-
-        // LEGS: Standard walking motion
-        model.rightLeg.xRot = limbSwing;
-        model.rightLeg.yRot = 0.0f;
-        model.rightLeg.zRot = 0.0f;
-
-        model.leftLeg.xRot = -limbSwing;
-        model.leftLeg.yRot = 0.0f;
-        model.leftLeg.zRot = 0.0f;
-    }
-
-    /**
-     * Setup sitting pose with subtle idle movements
-     */
-//? if <1.21 {
-    private static void setupSittingPose(PlayerModel model, float t, float lerpFactor) {
+    /** The sit: seated on the block with the legs out in front (see {@link PreviewLoops#sit}). */
+    private static void setupSittingPose(PlayerModel model, double seconds) {
         MinecraftCompat.INSTANCE.setYoung(model, false);
         MinecraftCompat.INSTANCE.setCrouching(model, false);
         MinecraftCompat.INSTANCE.setRiding(model, true); // Enable riding flag for sitting pose
         MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
-//?} else if <1.21.11 {
-    private static void setupSittingPose(PlayerModel model, float t, float lerpFactor) {
-        MinecraftCompat.INSTANCE.setYoung(model, false);
-        MinecraftCompat.INSTANCE.setCrouching(model, false);
-        MinecraftCompat.INSTANCE.setRiding(model, true); // Enable riding flag for sitting pose
-        MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
-//?} else {
-    private static void setupSittingPose(PlayerModel model, float t, float lerpFactor) {
-        MinecraftCompat.INSTANCE.setYoung(model, false);
-        MinecraftCompat.INSTANCE.setCrouching(model, false);
-        MinecraftCompat.INSTANCE.setRiding(model, true); // Enable riding flag for sitting pose
-        MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
-//?}
-
-        // HEAD: Subtle breathing and slight look-around
-        float headBob = (float)Math.sin(t * 0.6) * 0.02f;
-        float headTilt = (float)Math.sin(t * 0.4) * 0.03f;
-        model.head.xRot = headBob;
-        model.head.yRot = 0.0f;
-        model.head.zRot = headTilt;
-
-        // BODY: Subtle breathing motion
-        float breathe = (float)Math.sin(t * 0.5) * 0.01f;
-        model.body.xRot = breathe;
-        model.body.yRot = 0.0f;
-        model.body.zRot = 0.0f;
-
-        // ARMS: Resting on legs with subtle relaxed movement
-        float armSway = (float)Math.sin(t * 0.7) * 0.02f;
-        model.rightArm.xRot = -0.62f + armSway;
-        model.rightArm.yRot = 0.0f;
-        model.rightArm.zRot = 0.0f;
-
-        model.leftArm.xRot = -0.62f - armSway;
-        model.leftArm.yRot = 0.0f;
-        model.leftArm.zRot = 0.0f;
-
-        // LEGS: Bent for sitting with very subtle fidget
-        float legFidget = (float)Math.sin(t * 0.3) * 0.01f;
-        model.rightLeg.xRot = -1.4f + legFidget;
-        model.rightLeg.yRot = 0.31f;
-        model.rightLeg.zRot = 0.05f;
-
-        model.leftLeg.xRot = -1.4f - legFidget;
-        model.leftLeg.yRot = -0.31f;
-        model.leftLeg.zRot = -0.05f;
+        SkinSwapPoser.loop(model, PreviewLoops.sit(seconds));
     }
 
     /**
@@ -2535,11 +2262,13 @@ public class PlayerModelRenderer {
 //?}
         poseStack.pushPose();
 
-        // Hardcoded position and scale values
-        double offsetX = -0.333;
-        double offsetY = 1.4;
-        double offsetZ = 0.222;
-        double scale = 0.575;
+        // A block centred under the hips with its top at the seat and its bottom on the ground, wide
+        // enough for the hands to rest on its edges when the sit leans back; the legs reach out
+        // over its front
+        double scale = 0.675;
+        double offsetX = -scale / 2.0;
+        double offsetY = 1.5;
+        double offsetZ = 0.28125;
 
         // Position the grass block
         poseStack.translate(offsetX, offsetY, offsetZ);

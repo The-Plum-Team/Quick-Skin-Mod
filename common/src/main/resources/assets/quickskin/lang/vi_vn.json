@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": "Để nhập tệp .cpmmodel bạn cần mod Customizable Player Models",
   "quickskin.error.cpm_select_failed": "Không mặc được mô hình CPM này. Hãy kiểm tra Customizable Player Models có hoạt động không",
   "quickskin.error.import_failed": "Không nhập được tệp này làm skin. Hãy kiểm tra đó là ảnh PNG, WebP hoặc JPG mở được bình thường",
-  "quickskin.error.delete_own_skin": "Không thể xóa skin của tài khoản khi nó là skin duy nhất trong danh sách",
+  "quickskin.error.delete_last_skin": "Danh sách phải giữ lại ít nhất một skin",
   "quickskin.error.delete_failed": "Không xóa được \"%s\". Hãy kiểm tra tệp không đang mở trong chương trình khác",
   "quickskin.error.rename_exists": "Đã có skin mang tên đó. Hãy chọn tên khác",
   "quickskin.error.rename_invalid": "Tên đang trống hoặc có ký tự không được dùng trong tên tệp, như / \\ : * ? \" < > |",

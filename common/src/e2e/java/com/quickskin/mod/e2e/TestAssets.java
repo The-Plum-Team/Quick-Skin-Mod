@@ -372,6 +372,26 @@ public final class TestAssets {
     }
 
     /**
+     * A third valid 64x64 skin, distinct from {@link #makeClassicSkin()} and
+     * {@link #makeDistinctSkin()}, that the catalog steps drop into the uploads folder so another
+     * skin stays listed while the external skin is really deleted.
+     */
+    public static Path makeSpareSkin() throws Exception {
+        BufferedImage img = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setColor(new Color(0x88, 0x22, 0x66));
+        g.fillRect(0, 0, 64, 64);
+        g.setColor(new Color(0xEE, 0xDD, 0x22));
+        g.fillRect(8, 8, 8, 8);
+        g.setColor(new Color(0x22, 0xCC, 0xCC));
+        g.fillRect(0, 40, 64, 6);
+        g.dispose();
+        Path tmp = deterministicFixture("qs_e2e_spare_skin.png");
+        ImageIO.write(img, "png", tmp.toFile());
+        return tmp;
+    }
+
+    /**
      * A byte-distinct copy of the normal plaid skin for ReplayMod acknowledgement evidence.
      * Pixel {@code 0,0} is outside every player-model UV island, so the imported content gets a
      * fresh hash without changing the appearance promised by the compatibility contract.

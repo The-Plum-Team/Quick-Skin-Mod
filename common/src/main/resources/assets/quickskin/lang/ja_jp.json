@@ -93,7 +93,7 @@
   "quickskin.error.cpm_required": ".cpmmodel ファイルをインポートするには Customizable Player Models MOD が必要です",
   "quickskin.error.cpm_select_failed": "この CPM モデルを着られませんでした。Customizable Player Models が動いているか確認してください",
   "quickskin.error.import_failed": "このファイルをスキンとしてインポートできませんでした。正しく開ける PNG、WebP、JPG 画像か確認してください",
-  "quickskin.error.delete_own_skin": "リストにスキンがアカウントのスキンしかない間は削除できません",
+  "quickskin.error.delete_last_skin": "リストには少なくとも1つのスキンを残す必要があります",
   "quickskin.error.delete_failed": "「%s」を削除できませんでした。ファイルが他のプログラムで開かれていないか確認してください",
   "quickskin.error.rename_exists": "その名前のスキンはすでにあります。別の名前を選んでください",
   "quickskin.error.rename_invalid": "名前が空か、ファイル名に使えない文字が入っています（例： / \\ : * ? \" < > |）",

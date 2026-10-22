@@ -17,6 +17,7 @@ import pr_batch as batch
 
 
 REPOSITORY = "owner/repo"
+ALLOWED = ["alpha.txt", "beta.txt", "notes", "shared.txt"]
 
 
 class FakeGitHub:
@@ -27,6 +28,7 @@ class FakeGitHub:
         self.master = master
         self.pulls: dict[int, dict] = {}
         self.refs: dict[str, str] = {}
+        self.commits: dict[int, list[dict]] = {}
         self.calls: list[tuple[str, str, dict | None]] = []
 
     def add(self, number, sha, ref, *, draft=True, title=None, head_repo=REPOSITORY):
@@ -50,6 +52,9 @@ class FakeGitHub:
                     if self.pulls[key]["state"] == "open"]
         if method == "GET" and number:
             return copy.deepcopy(self.pulls[int(number.group(1))])
+        listed = re.fullmatch(r"pulls/(\d+)/commits\?per_page=100", endpoint)
+        if method == "GET" and listed:
+            return copy.deepcopy(self.commits[int(listed.group(1))])
         if method == "PATCH" and number:
             self.pulls[int(number.group(1))].update(body)
             return {}
@@ -87,7 +92,8 @@ class PullRequestBatchTest(unittest.TestCase):
         self.seed = self.root / "seed"
         self.git(self.root, "init", "--quiet", "--initial-branch=master", str(self.seed))
         self.configure(self.seed)
-        self.master = self.commit({"shared.txt": "one\ntwo\nthree\n"}, "chore: seed")
+        self.master = self.commit({"shared.txt": "one\ntwo\nthree\n",
+                                   batch.BATCH_PATHS: json.dumps(ALLOWED)}, "chore: seed")
         self.git(self.seed, "push", "--quiet", str(self.remote), "master")
         self.heads = {
             1: self.branch(1, "fix/alpha", {"alpha.txt": "alpha\n"}),
@@ -113,6 +119,7 @@ class PullRequestBatchTest(unittest.TestCase):
 
     def commit(self, files, message):
         for name, text in files.items():
+            (self.seed / name).parent.mkdir(parents=True, exist_ok=True)
             (self.seed / name).write_text(text, encoding="utf-8")
         self.git(self.seed, "add", "--all")
         self.git(self.seed, "commit", "--quiet", "--message", message)
@@ -226,9 +233,15 @@ class PullRequestBatchTest(unittest.TestCase):
         self.assertIn("\\| pipe", body)
 
     def merged_batch(self):
-        self.prepare([1, 2])
+        result = self.prepare([1, 2])
         number = next(key for key, pull in self.api.pulls.items() if pull["head"]["ref"] == "batch/tested")
         self.api.pulls[number].update(state="closed", merged=True, merged_at="2026-09-18T10:00:00Z")
+        self.api.pulls[number]["head"]["sha"] = result["head_sha"]
+        # What GitHub lists as the batch pull request's commits: the branch, oldest first.
+        self.api.commits[number] = [
+            {"sha": sha, "parents": [{"sha": self.git(self.remote, "rev-parse", f"{sha}^")}],
+             "commit": {"message": self.git(self.remote, "log", "-1", "--format=%B", sha) + "\n"}}
+            for sha in self.git(self.remote, "rev-list", "--reverse", f"{self.master}..{result['head_sha']}").split()]
         self.api.calls.clear()
         return number
 
@@ -276,6 +289,101 @@ class PullRequestBatchTest(unittest.TestCase):
                     batch.settle(self.api, number)
                 self.api.pulls[number] = pull = original
         self.assertEqual([], self.api.writes())
+
+    def test_settle_believes_the_marker_only_where_the_merged_commits_agree(self):
+        number = self.merged_batch()
+        pull = self.api.pulls[number]
+        marker = json.loads(batch.MARKER.search(pull["body"]).group(1))
+        first, second = marker["pulls"]
+
+        def body(pulls, base=None):
+            text = json.dumps({**marker, "base_sha": base or marker["base_sha"], "pulls": pulls},
+                              separators=(",", ":"))
+            return batch.MARKER.sub(lambda _: f"<!-- quick-skin-batch {text} -->", pull["body"])
+
+        commits = self.api.commits[number]
+        cases = {
+            # An edited marker would close another pull request, or one at a head that never merged.
+            "other pull": ({"body": body([{**first, "number": 3, "head_sha": self.heads[3]}, second])}, None),
+            "other head": ({"body": body([{**first, "head_sha": self.heads[3]}, second])}, None),
+            "swapped order": ({"body": body([{**second, "commit": first["commit"]},
+                                             {**first, "commit": second["commit"]}])}, None),
+            "shorter marker": ({"body": body([first])}, None),
+            "other base": ({"body": body([first, second], base="a" * 40)}, None),
+            "extra commit": ({}, commits + [{"sha": "b" * 40, "parents": [{"sha": second["commit"]}],
+                                             "commit": {"message": "x"}}]),
+            "head not merged": ({"head": {**pull["head"], "sha": first["commit"]}}, None),
+        }
+        for label, (change, listed) in cases.items():
+            with self.subTest(label=label):
+                original = copy.deepcopy(pull)
+                pull.update(change)
+                if listed is not None:
+                    self.api.commits[number] = listed
+                with self.assertRaises(batch.BatchError):
+                    batch.settle(self.api, number)
+                self.api.pulls[number] = pull = original
+                self.api.commits[number] = commits
+        self.assertEqual([], self.api.writes())
+        self.assertEqual([1, 2], batch.settle(self.api, number)["closed"])
+
+    def test_prepare_refuses_a_member_that_changes_a_path_outside_the_list_on_master(self):
+        cases = {
+            "managed caller": (".github/workflows/mod-base-build.yml", "x\n"),
+            "kit config": ("site/mod-base.json", "{}\n"),
+            "the list itself": (batch.BATCH_PATHS, json.dumps(ALLOWED + ["zeta.txt"])),
+            "unlisted new path": ("zeta.txt", "zeta\n"),
+        }
+        for number, (label, (path, text)) in enumerate(cases.items(), start=10):
+            with self.subTest(label=label):
+                head = self.branch(number, f"fix/case-{number}", {"alpha.txt": "alpha\n", path: text})
+                self.api.add(number, head, f"fix/case-{number}")
+                with self.assertRaisesRegex(batch.BatchError, rf"#{number} changes paths a batch may not carry"):
+                    self.prepare([1, number])
+                self.assertEqual("", self.remote_ref("refs/heads/batch/tested"))
+                self.assertEqual([], self.api.writes())
+        # Below an allowed directory everything is allowed, also a path added later.
+        head = self.branch(20, "notes/new", {"notes/guide/new.md": "new\n"})
+        self.api.add(20, head, "notes/new")
+        self.assertEqual([20], self.prepare([20], dry_run=True)["pulls"])
+
+    def test_prepare_needs_a_valid_list_on_master_and_never_takes_one_from_a_member(self):
+        self.git(self.seed, "rm", "--quiet", batch.BATCH_PATHS)
+        self.git(self.seed, "commit", "--quiet", "--message", "chore: drop the list")
+        self.git(self.seed, "push", "--quiet", str(self.remote), "master")
+        self.api.master = self.git(self.seed, "rev-parse", "HEAD")
+        with self.assertRaisesRegex(batch.BatchError, "has no scripts/ci/mod-base-batch-paths.json"):
+            self.prepare([1], dry_run=True)
+        for value in ([], ["b", "a"], ["a", "a"], ["/a"], ["a/"], ["a/../b"], [".github"], [".github/x"],
+                      ["scripts"], ["site/x.json"], ["docs/.Git/x"], "alpha.txt", [1]):
+            with self.subTest(value=value):
+                with self.assertRaises(batch.BatchError):
+                    batch.validate_allowed_paths(value)
+        self.assertEqual(frozenset({"common", "e2e/run-e2e.sh"}),
+                         batch.validate_allowed_paths(["common", "e2e/run-e2e.sh"]))
+
+    def test_the_policy_admits_whole_directories_without_a_protected_path(self):
+        files = [".github/workflows/a.yml", "README.md", "common/src/A.java", "common/src/b/B.java",
+                 "e2e/scenario_contract.py", "e2e/orchestrator.py", "scripts/ci/pr_batch.py",
+                 "scripts/ci/tests/test_x.py", "site/mod-base.json", "gradle/wrapper/gradle-wrapper.jar"]
+        self.assertEqual(["README.md", "common", "e2e/orchestrator.py", "scripts/ci/tests"],
+                         batch.batch_paths_policy(files))
+
+    def test_the_committed_list_is_the_policy_of_the_tracked_tree(self):
+        files = batch.tracked_files(batch.ROOT)
+        self.assertIn(batch.BATCH_PATHS, files)
+        committed = json.loads((batch.ROOT / batch.BATCH_PATHS).read_text(encoding="utf-8"))
+        self.assertEqual(batch.batch_paths_policy(files), committed,
+                         "run python3 scripts/ci/pr_batch.py paths --write")
+        allowed = batch.validate_allowed_paths(committed)
+        for path in ("common", "fabric", "forge", "neoforge", "modules", "docs/ci"):
+            self.assertIn(path, allowed)
+        for path in files:
+            if any(prefix in allowed for prefix in batch.ancestors(path)):
+                self.assertFalse(batch.is_protected(path), path)
+        for path in (".github/workflows/mod-base-build.yml", "site/mod-base.json", "release/release-matrix.json",
+                     "scripts/ci/mod-base-build.json", "gradle/verification-metadata.xml", "gradle.properties"):
+            self.assertTrue(batch.is_protected(path), path)
 
     def test_remote_is_resolved_only_from_an_exact_repository_url(self):
         for remote, url in (("origin", "https://github.com/Owner/Repo.git"),
