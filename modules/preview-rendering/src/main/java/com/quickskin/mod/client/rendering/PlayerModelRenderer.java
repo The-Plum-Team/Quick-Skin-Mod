@@ -7,6 +7,9 @@ import com.mojang.blaze3d.systems.RenderSystem;
 //?} else {
 //?}
 import com.mojang.blaze3d.vertex.PoseStack;
+//? if <1.21.6 {
+import com.mojang.blaze3d.vertex.VertexConsumer;
+//?}
 import com.mojang.math.Axis;
 import com.quickskin.mod.client.services.CapeAnimationHelper;
 import com.quickskin.mod.platform.MinecraftCompat;
@@ -89,6 +92,13 @@ public class PlayerModelRenderer {
                 : System.currentTimeMillis();
     }
 
+    /**
+     * Vanilla's elytra wings, folded as a standing player wears them: the layer's default pose,
+     * never animated. A preview that asks for them draws them with the cape's texture instead of
+     * the cape, as vanilla does for a player who wears both.
+     */
+    private static ModelPart elytraModel;
+
 //? if <1.21 {
     private static PlayerModel<?> classicModel;
     private static PlayerModel<?> slimModel;
@@ -119,12 +129,14 @@ public class PlayerModelRenderer {
             new LinkedHashMap<>(16, 0.75f, true);
     private static final int MAX_PENDING_CAPES = 128;
 
+    /** {@code elytra} is the wings to draw in the cape's place, or {@code null} for the cape. */
     public record PreviewCapeState(
 //? if <1.21.11 {
-            ResourceLocation texture, PlayerModel bodyModel, PlayerCapeModel capeModel) {
+            ResourceLocation texture, PlayerModel bodyModel, PlayerCapeModel capeModel,
 //?} else {
-            Identifier texture, PlayerModel bodyModel, PlayerCapeModel capeModel) {
+            Identifier texture, PlayerModel bodyModel, PlayerCapeModel capeModel,
 //?}
+            ModelPart elytra) {
     }
 
     private record PreviewCapeKey(
@@ -140,11 +152,11 @@ public class PlayerModelRenderer {
 //? if <1.21.11 {
             PlayerModel bodyModel, ResourceLocation skin, float rotationX, float rotationY, float pivotY,
             int x0, int y0, int x1, int y1, float scale,
-            ResourceLocation texture, PlayerCapeModel playerCapeModel) {
+            ResourceLocation texture, PlayerCapeModel playerCapeModel, ModelPart elytra) {
 //?} else {
             PlayerModel bodyModel, Identifier skin, float rotationX, float rotationY, float pivotY,
             int x0, int y0, int x1, int y1, float scale,
-            Identifier texture, PlayerCapeModel playerCapeModel) {
+            Identifier texture, PlayerCapeModel playerCapeModel, ModelPart elytra) {
 //?}
         synchronized (PENDING_CAPES) {
             PreviewCapeKey key = new PreviewCapeKey(
@@ -153,7 +165,7 @@ public class PlayerModelRenderer {
                 var oldest = PENDING_CAPES.keySet().iterator();
                 if (oldest.hasNext()) PENDING_CAPES.remove(oldest.next());
             }
-            PENDING_CAPES.put(key, new PreviewCapeState(texture, bodyModel, playerCapeModel));
+            PENDING_CAPES.put(key, new PreviewCapeState(texture, bodyModel, playerCapeModel, elytra));
         }
     }
 
@@ -189,10 +201,12 @@ public class PlayerModelRenderer {
     private static final Map<Model.Simple, PreviewCapeState> PENDING_CAPES = new IdentityHashMap<>();
     private static final int MAX_PENDING_CAPES = 128;
 
+    /** {@code elytra} is the wings to draw in the cape's place, or {@code null} for the cape. */
     public record PreviewCapeState(
             Identifier texture,
             PlayerModel bodyModel,
-            PlayerCapeModel capeModel
+            PlayerCapeModel capeModel,
+            ModelPart elytra
     ) {
     }
 
@@ -200,7 +214,8 @@ public class PlayerModelRenderer {
             Model.Simple renderModel,
             Identifier texture,
             PlayerModel bodyModel,
-            PlayerCapeModel playerCapeModel
+            PlayerCapeModel playerCapeModel,
+            ModelPart elytra
     ) {
         if (texture == null || bodyModel == null || playerCapeModel == null) {
             return;
@@ -213,7 +228,7 @@ public class PlayerModelRenderer {
                     PENDING_CAPES.remove(oldest.next());
                 }
             }
-            PENDING_CAPES.put(renderModel, new PreviewCapeState(texture, bodyModel, playerCapeModel));
+            PENDING_CAPES.put(renderModel, new PreviewCapeState(texture, bodyModel, playerCapeModel, elytra));
         }
     }
 
@@ -231,33 +246,52 @@ public class PlayerModelRenderer {
 //?}
 
     /**
-     * Initialize models (lazy initialization)
+     * Initialize models (lazy initialization).
+     *
+     * <p>The entity model set is filled by the first resource reload. Mods that remove the loading
+     * screen (Remove Reloading Screen) show the title screen while that reload is still running, and
+     * baking a layer the set does not hold yet throws. The preview then draws nothing and the next
+     * frame tries again; the models are published together, only once every layer has baked.
+     *
+     * @return {@code false} while the entity model set does not hold the player layers yet
      */
-    private static void ensureModelsLoaded() {
-        if (classicModel == null) {
-            Minecraft mc = Minecraft.getInstance();
-            ModelPart classicRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER);
-//? if <1.21.2 {
-            classicModel = new PlayerModel<>(classicRoot, false);
-//?} else {
-            classicModel = new PlayerModel(classicRoot, false);
-//?}
-
-            ModelPart slimRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER_SLIM);
-//? if <1.21.2 {
-            slimModel = new PlayerModel<>(slimRoot, true);
-//?} else {
-            slimModel = new PlayerModel(slimRoot, true);
-
-            // In MC 1.21.2+, the cape is a separate model (PlayerCapeModel).
-            ModelPart capeRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER_CAPE);
-//? if <1.21.6 {
-            capeModel = new PlayerCapeModel<>(capeRoot);
-//?} else {
-            capeModel = new PlayerCapeModel(capeRoot);
-//?}
-//?}
+    private static boolean ensureModelsLoaded() {
+        if (classicModel != null) {
+            return true;
         }
+        Minecraft mc = Minecraft.getInstance();
+        ModelPart classicRoot;
+        ModelPart slimRoot;
+//? if <1.21.2 {
+//?} else {
+        ModelPart capeRoot;
+//?}
+        try {
+            classicRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER);
+            slimRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER_SLIM);
+            elytraModel = mc.getEntityModels().bakeLayer(ModelLayers.ELYTRA);
+//? if <1.21.2 {
+//?} else {
+            // In MC 1.21.2+, the cape is a separate model (PlayerCapeModel).
+            capeRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER_CAPE);
+//?}
+        } catch (IllegalArgumentException layerNotLoadedYet) {
+            return false;
+        }
+
+//? if <1.21.2 {
+        slimModel = new PlayerModel<>(slimRoot, true);
+        classicModel = new PlayerModel<>(classicRoot, false);
+//?} else {
+//? if <1.21.6 {
+        capeModel = new PlayerCapeModel<>(capeRoot);
+//?} else {
+        capeModel = new PlayerCapeModel(capeRoot);
+//?}
+        slimModel = new PlayerModel(slimRoot, true);
+        classicModel = new PlayerModel(classicRoot, false);
+//?}
+        return true;
 //? if <1.21.6 {
 //?} else if <26.2 {
     }
@@ -658,8 +692,62 @@ public class PlayerModelRenderer {
             int mouseY,
             boolean followMouse
     ) {
+        // The skin menu's model makes a short move when another skin is picked. Its turn applies
+        // here and its bones where the model is posed; its lift and scale are kept fractional, so
+        // the model glides instead of stepping a pixel or a scale unit at a time. Packaged E2E pins
+        // every preview pose, so the move never plays there.
+        SkinSwapAnimation.Pose swap = DETERMINISTIC_E2E_RENDER
+                ? SkinSwapAnimation.Pose.REST
+                : playerData.advanceSkinSwap(System.nanoTime());
+        float turnedRotation = yRotation + swap.get(SkinSwapAnimation.Whole.TURN);
+//? if <1.21.6 {
+        // Lift and scale about the feet through the GUI pose, which every draw below inherits.
+        // The draw is inline, so the model's pose hook finds the move for exactly this call.
+        float swapScale = swap.get(SkinSwapAnimation.Whole.SCALE);
+        PoseStack guiPose = graphics.pose();
+        guiPose.pushPose();
+        guiPose.translate((double) x, y - swap.get(SkinSwapAnimation.Whole.LIFT) * scale, 0.0);
+        guiPose.scale(swapScale, swapScale, swapScale);
+        guiPose.translate((double) -x, (double) -y, 0.0);
+        SkinSwapPoser.beginInline(swap);
+        try {
+            renderPosedPlayerModel(graphics, x, y, scale, turnedRotation, playerData, mouseX, mouseY, followMouse);
+        } finally {
+            SkinSwapPoser.endInline();
+            guiPose.popPose();
+        }
+//?} else {
+        // The picture-in-picture draws below take the lift and scale from the preview data.
+        renderPosedPlayerModel(graphics, x, y, scale, turnedRotation, playerData, mouseX, mouseY, followMouse);
+//?}
+    }
+
+    private static void renderPosedPlayerModel(
+//? if <26.1 {
+            GuiGraphics graphics,
+//?} else {
+            GuiGraphicsExtractor graphics,
+//?}
+            int x,
+            int y,
+            float scale,
+            float yRotation,
+            PreviewPlayerData playerData,
+            int mouseX,
+            int mouseY,
+            boolean followMouse
+    ) {
         if (playerData.getSkinLocation() == null) {
             return; // No skin to render
+        }
+        if (!ensureModelsLoaded()) {
+            return; // The first resource reload has not filled the entity model set yet
+        }
+        // The live player cannot wear wings it may not have, so a preview of the elytra draws its own
+        // model as well
+        if (playerData.isOwnPose() || playerData.isElytraPreview()) {
+            renderPlayerModelManual(graphics, x, y, scale, yRotation, playerData, mouseX, mouseY, followMouse);
+            return;
         }
 
         // Get Minecraft instance
@@ -872,13 +960,18 @@ public class PlayerModelRenderer {
             // The picture-in-picture pass renders this state after the frame is extracted, so the
             // preview cape is keyed by the state itself and released by the cape layer that reads it.
             bindPreviewCape(renderState, playerData);
+            // The skin-change move is keyed the same way, for the model's pose hook.
+            SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
+            SkinSwapPoser.bind(renderState, swap);
 
-            // Compute offset: center entity vertically (bbHeight/2 + small offset)
-            org.joml.Vector3f offset = new org.joml.Vector3f(0, renderState.boundingBoxHeight / 2.0f + 0.0625f, 0);
+            // Compute offset: center entity vertically (bbHeight/2 + small offset). A positive
+            // offset moves the model down the box, so the move's lift is taken off it.
+            org.joml.Vector3f offset = new org.joml.Vector3f(0, renderState.boundingBoxHeight / 2.0f + 0.0625f
+                    - swap.get(SkinSwapAnimation.Whole.LIFT), 0);
 
             graphics.submitEntityRenderState(
                     renderState,
-                    (float)(int) scale,
+                    (float)(int) scale * swap.get(SkinSwapAnimation.Whole.SCALE),
                     offset,
 //?} else if <26.2 {
             ensureModelsLoaded();
@@ -916,13 +1009,18 @@ public class PlayerModelRenderer {
             // The picture-in-picture pass renders this state after the frame is extracted, so the
             // preview cape is keyed by the state itself and released by the cape layer that reads it.
             bindPreviewCape(renderState, playerData);
+            // The skin-change move is keyed the same way, for the model's pose hook.
+            SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
+            SkinSwapPoser.bind(renderState, swap);
 
-            // Compute offset: center entity vertically (bbHeight/2 + small offset)
-            org.joml.Vector3f offset = new org.joml.Vector3f(0, renderState.boundingBoxHeight / 2.0f + 0.0625f, 0);
+            // Compute offset: center entity vertically (bbHeight/2 + small offset). A positive
+            // offset moves the model down the box, so the move's lift is taken off it.
+            org.joml.Vector3f offset = new org.joml.Vector3f(0, renderState.boundingBoxHeight / 2.0f + 0.0625f
+                    - swap.get(SkinSwapAnimation.Whole.LIFT), 0);
 
             graphics.entity(
                     renderState,
-                    (float)(int) scale,
+                    (float)(int) scale * swap.get(SkinSwapAnimation.Whole.SCALE),
                     offset,
 //?} else {
             // 1.21.11: renderEntityInInventory removed. We call submitEntityRenderState directly
@@ -959,13 +1057,18 @@ public class PlayerModelRenderer {
             // The picture-in-picture pass renders this state after the frame is extracted, so the
             // preview cape is keyed by the state itself and released by the cape layer that reads it.
             bindPreviewCape(renderState, playerData);
+            // The skin-change move is keyed the same way, for the model's pose hook.
+            SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
+            SkinSwapPoser.bind(renderState, swap);
 
-            // Compute offset: center entity vertically (bbHeight/2 + small offset)
-            org.joml.Vector3f offset = new org.joml.Vector3f(0, renderState.boundingBoxHeight / 2.0f + 0.0625f, 0);
+            // Compute offset: center entity vertically (bbHeight/2 + small offset). A positive
+            // offset moves the model down the box, so the move's lift is taken off it.
+            org.joml.Vector3f offset = new org.joml.Vector3f(0, renderState.boundingBoxHeight / 2.0f + 0.0625f
+                    - swap.get(SkinSwapAnimation.Whole.LIFT), 0);
 
             graphics.entity(
                     renderState,
-                    (float)(int) scale,
+                    (float)(int) scale * swap.get(SkinSwapAnimation.Whole.SCALE),
                     offset,
 //?}
                     quaternionXZ,
@@ -1023,6 +1126,25 @@ public class PlayerModelRenderer {
 //?}
     }
 
+//? if <1.21.6 {
+    /**
+     * The folded elytra wings in the cape's place, where vanilla's wings layer puts them: on the
+     * body, a little behind it.
+     */
+    private static void renderPreviewElytra(
+//? if <1.21.2 {
+            PlayerModel<?> model, PoseStack poseStack, VertexConsumer consumer) {
+//?} else {
+            PlayerModel model, PoseStack poseStack, VertexConsumer consumer) {
+//?}
+        poseStack.pushPose();
+        model.body.translateAndRotate(poseStack);
+        poseStack.translate(0.0, 0.0, 0.125);
+        elytraModel.render(poseStack, consumer, 15728880, OverlayTexture.NO_OVERLAY);
+        poseStack.popPose();
+    }
+
+//?}
     /**
      * Manually render player model without requiring a player entity
      * Used on title screen where no world/player exists
@@ -1045,7 +1167,9 @@ public class PlayerModelRenderer {
             int mouseY,
             boolean followMouse
     ) {
-        ensureModelsLoaded();
+        if (!ensureModelsLoaded()) {
+            return;
+        }
 
         // Select model based on type
 //? if <1.21.11 {
@@ -1129,9 +1253,10 @@ public class PlayerModelRenderer {
         // Get buffer source
         MultiBufferSource.BufferSource bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
 
-        // Render grass block if sitting animation is active AND we're not in a world
-        // When in-game, animations are controlled by the game, so don't render the custom grass block
-        if ("sit".equals(playerData.getCurrentAnimation() != null ? playerData.getCurrentAnimation().toLowerCase(Locale.ROOT) : null) && mc.level == null) {
+        // Render grass block if sitting animation is active AND the pose is the preview's own
+        // When the live player is drawn, animations are controlled by the game, so don't render it
+        if ("sit".equals(playerData.getCurrentAnimation() != null ? playerData.getCurrentAnimation().toLowerCase(Locale.ROOT) : null)
+                && (mc.level == null || playerData.isOwnPose())) {
             renderGrassBlock(poseStack, bufferSource);
         }
 //?} else {
@@ -1216,7 +1341,10 @@ public class PlayerModelRenderer {
 //?}
 //? if <1.21.2 {
 
-            if (finalCapeTexture != null) {
+            if (finalCapeTexture != null && playerData.isElytraPreview()) {
+                renderPreviewElytra(model, poseStack,
+                        bufferSource.getBuffer(CapeRenderTypes.translucent(finalCapeTexture)));
+            } else if (finalCapeTexture != null) {
                 // Now render the cape using the final texture
                 RenderType capeRenderType = CapeRenderTypes.translucent(finalCapeTexture);
                 var capeVertexConsumer = bufferSource.getBuffer(capeRenderType);
@@ -1237,7 +1365,10 @@ public class PlayerModelRenderer {
             }
 //?} else if <1.21.6 {
 
-            if (finalCapeTexture != null) {
+            if (finalCapeTexture != null && playerData.isElytraPreview()) {
+                renderPreviewElytra(model, poseStack,
+                        bufferSource.getBuffer(CapeRenderTypes.translucent(finalCapeTexture)));
+            } else if (finalCapeTexture != null) {
                 RenderType capeRenderType = CapeRenderTypes.translucent(finalCapeTexture);
                 var capeVertexConsumer = bufferSource.getBuffer(capeRenderType);
 
@@ -1254,13 +1385,17 @@ public class PlayerModelRenderer {
         }
 //? if <1.21.6 {
 //?} else if <26.2 {
-        // Force PiP cache invalidation when cape changes by adding imperceptible scale nudge
-        int capeHash = capeTexture != null ? capeTexture.hashCode() : 0;
+        // Force PiP cache invalidation when cape changes by adding imperceptible scale nudge; the
+        // wings drawn in its place are a change too
+        int capeHash = (capeTexture != null ? capeTexture.hashCode() : 0)
+                ^ (playerData.isElytraPreview() ? 0x2A55 : 0);
         float scaleNudge = 0.000004f * (capeHash & 0x3FFF);
         float rotationXNudge = 0.0000001f * ((capeHash >>> 14) & 0x3FFFF);
 //?} else {
-        // Include cape identity in the PiP state so changing only the cape invalidates its cache.
-        int capeHash = capeTexture != null ? capeTexture.hashCode() : 0;
+        // Include cape identity in the PiP state so changing only the cape invalidates its cache;
+        // the wings drawn in its place are a change too.
+        int capeHash = (capeTexture != null ? capeTexture.hashCode() : 0)
+                ^ (playerData.isElytraPreview() ? 0x55 : 0);
         float scaleNudge = 0.000001f * (capeHash & 0xFF);
 //?}
 
@@ -1271,6 +1406,10 @@ public class PlayerModelRenderer {
         // Submit to PiP system - cape rendering injected by GuiSkinRendererMixin
         int boxHeight = (int)(scale * 2.3f);
         int boxHalfWidth = (int)(scale * 1.0f);
+        // The skin-change move's scale and lift; the box sits on whole GUI pixels.
+        SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
+        float swapScale = swap.get(SkinSwapAnimation.Whole.SCALE);
+        y -= Math.round(swap.get(SkinSwapAnimation.Whole.LIFT) * scale);
 //?}
 
 //? if <1.21 {
@@ -1283,7 +1422,7 @@ public class PlayerModelRenderer {
         // Lighting.setupFor3DItems();
         Lighting.setupFor3DItems();
 //?} else if <26.1 {
-        float submittedScale = (float)(int) scale + scaleNudge;
+        float submittedScale = (float)(int) scale * swapScale + scaleNudge;
         float submittedRotationY = -45.0f + yRotation;
         graphics.submitSkinRenderState(
                 model,
@@ -1299,9 +1438,10 @@ public class PlayerModelRenderer {
         );
         registerPendingCape(model, playerData.getSkinLocation(), rotationXNudge,
                 submittedRotationY, -1.0625f, x - boxHalfWidth, y - boxHeight,
-                x + boxHalfWidth, y, submittedScale, capeTexture, capeModel);
+                x + boxHalfWidth, y, submittedScale, capeTexture, capeModel,
+                playerData.isElytraPreview() ? elytraModel : null);
 //?} else if <26.2 {
-        float submittedScale = (float)(int) scale + scaleNudge;
+        float submittedScale = (float)(int) scale * swapScale + scaleNudge;
         float submittedRotationY = -45.0f + yRotation;
         graphics.skin(
                 model,
@@ -1317,14 +1457,15 @@ public class PlayerModelRenderer {
         );
         registerPendingCape(model, playerData.getSkinLocation(), rotationXNudge,
                 submittedRotationY, -1.0625f, x - boxHalfWidth, y - boxHeight,
-                x + boxHalfWidth, y, submittedScale, capeTexture, capeModel);
+                x + boxHalfWidth, y, submittedScale, capeTexture, capeModel,
+                playerData.isElytraPreview() ? elytraModel : null);
 //?} else {
         Model.Simple renderModel = new Model.Simple(
                 model.root(), net.minecraft.client.renderer.rendertype.RenderTypes::entityTranslucent);
         graphics.skin(
                 renderModel,
                 playerData.getSkinLocation(),
-                (float)(int) scale + scaleNudge,
+                (float)(int) scale * swapScale + scaleNudge,
                 0.0f,
                 -45.0f + yRotation,
                 -1.0625f,
@@ -1333,7 +1474,8 @@ public class PlayerModelRenderer {
                 x + boxHalfWidth,
                 y
         );
-        registerPendingCape(renderModel, capeTexture, model, capeModel);
+        registerPendingCape(renderModel, capeTexture, model, capeModel,
+                playerData.isElytraPreview() ? elytraModel : null);
 //?}
     }
 
@@ -2037,9 +2179,12 @@ public class PlayerModelRenderer {
             animation = "idle";
         }
 
-        // CHECK: Should we update animation this frame? (30 FPS instead of 60+)
+        // CHECK: Should we update animation this frame? (30 FPS instead of 60+, except while the
+        // skin-change move plays, which would stutter at that rate)
+        SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
         long now = animationTimeMillis();
         boolean shouldUpdate = DETERMINISTIC_E2E_RENDER
+                || !swap.isRest()
                 || (now - lastAnimationUpdate) >= ANIMATION_UPDATE_INTERVAL_MS;
 
         if (!shouldUpdate) {
@@ -2063,6 +2208,9 @@ public class PlayerModelRenderer {
         if (!DETERMINISTIC_E2E_RENDER) {
             lastAnimationUpdate = now;
         }
+
+        // The idle poses below leave the parts' pivots alone, so put back those a move shifted.
+        SkinSwapPoser.restore(model);
 
         // Get elapsed time using Minecraft's tick counter
 //? if <26.2 {
@@ -2090,8 +2238,17 @@ public class PlayerModelRenderer {
                 break;
             case "idle":
             default:
-                setupIdlePose(model, t, lerpFactor);
+                if (playerData.isShowcaseIdle()) {
+                    setupShowcaseIdlePose(model, elapsedTime);
+                } else {
+                    setupIdlePose(model, t, lerpFactor);
+                }
                 break;
+        }
+
+        // The skin-change move, on top of the animation's own pose.
+        if (!swap.isRest()) {
+            SkinSwapPoser.apply(model, swap);
         }
 
 //? if <1.21.2 {
@@ -2203,6 +2360,51 @@ public class PlayerModelRenderer {
         model.leftLeg.xRot = prevLeftLegRotX;
         model.leftLeg.yRot = 0.0f;
         model.leftLeg.zRot = 0.0f;
+    }
+
+    /**
+     * The skin menu's idle: the player stands squarely facing the viewer with the arms and legs a
+     * little apart, so the whole skin shows, and breathes slowly. The breath lifts the arms a
+     * touch away from the body and lets the head drift, each on its own slow period, so the
+     * motion never looks mechanical. Every angle is a smooth function of time, with no lerped
+     * state, so the stance is the same on every frame for the same time.
+     */
+    private static void setupShowcaseIdlePose(PlayerModel model, float seconds) {
+        MinecraftCompat.INSTANCE.setYoung(model, false);
+        MinecraftCompat.INSTANCE.setCrouching(model, false);
+        MinecraftCompat.INSTANCE.setRiding(model, false);
+        MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
+
+        // One breath every ~4 seconds; the head and arm sway drift on slower periods.
+        float breath = (float) Math.sin(seconds * (2.0 * Math.PI / 4.0));
+        float drift = (float) Math.sin(seconds * (2.0 * Math.PI / 7.0));
+        float sway = (float) Math.sin(seconds * (2.0 * Math.PI / 5.5) + 1.3);
+
+        model.head.xRot = -0.02f + breath * 0.02f;
+        model.head.yRot = drift * 0.08f;
+        model.head.zRot = sway * 0.025f;
+
+        model.body.xRot = breath * 0.012f;
+        model.body.yRot = 0.0f;
+        model.body.zRot = 0.0f;
+
+        // Arms held a little away from the body, opening slightly on each breath. Outward is
+        // +zRot for the right arm and -zRot for the left.
+        float armOut = 0.13f + (breath * 0.5f + 0.5f) * 0.035f;
+        model.rightArm.xRot = sway * 0.035f;
+        model.rightArm.yRot = 0.0f;
+        model.rightArm.zRot = armOut;
+        model.leftArm.xRot = -sway * 0.035f;
+        model.leftArm.yRot = 0.0f;
+        model.leftArm.zRot = -armOut;
+
+        // Feet planted apart, in the same outward sense as the arms.
+        model.rightLeg.xRot = 0.0f;
+        model.rightLeg.yRot = 0.0f;
+        model.rightLeg.zRot = 0.07f;
+        model.leftLeg.xRot = 0.0f;
+        model.leftLeg.yRot = 0.0f;
+        model.leftLeg.zRot = -0.07f;
     }
 
     /**

@@ -1133,26 +1133,46 @@ public class LocalAssetManager {
     }
 
     /**
-     * Get comparator for sorting assets based on sort mode
+     * Get comparator for sorting assets based on sort mode: the player's own skin first, then the
+     * favorites, each group in the mode's order
      */
     private Comparator<AssetMetadata> getSortComparator(SkinSortMode mode, String playerSkinHash) {
+        Comparator<AssetMetadata> pinned = Comparator
+                .comparing((AssetMetadata meta) -> !meta.hash().equals(playerSkinHash))
+                .thenComparing(meta -> skinPreferences == null || !skinPreferences.isFavorite(meta.hash()));
         return switch (mode) {
-            case LATEST_LAST -> Comparator
-                    .comparing((AssetMetadata meta) -> !meta.hash().equals(playerSkinHash))
+            case LATEST_LAST -> pinned
                     .thenComparing(AssetMetadata::friendlyName);
 
-            case LATEST_FIRST -> Comparator
-                    .comparing((AssetMetadata meta) -> !meta.hash().equals(playerSkinHash))
+            case LATEST_FIRST -> pinned
                     .thenComparing(Comparator.comparing(AssetMetadata::lastModifiedTime).reversed());
 
-            case ALPHABETICAL -> Comparator
-                    .comparing((AssetMetadata meta) -> !meta.hash().equals(playerSkinHash))
+            case ALPHABETICAL -> pinned
                     .thenComparing(AssetMetadata::friendlyName);
         };
     }
 
-    /** Get all selectable skin entries, including optional CPM models. */
+    /**
+     * Get all selectable skin entries, including optional CPM models, as the skin list shows them:
+     * the player's own skin is left out while the player has hidden it and another entry is listed.
+     */
     public List<AssetMetadata> getAllSkins() {
+        ClientConfig config = ClientConfig.getInstance();
+        List<AssetMetadata> skins = getSelectableSkins();
+        if (!config.enablePlayerOwnSkinSystem || !config.playerOwnSkinHidden) {
+            return skins;
+        }
+        return withoutOwnSkin(skins, catalog.resolve(config.playerOwnSkinHash));
+    }
+
+    /** Whether any selectable skin or CPM model other than the player's own skin is catalogued. */
+    public boolean hasSkinsBesidesOwnSkin() {
+        String ownSkin = catalog.resolve(ClientConfig.getInstance().playerOwnSkinHash);
+        return getSelectableSkins().stream().anyMatch(meta -> !meta.hash().equals(ownSkin));
+    }
+
+    /** Every selectable skin and CPM model, the own skin included, in the list's order. */
+    private List<AssetMetadata> getSelectableSkins() {
         CatalogSnapshot snapshot = catalog;
         String playerOwnSkinHash = snapshot.resolve(ClientConfig.getInstance().playerOwnSkinHash);
         SkinSortMode sortMode = ClientConfig.getInstance().getSkinSortMode();
@@ -1164,6 +1184,18 @@ public class LocalAssetManager {
 //?}
                 .sorted(getSortComparator(sortMode, playerOwnSkinHash))
                 .toList();
+    }
+
+    /**
+     * The skins without the own skin, unless it is the only one: a list never runs empty because
+     * the own skin is hidden.
+     */
+    static List<AssetMetadata> withoutOwnSkin(List<AssetMetadata> skins, @Nullable String ownSkinHash) {
+        if (ownSkinHash == null) {
+            return skins;
+        }
+        List<AssetMetadata> others = skins.stream().filter(meta -> !meta.hash().equals(ownSkinHash)).toList();
+        return others.isEmpty() ? skins : others;
     }
 
     /**
@@ -2033,18 +2065,27 @@ public class LocalAssetManager {
     }
 
     /**
-     * Get model type preference for a skin
+     * Get model type preference for a skin: the arm width chosen in the skin menu, or else the one
+     * detected when the skin was imported. A skin keeps that width until the player picks the
+     * other; "auto" remains only for a hash that names no catalogued skin, or a skin with no
+     * detected width.
      * @param hash Skin hash
-     * @return Model type preference ("auto", "classic", or "slim")
+     * @return Model type preference ("classic" or "slim", or "auto" as above)
      */
     public String getSkinModelPreference(String hash) {
         if (!NetworkSecurity.isValidContentId(hash)) return "auto";
         String primary = catalog.resolve(hash);
         if (primary == null) return "auto";
-        if (skinPreferences == null) {
-            return "auto";
+        String chosen = skinPreferences != null ? skinPreferences.getModelType(primary) : "auto";
+        if ("auto".equals(chosen)) {
+            // Nothing chosen yet, or chosen before the choice was only Wide or Slim: the arm width
+            // detected on import
+            AssetMetadata metadata = getMetadata(primary);
+            if (metadata != null && metadata.skinModel() != null) {
+                return metadata.skinModel();
+            }
         }
-        return skinPreferences.getModelType(primary);
+        return chosen;
     }
 
     /**
@@ -2060,6 +2101,22 @@ public class LocalAssetManager {
             skinPreferences.setModelType(primary, modelType);
             savePreferences();
         }
+    }
+
+    /** Whether the player marked this skin or CPM model as a favorite. */
+    public boolean isFavorite(String hash) {
+        if (!NetworkSecurity.isValidContentId(hash)) return false;
+        String primary = catalog.resolve(hash);
+        return primary != null && skinPreferences != null && skinPreferences.isFavorite(primary);
+    }
+
+    /** Marks or unmarks a skin or CPM model as a favorite, which the skin list shows first. */
+    public void setFavorite(String hash, boolean favorite) {
+        if (!NetworkSecurity.isValidContentId(hash)) return;
+        String primary = catalog.resolve(hash);
+        if (primary == null || skinPreferences == null) return;
+        skinPreferences.setFavorite(primary, favorite);
+        savePreferences();
     }
 
     /**

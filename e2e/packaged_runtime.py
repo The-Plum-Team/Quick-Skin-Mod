@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Iterator, Mapping
@@ -572,6 +573,20 @@ def server_runtime_recipe(
     )
 
 
+# Mirrors and CDNs serving runtime dependencies answer single runners with a 5xx or a reset
+# connection now and then; one such answer used to fail a whole packaged generation.
+DOWNLOAD_ATTEMPTS = 3
+DOWNLOAD_RETRY_DELAY_SECONDS = 10
+
+
+def _transient_download_error(exc: BaseException) -> bool:
+    """True for a failure a later attempt can cure: a 5xx, 408 or 429, a timeout or a reset."""
+
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code >= 500 or exc.code in (408, 429)
+    return isinstance(exc, (urllib.error.URLError, TimeoutError, ConnectionError, socket.timeout))
+
+
 def download(url: str, destination: Path, expected_sha256: str) -> Path:
     if not url.startswith("https://"):
         raise RuntimeFailure(f"refusing non-HTTPS runtime download: {url}")
@@ -587,12 +602,24 @@ def download(url: str, destination: Path, expected_sha256: str) -> Path:
         url,
         headers={"User-Agent": "The-Plum-Team/Quick-Skin-Mod packaged-e2e"},
     )
-    try:
-        with urllib.request.urlopen(request, timeout=120) as response, temporary.open("wb") as out:
-            shutil.copyfileobj(response, out)
-    except Exception as exc:
-        temporary.unlink(missing_ok=True)
-        raise RuntimeFailure(f"failed to download {url}: {exc}") from exc
+    for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+        try:
+            with (
+                urllib.request.urlopen(request, timeout=120) as response,
+                temporary.open("wb") as out,
+            ):
+                shutil.copyfileobj(response, out)
+            break
+        except Exception as exc:
+            temporary.unlink(missing_ok=True)
+            if attempt == DOWNLOAD_ATTEMPTS or not _transient_download_error(exc):
+                raise RuntimeFailure(f"failed to download {url}: {exc}") from exc
+            print(
+                f"download attempt {attempt}/{DOWNLOAD_ATTEMPTS} of {url} failed: {exc}; retrying",
+                file=sys.stderr,
+                flush=True,
+            )
+            time.sleep(DOWNLOAD_RETRY_DELAY_SECONDS * attempt)
     if sha256(temporary) != expected_sha256:
         actual = sha256(temporary)
         temporary.unlink(missing_ok=True)
@@ -1223,6 +1250,10 @@ def write_server_config(server: Path, scenario: str) -> Path | None:
     return config_path
 
 
+# ClientConfig.CURRENT_CONFIG_VERSION of the packaged mod.
+E2E_CLIENT_CONFIG_VERSION = 1
+
+
 def write_e2e_client_config(game_dir: Path) -> Path:
     """Seed a clean Quick Skin profile before client initialization.
 
@@ -1231,6 +1262,10 @@ def write_e2e_client_config(game_dir: Path) -> Path:
     with account data whose arrival time depends on the network.  Each E2E game directory is
     disposable, so disable that importer and start with no persisted selection before Minecraft
     loads the mod.
+
+    The menus keep the starred background that the contract's checkpoints describe; the settings
+    scenario switches to the blurred vanilla background itself. The current ``configVersion``
+    stops the client's one-time migration from replacing that choice.
     """
 
     config_path = game_dir / "config" / "quickskin-client.json"
@@ -1243,6 +1278,8 @@ def write_e2e_client_config(game_dir: Path) -> Path:
                 "activeCpmModelHash": "",
                 "activeCapeHash": "",
                 "playerOwnSkinHash": "",
+                "configVersion": E2E_CLIENT_CONFIG_VERSION,
+                "menuBackgroundStyle": "opaque_stars",
             },
             indent=2,
             sort_keys=True,

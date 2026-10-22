@@ -12,7 +12,8 @@
     "CapeLayerMixin",
     "ItemInHandRendererMixin",
     "PanoramaRendererMixin",
-    "PreviewEquipmentMixin"
+    "PreviewEquipmentMixin",
+    "PreviewSkinSwapPoseMixin"
   ],
   "mixins": [
     "ChunkMapAccessor",

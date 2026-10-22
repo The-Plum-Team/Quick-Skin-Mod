@@ -3,9 +3,15 @@
 
 The installed server tree is content-addressed and revalidated on every read, so a corrupt or
 substituted entry degrades to a cache miss and a fresh install. It is still executable material
-that a later job launches, so writing it is restricted the way Gradle's home cache already is:
-only a protected ``master`` generation may publish an entry, and every other context restores
-read-only. Pull requests, tags, ephemeral branches and unknown input are read-only.
+that a later job launches, and an Actions cache written from a ``master`` context is restored by
+every later run of the repository. Only a job that builds and runs exclusively protected-``master``
+code may therefore write: the job must declare itself a writer (``--writer-job true``, passed only
+by jobs whose runtime bundle was built from protected ``master`` in the same trusted context), and
+the run must be a manual or Build-gate dispatch on protected ``master``. Every other context
+restores read-only. That includes a ``repository_dispatch`` on ``master``: the optional-mod wave
+launches the JARs that the original ``pull_request`` run built when its merge reused that run, so
+code not fully reviewed could otherwise write a ``master`` cache entry. Pull requests, tags,
+ephemeral branches and unknown input are read-only.
 
 The policy is fail-closed. Anything that is not an exact approved writer prints ``true``
 (read-only), and malformed required input exits non-zero instead of guessing.
@@ -17,10 +23,11 @@ import argparse
 import sys
 from typing import Sequence
 
-# A protected `master` generation reaches packaged runtime through an explicit dispatch: the
-# Build gate dispatches the post-merge suite, and the compatibility producer is repository
-# dispatched. A `push` never starts packaged runtime, so it grants no write capability.
-WRITER_EVENTS = frozenset({"workflow_dispatch", "repository_dispatch"})
+# A protected `master` generation reaches packaged runtime from its own Build through an explicit
+# dispatch: the Build gate dispatches the post-merge suite, and a maintainer may dispatch it or a
+# release rehearsal. A `push` never starts packaged runtime, and a `repository_dispatch` (the
+# optional-mod wave) may run JARs a pull request built, so neither grants write capability.
+WRITER_EVENTS = frozenset({"workflow_dispatch"})
 WRITER_BRANCH = "master"
 READ_ONLY_REF_PREFIXES = (
     "automation/",
@@ -47,6 +54,7 @@ def is_read_only(
     ref_name: str,
     ref_type: str,
     ref_protected: bool,
+    writer_job: bool,
 ) -> bool:
     """Return ``True`` unless the exact input is an approved cache writer."""
     _require_non_empty(event_name, "event name")
@@ -54,8 +62,10 @@ def is_read_only(
     _require_non_empty(ref_type, "ref type")
     if not isinstance(ref_protected, bool):
         raise PolicyError("ref protected must be a boolean")
+    if not isinstance(writer_job, bool):
+        raise PolicyError("writer job must be a boolean")
 
-    if event_name not in WRITER_EVENTS or ref_type != "branch" or not ref_protected:
+    if not writer_job or event_name not in WRITER_EVENTS or ref_type != "branch" or not ref_protected:
         return True
     if ref_name.startswith(READ_ONLY_REF_PREFIXES):
         return True
@@ -68,6 +78,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--ref-name", required=True)
     parser.add_argument("--ref-type", required=True)
     parser.add_argument("--ref-protected", choices=("true", "false"), required=True)
+    parser.add_argument("--writer-job", choices=("true", "false"), required=True)
     args = parser.parse_args(argv)
 
     try:
@@ -76,6 +87,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ref_name=args.ref_name,
             ref_type=args.ref_type,
             ref_protected=args.ref_protected == "true",
+            writer_job=args.writer_job == "true",
         )
     except PolicyError as exc:
         print(f"Runtime store cache policy error: {exc}", file=sys.stderr)

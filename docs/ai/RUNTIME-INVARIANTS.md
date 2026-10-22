@@ -163,6 +163,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 
 ## Files, images, and persistence
 
+- Android launchers expose Linux/OpenJDK rather than an Android `os.name`. `FilePickerFiles`
+  recognises their Android runtime environment; `FileDialogHelper` routes skins, capes and batch
+  imports to the Minecraft-rendered `MobileFilePickerScreen` before any desktop native dialog.
+  Directory scans run on `ClientIoExecutor`, cap visited entries and do not follow symlink entries.
+  A stale scan never updates a closed picker. The picker releases the shared dialog guard on
+  removal (including cancellation) and restores its parent before invoking an import callback,
+  since cape import can open its own editor. It reads only launcher-accessible files; it does not
+  obtain Android storage permissions or bypass scoped storage. Desktop dialog routes stay native.
+
 - Use `BoundedFileReader`, `SafeImageReader`, and the established GIF preflight path. Do not add
   production `ImageIO.read`, unbounded `Files.readAllBytes`/`readString`, or decode-before-dimension
   validation.
@@ -196,12 +205,29 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Opaque-fill, import fallback, local/network presentation, and animation processing must share
   the same structural mask; content-addressed source bytes remain immutable when only presentation
   requires normalization.
-- A cape saved through the cape editor keeps its original PNG or GIF in
+- The player's own skin is never deleted. Deleting it from the skin menu sets
+  `ClientConfig.playerOwnSkinHidden`, and `LocalAssetManager.getAllSkins` then leaves it out of
+  the list, but only while another skin or CPM model is listed: the list never runs empty because
+  of it, deleting the last other skin clears the flag, and deleting it while it is the only skin
+  is refused. A hidden own skin is still the fallback look when the worn skin is deleted, and a
+  new own skin (the account's skin changed) is listed again.
+- A cape saved through the cape editor keeps its original PNG, WebP or GIF in
   `quickskin_cache/cape_editor_sources/<cape content ID>.<ext>` (`CapeEditorSources`). That file
   only reopens `CapeAdjustScreen`: it is never scanned, registered as a texture or animation, or
   substituted for a cape that has none. An edit writes the new metadata and source association
   first, replaces the catalogued PNG in place, and re-points the active cape and its animation
   speed to the new content ID; a source is removed only when no catalogued cape carries its ID.
+- An animated source opens in `CapeAdjustScreen` with a timeline (`CapeAnimationTimeline`): a
+  kept run of its frames, reversed and/or played there and back, each with its own source delay
+  divided by the chosen speed. Apply writes one atlas frame per entry of that sequence and its own
+  timing (one entry per atlas frame, in order, 20 ms to 60 s), and is refused past 256 frames.
+  Reopening the cape starts again from the retained source, untrimmed.
+- A GIF import the native loader refuses only for its size (canvas over 2048, more than 256
+  frames, more than 64 MB decoded) is decoded again by `ScaledGifDecoder`: bounded first (32 MB of
+  file, 4096 per side, 1024 frames, 512M composed canvas pixels), then composed one frame at a time
+  and shrunk evenly into an atlas of at most 1024 per side and 64 MB. Such an atlas, like any GIF
+  over 256 frames, always goes through the editor; only a GIF the catalogue loads as it is is
+  copied unchanged.
 - An active Quick Skin cape is authoritative for both the renderer's cape and profile-Elytra
   texture inputs. Never retain an unrelated Mojang/profile Elytra beside a custom cape: vanilla
   gives that dedicated field priority and would otherwise replace only the worn wings when the
@@ -216,6 +242,17 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   `RealCameraTextureIdMixin` prefixes Quick Skin skin ids inside Real Camera's own buffer record
   only; it is a fail-open shim without a compatibility lane. Do not rename the registered
   `quickskin:` texture locations for another mod.
+- JourneyMap draws player head icons from a face it crops itself, and no JourneyMap build reaches
+  a Quick Skin skin on its own: 1.20.1 downloads the Mojang skin, 1.21.1 to 1.21.3 accept only
+  Mojang's `HttpTexture`, and every build caches the first face per player for the session.
+  `JourneyMapIgnSkinMixin` (`IgnSkin.getFace`, every build) and `JourneyMapTextureCacheMixin`
+  (`TextureCache.getPlayerSkinLocation`, 1.21.6 and later) answer with `JourneyMapPlayerFaces`:
+  the worn skin's head front with its hat layer, scaled to JourneyMap's 24x24 face, registered
+  under one `quickskin:journeymap_face/<uuid>` id per player that a new skin replaces. Without a
+  Quick Skin skin, or before it has loaded, JourneyMap keeps its own face. They are fail-open
+  shims named by string without a compatibility lane; the face cache is bounded and cleared with
+  the session. Xaero's Minimap and World Map read the player's skin through `PlayerInfo` and the
+  renderer, which Quick Skin already overrides, and need no shim.
 - From Minecraft 1.21.2 onward, the vanilla outer skin parts are children of their matching body
   parts. Preserve their baked local poses; copying the parent pose onto a child applies the pivot
   twice and detaches both the flat outer layers and the 3D Skin Layers geometry in offline previews.
@@ -231,6 +268,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   preview and move and enlarge the pause preview.
 - Compatibility failures must degrade locally; they must not break base mod initialization or
   dedicated-server startup.
+- A release JAR holds only Quick Skin's own packages, so no other mod's copy of a library can
+  stop the game at module resolution. Bundled libraries are pure Java, relocated below
+  `com.quickskin.mod.shadow` and called directly; never nest a library JAR, ship a native library
+  or register a global Java service such as an ImageIO reader. `SafeImageReader` decodes WebP with
+  the relocated TwelveMonkeys reader and leaves PNG and JPEG to ImageIO. `verify_release.py`
+  enforces the JAR layout; see `DEPENDENCY-SECURITY.md`.
 - The latest look choice between Quick Skin and CPM is the local player's look, for every other
   player as well and across relogs and restarts (`CpmLook`). It is derived from CPM's persisted
   `selectedModel`, Quick Skin's selection and, per connection, a model the server assigned: a CPM
@@ -265,8 +308,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.
-- A preview hides everything the previewed player wears or holds. The one exception is the HUD
-  preview keeping a held TaCZ (Timeless and Classics Zero) gun readable, so TaCZ poses and draws
+- A preview hides everything the previewed player wears or holds. The cape editor's Elytra view
+  is no exception: it draws its own model with vanilla's folded wings wearing the edited cape's
+  texture (`PreviewPlayerData.isElytraPreview`), never the elytra the player has equipped. The
+  one exception is the HUD preview keeping a held TaCZ (Timeless and Classics Zero) gun readable, so TaCZ poses and draws
   that model as it does in the world. It exists only on the inline draw before 1.21.6; the
   render-state path keeps blanking both hands, because no TaCZ exists for those versions. TaCZ is
   not a supported integration and has no compatibility lane: recognise its gun type by name only,
@@ -410,24 +455,35 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   decodes the bytes the client registered for that hash rather than the source file, and the block
   restores the plaid classic skin before any cape checkpoint.
 - Catalog evidence drives the real rename, sort, own-skin, and delete paths of the skin menu,
-  never the service alone. The protected own-skin row must be pinned first, highlighted purple,
-  and refuse deletion with the real error toast; a stale saved skin id whose file vanished must
-  fall back to the vanilla default without a manual reset. The menu instance that returns from a
-  Rename or Delete dialog must still hold its forced menu scale: a dialog returns to its parent
-  exactly once, and `removed()` never leaves the close guard latched, so the catalog checkpoints
-  settle only at that scale rather than tolerating the user's scale.
+  never the service alone. The own-skin row must be pinned first and highlighted purple;
+  deleting it while another skin is listed must only hide it, keeping its file, deleting the last
+  other skin must list it again, and deleting it as the only skin must be refused with the real
+  error toast; a stale saved skin id whose file vanished must
+  fall back to the vanilla default without a manual reset. The catalog checkpoints run on the
+  menu instance that the Rename and Delete dialogs return to.
+- No Quick Skin screen writes the player's GUI Scale option or calls `resizeDisplay()`: other mods
+  break when the option changes or the display resizes under them. The skin and cape menus draw
+  at their own scale, chosen from the window size so they look the same at any option, by setting
+  only the window's scale while they are shown (`MenuGuiScale`), and put back the option's scale
+  in `removed()`, so every other screen and the world open at the player's own scale. A Quick
+  Skin dialog drawn over a menu (Delete, Rename, Settings, Upload to Mojang) takes the menu's
+  scale instead (`MenuGuiScale.follow`), so the menu behind it keeps its size, and puts back the
+  player's scale when it goes away. The
+  skin menu's packaged checkpoint asserts both the menu's scale on the window and the unchanged
+  option.
 - GUI cape import evidence must go through `CapeImportWorkflow` from the real drop entry point:
   a translucent user cape with a transparent elytra area must be saved with the vanilla elytra
   composited in, keep its half-transparent face in-world and on the equipped wings, and the menu
-  must show its import, cancel, batch-limit, and delete messages. Cape-menu evidence must click
+  must report its import, batch-limit, and delete outcomes as toasts, and a cancelled editor
+  leaves it without one. Cape-menu evidence must click
   real tiles through the screen's mouse handlers so selection, the None tile, the speed slider,
   the GIF badge, the scrollbar, the tooltip, and Hide Built-in Capes are exercised as a user does.
   The worn-cape capture must also pass its contract-owned pixel probe: the yellow border encloses
   a teal surface with repeated plaid bands visible through it. Atlas alpha alone cannot certify
   framebuffer transparency; a closed cape mesh must cull its opaque inward-facing back surface.
 - Settings evidence must show every tab through the real tab buttons, the keybind capture state,
-  the non-admin server notice with inactive server controls, and styled buttons over the vanilla
-  in-world background; the captured tab must be the tab whose controls the assertion toggles.
+  the non-admin server notice with inactive server controls, and the skin menu's own buttons over
+  the vanilla in-world background; the captured tab must be the tab whose controls the assertion toggles.
 - The `server-policy` scenario is the only place a non-default `quickskin-server.json` exists. Its
   seed comes solely from the contract's `orchestration.server_config`; the orchestrator writes it
   verbatim before the server starts. Evidence must prove the server override reached the client,
@@ -486,7 +542,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   client/server role that keeps those two trees in separate identity namespaces. The installed
   server keeps its own store and is the only runtime material transported between jobs: under its
   exact recipe digest with no prefix fallback, carrying only immutable content-addressed material,
-  published only by a protected `master` generation, and always optional because a restore that
+  published only by a declared writer job of a protected `master` dispatch that launches a bundle
+  its own run built (never by the optional-mod wave), and always optional because a restore that
   fails the store's own validation is a cache miss and a fresh install.
   Publish verified immutable trees under a recipe lock, hold an OS-backed lease continuously from
   lookup/build through materialization, and materialize a fresh mutable copy. Collection
@@ -496,10 +553,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   deletion (including read-only files), so a partial delete cannot poison the active namespace.
   Treat stale/unknown/corrupt identity as a miss or fail-closed error. Garbage
   collection is bounded housekeeping, never a correctness mechanism. Dependency hashes come from
-  the recorded Gradle verification metadata; first-download trust is forbidden here. Gradle's own
-  artifact verification is deliberately off (see `DEPENDENCY-SECURITY.md`), so this file is a
-  recorded inventory rather than a build gate, but the packaged-runtime store still pins every
-  download to the exact SHA-256 it reads from that inventory.
+  the strict Gradle verification metadata; first-download trust is forbidden. The packaged-runtime
+  store pins every download to the exact primary SHA-256 it reads from that file, the same file
+  Gradle enforces in strict mode (see `DEPENDENCY-SECURITY.md`).
 - An ingested runtime tree may contain a symbolic link only when it resolves inside that tree and
   to a regular file; real Java runtimes ship such links. Store the target's bytes, refuse escaping,
   dangling, and directory links, and never publish or materialize a link. Compare containment by
@@ -612,7 +668,7 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   differ only when all of that reusable identity is exact. It revalidates the
   capsule after the model exits, publishes only a bounded normalized report or sanitized attempt
   marker, never uploads raw provider text, and
-  retains completed and already-reviewed queue artifacts through their seven-day expiry. The
+  retains completed and already-reviewed queue artifacts through their two-day expiry. The
   cleanup job must succeed without deletion for both branches: its own or another in-progress
   report owner can still cancel during later tails, requiring the original input for recovery.
   Only missing/terminally invalid inputs enter exact-ID cleanup. A transient failure retains the

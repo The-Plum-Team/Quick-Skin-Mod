@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.common.util.SafeImageReader;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 
@@ -199,10 +200,31 @@ public final class MojangApiService {
      * @return CompletableFuture containing the MojangSkinData
      */
     public CompletableFuture<MojangSkinData> fetchSkinByUsername(String username) {
+        // Each step's time is logged with the result, to tell a slow Mojang from a slow client
+        long start = System.nanoTime();
+        long[] marks = new long[2];
         return getUuidFromUsername(username)
-                .thenCompose(uuid -> getSkinTextureData(uuid)
-                        .thenCompose(texture -> downloadSkinImage(texture.url)
-                                .thenApply(image -> new MojangSkinData(username, uuid, image, texture.modelType))));
+                .thenCompose(uuid -> {
+                    marks[0] = System.nanoTime();
+                    return getSkinTextureData(uuid)
+                            .thenCompose(texture -> {
+                                marks[1] = System.nanoTime();
+                                return downloadSkinImage(texture.url)
+                                        .thenApply(image -> {
+                                            long end = System.nanoTime();
+                                            QuickSkinInfo.LOGGER.info(
+                                                    "Mojang skin of '{}' fetched in {} ms (name {} ms, profile {} ms, image {} ms)",
+                                                    username, millis(start, end), millis(start, marks[0]),
+                                                    millis(marks[0], marks[1]), millis(marks[1], end));
+                                            return new MojangSkinData(username, uuid, image, texture.modelType,
+                                                    texture.url);
+                                        });
+                            });
+                });
+    }
+
+    private static long millis(long from, long to) {
+        return (to - from) / 1_000_000L;
     }
 
     private byte[] readResponse(String url, Stage stage, int timeout, int maximum) {
@@ -313,12 +335,19 @@ public final class MojangApiService {
         public final UUID uuid;
         public final BufferedImage image;
         public final String modelType;
+        /** The texture's address on Mojang's servers, which changes whenever the skin does; may be empty. */
+        public final String textureUrl;
 
         public MojangSkinData(String username, UUID uuid, BufferedImage image, String modelType) {
+            this(username, uuid, image, modelType, "");
+        }
+
+        public MojangSkinData(String username, UUID uuid, BufferedImage image, String modelType, String textureUrl) {
             this.username = username;
             this.uuid = uuid;
             this.image = image;
             this.modelType = modelType;
+            this.textureUrl = textureUrl != null ? textureUrl : "";
         }
     }
 }

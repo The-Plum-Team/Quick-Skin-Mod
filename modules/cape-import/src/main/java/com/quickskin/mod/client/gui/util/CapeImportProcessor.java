@@ -6,6 +6,7 @@ import com.quickskin.mod.common.util.HashUtil;
 import com.quickskin.mod.common.util.BoundedFileReader;
 import com.quickskin.mod.common.util.SafeImageReader;
 import com.quickskin.mod.common.util.GifDecoder;
+import com.quickskin.mod.common.util.UserFacingIOException;
 import com.quickskin.mod.networking.NetworkSecurity;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -36,6 +37,8 @@ public final class CapeImportProcessor {
     static final long MAX_SOURCE_BYTES = 32L * 1024L * 1024L;
     private static final int MAX_STATIC_DIMENSION = 4096;
     private static final long MAX_ATLAS_PIXELS = 64L * 1024L * 1024L / 4L;
+    /** The most frames a catalogued animated cape may have. */
+    private static final int MAX_ANIMATED_FRAMES = 256;
 
     private CapeImportProcessor() {
     }
@@ -55,7 +58,7 @@ public final class CapeImportProcessor {
             return false;
         }
         String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
-        return name.endsWith(".png") || name.endsWith(".gif");
+        return name.endsWith(".png") || name.endsWith(".gif") || name.endsWith(".webp");
     }
 
     public static PreparedCape prepare(Path source, GifDecoder gifDecoder) throws IOException {
@@ -63,12 +66,14 @@ public final class CapeImportProcessor {
             throw new IOException("Cape file does not exist or is not readable");
         }
         if (!isSupported(source)) {
-            throw new IOException("Only PNG and GIF cape files are supported");
+            throw new UserFacingIOException("Only PNG, WebP and GIF cape files are supported",
+                    "quickskin.cape.error.unsupported");
         }
 
         long sourceBytes = Files.size(source);
         if (sourceBytes <= 0 || sourceBytes > MAX_SOURCE_BYTES) {
-            throw new IOException("Cape file must be between 1 byte and 32 MB");
+            throw new UserFacingIOException("Cape file must be between 1 byte and 32 MB",
+                    "quickskin.cape.error.file_size", megabytes(sourceBytes), MAX_SOURCE_BYTES / (1024 * 1024));
         }
 
         boolean gif = source.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".gif");
@@ -76,7 +81,13 @@ public final class CapeImportProcessor {
             return prepareGif(source, gifDecoder);
         }
 
-        BufferedImage image = SafeImageReader.readPng(source);
+        // A still cape, PNG or WebP, is saved as a PNG like every other catalogued cape
+        BufferedImage image;
+        try {
+            image = SafeImageReader.readStillCape(source);
+        } catch (IOException unreadable) {
+            throw new UserFacingIOException(unreadable.getMessage(), "quickskin.cape.error.invalid_image");
+        }
         validateAtlas(image.getWidth(), image.getHeight(), 1);
         return new PreparedCape(source, image, 1, null, false,
                 image.getWidth() == 64 && image.getHeight() == 32);
@@ -88,13 +99,16 @@ public final class CapeImportProcessor {
             GifDecoder.DecodedGif gif = gifDecoder.decode(input);
             if (gif == null || gif.atlas() == null || gif.frameCount() < 1 || gif.metadata() == null
                     || gif.atlas().getHeight() % gif.frameCount() != 0) {
-                throw new IOException("Invalid GIF image");
+                throw new UserFacingIOException("Invalid GIF image", "quickskin.cape.error.invalid_image");
             }
             int width = gif.atlas().getWidth();
             int height = gif.atlas().getHeight() / gif.frameCount();
             validateAtlas(width, height, gif.frameCount());
-            return new PreparedCape(source, gif.atlas(), gif.frameCount(), gif.metadata(), true,
-                    width == 64 && height == 32);
+            // A shrunk GIF, or one with more frames than a cape may have, goes through the editor:
+            // only a GIF the catalogue can load as it is may be copied unchanged
+            boolean standard = width == 64 && height == 32 && !gif.resampled()
+                    && gif.frameCount() <= MAX_ANIMATED_FRAMES;
+            return new PreparedCape(source, gif.atlas(), gif.frameCount(), gif.metadata(), true, standard);
         }
     }
 
@@ -126,15 +140,33 @@ public final class CapeImportProcessor {
             Path metadataDirectory,
             BufferedImage vanillaElytra
     ) throws IOException {
+        return saveAdjusted(prepared, adjustedAtlas, null, targetDirectory, metadataDirectory, vanillaElytra);
+    }
+
+    /**
+     * Saves an editor import as a new catalogued cape.
+     *
+     * @param timing the timing the editor chose for an animated atlas, one entry per frame in
+     *               order, or {@code null} to keep the source's own
+     */
+    public static Path saveAdjusted(
+            PreparedCape prepared,
+            BufferedImage adjustedAtlas,
+            AnimationMetadata timing,
+            Path targetDirectory,
+            Path metadataDirectory,
+            BufferedImage vanillaElytra
+    ) throws IOException {
         if (adjustedAtlas == null) {
             throw new IOException("Cape adjustment produced no image");
         }
         requireDirectory(targetDirectory);
 
         int frameCount = adjustedFrameCount(adjustedAtlas);
+        AnimationMetadata metadata = adjustedTiming(prepared, timing, frameCount);
         BufferedImage finalAtlas = compositeElytraIfNeeded(adjustedAtlas, frameCount, vanillaElytra);
         return savePngUnique(prepared.source(), finalAtlas, targetDirectory,
-                metadataDirectory, frameCount > 1 ? prepared.animationMetadata() : null);
+                metadataDirectory, metadata);
     }
 
     /**
@@ -152,6 +184,18 @@ public final class CapeImportProcessor {
             Path cacheDirectory,
             BufferedImage vanillaElytra
     ) throws IOException {
+        return replaceAdjusted(prepared, adjustedAtlas, null, existingCape, cacheDirectory, vanillaElytra);
+    }
+
+    /** {@link #replaceAdjusted(PreparedCape, BufferedImage, Path, Path, BufferedImage)} with the editor's timing. */
+    public static Path replaceAdjusted(
+            PreparedCape prepared,
+            BufferedImage adjustedAtlas,
+            AnimationMetadata timing,
+            Path existingCape,
+            Path cacheDirectory,
+            BufferedImage vanillaElytra
+    ) throws IOException {
         if (adjustedAtlas == null) {
             throw new IOException("Cape adjustment produced no image");
         }
@@ -162,14 +206,14 @@ public final class CapeImportProcessor {
         }
 
         int frameCount = adjustedFrameCount(adjustedAtlas);
+        AnimationMetadata metadata = adjustedTiming(prepared, timing, frameCount);
         BufferedImage finalAtlas = compositeElytraIfNeeded(adjustedAtlas, frameCount, vanillaElytra);
         Path temporary = Files.createTempFile(
                 existingCape.getParent(), ".quickskin-cape-", ".png.tmp");
         try {
             writePng(finalAtlas, temporary);
             SafeImageReader.readPng(temporary);
-            saveMetadata(cacheDirectory, temporary,
-                    frameCount > 1 ? prepared.animationMetadata() : null);
+            saveMetadata(cacheDirectory, temporary, metadata);
             boolean hadSource = CapeEditorSources.find(cacheDirectory, HashUtil.computeAssetContentId(
                     BoundedFileReader.readBytes(temporary, (int) MAX_SOURCE_BYTES), "cape")) != null;
             Path retained = CapeEditorSources.retain(cacheDirectory, temporary, prepared.source());
@@ -189,6 +233,25 @@ public final class CapeImportProcessor {
         } finally {
             Files.deleteIfExists(temporary);
         }
+    }
+
+    /**
+     * The timing saved with an adjusted atlas: none for one frame, the editor's when it chose one
+     * (which must then name exactly the atlas's frames), and otherwise the source's.
+     */
+    private static AnimationMetadata adjustedTiming(
+            PreparedCape prepared, AnimationMetadata timing, int frameCount) throws IOException {
+        if (frameCount <= 1) {
+            return null;
+        }
+        if (timing == null) {
+            return prepared.animationMetadata();
+        }
+        if (timing.frameCount() != frameCount || timing.frames() == null
+                || timing.frames().size() != frameCount) {
+            throw new IOException("Cape animation timing does not match the adjusted frames");
+        }
+        return timing;
     }
 
     private static int adjustedFrameCount(BufferedImage adjustedAtlas) throws IOException {
@@ -425,16 +488,24 @@ public final class CapeImportProcessor {
         Files.createDirectories(directory);
     }
 
+    /** A size in megabytes as the player reads it: rounded up, so a file just over a limit shows over it. */
+    private static long megabytes(long bytes) {
+        return (bytes + 1024L * 1024L - 1) / (1024L * 1024L);
+    }
+
     private static void validateAtlas(int width, int frameHeight, int frameCount) throws IOException {
         if (width < 1 || frameHeight < 1 || frameCount < 1) {
-            throw new IOException("Cape has invalid dimensions");
+            throw new UserFacingIOException("Cape has invalid dimensions",
+                    "quickskin.cape.error.invalid_image");
         }
         if (width > MAX_STATIC_DIMENSION || frameHeight > MAX_STATIC_DIMENSION) {
-            throw new IOException("Cape dimensions exceed 4096 pixels");
+            throw new UserFacingIOException("Cape dimensions exceed 4096 pixels",
+                    "quickskin.cape.error.dimensions", width + "×" + frameHeight, MAX_STATIC_DIMENSION);
         }
         long pixels = (long) width * frameHeight * frameCount;
         if (pixels > MAX_ATLAS_PIXELS) {
-            throw new IOException("Cape requires more than 64 MB of decoded pixels");
+            throw new UserFacingIOException("Cape requires more than 64 MB of decoded pixels",
+                    "quickskin.cape.error.too_big");
         }
     }
 }

@@ -303,8 +303,9 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
 
     def test_choosing_a_model_withdraws_the_applied_skin(self) -> None:
         menu = PLAYER_SKIN_MENU_SCREEN.read_text(encoding="utf-8")
-        self.assertIn("public void onSkinSelected(", menu)
-        selected = menu[menu.index("public void onSkinSelected(") :]
+        # Choosing a skin applies the pending look, as Confirm does.
+        self.assertIn("private boolean applySelection(", menu)
+        selected = menu[menu.index("private boolean applySelection(") :]
         model_branch = selected[
             selected.index("if (metadata.isCpmModel()) {") : selected.index(
                 "com.quickskin.mod.config.ClientConfig config ="
@@ -315,8 +316,8 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
         activate = model_branch.index("CpmModelWorkflow.activateModel(metadata)")
         refused = model_branch.index("showError(", activate)
         withdraw = model_branch.index('appearances.applySkin(targetUUID, "", null);')
-        self.assertLess(refused, model_branch.index("return;", refused))
-        self.assertLess(model_branch.index("return;", refused), withdraw)
+        self.assertLess(refused, model_branch.index("return false;", refused))
+        self.assertLess(model_branch.index("return false;", refused), withdraw)
         self.assertIn("appearances.hasActiveSkin(targetUUID)", model_branch)
         self.assertIn("ReplayModHelper.getTargetPlayerUUID()", model_branch)
 
@@ -333,10 +334,8 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
     def test_opening_the_menu_is_no_look_choice(self) -> None:
         menu = PLAYER_SKIN_MENU_SCREEN.read_text(encoding="utf-8")
         restore = menu[menu.index("private void restoreSavedState()") :]
-        restore = restore[
-            : restore.index("// Restore model type preference for the selected skin")
-        ]
-        # While CPM's own model is the look, the menu selects (and so applies) no entry.
+        restore = restore[: restore.index("// Restore active cape selection")]
+        # While CPM's own model is the look, the menu selects no entry for Confirm to apply.
         gate = restore.index("if (cpmOwnsLook) {")
         self.assertLess(restore.index("CpmLook.Owner.CPM;"), gate)
         self.assertLess(
@@ -347,7 +346,7 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
         )
         self.assertNotIn("setSelected(", restore[gate : restore.index("} else if (", gate)])
 
-        selected = menu[menu.index("public void onSkinSelected(") :]
+        selected = menu[menu.index("private boolean applySelection(") :]
         model_branch = selected[
             selected.index("if (metadata.isCpmModel()) {") : selected.index(
                 "com.quickskin.mod.config.ClientConfig config ="
@@ -356,7 +355,7 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
         # The menu opening on Quick Skin's model, still the look, does not select it again.
         self.assertIn("CpmLook.Owner.QUICK_SKIN_MODEL;", model_branch)
         self.assertIn(
-            "if (!modelIsTheLook\n                        && !com.quickskin.mod.client.compat"
+            "if (!modelIsTheLook\n                    && !com.quickskin.mod.client.compat"
             ".CpmModelWorkflow.activateModel(metadata)) {",
             model_branch,
         )

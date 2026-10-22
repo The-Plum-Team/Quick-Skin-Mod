@@ -1,8 +1,14 @@
 package com.quickskin.mod.client.gui.screen;
 
+import com.quickskin.mod.client.gui.util.UiText;
+//? if <1.21.5 {
+import com.mojang.blaze3d.systems.RenderSystem;
+//?}
+import com.quickskin.mod.client.gui.util.DialogFrame;
+import com.quickskin.mod.client.gui.util.MenuGuiScale;
 import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.client.gui.effect.BlurHandler;
-import com.quickskin.mod.client.gui.util.ButtonFactory;
+import com.quickskin.mod.client.gui.widget.ConfirmButton;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 //? if <26.1 {
@@ -13,72 +19,103 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+//? if <1.21.11 {
+import net.minecraft.resources.ResourceLocation;
+//?} else {
+import net.minecraft.resources.Identifier;
+//?}
 
+import java.util.List;
 import java.util.function.Consumer;
 
+/**
+ * Asks before deleting: a {@link DialogFrame} with a red header and the bin, the message, and
+ * Cancel beside a red Delete. When given the skins it deletes, it shows their faces in a row above
+ * the message, framed in red.
+ */
 @Environment(EnvType.CLIENT)
 public class DeletionConfirmScreen extends Screen {
     private final Screen parent;
     private final Component message;
     private final Consumer<Boolean> callback;
+    private final List<Preview> previews;
 
-    // Panel styling
-    private static final int PANEL_BG = 0xB0000000;           // Darker semi-transparent background for frosted glass effect
-    private static final int PANEL_OUTLINE = 0x60FFFFFF;      // Subtle white outline
-    // Keep the Stonecutter seam aligned with the release branches; both APIs require opaque ARGB.
-    //? if <1.21.11 {
-    private static final int TITLE_COLOR = 0xFFFFFFFF;        // Opaque white title
-    private static final int MESSAGE_COLOR = 0xFFFFFFFF;      // Opaque white message
-    private static final int WARNING_COLOR = 0xFFFFCC00;      // Opaque orange warning text
-    //?} else {
-    private static final int TITLE_COLOR = 0xFFFFFFFF;        // Opaque white title
-    private static final int MESSAGE_COLOR = 0xFFFFFFFF;      // Opaque white message
-    private static final int WARNING_COLOR = 0xFFFFCC00;      // Opaque orange warning text
-    //?}
+    /**
+     * A skin to show: the face (8,8) and its hat (40,8) of a skin texture of the given size, or
+     * the whole texture for an icon such as a CPM model's.
+     */
+    public record Preview(
+            //? if <1.21.11 {
+            ResourceLocation texture,
+            //?} else {
+            Identifier texture,
+            //?}
+            int textureWidth, int textureHeight, boolean wholeTexture) {
+    }
+
+    private static final int MESSAGE_COLOR = 0xFFDDDDDD;
+    private static final int MORE_COLOR = 0xFFC8C8C8;
+    private static final int FACE_FRAME = 0xFFE04040;
+    /** Faces shown at most; more are counted after them. */
+    private static final int MAX_FACES = 7;
+    private static final int FACE_SIZE = 18;
+    private static final int FACE_GAP = 5;
 
     // Panel dimensions
-    private final int panelWidth = 340;
-    private final int panelHeight = 160;
+    private final int panelWidth = 300;
+    private int panelHeight;
     private int panelX;
     private int panelY;
 
     public DeletionConfirmScreen(Screen parent, Component title, Component message, Consumer<Boolean> callback, boolean isPermanentDelete) {
+        this(parent, title, message, callback, List.of());
+    }
+
+    public DeletionConfirmScreen(Screen parent, Component title, Component message, Consumer<Boolean> callback,
+                                 List<Preview> previews) {
         super(title);
         this.parent = parent;
         this.message = message;
         this.callback = callback;
+        this.previews = List.copyOf(previews);
     }
 
     @Override
     protected void init() {
-        // Calculate centered panel position
+        // Drawn over a menu, the dialog takes the menu's scale so the menu behind keeps its size
+        if (this.minecraft != null) {
+            MenuGuiScale.follow(this.minecraft, this, this.parent);
+        }
+        // The header, the faces when there are any, the message, then the buttons
+        this.panelHeight = 136 + (previews.isEmpty() ? 0 : FACE_SIZE + 12);
         this.panelX = (this.width - this.panelWidth) / 2;
         this.panelY = (this.height - this.panelHeight) / 2;
 
         // Button dimensions
         int buttonWidth = 120;
         int buttonHeight = 20;
-        int buttonSpacing = 10;
-        int buttonY = this.panelY + this.panelHeight - buttonHeight - 20;
+        int buttonSpacing = 8;
+        int buttonY = DialogFrame.bodyBottom(this.panelY, this.panelHeight) - buttonHeight - 12;
 
         // Calculate button positions (centered, side by side)
         int totalButtonWidth = (buttonWidth * 2) + buttonSpacing;
         int buttonStartX = this.panelX + (this.panelWidth - totalButtonWidth) / 2;
 
         // Cancel button (left, safe)
-        Button cancelButton = ButtonFactory.createStyled(
+        Button cancelButton = DialogFrame.button(
             buttonStartX, buttonY, buttonWidth, buttonHeight,
             Component.translatable("quickskin.button.cancel"),
             (button) -> this.callback.accept(false)
         );
 
         // Confirm delete button (right, red/danger)
-        Button confirmButton = ButtonFactory.createDanger(
+        ConfirmButton confirmButton = DialogFrame.button(
             buttonStartX + buttonWidth + buttonSpacing, buttonY,
             buttonWidth, buttonHeight,
             Component.translatable("quickskin.button.delete"),
             (button) -> this.callback.accept(true)
         );
+        confirmButton.setDanger(true);
 
         this.addRenderableWidget(cancelButton);
         this.addRenderableWidget(confirmButton);
@@ -92,72 +129,31 @@ public class DeletionConfirmScreen extends Screen {
     //?}
         // Render parent screen in background
         if (this.parent != null) {
-            //? if <26.1 {
-            this.parent.render(graphics, -1, -1, partialTicks);
-            //?} else {
-            GuiCompat.extractParent(this.parent, graphics, partialTicks);
-            //?}
+            BlurHandler.renderParent(this.parent, graphics, partialTicks);
         }
 
         //? if <1.21.6 {
         graphics.flush();
-        //?} else {
-        // Disable depth test so the blur/overlay/modal panels render on top of the 3D player widget
-        org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);
         //?}
-        BlurHandler.renderBlur();
+        // From 1.21.6 the blur starts a new stratum, which draws the dialog over the 3D player
+        // widget; the GUI is drawn later by the render backend, which may not be OpenGL
+        BlurHandler.renderBlur(graphics);
 
         // Draw lighter overlay over entire screen (so blur is more visible)
         graphics.fill(0, 0, this.width, this.height, 0x60000000);
 
-        // Draw main panel background with frosted glass effect
-        graphics.fill(this.panelX, this.panelY,
-                     this.panelX + this.panelWidth,
-                     this.panelY + this.panelHeight,
-                     PANEL_BG);
+        DialogFrame.draw(graphics, this.font, this.panelX, this.panelY, this.panelWidth, this.panelHeight,
+                DialogFrame.Accent.DANGER, DialogFrame.ICON_BIN, this.title);
 
-        // Draw subtle outline around panel
-        // Top
-        graphics.fill(this.panelX, this.panelY,
-                     this.panelX + this.panelWidth, this.panelY + 1,
-                     PANEL_OUTLINE);
-        // Bottom
-        graphics.fill(this.panelX, this.panelY + this.panelHeight - 1,
-                     this.panelX + this.panelWidth, this.panelY + this.panelHeight,
-                     PANEL_OUTLINE);
-        // Left
-        graphics.fill(this.panelX, this.panelY,
-                     this.panelX + 1, this.panelY + this.panelHeight,
-                     PANEL_OUTLINE);
-        // Right
-        graphics.fill(this.panelX + this.panelWidth - 1, this.panelY,
-                     this.panelX + this.panelWidth, this.panelY + this.panelHeight,
-                     PANEL_OUTLINE);
-
-        // Draw title (centered)
-        int titleY = this.panelY + 20;
-        //? if <26.1 {
-        graphics.drawCenteredString(this.font, this.title,
-        //?} else {
-        graphics.centeredText(this.font, this.title,
-        //?}
-                                   this.width / 2, titleY,
-                                   TITLE_COLOR);
-
-        // Draw warning icon (simple exclamation mark)
-        int iconY = this.panelY + 45;
-        String warningIcon = "!";
-        //? if <26.1 {
-        graphics.drawCenteredString(this.font, warningIcon,
-        //?} else {
-        graphics.centeredText(this.font, warningIcon,
-        //?}
-                                   this.width / 2, iconY,
-                                   WARNING_COLOR);
+        int bodyY = DialogFrame.bodyTop(this.panelY) + 12;
+        if (!previews.isEmpty()) {
+            renderFaces(graphics, bodyY);
+            bodyY += FACE_SIZE + 12;
+        }
 
         // Draw message (word-wrapped if needed)
-        int messageY = this.panelY + 65;
-        int messageMaxWidth = this.panelWidth - 40; // 20px padding on each side
+        int messageY = bodyY;
+        int messageMaxWidth = this.panelWidth - 32;
 
         // Simple word wrap for message
         String messageText = this.message.getString();
@@ -166,13 +162,7 @@ public class DeletionConfirmScreen extends Screen {
         int lineHeight = 10;
         int currentY = messageY;
         for (String line : wrappedLines) {
-            //? if <26.1 {
-            graphics.drawCenteredString(this.font, line,
-            //?} else {
-            graphics.centeredText(this.font, line,
-            //?}
-                                       this.width / 2, currentY,
-                                       MESSAGE_COLOR);
+            UiText.drawCentered(graphics, this.font, line, this.width / 2, currentY, MESSAGE_COLOR);
             currentY += lineHeight;
         }
 
@@ -181,9 +171,51 @@ public class DeletionConfirmScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTicks);
         //?} else {
         super.extractRenderState(graphics, mouseX, mouseY, partialTicks);
-
-        org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_DEPTH_TEST);
         //?}
+    }
+
+    /** The skins' faces in a row, centred, each in a red frame, and how many more there are. */
+    private void renderFaces(
+            //? if <26.1 {
+            GuiGraphics graphics,
+            //?} else {
+            GuiGraphicsExtractor graphics,
+            //?}
+            int y) {
+        int shown = Math.min(previews.size(), MAX_FACES);
+        int hidden = previews.size() - shown;
+        String more = hidden > 0 ? "+" + hidden : "";
+        int rowWidth = shown * FACE_SIZE + (shown - 1) * FACE_GAP
+                + (hidden > 0 ? FACE_GAP + this.font.width(more) : 0);
+        int x = this.panelX + (this.panelWidth - rowWidth) / 2;
+        //? if <1.21.5 {
+        RenderSystem.enableBlend();
+        //?}
+        for (int i = 0; i < shown; i++) {
+            Preview preview = previews.get(i);
+            graphics.fill(x - 1, y - 1, x + FACE_SIZE + 1, y + FACE_SIZE + 1, FACE_FRAME);
+            graphics.fill(x, y, x + FACE_SIZE, y + FACE_SIZE, 0xFF1C1D1F);
+            if (preview.wholeTexture()) {
+                GuiCompat.blit(graphics, preview.texture(), x, y, FACE_SIZE, FACE_SIZE,
+                        0, 0, preview.textureWidth(), preview.textureHeight(),
+                        preview.textureWidth(), preview.textureHeight());
+            } else {
+                int texel = Math.max(1, preview.textureWidth() / 64);
+                GuiCompat.blit(graphics, preview.texture(), x, y, FACE_SIZE, FACE_SIZE,
+                        8.0f * texel, 8.0f * texel, 8 * texel, 8 * texel,
+                        preview.textureWidth(), preview.textureHeight());
+                GuiCompat.blit(graphics, preview.texture(), x, y, FACE_SIZE, FACE_SIZE,
+                        40.0f * texel, 8.0f * texel, 8 * texel, 8 * texel,
+                        preview.textureWidth(), preview.textureHeight());
+            }
+            x += FACE_SIZE + FACE_GAP;
+        }
+        //? if <1.21.5 {
+        RenderSystem.disableBlend();
+        //?}
+        if (hidden > 0) {
+            UiText.draw(graphics, this.font, more, x, y + (FACE_SIZE - 8) / 2, MORE_COLOR);
+        }
     }
 
     private java.util.List<String> wrapText(String text, int maxWidth) {
@@ -215,6 +247,9 @@ public class DeletionConfirmScreen extends Screen {
 
     @Override
     public void removed() {
+        if (this.minecraft != null) {
+            MenuGuiScale.leave(this.minecraft, this);
+        }
         super.removed();
         // Cleanup blur resources
         BlurHandler.cleanup();

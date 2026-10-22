@@ -19,9 +19,18 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * Panel that manages the skin list widget on the left side of the screen
+ * Panel that manages the skin column on the left side of the screen: a grid of tiles, or a list of
+ * cards one per row
  */
 public class SkinListPanel extends AbstractWidget {
+
+    /** Size of a skin tile: a 24 px face (three pixels per skin texel) inside a 4 px frame. */
+    public static final int TILE_SIZE = 32;
+
+    /** Tiles per row of the grid, whose width the list's cards span. */
+    private final int columns;
+    /** Whether the skins are cards in rows instead of tiles. */
+    private final boolean rows;
 
     @Nullable
     private SkinListWidget skinListWidget;
@@ -29,8 +38,11 @@ public class SkinListPanel extends AbstractWidget {
     private final Minecraft minecraft;
     private final Consumer<SkinEntry> onSkinSelectedCallback;
 
-    public SkinListPanel(int x, int y, int width, int height, Minecraft minecraft, Consumer<SkinEntry> onSkinSelectedCallback) {
-        super(x, y, width, height, Component.empty());
+    public SkinListPanel(int x, int y, int columns, boolean rows, int height, Minecraft minecraft,
+                         Consumer<SkinEntry> onSkinSelectedCallback) {
+        super(x, y, SkinListWidget.widthFor(TILE_SIZE, columns), height, Component.empty());
+        this.columns = columns;
+        this.rows = rows;
         this.minecraft = minecraft;
         this.onSkinSelectedCallback = onSkinSelectedCallback;
     }
@@ -40,22 +52,7 @@ public class SkinListPanel extends AbstractWidget {
      */
     public void init(com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen screen) {
         // Create skin list widget
-        skinListWidget = new SkinListWidget(
-            screen,
-            minecraft,
-            width,
-            height,
-            getY(),
-            //? if >=1.21 {
-            getX(), // X position
-            //?}
-            40 // Entry height - matches original
-        );
-        //? if <1.21 {
-        skinListWidget.setLeftPos(getX());
-        skinListWidget.setRenderBackground(false);
-        skinListWidget.setRenderTopAndBottom(false);
-        //?}
+        skinListWidget = new SkinListWidget(screen, minecraft, getX(), getY(), height, TILE_SIZE, columns, rows);
         screen.registerWidget(skinListWidget);
 
         // Load skins from LocalAssetManager
@@ -86,9 +83,19 @@ public class SkinListPanel extends AbstractWidget {
             return;
         }
 
-        // Clear and reload
+        // Clear and reload, keeping the selected skin selected wherever it lands
+        SkinEntry selected = skinListWidget.getSelected();
+        String selectedHash = selected != null ? selected.getMetadata().hash() : null;
         skinListWidget.clearSkinEntries();
         loadSkins();
+        if (selectedHash != null) {
+            for (SkinEntry entry : skinListWidget.children()) {
+                if (entry.getMetadata().hash().equals(selectedHash)) {
+                    skinListWidget.setSelected(entry);
+                    break;
+                }
+            }
+        }
     }
 
     /**
@@ -123,6 +130,19 @@ public class SkinListPanel extends AbstractWidget {
         }
     }
 
+    /** Scrolls the list to show a skin's entry, without selecting it. */
+    public void reveal(String hash) {
+        if (skinListWidget == null) {
+            return;
+        }
+        for (SkinEntry entry : skinListWidget.children()) {
+            if (entry.getMetadata().hash().equals(hash)) {
+                skinListWidget.makeVisible(entry);
+                return;
+            }
+        }
+    }
+
     /**
      * Get the skin list widget
      */
@@ -141,6 +161,17 @@ public class SkinListPanel extends AbstractWidget {
             return null;
         }
         return skinListWidget.getSelected();
+    }
+
+    /** Number of skins in the column. */
+    public int size() {
+        return skinListWidget == null ? 0 : skinListWidget.children().size();
+    }
+
+    /** One-based position of the selected skin, or 0 when none is selected. */
+    public int selectedPosition() {
+        SkinEntry selected = getSelected();
+        return selected == null || skinListWidget == null ? 0 : skinListWidget.children().indexOf(selected) + 1;
     }
 
     @Override

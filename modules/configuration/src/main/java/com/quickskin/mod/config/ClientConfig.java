@@ -28,6 +28,13 @@ public class ClientConfig {
     private static final int MAX_CAPE_SPEED_ENTRIES = 4096;
     private static volatile ClientConfig instance;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    /**
+     * Version of the stored settings. A file written before a version existed reads as 0; each
+     * step in {@link #migrate()} brings an older file up to date once.
+     */
+    static final int CURRENT_CONFIG_VERSION = 1;
+
+    public int configVersion = 0;
 
     // GUI Settings
     public boolean showSkinPreviewOverlay = false;
@@ -37,6 +44,7 @@ public class ClientConfig {
     public boolean enablePlayerPreviewCustomization = false; // Enable customization (resize, reposition) of player previews
     public boolean showTitleScreenPreview = true; // Show the player preview and its controls on the title screen
     public boolean showPauseMenuPreview = true; // Show the player preview and its controls in the pause menu
+    public boolean compactChangeSkinButton = false; // Show the title/pause menu Change Skin button as an icon
     public float hudOverlayRotation = 20.0f;
 
     // Player Preview Slider Percentages (1-100%) for different contexts
@@ -74,17 +82,15 @@ public class ClientConfig {
     // Transparency Settings
     public boolean disableSkinTransparency = false; // Disable transparency in player skins
 
-    // GUI Style Settings
-    public boolean enableStyledButtons = false; // Enable custom styled buttons with frosted glass aesthetic
-
     // Cape Settings
     public boolean hideBuiltInCapes = false; // Hide built-in Minecraft capes from cape menu
 
     // Sorting Settings
     public String skinSortMode = "LATEST_LAST"; // Skin list sorting mode
+    public boolean skinListRows = false; // Skin menu shows its skins as cards in rows instead of a grid of tiles
 
     // Menu Background Style
-    public String menuBackgroundStyle = "opaque_stars"; // "opaque_stars" or "vanilla_blur"
+    public String menuBackgroundStyle = "vanilla_blur"; // "vanilla_blur" or "opaque_stars"
 
     // --- NEW --- Modpack Settings
     public boolean enablePlayerOwnSkinSystem = true; // When enabled, automatically downloads and protects the player's own skin.
@@ -98,7 +104,9 @@ public class ClientConfig {
     @Deprecated // Now using per-skin model preferences stored in skin-preferences.json
     public String activeModelType = "auto"; // "auto", "classic", "slim" (deprecated - kept for compatibility)
     public String activeCapeHash = ""; // Active cape hash
-    public String playerOwnSkinHash = ""; // Hash of the player's own Mojang skin (protected from deletion)
+    public String playerOwnSkinHash = ""; // Hash of the player's own Mojang skin (never deleted, only hidden)
+    public boolean playerOwnSkinHidden = false; // The own skin is left out of the skin list while other skins are listed
+    public String playerOwnSkinTexture = ""; // Mojang texture address the own skin was downloaded from
     public String playerOwnSkinAccount = ""; // Launcher account that playerOwnSkinHash was downloaded for
     public AccountSkinPreferences accountSkins = new AccountSkinPreferences(); // Skin selection per launcher account
 
@@ -125,9 +133,11 @@ public class ClientConfig {
         if (Files.exists(configPath)) {
             try {
                 String json = BoundedFileReader.readUtf8(configPath, MAX_CONFIG_BYTES);
-                ClientConfig config = GSON.fromJson(json, ClientConfig.class);
+                ClientConfig config = parse(json);
                 if (config != null) {
-                    config.normalize();
+                    if (config.migrate()) {
+                        config.save();
+                    }
                     return config;
                 }
                 QuickSkinInfo.LOGGER.warn("Client config {} contained JSON null; using defaults", configPath);
@@ -138,8 +148,36 @@ public class ClientConfig {
 
         // Return default config and save it
         ClientConfig config = new ClientConfig();
+        config.configVersion = CURRENT_CONFIG_VERSION;
         config.save();
         return config;
+    }
+
+    /** Parses stored settings without migrating them; null for a JSON {@code null}. */
+    static ClientConfig parse(String json) {
+        ClientConfig config = GSON.fromJson(json, ClientConfig.class);
+        if (config != null) {
+            config.normalize();
+        }
+        return config;
+    }
+
+    /**
+     * Brings settings written by an older version up to date.
+     *
+     * @return whether anything changed, so the caller saves the file once
+     */
+    boolean migrate() {
+        if (configVersion >= CURRENT_CONFIG_VERSION) {
+            return false;
+        }
+        if (configVersion < 1) {
+            // 1: the blurred vanilla background replaces the starred one as the default. Every
+            // earlier file stored the old default whether or not the player chose it.
+            menuBackgroundStyle = BackgroundStyle.VANILLA_BLUR.getId();
+        }
+        configVersion = CURRENT_CONFIG_VERSION;
+        return true;
     }
 
     /**
@@ -331,7 +369,7 @@ public class ClientConfig {
             capeAnimationSpeeds.remove(capeAnimationSpeeds.keySet().iterator().next());
         }
         if (skinSortMode == null) skinSortMode = "LATEST_LAST";
-        if (menuBackgroundStyle == null) menuBackgroundStyle = "opaque_stars";
+        if (menuBackgroundStyle == null) menuBackgroundStyle = BackgroundStyle.VANILLA_BLUR.getId();
         activeSkinHash = validHashOrEmpty(activeSkinHash);
         activeCpmModelHash = validHashOrEmpty(activeCpmModelHash);
         if (!("auto".equals(activeModelType) || "classic".equals(activeModelType)
@@ -339,7 +377,11 @@ public class ClientConfig {
         if (activeCapeHash == null || activeCapeHash.length() > 256
                 || activeCapeHash.chars().anyMatch(Character::isISOControl)) activeCapeHash = "";
         playerOwnSkinHash = validHashOrEmpty(playerOwnSkinHash);
+        if (playerOwnSkinTexture == null || playerOwnSkinTexture.length() > 512 || playerOwnSkinHash.isEmpty()) {
+            playerOwnSkinTexture = "";
+        }
         if (!AccountSkinPreferences.isKey(playerOwnSkinAccount)) playerOwnSkinAccount = "";
+        if (playerOwnSkinHash.isEmpty()) playerOwnSkinHidden = false;
         if (accountSkins == null) accountSkins = new AccountSkinPreferences();
         accountSkins.normalize();
     }

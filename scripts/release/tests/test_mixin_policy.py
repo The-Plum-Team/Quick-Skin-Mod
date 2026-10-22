@@ -56,6 +56,7 @@ DEGRADABLE_MIXINS = {
     "main:com/quickskin/mod/mixin/GuiSkinRendererMixin.java",
     "main:com/quickskin/mod/mixin/PanoramaRendererMixin.java",
     "main:com/quickskin/mod/mixin/PreviewEquipmentMixin.java",
+    "main:com/quickskin/mod/mixin/PreviewSkinSwapPoseMixin.java",
 }
 
 # Third-party integrations remain fail-local in production. Their targets are either selected by
@@ -72,6 +73,8 @@ OPTIONAL_MIXINS = {
     "main:com/quickskin/mod/mixin/compat/EarsLayerRendererMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
     "main:com/quickskin/mod/mixin/compat/RealCameraTextureIdMixin.java",
+    "main:com/quickskin/mod/mixin/compat/JourneyMapIgnSkinMixin.java",
+    "main:com/quickskin/mod/mixin/compat/JourneyMapTextureCacheMixin.java",
     "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
     "overlay:com/quickskin/mod/mixin/compat/ReplayModCompatMixin.java",
 }
@@ -241,6 +244,8 @@ class MixinPolicyTest(unittest.TestCase):
                 self.assertIs(config["required"], False)
                 self.assertEqual(config["injectors"]["defaultRequire"], 0)
                 self.assertIn("RealCameraTextureIdMixin", config["client"])
+                self.assertIn("JourneyMapIgnSkinMixin", config["client"])
+                self.assertIn("JourneyMapTextureCacheMixin", config["client"])
 
     def test_configured_mixins_exist_and_dynamic_mixins_are_audited(self) -> None:
         configs = self.configs_named("quickskin.mixins.json") + self.configs_named(
@@ -268,6 +273,8 @@ class MixinPolicyTest(unittest.TestCase):
         self.assertIn('"CpmModelDefinitionLoaderMixin"', plugin)
         self.assertIn('"CpmRenderDepthMixin"', plugin)
         self.assertIn('"RealCameraTextureIdMixin"', plugin)
+        self.assertIn('"JourneyMapIgnSkinMixin"', plugin)
+        self.assertIn('"JourneyMapTextureCacheMixin"', plugin)
         configured.add("CpmRenderDepthMixin")
 
         source_classes = {source.stem for source in self.mixin_sources()}

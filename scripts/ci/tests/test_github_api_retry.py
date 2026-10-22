@@ -84,6 +84,67 @@ class GitHubApiRetryTest(unittest.TestCase):
                 self.assertEqual("actual-admission-still-required\n", completed.stdout)
                 self.assertEqual("GitHub REST core budget telemetry unavailable.\n", completed.stderr)
 
+    def _admission(self, remaining: int, *, limit: int = 1000, reserve: str | None = None,
+                   label: str = "visual review drain", summary: Path | None = None
+                   ) -> subprocess.CompletedProcess[str]:
+        counters = json.dumps({"limit": limit, "used": limit - remaining, "remaining": remaining,
+                               "reset": 4102444800, "token": "must-not-print"})
+        environment = {"GH_TOKEN": "fixture-token"}
+        if reserve is not None:
+            environment["GITHUB_API_BACKGROUND_RESERVE_PERCENT"] = reserve
+        if summary is not None:
+            environment["GITHUB_STEP_SUMMARY"] = str(summary)
+        return self._run(f'''
+            [[ "$1 $2" == "api rate_limit" && "$GH_TOKEN" == "fixture-token" ]] || exit 98
+            printf '%s\\n' {shlex.quote(counters)}
+        ''', invocation=f"github_api_background_admission {shlex.quote(label)}",
+            environment_overrides=environment)
+
+    @unittest.skipUnless(shutil.which("jq"), "background admission uses the workflow's jq")
+    def test_background_admission_defers_only_below_the_reserve_and_logs_numbers(self) -> None:
+        for remaining, expected in ((1000, 0), (400, 0), (399, 75), (0, 75)):
+            with self.subTest(remaining=remaining):
+                completed = self._admission(remaining)
+                self.assertEqual(expected, completed.returncode, completed.stderr)
+                self.assertEqual("", completed.stdout)
+                self.assertIn(f"core remaining {remaining} of 1000", completed.stderr)
+                self.assertIn("deferred" if expected else "admitted", completed.stderr)
+                self.assertNotIn("token", completed.stderr)
+        with tempfile.TemporaryDirectory() as temporary:
+            summary = Path(temporary) / "summary.md"
+            completed = self._admission(120, limit=5000, summary=summary)
+            self.assertEqual(75, completed.returncode, completed.stderr)
+            text = summary.read_text(encoding="utf-8")
+            self.assertIn("visual review drain deferred; core remaining 120 of 5000 (2%)", text)
+            self.assertIn("below the 40% reserve", text)
+            self.assertIn("stays queued", text)
+
+    @unittest.skipUnless(shutil.which("jq"), "background admission uses the workflow's jq")
+    def test_background_admission_reserve_is_bounded_and_overridable(self) -> None:
+        self.assertEqual(0, self._admission(300, reserve="25").returncode)
+        self.assertEqual(75, self._admission(300, reserve="31").returncode)
+        self.assertEqual(0, self._admission(900, reserve="").returncode)
+        for reserve in ("0", "100", "40%", "-1", "4 0", "07"):
+            with self.subTest(reserve=reserve):
+                completed = self._admission(900, reserve=reserve)
+                self.assertEqual(2, completed.returncode)
+        for label in ("", "$(touch pwned)", "a" * 81, "-n"):
+            with self.subTest(label=label):
+                self.assertEqual(2, self._admission(900, label=label).returncode)
+
+    @unittest.skipUnless(shutil.which("jq"), "background admission uses the workflow's jq")
+    def test_background_admission_fails_open_on_unusable_telemetry(self) -> None:
+        for body in ('exit 1', 'printf \'signed-secret\\n\'',
+                     'printf \'{"limit":0,"used":0,"remaining":0,"reset":1800000000}\\n\'',
+                     'printf \'{"limit":1000,"used":1,"remaining":1001,"reset":1800000000}\\n\'',
+                     'printf \'{"limit":1000,"used":1,"remaining":"1","reset":1800000000}\\n\''):
+            with self.subTest(body=body):
+                completed = self._run('printf \'sensitive diagnostics\\n\' >&2\n' + body,
+                                      invocation="github_api_background_admission 'compatibility review recovery'")
+                self.assertEqual(0, completed.returncode)
+                self.assertEqual("GitHub API background admission: compatibility review recovery admitted; "
+                                 "core budget telemetry unavailable.\n", completed.stderr)
+
     def test_inherited_shell_hooks_and_credentials_cannot_replace_fake_cli(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             hook = Path(temporary) / "inherited-shell-hook"

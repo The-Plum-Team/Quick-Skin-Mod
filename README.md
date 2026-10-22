@@ -97,8 +97,9 @@ certify those images. Version-branch synchronization is retired under the shared
 - Synchronize Quick Skin appearances between players who run Quick Skin when the mod is also
   installed on the server.
 - Use optional integrations with Customizable Player Models (`.cpmmodel`), Ears, 3D Skin Layers,
-  CustomNPCs, Essential, ReplayMod, and FancyMenu (whose layouts can hide, move, and resize the
-  title and pause player preview) when the matching third-party mod is installed.
+  CustomNPCs, Essential, ReplayMod, FancyMenu (whose layouts can hide, move, and resize the
+  title and pause player preview) and JourneyMap (whose player icons show the Quick Skin face)
+  when the matching third-party mod is installed.
 
 Quick Skin does not declare these integrations as required dependencies. If an optional mod or API
 is unavailable, its integration disables itself and normal skin/cape behavior remains available.
@@ -165,6 +166,13 @@ and [ADR 0012](docs/architecture/decisions/0012-share-uploaded-account-skins-wit
 2. Import a skin or place it under `.minecraft/quickskin/skins/`.
 3. Import a cape or place it under `.minecraft/quickskin/capes/`.
 4. Select an appearance, preview it, and choose automatic, classic, or slim arms.
+
+On Android launchers such as MJLauncher, Import opens a file browser inside Minecraft, starting
+in the phone's Downloads folder. Use the Phone storage or Game folder buttons to choose another
+location. Android may hide files in Downloads even when the folder itself is visible. Only files
+the launcher can read are available; copy a missing file into the game folder using a file manager
+that can access the launcher's storage. The underlined hint and matching Game folder label identify
+this alternative; the chooser does not request Android storage permissions.
 
 When CPM is installed, standalone models live under `.minecraft/player_models/` and can be imported as `.cpmmodel` files.
 

@@ -92,7 +92,13 @@ provenance for every reused frame. A consumer expecting full evidence must rejec
 report, even when that selection happens to contain all authored steps.
 
 `PlayerOwnSkinBootstrap` belongs to `skin-import`, including its bounded async startup task,
-closed-state guard, and persisted own-skin selection. `SavedAppearanceRestorer` belongs to
+closed-state guard, and persisted own-skin selection. It checks the account's Mojang texture on
+every start, recognising the listed own skin by that texture's address, and lists a new one as the
+own skin, which whoever wore the previous one then wears; the previous one stays in the list,
+and the new one is listed even when the player had hidden the previous one.
+`skin-upload` reports every accepted upload with the active texture of Mojang's reply
+(`MojangSkinUploader.UploadListener`), which `ClientFeatureBindings` hands to the bootstrap, since
+Mojang may retouch an uploaded skin (the `uploaded-skin-adoption` binding). `SavedAppearanceRestorer` belongs to
 `appearance-services`. `ClientEvents` admits the session/Replay subject and delegates to those
 features; it owns event registration and teardown wiring. The existing catalog E2E checks inspect
 the actual import owner and exercise the same composed saved-appearance path.
@@ -120,7 +126,8 @@ native conversion and preserves the allocation-free cached lookup. Server stores
 `Path` supplied by `ServerRuntime`, without importing `MinecraftServer`.
 `cape-import` receives a `GifDecoder` through its workflow constructor. Its API returns a bounded
 ARGB atlas and animation metadata; `MinecraftGifDecoder` in the adapter owns native decoding,
-channel conversion, and native-frame disposal. Keep native image objects out of import processing.
+channel conversion, and native-frame disposal. A GIF it refuses only for its size falls back to
+`ScaledGifDecoder` in `image-core`, which decodes in Java frame by frame and shrinks. Keep native image objects out of import processing.
 
 `ClientFeatureBindings` installs the process-owned links before catalog scans or network callbacks:
 CPM consumes `CpmAssetAccess`, accepted packets target `RemoteAppearanceTarget`, and feature code
@@ -260,7 +267,7 @@ Quick Skin's sources below own the scenarios, the adapter and the review semanti
   `e2e/runtime_store_cache.py` derives that transport identity, always the exact server recipe
   digest and never a commit, and names the immutable directories that may travel;
   `scripts/ci/runtime_store_cache_policy.py` is the fail-closed writer policy that admits only a
-  protected `master` dispatch. A restore that fails validation is a cache miss and a fresh
+  job declaring `runtime-store-writer` in a `workflow_dispatch` on protected `master`. A restore that fails validation is a cache miss and a fresh
   install. See [ADR 0008](../architecture/decisions/0008-transport-the-installed-loader-server-between-jobs.md).
 - `e2e/visual_evidence.py` reads successful `result.json` reports, verifies the scenario-contract
   hash and exact graph, bounded printable passed-assertion messages, PNG containment, full decode,
@@ -473,7 +480,7 @@ Quick Skin's sources below own the scenarios, the adapter and the review semanti
   generation, the authenticated selection). Both import the kit lazily, so modules that do not
   touch Pages need no kit. Every verified selection is handed off. `feature_evidence.compose`
   works per frame: a re-tested lane is the selected execution's record, and when the selection
-  re-captured only some of its checkpoints (the `hud-preview` selection re-captures 2 of the 63
+  re-captured only some of its checkpoints (the `hud-preview` selection re-captures 2 of the 64
   `full` ones) it also carries `baseline_run`, the baseline lane's `profile`, `status`,
   `elapsed_s` and `jars` its older frames were tested with. The kit's R3 re-verifies both epochs
   against their sources.
@@ -493,7 +500,9 @@ Quick Skin's sources below own the scenarios, the adapter and the review semanti
   live `master` SHA immediately before model admission. An exact wake may select only its requested
   authenticated artifact and queries only that immutable capsule plus its exact report, cooldown,
   generation-block, and current-generation identities; it does not rescan the repository-wide
-  queue. Transient GitHub API and installation-rate-limit responses
+  queue. It reports `owner_settling` when an ineligible capsule's curator run has not completed
+  yet, and only that state makes the drain repeat its bounded selection.
+  Transient GitHub API and installation-rate-limit responses
   receive bounded backoff before the durable wake is allowed to fail visibly. Queue state
   lives in Actions artifacts rather than pending workflow runs, so GitHub concurrency coalescing
   cannot lose a review. Exact artifact IDs define drain concurrency groups: duplicate wakes cannot
@@ -503,11 +512,12 @@ Quick Skin's sources below own the scenarios, the adapter and the review semanti
   concurrently with its direct wake. Queue selection also authenticates generation-block artifacts
   from failed/in-progress protected drains and skips only inputs carrying the exact blocked master
   generation; the marker's owner still binds it to its exact protected reviewer implementation.
-  Full recovery parses and bounds the complete artifact inventory, then authenticates only
-  reports, attempts, blocks and certificates relevant to eligible current-generation capsules.
-  Capsule age and an older producer commit cannot exclude otherwise eligible historical work.
+  Full recovery never reads the repository-wide artifact listing: it lists the curator runs at the
+  current `master` SHA (the curator uploads only its own generation) and each run's artifacts, then
+  looks up by exact name and authenticates only the reports, attempts, blocks and certificates of
+  those current-generation capsules. Capsule age cannot exclude otherwise eligible work.
   Completed and already-reviewed inputs survive their own or another report owner's late
-  cancellation until seven-day expiry. Cleanup is a successful no-op for both branches; ordinary
+  cancellation until their two-day expiry. Cleanup is a successful no-op for both branches; ordinary
   report authentication suppresses redispatch, while cancelled owners reopen model-free recovery.
   Only missing/terminally invalid inputs keep exact-ID cleanup. The
   [visual-review pipeline](../ci/VISUAL-REVIEW-PIPELINE.md) records the additional retained storage

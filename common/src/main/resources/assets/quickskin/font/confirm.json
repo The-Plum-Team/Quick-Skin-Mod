@@ -1,0 +1,27 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 3
+      }
+    },
+    {
+      "type": "bitmap",
+      "file": "quickskin:font/confirm.png",
+      "height": 18,
+      "ascent": 14,
+      "chars": [
+        "ABCDEFGHIJKLMNOP",
+        "QRSTUVWXYZ012345",
+        "6789():.,!?-/'+%",
+        "ÀÁÂÃÄÈÉÊËÌÍÎÏÑÒÓ",
+        "ÔÕÖÙÚÛÜÇ¿¡\u0000\u0000\u0000\u0000\u0000\u0000"
+      ]
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

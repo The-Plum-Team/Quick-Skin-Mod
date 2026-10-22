@@ -45,6 +45,12 @@ inputs:
     description: Bounded retention needed by downstream authenticated consumers
     required: false
     default: "1"
+  runtime-store-writer:
+    description: >-
+      Set to true only by a job whose bundle was built from protected master in the same trusted
+      context; the writer policy still decides. Every other job restores the server store read-only.
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -139,13 +145,17 @@ runs:
     - name: Decide whether this generation may publish an installed server
       id: server-store-policy
       shell: bash
+      env:
+        RUNTIME_STORE_WRITER: ${{ inputs.runtime-store-writer }}
       run: |
         set -euo pipefail
+        [[ "$RUNTIME_STORE_WRITER" == true || "$RUNTIME_STORE_WRITER" == false ]]
         read_only="$(python3 scripts/ci/runtime_store_cache_policy.py \
           --event-name "$GITHUB_EVENT_NAME" \
           --ref-name "$GITHUB_REF_NAME" \
           --ref-type "${GITHUB_REF_TYPE:-branch}" \
-          --ref-protected "${GITHUB_REF_PROTECTED:-false}")"
+          --ref-protected "${GITHUB_REF_PROTECTED:-false}" \
+          --writer-job "$RUNTIME_STORE_WRITER")"
         printf 'read-only=%s\n' "$read_only" >> "$GITHUB_OUTPUT"
 
     # An exact recipe key with no prefix fallback: a near miss must never satisfy a lookup that
@@ -177,6 +187,10 @@ runs:
         SDL_VIDEO_FORCE_EGL: "1"
       run: |
         set -euo pipefail
+        # Minecraft runs the staged JARs, which may come from another run. Nothing it starts may
+        # reach the job's Actions runtime, cache or result services, or a GitHub token.
+        unset ACTIONS_RUNTIME_TOKEN ACTIONS_RUNTIME_URL ACTIONS_CACHE_URL ACTIONS_RESULTS_URL \
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL GITHUB_TOKEN GH_TOKEN
         selection_arguments=()
         if [[ -n "$E2E_SELECTION_SHA256" ]]; then
           if [[ ! "$E2E_SELECTION_BASE" =~ ^[0-9a-f]{40}$ ||
@@ -252,6 +266,7 @@ runs:
 
     - name: Publish the installed loader server for later generations
       if: >-
+        inputs.runtime-store-writer == 'true' &&
         steps.server-store.outputs.transported == 'true' &&
         steps.server-store-policy.outputs.read-only == 'false' &&
         steps.server-store-restore.outputs.cache-hit != 'true'

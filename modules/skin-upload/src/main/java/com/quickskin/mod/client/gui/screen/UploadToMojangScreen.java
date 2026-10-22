@@ -1,12 +1,13 @@
 package com.quickskin.mod.client.gui.screen;
 
+import com.quickskin.mod.client.gui.util.MenuGuiScale;
 import com.quickskin.mod.client.api.ClientNetworkActions;
 import com.quickskin.mod.client.api.ClientNetworkApi;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.client.gui.effect.BlurHandler;
-import com.quickskin.mod.client.gui.util.ButtonFactory;
+import com.quickskin.mod.client.gui.util.DialogFrame;
 import com.quickskin.mod.client.util.MojangSkinUploader;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -30,18 +31,13 @@ public class UploadToMojangScreen extends Screen {
     private final AssetMetadata metadata;
     private final Consumer<Boolean> callback;
 
-    // Panel styling
-    private static final int PANEL_BG = 0xB0000000;           // Darker semi-transparent background for frosted glass effect
-    private static final int PANEL_OUTLINE = 0x60FFFFFF;      // Subtle white outline
     // Keep the Stonecutter seam aligned with the release branches; both APIs require opaque ARGB.
     //? if <1.21.11 {
-    private static final int TITLE_COLOR = 0xFFFFFFFF;        // Opaque white title
     private static final int MESSAGE_COLOR = 0xFFFFFFFF;      // Opaque white message
     private static final int INFO_COLOR = 0xFF40A040;         // Opaque green info text
     private static final int ERROR_COLOR = 0xFFFF4040;        // Opaque red error text
     private static final int SUCCESS_COLOR = 0xFF40FF40;      // Opaque bright green success text
     //?} else {
-    private static final int TITLE_COLOR = 0xFFFFFFFF;        // Opaque white title
     private static final int MESSAGE_COLOR = 0xFFFFFFFF;      // Opaque white message
     private static final int INFO_COLOR = 0xFF40A040;         // Opaque green info text
     private static final int ERROR_COLOR = 0xFFFF4040;        // Opaque red error text
@@ -76,6 +72,10 @@ public class UploadToMojangScreen extends Screen {
 
     @Override
     protected void init() {
+        // Drawn over a menu, the dialog takes the menu's scale so the menu behind keeps its size
+        if (this.minecraft != null) {
+            MenuGuiScale.follow(this.minecraft, this, this.parent);
+        }
         active = true;
 
         // Calculate centered panel position
@@ -85,22 +85,22 @@ public class UploadToMojangScreen extends Screen {
         // Button dimensions
         int buttonWidth = 120;
         int buttonHeight = 20;
-        int buttonSpacing = 10;
-        int buttonY = this.panelY + this.panelHeight - buttonHeight - 20;
+        int buttonSpacing = 8;
+        int buttonY = DialogFrame.bodyBottom(this.panelY, this.panelHeight) - buttonHeight - 12;
 
         // Calculate button positions (centered, side by side)
         int totalButtonWidth = (buttonWidth * 2) + buttonSpacing;
         int buttonStartX = this.panelX + (this.panelWidth - totalButtonWidth) / 2;
 
         // Cancel/Close button (left)
-        this.cancelButton = ButtonFactory.createStyled(
+        this.cancelButton = DialogFrame.button(
             buttonStartX, buttonY, buttonWidth, buttonHeight,
             Component.translatable("quickskin.button.cancel"),
             (button) -> this.callback.accept(false)
         );
 
         // Upload button (right, green/success)
-        this.uploadButton = ButtonFactory.createStyled(
+        this.uploadButton = DialogFrame.button(
             buttonStartX + buttonWidth + buttonSpacing, buttonY,
             buttonWidth, buttonHeight,
             Component.translatable("quickskin.button.upload_skin"),
@@ -215,54 +215,20 @@ public class UploadToMojangScreen extends Screen {
     //?}
         // Render parent screen in background
         if (this.parent != null) {
-            //? if <26.1 {
-            this.parent.render(graphics, -1, -1, partialTicks);
-            //?} else {
-            GuiCompat.extractParent(this.parent, graphics, partialTicks);
-            //?}
+            BlurHandler.renderParent(this.parent, graphics, partialTicks);
         }
 
         //? if <1.21.6 {
         graphics.flush();
         //?}
-        BlurHandler.renderBlur();
+        BlurHandler.renderBlur(graphics);
 
         // Draw lighter overlay over entire screen (so blur is more visible)
         graphics.fill(0, 0, this.width, this.height, 0x60000000);
 
-        // Draw main panel background with frosted glass effect
-        graphics.fill(this.panelX, this.panelY,
-                     this.panelX + this.panelWidth,
-                     this.panelY + this.panelHeight,
-                     PANEL_BG);
-
-        // Draw subtle outline around panel
-        // Top
-        graphics.fill(this.panelX, this.panelY,
-                     this.panelX + this.panelWidth, this.panelY + 1,
-                     PANEL_OUTLINE);
-        // Bottom
-        graphics.fill(this.panelX, this.panelY + this.panelHeight - 1,
-                     this.panelX + this.panelWidth, this.panelY + this.panelHeight,
-                     PANEL_OUTLINE);
-        // Left
-        graphics.fill(this.panelX, this.panelY,
-                     this.panelX + 1, this.panelY + this.panelHeight,
-                     PANEL_OUTLINE);
-        // Right
-        graphics.fill(this.panelX + this.panelWidth - 1, this.panelY,
-                     this.panelX + this.panelWidth, this.panelY + this.panelHeight,
-                     PANEL_OUTLINE);
-
-        // Draw title (centered)
-        int titleY = this.panelY + 20;
-        //? if <26.1 {
-        graphics.drawCenteredString(this.font, this.title,
-        //?} else {
-        graphics.centeredText(this.font, this.title,
-        //?}
-                                   this.width / 2, titleY,
-                                   TITLE_COLOR);
+        // A DialogFrame with a green header and the upload arrow
+        DialogFrame.draw(graphics, this.font, this.panelX, this.panelY, this.panelWidth, this.panelHeight,
+                DialogFrame.Accent.UPLOAD, DialogFrame.ICON_UPLOAD, this.title);
 
         // Draw status icon and messages
         int iconY = this.panelY + 40;
@@ -431,6 +397,9 @@ public class UploadToMojangScreen extends Screen {
 
     @Override
     public void removed() {
+        if (this.minecraft != null) {
+            MenuGuiScale.leave(this.minecraft, this);
+        }
         active = false;
         uploadAttempt++;
         if (uploadTask != null) {

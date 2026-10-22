@@ -1,7 +1,10 @@
 package com.quickskin.mod.client.gui.util;
 
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
+import com.quickskin.mod.common.data.AnimationMetadata;
 import com.quickskin.mod.common.util.GifDecoder;
+import com.quickskin.mod.common.util.UserFacingIOException;
+import com.quickskin.mod.common.util.UserFacingIOException.UserMessage;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 
@@ -13,6 +16,7 @@ import java.util.ArrayDeque;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /** Sequential state machine for a bounded batch of cape imports. */
@@ -34,22 +38,33 @@ public final class CapeImportWorkflow {
     private int failed;
     private int cancelledCount;
     private String firstError;
+    private UserMessage firstErrorMessage;
     private boolean cancelled;
     private boolean finished;
 
-    public record Summary(int succeeded, int failed, int cancelled, String firstError) {
+    /**
+     * How a batch ended. {@code firstError} is the first failure's English detail, for the log;
+     * {@code firstErrorMessage} is what to tell the player about it, or {@code null} when that
+     * failure was an internal one with nothing more useful to say than that the import failed.
+     */
+    public record Summary(int succeeded, int failed, int cancelled, String firstError,
+                          UserMessage firstErrorMessage) {
     }
 
     @FunctionalInterface
     public interface AdjustmentHandler {
+        /**
+         * @param apply takes the adjusted atlas and, for an animated one, the timing chosen for
+         *              its frames ({@code null} keeps the source's)
+         */
         void request(
                 CapeImportProcessor.PreparedCape prepared,
-                Consumer<BufferedImage> apply,
+                BiConsumer<BufferedImage, AnimationMetadata> apply,
                 Runnable cancel
         );
     }
 
-    private record PreparedResult(CapeImportProcessor.PreparedCape prepared, String error) {
+    private record PreparedResult(CapeImportProcessor.PreparedCape prepared, Throwable error) {
         private static PreparedResult saved() {
             return new PreparedResult(null, null);
         }
@@ -58,7 +73,7 @@ public final class CapeImportWorkflow {
             return new PreparedResult(prepared, null);
         }
 
-        private static PreparedResult failed(String error) {
+        private static PreparedResult failed(Throwable error) {
             return new PreparedResult(null, error);
         }
     }
@@ -85,20 +100,23 @@ public final class CapeImportWorkflow {
         if (sources != null) {
             for (Path source : sources) {
                 if (pending.size() >= MAX_BATCH_FILES) {
-                    reject("Cape import batches are limited to 16 files");
+                    reject("Cape import batches are limited to 16 files",
+                            UserMessage.of("quickskin.cape.error.batch_count", sources.size(), MAX_BATCH_FILES));
                     continue;
                 }
                 try {
                     long bytes = Files.size(source);
                     if (bytes <= 0 || bytes > 32L * 1024L * 1024L
                             || retainedSourceBytes + bytes > MAX_BATCH_SOURCE_BYTES) {
-                        reject("Cape import batch exceeds its 64 MB source limit");
+                        reject("Cape import batch exceeds its 64 MB source limit",
+                                UserMessage.of("quickskin.cape.error.batch_size",
+                                        MAX_BATCH_SOURCE_BYTES / (1024 * 1024)));
                         continue;
                     }
                     pending.addLast(source);
                     retainedSourceBytes += bytes;
                 } catch (IOException | RuntimeException error) {
-                    reject(error.getMessage());
+                    recordFailure(error);
                 }
             }
         }
@@ -136,7 +154,7 @@ public final class CapeImportWorkflow {
         ClientIoExecutor.supplyAsync(() -> prepareOrSave(source))
                 .whenComplete((result, throwable) -> mainExecutor.execute(() -> {
                     if (throwable != null) {
-                        recordFailure(messageOf(throwable));
+                        recordFailure(throwable);
                         processNext();
                         return;
                     }
@@ -154,7 +172,7 @@ public final class CapeImportWorkflow {
                     prepared, targetDirectory, metadataDirectory, vanillaElytra);
             return PreparedResult.saved();
         } catch (IOException | RuntimeException error) {
-            return PreparedResult.failed(error.getMessage());
+            return PreparedResult.failed(error);
         }
     }
 
@@ -187,9 +205,9 @@ public final class CapeImportWorkflow {
         try {
             adjustmentHandler.request(
                     result.prepared(),
-                    adjusted -> {
+                    (adjusted, timing) -> {
                         if (!answered.compareAndSet(false, true)) return;
-                        saveAdjusted(result.prepared(), adjusted);
+                        saveAdjusted(result.prepared(), adjusted, timing);
                     },
                     () -> {
                         if (!answered.compareAndSet(false, true)) return;
@@ -198,30 +216,30 @@ public final class CapeImportWorkflow {
                     });
         } catch (RuntimeException error) {
             if (answered.compareAndSet(false, true)) {
-                recordFailure(error.getMessage());
+                recordFailure(error);
                 continueAfterSettledImport();
             }
         }
     }
 
     private void saveAdjusted(
-            CapeImportProcessor.PreparedCape prepared, BufferedImage adjusted) {
+            CapeImportProcessor.PreparedCape prepared, BufferedImage adjusted, AnimationMetadata timing) {
         ClientIoExecutor.supplyAsync(() -> {
             try {
                 Path saved = CapeImportProcessor.saveAdjusted(
-                        prepared, adjusted, targetDirectory, metadataDirectory, vanillaElytra);
+                        prepared, adjusted, timing, targetDirectory, metadataDirectory, vanillaElytra);
                 try {
                     CapeEditorSources.retain(metadataDirectory, saved, prepared.source());
                 } catch (IOException | RuntimeException ignored) {
                     // The cape is imported; it only cannot be reopened in the editor.
                 }
-                return (String) null;
+                return (Throwable) null;
             } catch (IOException | RuntimeException error) {
-                return error.getMessage();
+                return error;
             }
         }).whenComplete((error, throwable) -> mainExecutor.execute(() -> {
             if (throwable != null) {
-                recordFailure(messageOf(throwable));
+                recordFailure(throwable);
             } else if (error != null) {
                 recordFailure(error);
             } else {
@@ -249,19 +267,22 @@ public final class CapeImportWorkflow {
         cancelledCount++;
     }
 
-    private synchronized void reject(String error) {
+    private synchronized void reject(String error, UserMessage userMessage) {
         failed++;
-        if (firstError == null && error != null && !error.isBlank()) firstError = error;
+        if (firstError == null) {
+            firstError = error != null && !error.isBlank() ? error : "Cape import failed";
+            firstErrorMessage = userMessage;
+        }
     }
 
-    private synchronized void recordFailure(String error) {
-        reject(error != null ? error : "Cape import failed");
+    private synchronized void recordFailure(Throwable error) {
+        reject(messageOf(error), UserFacingIOException.find(error));
     }
 
     private synchronized void finish() {
         if (finished) return;
         finished = true;
-        completion.accept(new Summary(succeeded, failed, cancelledCount, firstError));
+        completion.accept(new Summary(succeeded, failed, cancelledCount, firstError, firstErrorMessage));
     }
 
     private static String messageOf(Throwable throwable) {

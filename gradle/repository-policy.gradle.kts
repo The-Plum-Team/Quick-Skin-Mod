@@ -35,7 +35,21 @@ repositories.withType<MavenArtifactRepository>().configureEach {
             includeGroupByRegex("cpw\\.mods(\\..*)?")
             excludeGroupByRegex("net\\.neoforged\\.fancymodloader\\.[0-9a-f]{64}")
         }
-        repositoryHost == "repo.maven.apache.org" -> content {
+        // The Plum Team's mirror, added first by gradle/maven-mirror.gradle.kts. Exact groups only, so
+        // Loom's generated hash-named namespaces can never match it.
+        repositoryHost == "the-plum-team.github.io" && url.path == "/maven-mirror/" -> content {
+            listOf(
+                "net.fabricmc", "net.fabricmc.fabric-api", "net.fabricmc.unpick",
+                "dev.architectury", "dev.architectury.loom", "dev.architectury.loom-no-remap",
+                "architectury-plugin", "dev.kikugie", "dev.kikugie.stonecutter",
+                "net.neoforged", "net.neoforged.fancymodloader", "net.neoforged.installertools",
+                "net.neoforged.accesstransformers", "cpw.mods", "net.minecraftforge",
+            ).forEach { includeGroup(it) }
+        }
+        // Google's mirror of Maven Central, declared right after every mavenCentral(), takes
+        // Central's filter.
+        repositoryHost == "repo.maven.apache.org" ||
+            (repositoryHost == "maven-central.storage-download.googleapis.com" && url.path == "/maven2/") -> content {
             excludeGroupByRegex("dev\\.architectury(\\..*)?")
             excludeGroupByRegex("net\\.fabricmc(\\..*)?")
             excludeGroupByRegex("com\\.mojang(\\..*)?")
@@ -53,3 +67,32 @@ repositories.withType<MavenArtifactRepository>().configureEach {
         )
     }
 }
+
+// Architectury Plugin 3.5.170 adds `net.fabricmc:fabric-loader:+` to its transformer classpath
+// (ArchitectPluginExtension.common and the default envAnnotationProvider of each Transform).
+// Under strict verification that selector turns every new Fabric Loader release into a
+// missing-checksum failure in every build (#1438 restored 0.19.5 the day it was published). Pin
+// that selector to the reviewed version and refuse any other dynamic or changing selector in that
+// classpath. The classpath also carries the target's own fabric-loader, which keeps winning
+// conflict resolution only when it is newer than the pin, exactly as before.
+// Change the pin only together with that version's JAR and POM checksums in
+// gradle/verification-metadata.xml.
+val architecturyTransformerFabricLoaderVersion = "0.19.5"
+configurations.matching { it.name == "architecturyTransformerClasspath" }.configureEach {
+    resolutionStrategy {
+        eachDependency {
+            if (
+                requested.group == "net.fabricmc" &&
+                requested.name == "fabric-loader" &&
+                requested.version == "+"
+            ) {
+                useVersion(architecturyTransformerFabricLoaderVersion)
+                because("Architectury declares fabric-loader:+; strict verification needs a reviewed one")
+            }
+        }
+        failOnDynamicVersions()
+        failOnChangingVersions()
+    }
+}
+
+apply(from = rootProject.file("gradle/maven-mirror.gradle.kts"))

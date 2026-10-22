@@ -55,8 +55,9 @@ EXPECTED_STEPS = {
         "catalog_rename",
         "catalog_sort",
         "catalog_own_skin",
-        "catalog_delete_protected",
+        "catalog_hide_own_skin",
         "catalog_delete",
+        "catalog_delete_protected",
         "model_slim",
         "model_classic",
         "slim_skin_auto_detect",
@@ -231,7 +232,7 @@ EXPECTED_CAPTURES = {
     ),
 }
 
-EXPECTED_CAPTURE_COUNT = 97
+EXPECTED_CAPTURE_COUNT = 98
 
 # The scenario index the mutation cases below address. Mutations must target the intended
 # scenario even after the contract grows, so these are named rather than inlined.
@@ -613,7 +614,7 @@ class ScenarioContractTest(unittest.TestCase):
         self.assertEqual("Skin menu", skin_menu.title)
         self.assertEqual("key", skin_menu.review_tier)
         self.assertEqual(
-            ((0.34, 0.09, 0.66, 0.91),),
+            ((0.0, 0.0, 1.0, 1.0),),
             self.contract.review_regions_for("full.client_a.skin_menu_screen"),
         )
 
@@ -816,7 +817,7 @@ class ScenarioContractTest(unittest.TestCase):
                     "external_skin_drop",
                     "catalog_delete",
                     0.002,
-                    (0.34, 0.09, 0.66, 0.91),
+                    (0.0, 0.05, 0.09, 0.95),
                 ),
                 (
                     "model_classic",
@@ -882,7 +883,7 @@ class ScenarioContractTest(unittest.TestCase):
                     "settings_screen",
                     "settings_keybind_capture",
                     0.00001,
-                    (0.16, 0.25, 0.28, 0.31),
+                    (0.72, 0.21, 0.86, 0.29),
                 ),
                 (
                     "settings_screen",
@@ -900,7 +901,7 @@ class ScenarioContractTest(unittest.TestCase):
                     "skin_menu_screen",
                     "styled_buttons_vanilla_background",
                     0.02,
-                    (0.03, 0.2, 0.2, 0.8),
+                    (0.25, 0.12, 0.35, 0.5),
                 ),
                 (
                     "local_skin_apply",
@@ -985,7 +986,7 @@ class ScenarioContractTest(unittest.TestCase):
         self.assertIsInstance(opaque, scenario_contract.OpaqueStarsProbe)
         assert isinstance(opaque, scenario_contract.OpaqueStarsProbe)
         self.assertEqual("skin_menu_screen", opaque.step)
-        self.assertEqual((0.03, 0.20, 0.20, 0.80), opaque.region)
+        self.assertEqual((0.25, 0.12, 0.35, 0.50), opaque.region)
         self.assertEqual((32.0, 64, 0.10), (
             opaque.maximum_mean_luma,
             opaque.bright_luma,
@@ -1007,45 +1008,45 @@ class ScenarioContractTest(unittest.TestCase):
             [
                 (
                     "skin_menu_screen",
-                    "skin catalog labels",
-                    (480, 195, 850, 300),
+                    "skin column counter",
+                    (16, 96, 120, 156),
                     175,
-                    500,
+                    200,
                 ),
                 (
                     "skin_menu_screen",
-                    "skin drop-zone instructions",
-                    (560, 440, 745, 523),
+                    "player name tag",
+                    (600, 116, 1000, 162),
                     175,
-                    300,
+                    100,
                 ),
                 (
                     "cape_menu_screen",
                     "cape menu title",
-                    (590, 100, 735, 140),
+                    (505, 35, 650, 75),
                     159,
-                    174,
+                    300,
                 ),
                 (
                     "cape_menu_screen",
                     "cape drop-zone instructions",
-                    (590, 200, 885, 260),
+                    (585, 140, 880, 200),
                     159,
-                    531,
+                    650,
                 ),
                 (
                     "cape_adjust_screen",
                     "cape editor title",
-                    (675, 20, 925, 50),
+                    (16, 14, 330, 50),
                     75,
-                    400,
+                    900,
                 ),
                 (
                     "cape_adjust_screen",
                     "cape editor instructions",
-                    (300, 624, 780, 672),
+                    (1100, 14, 1590, 50),
                     75,
-                    900,
+                    1200,
                 ),
                 (
                     "cape_fill_color_picker",
@@ -1057,44 +1058,44 @@ class ScenarioContractTest(unittest.TestCase):
                 (
                     "bmo_padded_source_screen",
                     "BMO source dimensions",
-                    (45, 100, 250, 140),
-                    75,
-                    120,
+                    (820, 634, 1040, 662),
+                    175,
+                    300,
                 ),
                 (
                     "bmo_padded_source_screen",
                     "BMO output dimensions",
-                    (1035, 100, 1255, 140),
-                    75,
-                    120,
+                    (1215, 514, 1430, 552),
+                    175,
+                    300,
                 ),
                 (
                     "cape_tile_tooltip",
                     "cape tile tooltip copy",
-                    (765, 190, 1040, 345),
+                    (600, 125, 875, 290),
                     159,
                     2500,
                 ),
                 (
                     "settings_screen",
                     "Open Skin Menu setting label",
-                    (445, 235, 655, 265),
+                    (510, 210, 960, 240),
                     175,
-                    300,
+                    1100,
                 ),
                 (
                     "settings_server_tab",
                     "server transparency setting label",
-                    (305, 234, 780, 268),
+                    (510, 196, 1145, 244),
                     175,
-                    1300,
+                    1800,
                 ),
                 (
                     "settings_server_tab",
                     "non-admin server notice",
-                    (495, 655, 1105, 688),
+                    (685, 728, 1190, 757),
                     175,
-                    1700,
+                    1400,
                 ),
             ],
             text_values,

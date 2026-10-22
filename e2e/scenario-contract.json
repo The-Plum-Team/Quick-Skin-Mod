@@ -9,6 +9,38 @@
     900
   ],
   "review_regions": {
+    "feature-navigation.client_a.cape_menu_settings_return": [
+      [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ]
+    ],
+    "feature-navigation.client_a.open_skin_menu_using_key": [
+      [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ]
+    ],
+    "feature-navigation.client_a.open_skin_menu_using_vanilla_button": [
+      [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ]
+    ],
+    "feature-navigation.client_a.skin_menu_settings_return": [
+      [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ]
+    ],
     "full.client_a.adjusted_bmo_cape": [
       [
         0.4,
@@ -68,29 +100,29 @@
     "full.client_a.bmo_adjust_screen": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.bmo_padded_source_screen": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.bundled_bmo_cape": [
@@ -112,71 +144,71 @@
     "full.client_a.cape_adjust_opaque_off": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_adjust_opaque_on": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_adjust_screen": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_adjust_zoom_in": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_adjust_zoom_out": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_delete_local": [
@@ -196,43 +228,43 @@
     "full.client_a.cape_editor_ignores_elytra": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_editor_snap_mirror": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_fill_color_picker": [
       [
         0.01,
-        0.04,
-        0.74,
-        0.78
+        0.02,
+        0.67,
+        0.8
       ],
       [
-        0.37,
-        0.93,
-        0.57,
-        0.99
+        0.67,
+        0.9,
+        0.99,
+        0.98
       ]
     ],
     "full.client_a.cape_import_standard": [
@@ -357,42 +389,50 @@
     ],
     "full.client_a.catalog_delete": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.catalog_delete_protected": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ]
+    ],
+    "full.client_a.catalog_hide_own_skin": [
+      [
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.catalog_own_skin": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.catalog_rename": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.catalog_sort": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.delete_dialog": [
@@ -413,10 +453,10 @@
     ],
     "full.client_a.external_skin_drop": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.hd_cape_no_downscale": [
@@ -433,6 +473,14 @@
         0.34,
         0.58,
         0.86
+      ]
+    ],
+    "full.client_a.hud_preview_disabled": [
+      [
+        0.82,
+        0.72,
+        0.96,
+        0.99
       ]
     ],
     "full.client_a.hud_preview_overlay": [
@@ -541,10 +589,10 @@
     ],
     "full.client_a.skin_menu_screen": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.slim_skin_auto_detect": [
@@ -565,10 +613,10 @@
     ],
     "full.client_a.styled_buttons_vanilla_background": [
       [
-        0.03,
-        0.09,
-        0.97,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "full.client_a.title_screen_splash_order": [
@@ -813,10 +861,10 @@
     ],
     "server-policy.client_a.cooldown_skin_menu": [
       [
-        0.34,
-        0.09,
-        0.66,
-        0.91
+        0.0,
+        0.0,
+        1.0,
+        1.0
       ]
     ],
     "server-policy.client_a.transparent_skin_server_policy": [
@@ -857,46 +905,6 @@
         0.0,
         0.75,
         0.25
-      ]
-    ],
-    "feature-navigation.client_a.open_skin_menu_using_key": [
-      [
-        0.0,
-        0.0,
-        1.0,
-        1.0
-      ]
-    ],
-    "feature-navigation.client_a.skin_menu_settings_return": [
-      [
-        0.0,
-        0.0,
-        1.0,
-        1.0
-      ]
-    ],
-    "feature-navigation.client_a.cape_menu_settings_return": [
-      [
-        0.0,
-        0.0,
-        1.0,
-        1.0
-      ]
-    ],
-    "feature-navigation.client_a.open_skin_menu_using_vanilla_button": [
-      [
-        0.0,
-        0.0,
-        1.0,
-        1.0
-      ]
-    ],
-    "full.client_a.hud_preview_disabled": [
-      [
-        0.82,
-        0.72,
-        0.96,
-        0.99
       ]
     ]
   },
@@ -1678,15 +1686,15 @@
               "capture": {
                 "title": "Skin menu",
                 "review_tier": "key",
-                "expectation": "The Quick Skin player-skin menu is open with readable catalog labels and drop-zone instructions over a dark, subtly starred background; there is no bright blur, radial wash or other background-compositing artifact.",
+                "expectation": "The Quick Skin skin menu is open without a panel: a column of skin face tiles under a Skins counter with a sort button and, under them, the import zone (corner marks, a tray icon and Drop skin files here / or click to import) on the left, the player-name search field with a flat search button at the top centre, a row of four link icons (Modrinth, CurseForge, Discord, settings) at the top right, the large player model in the middle on a white turntable ring with the player's name above it, five square icon buttons in a shallow arc beside the model, the middle one of each side standing out (body width, skin websites and a greyed-out coming-soon lock on its left, upload to Mojang and cape on its right), a large CONFIRM button at the bottom, all over a dark, subtly starred background; there is no bright blur, radial wash or other background-compositing artifact.",
                 "probes": [
                   {
                     "kind": "opaque-stars-background",
                     "region": [
-                      0.03,
-                      0.2,
-                      0.2,
-                      0.8
+                      0.25,
+                      0.12,
+                      0.35,
+                      0.5
                     ],
                     "maximum_mean_luma": 32.0,
                     "bright_luma": 64,
@@ -1694,27 +1702,27 @@
                   },
                   {
                     "kind": "required-gui-text",
-                    "label": "skin catalog labels",
+                    "label": "skin column counter",
                     "box": [
-                      480,
-                      195,
-                      850,
-                      300
+                      16,
+                      96,
+                      120,
+                      156
                     ],
                     "minimum_luma_exclusive": 175,
-                    "minimum_pixels": 500
+                    "minimum_pixels": 200
                   },
                   {
                     "kind": "required-gui-text",
-                    "label": "skin drop-zone instructions",
+                    "label": "player name tag",
                     "box": [
-                      560,
-                      440,
-                      745,
-                      523
+                      600,
+                      116,
+                      1000,
+                      162
                     ],
                     "minimum_luma_exclusive": 175,
-                    "minimum_pixels": 300
+                    "minimum_pixels": 100
                   }
                 ]
               },
@@ -1735,7 +1743,7 @@
               "capture": {
                 "title": "External skin imported",
                 "review_tier": "all",
-                "expectation": "The skin menu shows the externally dropped skin as an available catalog entry without a broken texture.",
+                "expectation": "The skin column shows the externally dropped skin as an extra face tile without a broken texture.",
                 "probes": []
               },
               "requires": [
@@ -1756,7 +1764,7 @@
               "capture": {
                 "title": "Catalog rename",
                 "review_tier": "key",
-                "expectation": "The skin menu lists the externally dropped skin under its new name qs_e2e_renamed after the real rename dialog was confirmed; both catalog rows keep a face thumbnail and a model label, and no row still shows the original dropped filename.",
+                "expectation": "After the real rename dialog was confirmed, the renamed external skin is previewed: its tile is selected in the skin column and the centred model wears it; both skin tiles keep a face thumbnail.",
                 "probes": []
               },
               "requires": [
@@ -1777,7 +1785,7 @@
               "capture": {
                 "title": "Catalog sorted latest first",
                 "review_tier": "all",
-                "expectation": "The skin menu's sort button now shows the Latest First arrow icon and the renamed external skin row is listed above the imported plaid skin row.",
+                "expectation": "The skin column's sort button now shows the Latest First arrow icon and the renamed external skin's tile is listed above the imported plaid skin's tile.",
                 "probes": []
               },
               "requires": [
@@ -1798,7 +1806,7 @@
               "capture": {
                 "title": "Own skin protected",
                 "review_tier": "key",
-                "expectation": "The imported plaid skin is marked as the player's own skin: its selected row is pinned to the top of the catalog and highlighted purple instead of blue, with no delete, rename or upload buttons on the row.",
+                "expectation": "The imported plaid skin is marked as the player's own skin: its selected tile is pinned to the top of the skin column and framed purple instead of blue, and no delete, rename or upload buttons appear beside it.",
                 "probes": []
               },
               "requires": [
@@ -1815,12 +1823,12 @@
               }
             },
             {
-              "id": "catalog_delete_protected",
+              "id": "catalog_hide_own_skin",
               "assertion_required": true,
               "capture": {
-                "title": "Own skin deletion refused",
-                "review_tier": "all",
-                "expectation": "A red error toast reading Cannot delete your own skin! is visible over the skin menu while the protected purple own-skin row remains in the catalog.",
+                "title": "Own skin hidden",
+                "review_tier": "key",
+                "expectation": "After the real delete confirmation on the purple own-skin tile, the skin column no longer lists it and shows only the renamed external skin's tile; no toast is shown. That the own skin's file and catalogue entry are kept, only hidden, is proven by the runtime evidence.",
                 "probes": []
               },
               "requires": [
@@ -1830,6 +1838,7 @@
               "covers": {
                 "modules": [
                   "asset-catalog",
+                  "configuration",
                   "skin-menu"
                 ],
                 "bindings": []
@@ -1841,16 +1850,39 @@
               "capture": {
                 "title": "External skin deleted",
                 "review_tier": "key",
-                "expectation": "After the real delete confirmation, the renamed external skin row is gone; the catalog shows only the protected purple own-skin row above the drop-zone instructions.",
+                "expectation": "After the real delete confirmation, the renamed external skin's tile is gone and the hidden own skin is back: the skin column shows only the purple own-skin tile, with the import zone filling the column below it.",
                 "probes": []
               },
               "requires": [
-                "catalog_delete_protected"
+                "catalog_hide_own_skin"
               ],
               "requires_captures": [],
               "covers": {
                 "modules": [
                   "asset-catalog",
+                  "configuration",
+                  "skin-menu"
+                ],
+                "bindings": []
+              }
+            },
+            {
+              "id": "catalog_delete_protected",
+              "assertion_required": true,
+              "capture": {
+                "title": "Own skin deletion refused",
+                "review_tier": "all",
+                "expectation": "An error toast with a red strip and cross icon, saying that the account's skin can't be deleted while it is the only skin in the list, is visible over the skin menu while the purple own-skin tile, the only skin, remains in the skin column.",
+                "probes": []
+              },
+              "requires": [
+                "catalog_delete"
+              ],
+              "requires_captures": [],
+              "covers": {
+                "modules": [
+                  "asset-catalog",
+                  "configuration",
                   "skin-menu"
                 ],
                 "bindings": []
@@ -2119,31 +2151,31 @@
               "capture": {
                 "title": "Cape menu",
                 "review_tier": "all",
-                "expectation": "The Quick Skin cape menu is open with readable My Capes and Default Capes section headings, the drop-zone instructions Drop cape files here or click 'Import Cape' beside the My Capes tiles, the grid of built-in cape tiles, a rear 3D player preview and the Import Cape, Remove Cape and Done buttons. A hover tooltip for the built-in tile under the resting mouse (such as BMO Cape) may be shown.",
+                "expectation": "The Quick Skin cape menu is open with readable My Capes and Default Capes section headings, the import zone beside the My Capes tiles (corner marks and a tray icon beside Drop cape files here / or click to import), the grid of built-in cape tiles, a rear 3D player preview and the Import Cape, Remove Cape and Done buttons. A hover tooltip for the built-in tile under the resting mouse (such as BMO Cape) may be shown.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
                     "label": "cape menu title",
                     "box": [
-                      590,
-                      100,
-                      735,
-                      140
+                      505,
+                      35,
+                      650,
+                      75
                     ],
                     "minimum_luma_exclusive": 159,
-                    "minimum_pixels": 174
+                    "minimum_pixels": 300
                   },
                   {
                     "kind": "required-gui-text",
                     "label": "cape drop-zone instructions",
                     "box": [
-                      590,
-                      200,
-                      885,
-                      260
+                      585,
+                      140,
+                      880,
+                      200
                     ],
                     "minimum_luma_exclusive": 159,
-                    "minimum_pixels": 531
+                    "minimum_pixels": 650
                   }
                 ]
               },
@@ -2187,31 +2219,31 @@
               "capture": {
                 "title": "Cape editor",
                 "review_tier": "all",
-                "expectation": "The Quick Skin cape-adjustment editor is open with its readable Adjust Cape Image title and Drag to move \u00b7 Scroll to zoom instructions. Its cyan-framed canvas shows the 64x32 test cape: a flat navy base with an orange, green-striped Front panel and labelled Front, Cape Back and Elytra region outlines; there are no grid lines. Beside it are the Output resolution buttons, the Reset Position, Snap and Mirror buttons and the Front and Cape Back preview thumbnails, with the Opaque, Fill and Zoom controls below the canvas and Cancel and Apply Cape buttons at the bottom.",
+                "expectation": "The Quick Skin cape-adjustment editor is open: a slate header strip carries the readable Adjust Cape Image title on the left and the Drag to move \u00b7 Scroll to zoom instructions on the right. Its framed canvas shows the 64x32 test cape: a flat navy base with an orange, green-striped Front panel and labelled Front, Cape Back and Elytra region outlines; there are no grid lines. Under the canvas a Zoom panel holds the source size, a zoom-out button, the zoom slider with its percentage and a zoom-in button. A panel on the right opens with Cape and Elytra view buttons, Cape selected in blue, above a 3D player wearing the cape from behind, then the Resolution buttons 1x to 16x with the output size under them, the Position buttons Center, Snap and Mirror, and the Opaque fill switch with its colour swatch. Cancel and a green Apply Cape button sit at the bottom right.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
                     "label": "cape editor title",
                     "box": [
-                      675,
-                      20,
-                      925,
+                      16,
+                      14,
+                      330,
                       50
                     ],
                     "minimum_luma_exclusive": 75,
-                    "minimum_pixels": 400
+                    "minimum_pixels": 900
                   },
                   {
                     "kind": "required-gui-text",
                     "label": "cape editor instructions",
                     "box": [
-                      300,
-                      624,
-                      780,
-                      672
+                      1100,
+                      14,
+                      1590,
+                      50
                     ],
                     "minimum_luma_exclusive": 75,
-                    "minimum_pixels": 900
+                    "minimum_pixels": 1200
                   }
                 ]
               },
@@ -2278,7 +2310,7 @@
               "capture": {
                 "title": "Cape transparency enabled",
                 "review_tier": "all",
-                "expectation": "The cape editor displays the transparent form of the test cape with the opaque toggle disabled.",
+                "expectation": "The cape editor displays the transparent form of the test cape with the Opaque fill switch off.",
                 "probes": []
               },
               "requires": [
@@ -2301,7 +2333,7 @@
               "capture": {
                 "title": "Cape forced opaque",
                 "review_tier": "all",
-                "expectation": "The cape editor shows the opaque form of the test cape: the toggle reads Opaque: ON, the fill button reads Fill: #FF00FF beside a magenta swatch, and the Front preview thumbnail shows the cape's transparent window filled with opaque magenta inside its yellow border. The canvas above still shows the unmodified source image, whose window remains a checkerboard; the fill is applied to the composed cape, which the runtime evidence proves opaque.",
+                "expectation": "The cape editor shows the opaque form of the test cape: the Opaque fill switch in the right panel is on (green, knob on the right) beside a magenta swatch, and the 3D player preview wears the cape with its transparent window filled with opaque magenta inside its yellow border. The canvas still shows the unmodified source image, whose window remains a checkerboard; the fill is applied to the composed cape, which the runtime evidence proves opaque.",
                 "probes": []
               },
               "requires": [
@@ -2324,7 +2356,7 @@
               "capture": {
                 "title": "Fill colour picker",
                 "review_tier": "all",
-                "expectation": "The cape editor shows its fill-colour popover open over the lower-left of the canvas, directly above the Opaque: ON toggle and the Fill: #FF00FF button: R: 255, G: 0 and B: 255 channel sliders, a hex field reading #FF00FF and a magenta swatch.",
+                "expectation": "The cape editor shows its fill-colour popover open over the lower-left of the canvas, framed like the editor's panels: R: 255, G: 0 and B: 255 labels beside their channel sliders, a hex field reading #FF00FF and a tall magenta swatch. In the right panel the Opaque fill switch is on and its swatch is magenta.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
@@ -2358,7 +2390,7 @@
               "capture": {
                 "title": "Cape zoomed out",
                 "review_tier": "all",
-                "expectation": "At the low zoom position (the Zoom slider reads 32%) the cape editor canvas shows the whole 320x180 night-sky source image small, in a cyan frame over the checkerboard. At this size it covers none of the Front and Cape Back regions, so those preview thumbnails are empty dark tiles.",
+                "expectation": "At the low zoom position (the Zoom panel under the canvas reads 32%) the cape editor canvas shows the whole 320x180 night-sky source image small, in a cyan frame over the checkerboard. At this size it covers none of the Front and Cape Back regions, so the 3D player preview wears an empty, transparent cape.",
                 "probes": []
               },
               "requires": [
@@ -2381,7 +2413,7 @@
               "capture": {
                 "title": "Cape zoomed in",
                 "review_tier": "all",
-                "expectation": "At the high zoom position (the Zoom slider reads 391%) the cape editor canvas is filled by a magnified crop of the night-sky source: dark sky with scattered stars and one dark mountain peak, which also fills the Front and Cape Back preview thumbnails. That this crop differs from the zoomed-out one is proven by the runtime evidence (580 atlas pixels changed).",
+                "expectation": "At the high zoom position (the Zoom panel under the canvas reads 391%) the cape editor canvas is filled by a magnified crop of the night-sky source: dark sky with scattered stars and one dark mountain peak, which also covers the cape the 3D player preview wears. That this crop differs from the zoomed-out one is proven by the runtime evidence (580 atlas pixels changed).",
                 "probes": []
               },
               "requires": [
@@ -2404,7 +2436,7 @@
               "capture": {
                 "title": "Editor snap and mirror",
                 "review_tier": "all",
-                "expectation": "The cape editor shows the night-sky source shifted off-centre by a snapped drag, leaving a checkerboard strip at the right of the canvas, with the Snap button reading Snap: 4px and the Mirror button reading Mirror: ON. With mirroring on, the canvas hides the Cape Back outline and the Cape Back preview thumbnail repeats the Front thumbnail's night-sky art.",
+                "expectation": "The cape editor shows the night-sky source shifted off-centre by a snapped drag, leaving a checkerboard strip at the right of the canvas; in the right panel's Position row the Snap button reads 4px and the Mirror button is highlighted blue because mirroring is on. With mirroring on, the canvas hides the Cape Back outline; that the composed Cape Back repeats the Front's night-sky art is proven by the runtime evidence.",
                 "probes": []
               },
               "requires": [
@@ -2425,7 +2457,7 @@
               "capture": {
                 "title": "Cape imported through the menu",
                 "review_tier": "key",
-                "expectation": "The cape menu shows the green \u2713 Imported cape message above its buttons and a new My Capes tile for a teal-and-yellow cape imported through the real import workflow.",
+                "expectation": "The cape menu shows a green-striped Imported cape toast in its top-right corner and a new My Capes tile for a teal-and-yellow cape imported through the real import workflow.",
                 "probes": []
               },
               "requires": [
@@ -2451,7 +2483,12 @@
                 "probes": [
                   {
                     "kind": "translucent-cape-underlay",
-                    "region": [0.43, 0.50, 0.57, 0.74],
+                    "region": [
+                      0.43,
+                      0.5,
+                      0.57,
+                      0.74
+                    ],
                     "minimum_contrast": 4.0,
                     "minimum_band_changes": 5
                   }
@@ -2558,31 +2595,31 @@
               "capture": {
                 "title": "Black-padded BMO source",
                 "review_tier": "key",
-                "expectation": "At the editor's 100% reset zoom, Source: 128x64 and Output: 64x32 are both visible: the output selector describes the final atlas, not the imported source. The complete BMO atlas is centred at half size inside that double-sized source, with broad opaque-black padding on all four sides and a checkerboard visible only through transparent source pixels; at this before-crop checkpoint it is intentionally not aligned to the coloured UV guides yet.",
+                "expectation": "At the editor's 100% reset zoom, Source: 128x64 (in the Zoom panel under the canvas) and Output: 64x32 (under the right panel's Resolution buttons) are both visible: the output selector describes the final atlas, not the imported source. The complete BMO atlas is centred at half size inside that double-sized source, with broad opaque-black padding on all four sides and a checkerboard visible only through transparent source pixels; at this before-crop checkpoint it is intentionally not aligned to the coloured UV guides yet.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
                     "label": "BMO source dimensions",
                     "box": [
-                      45,
-                      100,
-                      250,
-                      140
+                      820,
+                      634,
+                      1040,
+                      662
                     ],
-                    "minimum_luma_exclusive": 75,
-                    "minimum_pixels": 120
+                    "minimum_luma_exclusive": 175,
+                    "minimum_pixels": 300
                   },
                   {
                     "kind": "required-gui-text",
                     "label": "BMO output dimensions",
                     "box": [
-                      1035,
-                      100,
-                      1255,
-                      140
+                      1215,
+                      514,
+                      1430,
+                      552
                     ],
-                    "minimum_luma_exclusive": 75,
-                    "minimum_pixels": 120
+                    "minimum_luma_exclusive": 175,
+                    "minimum_pixels": 300
                   }
                 ]
               },
@@ -2606,7 +2643,7 @@
               "capture": {
                 "title": "Black-padded BMO aligned",
                 "review_tier": "key",
-                "expectation": "At 200% zoom, the complete 64x32 BMO atlas fills the crop: the Front, Cape Back and tapered Elytra art align with their coloured guides and the previews are intact. Narrow teal strips between or beside those three highlighted faces are expected auxiliary side, top and bottom UV faces from the same BMO atlas, not leaked padding.",
+                "expectation": "At 200% zoom, the complete 64x32 BMO atlas fills the crop: the Front, Cape Back and tapered Elytra art align with their coloured guides and the 3D player preview wears the aligned cape. Narrow teal strips between or beside those three highlighted faces are expected auxiliary side, top and bottom UV faces from the same BMO atlas, not leaked padding.",
                 "probes": []
               },
               "requires": [
@@ -2828,7 +2865,7 @@
               "capture": {
                 "title": "Editor preview ignores equipped elytra",
                 "review_tier": "all",
-                "expectation": "The cape editor, drawn at a small GUI scale, shows the flat magenta probe cape in its canvas and preview thumbnails, and its 3D player preview wears that magenta cape as an ordinary flat cape with no elytra wings drawn. That the player has an elytra equipped at this moment, and that the preview kept the same cape pixels, is proven by the runtime evidence.",
+                "expectation": "The cape editor shows the flat magenta probe cape in its canvas, and the 3D player preview in its right panel wears that magenta cape as an ordinary flat cape with no elytra wings drawn. That the player has an elytra equipped at this moment, and that the preview kept the same cape pixels, is proven by the runtime evidence.",
                 "probes": []
               },
               "requires": [
@@ -2898,10 +2935,10 @@
                     "kind": "required-gui-text",
                     "label": "cape tile tooltip copy",
                     "box": [
-                      765,
-                      190,
-                      1040,
-                      345
+                      600,
+                      125,
+                      875,
+                      290
                     ],
                     "minimum_luma_exclusive": 159,
                     "minimum_pixels": 2500
@@ -2939,7 +2976,7 @@
               "capture": {
                 "title": "Local cape deleted",
                 "review_tier": "key",
-                "expectation": "The cape menu shows the green \u2713 Deleted cape message above its buttons, and My Capes no longer contains a red-and-black striped contrast cape tile: the real delete confirmation removed it, as the runtime evidence proves. The animated GIF tile keeps its yellow selection outline.",
+                "expectation": "The cape menu shows a green-striped Deleted cape toast in its top-right corner, and My Capes no longer contains a red-and-black striped contrast cape tile: the real delete confirmation removed it, as the runtime evidence proves. The animated GIF tile keeps its yellow selection outline.",
                 "probes": []
               },
               "requires": [
@@ -3022,19 +3059,19 @@
               "capture": {
                 "title": "Settings screen",
                 "review_tier": "all",
-                "expectation": "The Quick Skin settings screen is open on its Client tab (tabs Client, GUI Edit, Modpack and Server): a key-binding button reading Not Bound beside the readable Open Skin Menu label, and three checkboxes, Disable Skin Transparency clear and Show Title Screen Preview and Show Pause Menu Preview checked, above a Done button.",
+                "expectation": "The Quick Skin settings screen is open on its Client tab (tabs Client, Interface, Modpack and Server): Minecraft's own key-binding button reading Not Bound right of the readable label Assign a key to open the skin menu, then four rows with toggles, Show transparent parts of skins as opaque off, Show your character on the title screen and Show your character in the pause menu on, and Compact the Change Skin button to make it smaller off, with a close X in the slate header. Labels too long for one line wrap onto a second line inside their row.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
                     "label": "Open Skin Menu setting label",
                     "box": [
-                      445,
-                      235,
-                      655,
-                      265
+                      510,
+                      210,
+                      960,
+                      240
                     ],
                     "minimum_luma_exclusive": 175,
-                    "minimum_pixels": 300
+                    "minimum_pixels": 1100
                   }
                 ]
               },
@@ -3076,9 +3113,9 @@
               "id": "settings_gui_edit_tab",
               "assertion_required": true,
               "capture": {
-                "title": "GUI Edit tab",
+                "title": "Interface tab",
                 "review_tier": "all",
-                "expectation": "The settings GUI Edit tab lists five checkboxes: mini player preview, styled buttons, preview customization, hide built-in capes and vanilla background; the mini preview, styled buttons and vanilla background boxes are checked and the other two are clear.",
+                "expectation": "The settings Interface tab lists four rows with toggles: Show your character in a corner while you play, Allow moving and resizing the previews, Hide the official Minecraft capes and Minecraft's blurred background instead of stars; the first and last toggles are on and the other two are off.",
                 "probes": []
               },
               "requires": [
@@ -3099,7 +3136,7 @@
               "capture": {
                 "title": "Modpack tab",
                 "review_tier": "all",
-                "expectation": "The settings Modpack tab shows the single Enable Player's Own Skin System checkbox.",
+                "expectation": "The settings Modpack tab shows the single Automatically import your account's skin row with its toggle.",
                 "probes": []
               },
               "requires": [
@@ -3120,31 +3157,31 @@
               "capture": {
                 "title": "Server tab as non-admin",
                 "review_tier": "all",
-                "expectation": "The settings Server tab shows the Disable Skin Transparency (Server) checkbox (clear) and the Skin Change Cooldown (seconds) box reading 0, plus the yellow notice Only server admins can change these settings near the bottom of the dialog. That both controls are inactive for this non-admin player is proven by the runtime evidence.",
+                "expectation": "The settings Server tab shows the greyed Turn off Quick Skin's transparency system for every player row, its label on one or two lines, with its toggle off and the Seconds to wait between skin changes box reading 0, plus the yellow notice Only admins can change these settings near the bottom of the dialog. That both controls are inactive for this non-admin player is proven by the runtime evidence.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
                     "label": "server transparency setting label",
                     "box": [
-                      305,
-                      234,
-                      780,
-                      268
+                      510,
+                      196,
+                      1145,
+                      244
                     ],
                     "minimum_luma_exclusive": 175,
-                    "minimum_pixels": 1300
+                    "minimum_pixels": 1800
                   },
                   {
                     "kind": "required-gui-text",
                     "label": "non-admin server notice",
                     "box": [
-                      495,
-                      655,
-                      1105,
-                      688
+                      685,
+                      728,
+                      1190,
+                      757
                     ],
                     "minimum_luma_exclusive": 175,
-                    "minimum_pixels": 1700
+                    "minimum_pixels": 1400
                   }
                 ]
               },
@@ -3164,9 +3201,9 @@
               "id": "styled_buttons_vanilla_background",
               "assertion_required": true,
               "capture": {
-                "title": "Styled buttons over vanilla background",
+                "title": "Skin menu over blurred vanilla background",
                 "review_tier": "key",
-                "expectation": "The skin menu is open with Quick Skin's styled buttons (dark translucent fills with light outlines and a green Done bar) over Minecraft's translucent in-world overlay instead of the starred background: the daytime world is dimly visible behind the panel and no star pattern is drawn.",
+                "expectation": "The skin menu is open with Quick Skin's own grey buttons and its large grey Confirm button over Minecraft's blurred, translucent in-world overlay instead of the starred background: the daytime world is dimly visible around the floating controls but softly blurred, with no sharp terrain edges, and no star pattern is drawn. The menu's own text, buttons and player preview stay sharp.",
                 "probes": []
               },
               "requires": [
@@ -3388,10 +3425,10 @@
               "second_step": "catalog_delete",
               "minimum_changed_fraction": 0.002,
               "region": [
-                0.34,
+                0.0,
+                0.05,
                 0.09,
-                0.66,
-                0.91
+                0.95
               ]
             },
             {
@@ -3497,10 +3534,10 @@
               "second_step": "settings_keybind_capture",
               "minimum_changed_fraction": 1e-05,
               "region": [
-                0.16,
-                0.25,
-                0.28,
-                0.31
+                0.72,
+                0.21,
+                0.86,
+                0.29
               ]
             },
             {
@@ -3530,10 +3567,10 @@
               "second_step": "styled_buttons_vanilla_background",
               "minimum_changed_fraction": 0.02,
               "region": [
-                0.03,
-                0.2,
-                0.2,
-                0.8
+                0.25,
+                0.12,
+                0.35,
+                0.5
               ]
             },
             {
@@ -3619,16 +3656,16 @@
               "capture": {
                 "title": "Skin change on cooldown",
                 "review_tier": "key",
-                "expectation": "The Quick Skin skin menu is open with its full-width Done button disabled and reading On Cooldown followed by a remaining-seconds countdown, because the server enforces a skin-change cooldown after the first change.",
+                "expectation": "The Quick Skin skin menu is open with its Confirm button disabled and reading On Cooldown followed by a remaining-seconds countdown, because the server enforces a skin-change cooldown after the first change.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
                     "label": "cooldown button label",
                     "box": [
-                      712,
-                      770,
-                      889,
-                      798
+                      560,
+                      725,
+                      1040,
+                      775
                     ],
                     "minimum_luma_exclusive": 127,
                     "minimum_pixels": 240
@@ -4597,7 +4634,7 @@
               "capture": {
                 "title": "Skin menu opened through its key binding",
                 "review_tier": "key",
-                "expectation": "The registered key opens the settled skin menu: its catalog is empty apart from the Drop skin files here or click 'Import Skin' drop zone, its search field and buttons are visible, and its player preview wears the UUID-selected vanilla default skin.",
+                "expectation": "The registered key opens the settled skin menu: its skin column holds only the import zone with its tray icon and drop text, its search field and floating buttons are visible, and its large centred player model wears the UUID-selected vanilla default skin.",
                 "probes": []
               }
             },
@@ -4618,7 +4655,7 @@
               "capture": {
                 "title": "Skin menu opened through the vanilla-menu button",
                 "review_tier": "key",
-                "expectation": "The injected Quick Skin button opens the settled skin menu: its catalog is empty apart from the Drop skin files here or click 'Import Skin' drop zone, its search field and buttons are visible, and its player preview wears the UUID-selected vanilla default skin. That the vanilla title screen stays the menu's parent is proven by the runtime evidence.",
+                "expectation": "The injected Quick Skin button opens the settled skin menu: its skin column holds only the import zone with its tray icon and drop text, its search field and floating buttons are visible, and its large centred player model wears the UUID-selected vanilla default skin. That the vanilla title screen stays the menu's parent is proven by the runtime evidence.",
                 "probes": []
               }
             },
@@ -4639,7 +4676,7 @@
               "capture": {
                 "title": "Skin menu rebuilt after changing settings",
                 "review_tier": "key",
-                "expectation": "Closing settings after enabling styled buttons returns to a new skin menu with styled controls and its player preview.",
+                "expectation": "Closing settings after switching on Minecraft's blurred background returns to a new skin menu, drawn over the blurred title panorama instead of stars, with its player preview.",
                 "probes": []
               }
             },
@@ -4660,7 +4697,7 @@
               "capture": {
                 "title": "Cape menu rebuilt after changing settings",
                 "review_tier": "key",
-                "expectation": "Closing settings after disabling styled buttons returns to a new cape menu with vanilla controls and its player preview.",
+                "expectation": "Closing settings after hiding the official Minecraft capes returns to a new cape menu that lists no built-in capes, with its grey Import and Remove buttons, its green Done button and its player preview.",
                 "probes": []
               }
             }

@@ -1,5 +1,31 @@
 pluginManagement {
     repositories {
+        // The Plum Team's hash-checked mirror is searched first for these groups only; a 404 falls
+        // through to the upstream repositories below. Keep this list equal to the one in
+        // gradle/maven-mirror.gradle.kts and gradle/repository-policy.gradle.kts.
+        // -Pplum.mavenMirror=false is the emergency switch that leaves it out, as there.
+        val plumMirrorSwitch = providers.gradleProperty("plum.mavenMirror").orNull
+        require(plumMirrorSwitch == null || plumMirrorSwitch == "true" || plumMirrorSwitch == "false") {
+            "plum.mavenMirror must be true or false, not '$plumMirrorSwitch'"
+        }
+        if (plumMirrorSwitch != "false") {
+            maven("https://the-plum-team.github.io/maven-mirror/") {
+                name = "PlumMavenMirror"
+                // The mirror holds exactly the files in the verification metadata: a module's
+                // .module file, without the .pom that only points to it.
+                metadataSources { gradleMetadata(); mavenPom() }
+                mavenContent { releasesOnly() }
+                content {
+                    listOf(
+                        "net.fabricmc", "net.fabricmc.fabric-api", "net.fabricmc.unpick",
+                        "dev.architectury", "dev.architectury.loom", "dev.architectury.loom-no-remap",
+                        "architectury-plugin", "dev.kikugie", "dev.kikugie.stonecutter",
+                        "net.neoforged", "net.neoforged.fancymodloader", "net.neoforged.installertools",
+                        "net.neoforged.accesstransformers", "cpw.mods", "net.minecraftforge",
+                    ).forEach { includeGroup(it) }
+                }
+            }
+        }
         maven("https://maven.fabricmc.net/") {
             name = "FabricPluginRepository"
             mavenContent { releasesOnly() }
@@ -48,6 +74,24 @@ pluginManagement {
             }
         }
         mavenCentral {
+            content {
+                excludeGroupByRegex("net\\.fabricmc(\\..*)?")
+                excludeGroupByRegex("dev\\.architectury(\\..*)?")
+                excludeGroup("architectury-plugin")
+                excludeGroup("com.github.architectury")
+                excludeGroupByRegex("com\\.mojang(\\..*)?")
+                excludeGroupByRegex("net\\.minecraftforge(\\..*)?")
+                excludeGroupByRegex("de\\.oceanlabs\\.mcp(\\..*)?")
+                excludeGroupByRegex("org\\.spongepowered(\\..*)?")
+                excludeGroupByRegex("net\\.neoforged(\\..*)?")
+                excludeGroupByRegex("dev\\.kikugie(\\..*)?")
+            }
+        }
+        // Google's mirror of Maven Central, under Central's filter: a transient 404 from Central to
+        // one runner falls through to the same path here. Verification checksums name artifacts,
+        // not repositories, so every file it serves is checked exactly as one from Central.
+        maven("https://maven-central.storage-download.googleapis.com/maven2/") {
+            name = "GoogleMavenCentralMirror"
             content {
                 excludeGroupByRegex("net\\.fabricmc(\\..*)?")
                 excludeGroupByRegex("dev\\.architectury(\\..*)?")

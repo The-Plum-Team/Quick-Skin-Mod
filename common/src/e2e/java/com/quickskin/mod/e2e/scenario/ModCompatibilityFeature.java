@@ -9,7 +9,7 @@ import com.quickskin.mod.client.compat.EssentialCompatIntegration;
 import com.quickskin.mod.client.gui.integration.FancyMenuWidgets;
 import com.quickskin.mod.client.gui.integration.MenuIntegration;
 import com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen;
-import com.quickskin.mod.client.gui.util.GuiScaleManager;
+import com.quickskin.mod.client.gui.util.MenuGuiScale;
 import com.quickskin.mod.client.gui.util.SkinImporter;
 import com.quickskin.mod.client.gui.widget.IconActionButton;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
@@ -803,8 +803,7 @@ interface ModCompatibilityFeature {
         private boolean menuPreviewReady(Object expectedLocation) {
             Screen current = VanillaShim.currentScreen(minecraft);
             boolean screenReady = current instanceof PlayerSkinMenuScreen;
-            boolean scaleReady = VanillaShim.guiScale(minecraft)
-                    == GuiScaleManager.getOptimalMenuScale();
+            boolean scaleReady = VanillaShim.guiScale(minecraft) == MenuGuiScale.scaleFor(minecraft);
             boolean meshReady = meshCacheContains(expectedLocation);
             boolean renderReady = manualRenderObserved();
             PlayerWidget widget = screenReady
@@ -818,7 +817,7 @@ interface ModCompatibilityFeature {
                         + ", widgetTexture=" + widgetTexture
                         + ", localTexture=" + localTextureDimensions(expectedLocation)
                         + ", guiScale=" + VanillaShim.guiScale(minecraft)
-                        + "/" + GuiScaleManager.getOptimalMenuScale()
+                        + "/" + MenuGuiScale.scaleFor(minecraft)
                         + ", mesh=" + meshReady + ", rendered=" + renderReady);
             }
             if (!screenReady || expectedLocation == null || !scaleReady

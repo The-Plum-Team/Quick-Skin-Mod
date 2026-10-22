@@ -40,7 +40,7 @@ parity. They use read-only permissions, the exact protected checkout, bounded ex
 and complete pre-secret capsule/provenance/image validation. The artifact handoff contains
 the **original ZIP bytes**, not a rewritten manifest or image set. Its name includes the
 current drain run, attempt and original capsule ID; retention is one day. The original
-seven-day queued capsule remains the durable retry source.
+two-day queued capsule remains the durable retry source.
 
 Preparation initially checks out the immutable executing workflow `github.sha`, never
 a selector output. Before any API access, an inline guard checks the selected immutable
@@ -117,7 +117,7 @@ does not bypass the shared capacity scheduler or claim immediate dispatch during
 open circuit.
 
 Freshly completed inputs and inputs skipped as already reviewed remain until their
-existing seven-day expiry. The cleanup job succeeds without any API call for either
+existing two-day expiry. The cleanup job succeeds without any API call for either
 case, preserving release-tail dependencies. A fresh owner can still be cancelled after
 cleanup, and an already-reviewed report can belong to another still-running drain;
 neither is proof that the recovery input can be deleted. Missing and terminally invalid
@@ -174,17 +174,91 @@ previously made scheduled compatibility recovery fail permanently once a name cr
 records, and would have done the same to the shared capacity circuit.
 
 This durability has an explicit storage/API cost. Admission allows at most 512 MiB per
-input: one 16-target generation can retain up to 8 GiB for seven days (up to 56 GiB with
+input: one 16-target generation can retain up to 8 GiB for two days (up to 16 GiB with
 one such generation daily), excluding reports, caches and one-day prepared wrappers.
 This is a per-input/per-wave bound, not a repository-wide aggregate storage cap. The
 16-target queue regression observes 17 unique owner lookups per settled generic sweep
 (16 report owners plus one shared curator); the real client memoizes those owner GETs.
 At the existing 48 daily sweeps, a still-current retained generation therefore adds
-816 owner GETs/day versus an empty input queue, plus any additional artifact-list pages.
+816 owner GETs/day versus an empty input queue, plus its bounded listing reads (below).
 Historical non-current generations do not trigger those owner reads. Each fresh completion
 avoids its previous cleanup metadata GET and DELETE, but that does not establish net API
 or storage savings. Retention itself adds no runner, dispatch or polling loop; the possible
 older-marker expiry retry above must not be counted as guaranteed zero added inference.
+
+## Queue listing, probe queue and capsule retention
+
+Measured on 2026-10-12, `GET /repos/{owner}/{repo}/actions/artifacts` returned HTTP 500 for this
+repository even with `per_page=1` (since at least 2026-10-11T18:27Z), so every scheduled sweep and
+every capacity fan-out failed. The newest 200 curator runs alone held 441 live capsules (22.6 GB);
+the 157 that were reviewed waited a median 0.36 h, 1.03 h at p99 and 2.92 h at most, and none
+waited a day. Name-filtered and per-run listings kept working. Therefore:
+
+- `visual_review_queue.py` never reads the repository-wide listing. A sweep or fan-out lists the
+  curator workflow's runs at the current `master` SHA (`?head_sha=`, at most 10 pages), then the
+  artifacts of each terminal successful/failed run (`/actions/runs/{id}/artifacts`, at most 10
+  pages each), and looks up each eligible key's report and attempt marker plus the generation's
+  block and certificate by exact name. Reaching a bound, or more than 512 pending keys, fails
+  closed. Every capsule and marker is still authenticated against its owner run as before. The
+  curator only uploads a capsule for its own SHA, so this reads the complete eligible queue; a
+  capsule whose name disagreed with its producer SHA would still be admitted by its exact wake.
+- The capacity probe's `quick-skin-claude-capacity-probe` lock, shared with the optional-mod
+  reviewer, uses `queue: max`. The default concurrency queue keeps one pending job and cancels the
+  rest, which cancelled 15 of the 17 drain wakes of one wave; every queued probe now runs in turn
+  and rechecks the fresh shared marker before probing.
+- Only the transient queue capsule `visual-review-input-*` was shortened, from seven to two days.
+  Two days cover the longest observed wait, a five-hour Claude usage window, 30-minute retry
+  cooldowns and sweep cadence with over a day to spare. Reports, generation blocks, anchor
+  certificates and verdict caches are evidence and keep their retention; prepared wrappers,
+  attempt markers and capacity markers already retained one day.
+
+## Wake storm of 2026-10-15
+
+After the push of `1def0269` to `master`, the repository's Actions token budget (5,000 core
+requests per hour here) ran out at about 19:19 UTC. Read from the exact run logs:
+
+- The curator run 38790242686 curated 17 capsules and its `request-drain` job sent 17 exact
+  wakes at 19:13:27–19:13:35 (`dispatched=17`). No capacity marker was fresh, so every wake
+  queued a probe behind the shared probe lock.
+- The first wake, run 38792130673, probed, found capacity ready and its `resume-capacity-queue`
+  job (19:14:12–19:14:34) redispatched every other pending capsule: 16 more drain runs at
+  19:14:28–19:14:33, each for an artifact ID whose own exact wake was already queued or running.
+  33 drain runs served 17 capsules.
+- The same wake's review confirmed a defect at 19:16:45 and published the generation block.
+  One duplicate (38792263418) had started at 19:14:38 and reviewed the capsule whose own wake the
+  guard had deferred. The other 15 waited in their artifacts' concurrency groups and then found
+  their capsules reviewed or blocked. The selection loop repeated any ineligible exact selection
+  up to twelve times, so they ran 102 exact selections (six of them twelve each) at about six
+  REST requests apiece: roughly 610 requests that could not admit a review.
+- The background admission guard read `GET /rate_limit` 33 times. 30 reads reported 585 to 783
+  of 5,000 used (84–88 % left) between 19:13:36 and 19:19:54; the other three reported 3,959
+  (19:13:36), 4,890 (19:18:31) and 5,000 (19:19:34) used. The first `API rate limit exceeded for
+  installation` answered the Pages run 38790217642 at 19:18:46 and failed its 34 cache refreshes;
+  every lane of the shared packaged E2E 38788756576 then failed in `Fetch the sealed Build
+  bundle` (19:19:52–19:23:19), turning the commit's packaged gate red. The window reset at about
+  19:28. The guard's reading therefore did not track the exhausted budget in 30 of 33 cases; it is
+  kept because its deferrals were correct, but it cannot be the only bound.
+
+Two rules now keep a wave to one drain run per capsule and one selection per terminal wake:
+
+- A freshly ready probe fans the queue out only while no other drain run is queued or running
+  (one listing of the drain workflow's runs, the check a sweep already makes before it asks for
+  `resume_queue`). An unreadable listing skips the fan-out. A sweep's explicit `resume_queue`
+  keeps its own decision. A capsule whose wake settled while capacity was paused is still
+  recovered by the next sweep, which fans the backlog out when no drain is active.
+- The exact selector reports `owner_settling=true` only while the curator run that owns the
+  requested capsule has not completed, and the drain repeats its selection only then. An
+  already-reviewed, blocked, cooling, superseded, missing or foreign capsule is selected once:
+  seven requests for a reviewed duplicate (`ExactWakeSettlingTest` pins them). Selector errors
+  are still retried within the same twelve attempts.
+
+Replayed on the incident, these remove the 16 duplicate runs and their roughly 610 wasted
+selection requests. The capsule whose wake the guard deferred then waits for the next sweep, as
+every guard deferral already does. The 17 exact wakes, their probes, preparations and reviews are
+unchanged, and so are every authentication, the live-head recheck before model admission and the
+first-defect block.
+Editing `visual-review-drain.yml` changes the cache-producing workflow, so the first ordinary
+wave after this change restores no historical verdict shard (one cold wave, as above).
 
 ## Observable model attempts and local retry waits
 

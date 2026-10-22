@@ -60,6 +60,8 @@ extensions.configure<BasePluginExtension> {
 }
 repositories {
     mavenCentral()
+    // Google's mirror of Maven Central, for a transient 404 from Central (DEPENDENCY-SECURITY.md).
+    maven("https://maven-central.storage-download.googleapis.com/maven2/") { name = "GoogleMavenCentralMirror" }
     maven("https://maven.architectury.dev/") {
         content { includeModule("dev.architectury", "architectury-injectables") }
     }
@@ -67,6 +69,7 @@ repositories {
         content { includeModule("net.fabricmc", "fabric-loader") }
     }
 }
+apply(from = rootProject.file("gradle/maven-mirror.gradle.kts"))
 apply(from = rootProject.file("gradle/archive-conventions.gradle.kts"))
 
 extensions.configure<JavaPluginExtension> {

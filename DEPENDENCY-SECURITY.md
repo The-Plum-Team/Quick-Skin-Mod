@@ -1,37 +1,66 @@
 # Dependency security policy
 
 Quick Skin treats build plugins and dependencies as executable supply-chain inputs.
+`gradle.properties` explicitly selects Gradle's strict verification mode for every matrix target;
+do not pass `--dependency-verification lenient` or `off` in development, CI, or release automation.
+CI never writes verification metadata or locks: a missing or changed checksum fails the build and
+is fixed by a reviewed pull request.
 
-**Gradle's artifact verification is recorded but not enforced.** `gradle.properties` selects
-`org.gradle.dependency.verification=off` deliberately. Upstream publishers occasionally replace an
-artifact under an existing version coordinate: on 2026-09-02 Fabric API republished its complete
-1.21.1 module set, and every build and packaged run on that branch failed until the lock was
-rewritten. Because that recurs on each upstream republication, the maintainer accepted the trade
-and turned enforcement off. `gradle/verification-metadata.xml` remains the recorded hash inventory
-and is still consumed by the SBOM and by the packaged-runtime store; it simply no longer fails a
-build. Every other layer below stays in force.
+Upstream publishers occasionally replace an artifact under an existing version coordinate. On
+2026-09-02 Fabric API republished its complete 1.21.1 module set, and enforcement was turned off
+until the shared Build gate required it again. A republication is now handled as a reviewed
+checksum change, never by relaxing the mode: see
+[Upstream republication](#upstream-republication).
 
 ## Enforcement layers
 
 - `gradle/wrapper/gradle-wrapper.properties` pins the Gradle distribution with SHA-256, and the
-  repository also records the wrapper JAR and distribution checksums.
+  repository also records the wrapper JAR and distribution checksums. The wrapper downloads the
+  distribution from GitHub's release mirror (`github.com/gradle/gradle-distributions`), whose zip
+  has the same SHA-256 as the `services.gradle.org` one, and retries a failed download three times
+  with a backoff starting at ten seconds.
 - `settings.gradle.kts` routes plugin groups only to their expected Fabric, Architectury, Mojang,
   Forge, NeoForge, Kikugie, Maven Central, or Gradle Plugin Portal repositories. Central and the
   Plugin Portal explicitly reject ecosystem groups owned by the specialist repositories.
 - `gradle/repository-policy.gradle.kts` applies to every buildable common/loader node. It limits
   each remote repository to its owned groups, rejects unknown remote hosts, and prevents generated
-  Loom namespaces from ever resolving over the network.
-- `gradle/verification-metadata.xml` records SHA-256 for both artifacts and Maven/Gradle metadata.
-  It covers settings and build plugins plus the resolvable common, test, Fabric, Forge,
-  Minecraft, mappings, transform, runtime, native, and E2E classpaths for the active 1.20.1 graph.
-  Gradle no longer rejects a mismatch, but `e2e/packaged_runtime.py` still resolves the exact
-  SHA-256 it pins for each packaged-runtime download from this file, so keep it accurate.
+  Loom namespaces from ever resolving over the network. It also pins the `fabric-loader:+` that
+  Architectury Plugin adds to `architecturyTransformerClasspath` to one reviewed version and makes
+  Gradle refuse any dynamic or changing selector in that classpath, so a new Fabric Loader release
+  cannot break strict verification. The build declares no dynamic versions anywhere else either.
+- `gradle/maven-mirror.gradle.kts` puts The Plum Team's
+  [Maven mirror](https://github.com/The-Plum-Team/maven-mirror) first in every project that applies
+  the policy or the Java module conventions, and `settings.gradle.kts` does the same for plugins.
+  It is limited to exact Fabric, Architectury, Stonecutter, NeoForge and Forge groups, serves only
+  openly licensed files whose SHA-256 matched the mods' own verification metadata, and answers 404
+  for everything else, so Gradle falls back to the upstream repositories unchanged. Strict
+  verification checks every file the mirror serves against `gradle/verification-metadata.xml`,
+  exactly as it checks files from the upstream repositories. `-Pplum.mavenMirror=false` (or
+  `ORG_GRADLE_PROJECT_plum.mavenMirror=false` in the environment) is the emergency switch: it
+  leaves the mirror out of both places, so every group resolves from its upstream repositories.
+- Google's mirror of Maven Central (`https://maven-central.storage-download.googleapis.com/maven2/`)
+  follows every `mavenCentral()` declaration, in `settings.gradle.kts` and in every project, under
+  Central's content filter, so a transient 404 from Central to one runner falls through to the same
+  path there. Verification checksums name artifacts, not repositories: every file it serves is
+  checked exactly as one from Central, and it needs no metadata of its own.
+- `gradle/verification-metadata.xml` verifies both artifacts and Maven/Gradle metadata with
+  SHA-256. It covers settings and build plugins plus the resolvable common, test, Fabric, Forge,
+  NeoForge, Minecraft, mappings, transform, runtime, native, and E2E classpaths of every target in
+  `release/release-matrix.json`. `e2e/packaged_runtime.py` also resolves from this file the exact
+  primary SHA-256 it pins for each packaged-runtime download.
 - `gradle/dependency-locks/` strictly locks only `shadowBundle`, the external graph physically
-  embedded in each release JAR. Fabric merges it into the mod JAR; Forge and NeoForge nest each
-  library unmodified under `META-INF/jarjar/`, because FML loads the mod JAR as one Java module
-  and a merged library would collide with another mod's copy. Locking Loom's generated
-  configurations is deliberately avoided; their external inputs remain pinned by
-  coordinate-specific verification metadata.
+  embedded in each release JAR. Locking Loom's generated configurations is deliberately avoided;
+  their external inputs remain pinned by coordinate-specific verification metadata.
+- A release JAR holds only Quick Skin's own packages. FML loads a mod JAR as one Java module, and
+  the game stops at startup when two modules export the same package, so a library kept under its
+  upstream package collides with every other mod that ships it, whether merged or nested as its
+  own module. `gradle/bundled-library-conventions.gradle.kts` relocates every `shadowBundle`
+  library below `com.quickskin.mod.shadow`, leaves out its global ImageIO service registrations
+  and Maven metadata, and adds its license from `licenses/` under `META-INF/licenses/`. A bundled
+  library must therefore be pure Java: a JNI binding cannot be relocated, because its native
+  symbols name the original classes. `scripts/release/verify_release.py` rejects a production JAR
+  with any class or resource directory outside Quick Skin's namespaces, a nested JAR, a native
+  library, a `META-INF/services` registration or a module descriptor.
 - `scripts/release/generate_sbom.py` converts that exact per-lane embedded graph into one
   deterministic CycloneDX document. Every production JAR is represented by its staged hashes and
   depends only on coordinates present in its strict lock; every listed library carries the exact
@@ -39,6 +68,38 @@ build. Every other layer below stays in force.
   SHA-256 of the canonical document without that field, so identical inputs keep identical bytes;
   validation rejects a missing or stale serial. A missing lane, lock, component, JAR checksum,
   or manifest binding stops staging and all later publication jobs.
+
+## Actions cache writers
+
+An Actions cache is executable supply-chain input too: an entry written from a `master` context is
+restored by every later run of the repository, pull requests included. Only a job that builds and
+runs exclusively protected-`master` code may write one. A job that launches bytes built anywhere
+else (a pull request's JARs, a candidate checkout, another run's artifact) restores read-only, even
+when a trusted trigger such as `repository_dispatch`, `workflow_run`, `schedule` or
+`pull_request_target` gives it a `master`-scoped token. Steps that execute such bytes also unset
+`ACTIONS_RUNTIME_TOKEN`, `ACTIONS_CACHE_URL` and `ACTIONS_RESULTS_URL`. That is defence in depth
+only: a process with the runner user's privileges can still read the token from the runner itself.
+Keeping every save out of such a job stops the workflow from writing; only running those bytes in a
+separate unprivileged account, as the mod-base kit's fenced Build does, would take the capability
+away from them.
+
+- Gradle home is written only by the native Build's target jobs (`build-matrix.yml`, called by
+  `build-gate.yml` with `cache-writer: true`), and `scripts/ci/gradle_cache_policy.py` admits only
+  a `push` or `workflow_dispatch` on protected `master`. Those jobs check out `github.sha`, compile
+  it from source and launch nothing downloaded. Every other context restores read-only: pull
+  requests (whose writes GitHub would scope to the pull request's own ref anyway), release
+  branches, Packaged E2E's own compile, which does not pass `cache-writer`, and Release.
+- The installed Forge/NeoForge server (`runtime-store-v1|…`) is the other written family. The
+  packaged-runtime action saves it only when its job passes `runtime-store-writer: "true"` and
+  `scripts/ci/runtime_store_cache_policy.py` approves the run: a `workflow_dispatch` on protected
+  `master`. Packaged E2E and the release rehearsal are the declared writers; both launch a bundle
+  their own run built from `master` (a `master` dispatch of Packaged E2E takes the push Build of the
+  same SHA, never a pull request's). The optional-mod wave is a `repository_dispatch` that launches
+  the original pull request's JARs whenever the merge reused that pull request, so it restores
+  read-only.
+- `scripts/ci/tests/test_workflow_security.py` holds every workflow to this rule: the set of jobs
+  that can save a cache equals its reviewed list of trusted writers, and no job that launches a
+  downloaded bundle or checks out a ref other than `github.sha` can save one.
 
 ## Offline CycloneDX validation boundary
 
@@ -58,24 +119,35 @@ result disagrees; fetching a newer schema at runtime is not an acceptable fallba
 Loom exposes some generated outputs through file-backed Maven repositories. Their JAR byte layout
 is not portable across clean worktrees, even when their external inputs and coordinates are the
 same, so recording their generated SHA-256 values would make a clean build fail for the wrong
-reason. Exactly four trusted-artifact rules cover those local outputs:
+reason. Exactly five trusted-artifact rules cover those local outputs:
 
 | Group rule | Name rule | Owner |
 |---|---|---|
 | `^remapped[.].+$` | any | Loom-remapped mod/API modules |
 | `^loom$` | `^mappings$` | Loom layered mappings |
-| `^net[.]minecraft$` | exact Loom merged Minecraft, Forge, or NeoForge name shapes, optionally ending in `-deobf` | Loom merged game modules |
+| `^net[.]minecraft$` | exact Loom merged Minecraft, Forge, or NeoForge name shapes, optionally ending in `-deobf` or in Loom's 10-hex project-processing hash | Loom merged game modules |
 | `^net[.]minecraftforge[.][0-9a-f]{64}$` | `^fmlloader$` | Loom transformed Forge loader |
+| `^net[.]neoforged[.]fancymodloader[.][0-9a-f]{64}$` | `^loader$` | Loom transformed NeoForge loader |
 
 This is not permission to trust similarly named downloads. The project repository policy excludes
-all four namespaces from Maven Central and excludes the transformed Forge namespace from Forge's
-remote repository; other approved remote repositories have positive group allowlists that cannot
-match them. Only Loom's local file repositories can supply these coordinates. The original Loom,
-Minecraft, loader, API, mappings source, and transform-tool inputs remain SHA-256 verified.
+these namespaces from Maven Central, the transformed Forge namespace from Forge's remote
+repository and the transformed NeoForge namespace from NeoForge's remote repository; other
+approved remote repositories have positive group allowlists that cannot match them. Only Loom's
+local file repositories can supply these coordinates. The original Loom, Minecraft, loader, API,
+mappings source, and transform-tool inputs remain SHA-256 verified.
 The optional `-deobf` suffix is required by Loom's unobfuscated NeoForge path: those merged JARs
 are rebuilt locally and are intentionally nondeterministic, so recording a generated checksum
 would make identical clean CI runs disagree. The trust rule remains confined to the synthetic
 `net.minecraft` coordinate shape and does not cover any publisher artifact.
+The optional lowercase 10-hex suffix (`-[0-9a-f]{10}`, never combined with `-deobf`) is Loom's
+project-processed Forge/NeoForge game JAR, for example
+`neoforge-26.1.1.15-beta-minecraft-merged-df325f964f`. Loom writes it only into the project's own
+`.gradle/loom-cache/minecraftMaven` file repository (`LoomLocalMinecraft`) when it applies the
+project's `META-INF/accesstransformer.cfg`. The NeoForge 26.1 and 26.1.1 overlay ships that file
+into generated resources, so a clean first build still resolves the shared merged JAR while the
+release workflow's `--rerun-tasks` rebuild of the same checkout resolves the processed one. It is
+the same suffix shape the Fabric `minecraft-merged-<hash>` alternative already accepts, and the
+`-beta` loader versions were already covered by the version part of the rule.
 
 Gradle dependency verification does not cover the wrapper download or arbitrary downloads made
 outside Gradle's dependency engine. The wrapper has its separate checksum. Packaged-E2E installer
@@ -91,16 +163,26 @@ requires an activation probe and explicit applicability or `not_applicable` rows
 
 ## Updating dependencies
 
-Start from a trusted checkout and intentionally change the declared version first. Then regenerate
-the active graph and selective locks in one serialized invocation:
+Start from a trusted checkout and intentionally change the declared version first. Then record the
+graph of every target the change reaches, one serialized invocation per target, using the same
+tasks as `scripts/release/build_matrix.py` so build, test, transform and harness classpaths are
+all resolved (`<minecraft>` is a matrix `artifact_version`):
 
 ```bash
 ./gradlew --no-daemon --no-parallel \
-  --write-verification-metadata sha256 --write-locks \
-  :common:1.20.1:dependencies \
-  :fabric:1.20.1:dependencies \
-  :forge:1.20.1:dependencies
+  --write-verification-metadata sha256 -PquickskinTarget=<minecraft> \
+  clean buildTargetLanes buildTargetE2EHarnesses
 ```
+
+Add `--write-locks` only when a shaded `shadowBundle` dependency changed (see
+[gradle/dependency-locks/README.md](gradle/dependency-locks/README.md)); a new bundled library also
+needs its relocation in `gradle/bundled-library-conventions.gradle.kts` and its license in
+`licenses/`. Writing metadata adds
+entries but never removes them, and it is a maintainer action: CI and release automation never run
+it. Gradle also rewrites the whole file in its own order and may raise the schema version, which
+buries the new values in a reordering diff. Commit only the added or changed entries in the
+committed file's order and schema, and check that the result trusts exactly the values of the file
+Gradle wrote.
 
 Review every metadata and lockfile diff. Confirm new coordinates are expected, compare critical
 checksums with an independent publisher source when one exists, remove obsolete components, and
@@ -108,6 +190,21 @@ never add a broad trusted group to make a failure disappear. `origin="Generated 
 honest bootstrap marker, not proof of publisher authenticity; repository routing and human review
 remain part of the trust decision.
 
-Run the policy regression tests and then the proportional Gradle build gate in strict mode. A
-dependency-verification failure after an unrelated change is a security review event, not a cache
-problem to bypass.
+Run the policy regression tests and then `python scripts/release/build_matrix.py --clean --target
+<minecraft>` for each affected target in strict mode, from a Gradle user home that did not take part
+in writing the metadata. A dependency-verification failure after an unrelated change is a security
+review event, not a cache problem to bypass.
+
+## Upstream republication
+
+When a publisher replaces bytes under an existing coordinate, strict mode fails every target that
+resolves it. Do not switch the mode to `lenient` or `off`, and do not trust the group. Instead:
+
+1. Download the served artifact outside Gradle and compute its SHA-256.
+2. Compare it with an independent publisher source, such as the repository's own `.sha256` or
+   `.sha512` sidecar, and inspect that the artifact still contains only the expected content.
+3. Record the new value as an `<also-trust>` child of the existing `<sha256>` entry, as the Fabric
+   API 1.21.1 modules already do, in a reviewed pull request that names the evidence. The
+   exception is a JAR the packaged-runtime store downloads (the aggregate `fabric-api` JAR and
+   the Architectury JARs of the matrix): the store pins only the primary value, so there the new
+   value becomes the primary one and the old value moves to `<also-trust>`.

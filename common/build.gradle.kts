@@ -87,6 +87,8 @@ extensions.configure<ArchitectPluginExtension>("architectury") {
 
 repositories {
     mavenCentral()
+    // Google's mirror of Maven Central, for a transient 404 from Central (DEPENDENCY-SECURITY.md).
+    maven("https://maven-central.storage-download.googleapis.com/maven2/") { name = "GoogleMavenCentralMirror" }
 }
 apply(from = rootProject.file("gradle/repository-policy.gradle.kts"))
 
@@ -185,7 +187,7 @@ dependencies {
     modImpl("net.fabricmc:fabric-loader:${versionProp("fabric_loader_version")}")
     modImpl("dev.architectury:architectury:${versionProp("architectury_api_version")}")
 
-    "implementation"("org.sejda.imageio:webp-imageio:0.1.6")
+    "implementation"("com.twelvemonkeys.imageio:imageio-webp:3.15.3")
 
     "testImplementation"("org.junit.jupiter:junit-jupiter:5.13.4")
     "testRuntimeOnly"("org.junit.platform:junit-platform-launcher:1.13.4")

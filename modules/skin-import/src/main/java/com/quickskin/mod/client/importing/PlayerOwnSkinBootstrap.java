@@ -78,27 +78,22 @@ public final class PlayerOwnSkinBootstrap {
         if (account != null && !account.equals(config.playerOwnSkinAccount)) {
             if (!config.playerOwnSkinAccount.isEmpty()) {
                 config.playerOwnSkinHash = "";
+                config.playerOwnSkinTexture = "";
+                config.playerOwnSkinHidden = false;
             }
             config.playerOwnSkinAccount = config.playerOwnSkinHash.isEmpty() ? "" : account;
         }
 
-        // Check if we already have the player's skin hash and it exists
-        if (!config.playerOwnSkinHash.isEmpty()) {
-            AssetMetadata existingMetadata = LocalAssetManager.getInstance().getMetadata(config.playerOwnSkinHash);
-            if (existingMetadata != null) {
-                // Player's skin already exists
-                return;
-            }
-        }
-
-        // Download player's own skin (async, won't block startup)
+        // Download the account's skin on every start (async, won't block startup), even when an
+        // own skin is already listed: Mojang may serve another one by now, changed elsewhere or
+        // retouched by Mojang after an upload, and the own skin is the one other players see.
         playerOwnSkinTask = com.quickskin.mod.client.services.MojangApiService.getInstance()
                 .fetchSkinByUsername(playerName)
                 .thenAccept(skinData -> {
                     if (!closed && minecraft != null) {
                         minecraft.execute(() -> {
                             if (!closed && skinData != null) {
-                                handlePlayerOwnSkinFetched(skinData, account);
+                                handlePlayerOwnSkinFetched(skinData, account, null);
                             }
                         });
                     }
@@ -119,8 +114,20 @@ public final class PlayerOwnSkinBootstrap {
      * Smart mode: checks if skin already exists before saving a duplicate
      */
     private static void handlePlayerOwnSkinFetched(
-            com.quickskin.mod.client.services.MojangApiService.MojangSkinData skinData, String account) {
+            com.quickskin.mod.client.services.MojangApiService.MojangSkinData skinData, String account,
+            @org.jetbrains.annotations.Nullable String replacedSkin) {
         try {
+            // The same Mojang texture as the listed own skin: nothing changed. Its stored copy
+            // may have been flattened by the transparency setting, so the texture's address is
+            // compared rather than a hash of the pixels.
+            com.quickskin.mod.config.ClientConfig ownConfig = com.quickskin.mod.config.ClientConfig.getInstance();
+            boolean wearsReplaced = replacedSkin != null && replacedSkin.equals(ownConfig.activeSkinHash);
+            if (!wearsReplaced && !skinData.textureUrl.isEmpty()
+                    && skinData.textureUrl.equals(ownConfig.playerOwnSkinTexture)
+                    && LocalAssetManager.getInstance().getMetadata(ownConfig.playerOwnSkinHash) != null) {
+                return;
+            }
+
             // Process the image to get its final form before hashing and saving.
             // This ensures the hash we check against is the same as the one that will be generated from the saved file.
             BufferedImage image = skinData.image;
@@ -148,6 +155,14 @@ public final class PlayerOwnSkinBootstrap {
             }
 
             LocalAssetManager assetManager = LocalAssetManager.getInstance();
+            com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
+            String previousOwnSkin = config.playerOwnSkinHash;
+            if (!wearsReplaced && finalHash.equals(previousOwnSkin) && assetManager.getMetadata(finalHash) != null) {
+                // Mojang still serves the listed own skin; remember which texture it is
+                config.playerOwnSkinTexture = skinData.textureUrl;
+                config.save();
+                return;
+            }
             AssetMetadata existingMetadata = assetManager.getMetadata(finalHash);
 
             if (existingMetadata == null) {
@@ -164,11 +179,27 @@ public final class PlayerOwnSkinBootstrap {
             }
 
             // Now that the skin is guaranteed to be in the asset manager, set its hash in the config.
-            com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
+            // A previous own skin stays in the list as an ordinary skin, and a new own skin is
+            // listed even when the player had hidden the previous one.
+            if (!finalHash.equals(config.playerOwnSkinHash)) {
+                config.playerOwnSkinHidden = false;
+            }
             config.playerOwnSkinHash = finalHash;
+            config.playerOwnSkinTexture = skinData.textureUrl;
             config.playerOwnSkinAccount = account != null ? account : "";
 
-            if (config.activeSkinHash.isEmpty() && config.activeCpmModelHash.isEmpty()) {
+            // Whoever wore the previous own skin wears the new one: it is the same account skin
+            // as Mojang now serves it. So does whoever wore the skin just uploaded, which Mojang
+            // may have retouched.
+            boolean woreOwnSkin = config.activeCpmModelHash.isEmpty() && !config.activeSkinHash.equals(finalHash)
+                    && (config.activeSkinHash.equals(previousOwnSkin) || config.activeSkinHash.equals(replacedSkin))
+                    && !config.activeSkinHash.isEmpty();
+            String accountSelection = account != null ? config.accountSkins.skinHash(account) : "";
+            if (!accountSelection.isEmpty() && !accountSelection.equals(finalHash)
+                    && (accountSelection.equals(previousOwnSkin) || accountSelection.equals(replacedSkin))) {
+                config.accountSkins.select(account, finalHash);
+            }
+            if ((config.activeSkinHash.isEmpty() && config.activeCpmModelHash.isEmpty()) || woreOwnSkin) {
                 config.activeSkinHash = finalHash;
 
                 // Apply it to the player if they're in a world.
@@ -190,6 +221,38 @@ public final class PlayerOwnSkinBootstrap {
         } catch (Exception e) {
             QuickSkinInfo.LOGGER.error("Could not import the local player's Mojang skin", e);
         }
+    }
+
+    /**
+     * After a skin is uploaded to Mojang, downloads the texture Mojang kept for it and makes it
+     * the own skin, as the start-up check would on the next launch. Mojang may retouch an
+     * upload, so this is the skin other players see; whoever wore the uploaded skin wears it.
+     * Runs from the upload's worker thread.
+     */
+    public static void adoptUploadedSkin(String textureUrl, String model, @org.jetbrains.annotations.Nullable AssetMetadata uploaded) {
+        if (closed || !com.quickskin.mod.config.ClientConfig.getInstance().enablePlayerOwnSkinSystem) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || minecraft.getUser() == null) {
+            return;
+        }
+        String playerName = minecraft.getUser().getName();
+        java.util.UUID profileId = minecraft.getUser().getProfileId();
+        String account = com.quickskin.mod.config.AccountSkinPreferences.key(profileId, playerName);
+        String uploadedHash = uploaded != null ? uploaded.hash() : null;
+        MojangApiService.getInstance().downloadSkinImage(textureUrl)
+                .thenAccept(image -> minecraft.execute(() -> {
+                    if (!closed && image != null) {
+                        handlePlayerOwnSkinFetched(new MojangApiService.MojangSkinData(
+                                playerName, profileId, image, model, textureUrl), account, uploadedHash);
+                    }
+                }))
+                .exceptionally(throwable -> {
+                    QuickSkinInfo.LOGGER.warn("Could not download the skin Mojang kept after the upload: {}",
+                            throwable.toString());
+                    return null;
+                });
     }
 
     /**

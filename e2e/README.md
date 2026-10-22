@@ -55,15 +55,15 @@ This `master` shared source exercises the following exact packaged lanes:
 | `fabric-26.3` | `26.3` | Fabric | `25` | `11` |
 | `neoforge-26.3` | `26.3` | NeoForge | `25` | `11` |
 
-Scenario contract SHA-256: `abcd9ca1d82dda3067fc65b54cf1caf0642bf4315eea0a2e59f9f3fd64a8e217`
-Contract totals: `128` ordered steps, `97` captures.
+Scenario contract SHA-256: `f6802cb668c5b5daa0d63bdc7d2f4519606aa458c4b46edbbde40823ed0d1ab9`
+Contract totals: `129` ordered steps, `98` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
 | `phase0-smoke` | `runtime-default`, `pr`, `release` | `single-client` | `client_a` | `2` | `2` |
 | `propagation` | `pr`, `release` | `sequential-two-client` | `client_a`, `client_b` | `6` | `4` |
 | `propagation-live` | `pr`, `release` | `concurrent-two-client` | `client_a`, `client_b` | `17` | `9` |
-| `full` | `pr`, `release` | `single-client` | `client_a` | `70` | `63` |
+| `full` | `pr`, `release` | `single-client` | `client_a` | `71` | `64` |
 | `server-policy` | `pr`, `release` | `single-client` | `client_a` | `4` | `4` |
 | `session` | `pr`, `release` | `single-client` | `client_a` | `5` | `4` |
 | `mod-compatibility` | `compatibility` | `single-client` | `client_a` | `3` | `2` |
@@ -281,7 +281,8 @@ ignores. Installer hashes and runtime/version facts remain matrix-owned; the sta
 production and harness JAR hashes remain manifest-owned. `RuntimeStore` is never uploaded as
 evidence. The installed Forge/NeoForge server keeps its own store and is the one piece of runtime
 material transported between GitHub jobs, under its exact recipe digest and only from a protected
-`master` generation, because its installer downloads unpinned Maven libraries on every install.
+`master` dispatch that launches a bundle its own run built, because its installer downloads
+unpinned Maven libraries on every install. The optional-mod wave restores it read-only.
 The client install stays job-local. Forge and NeoForge server installation retry bounded transient Maven failures
 in a fresh isolated directory each time and publish only a complete tree with its launcher script,
 so an incomplete download can never contaminate the next attempt. That install now runs once per
@@ -374,7 +375,7 @@ through the real drop workflow (vanilla elytra composited into its transparent e
 the fill-colour picker, snap-and-mirror the editor, and drive the cape menu with real tile clicks:
 selection outline, GIF badge, speed slider, tooltip, scrollbar, delete, the None tile, and Hide
 Built-in Capes. Settings checkpoints capture every tab, the keybind capture state, the non-admin
-server notice, and styled buttons over the vanilla in-world background.
+server notice, and the skin menu's own buttons over the vanilla in-world background.
 
 Two single-client scenarios complement it. `server-policy` is the only lane whose dedicated server
 starts with a non-default `quickskin-server.json`; the seed is declared in the contract's
@@ -826,7 +827,7 @@ lossless anchor `mb-anchor--mc<TARGET>--<commit>--<run_id>--a<attempt>`, which t
 and the Pages side can compose a selected handoff with its authenticated full baseline archive.
 The composition works per frame, so every verified selection is handed off, including one that
 re-captures only some checkpoints of a lane (today's `hud-preview` selection re-captures 2 of the
-63 `full` ones). Such a lane is the selected execution's record and keeps the baseline execution
+64 `full` ones). Such a lane is the selected execution's record and keeps the baseline execution
 of its older frames as `baseline_run` (see
 [ADR 0010](../docs/architecture/decisions/0010-delegate-public-evidence-to-mod-base.md)).
 Each frame keeps its original tested commit/run/JAR and separate coverage provenance, and a partial

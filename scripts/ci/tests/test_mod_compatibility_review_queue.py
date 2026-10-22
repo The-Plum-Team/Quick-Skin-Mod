@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import json
+import os
 import sys
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "scripts" / "ci"))
 
+import mod_compatibility_review_queue as queue  # noqa: E402
 from mod_compatibility_review_queue import (  # noqa: E402
     PLAN_NAME,
     REVIEW_WORKFLOW,
@@ -274,6 +279,33 @@ class ModCompatibilityReviewQueueTest(unittest.TestCase):
                 FakeApi(plans, {10: owner(10, SOURCE_WORKFLOW)}),
                 repository=REPOSITORY,
             )
+
+    def test_recovery_lists_a_bounded_oldest_first_backlog_beside_its_selection(self) -> None:
+        count = queue.MAX_PENDING_FANOUT + 3
+        plans = [
+            artifact(index, PLAN_NAME, run_id=100 + index, minutes_ago=count - index)
+            for index in range(1, count + 1)
+        ]
+        api = FakeApi(plans, {100 + index: owner(100 + index, SOURCE_WORKFLOW)
+                              for index in range(1, count + 1)})
+        with tempfile.TemporaryDirectory() as temporary:
+            outputs = Path(temporary) / "outputs"
+            listing = Path(temporary) / "pending.json"
+            with mock.patch.object(queue, "GitHubApi", return_value=api), \
+                    mock.patch.dict(os.environ, {"GH_TOKEN": "fixture-token"}):
+                self.assertEqual(0, queue.main(["--repository", REPOSITORY, "--github-output",
+                                                str(outputs), "--pending-json", str(listing)]))
+                # The listing is created exclusively and never overwrites an existing path.
+                with mock.patch("sys.stderr"):
+                    self.assertEqual(2, queue.main(["--repository", REPOSITORY, "--github-output",
+                                                    str(outputs), "--pending-json", str(listing)]))
+            pending = json.loads(listing.read_text(encoding="utf-8"))
+            self.assertEqual(queue.MAX_PENDING_FANOUT, len(pending))
+            self.assertEqual([{"source_run_id": 100 + index, "source_sha": SHA}
+                              for index in range(1, queue.MAX_PENDING_FANOUT + 1)], pending)
+            self.assertIn("source_run_id=101\n", outputs.read_text(encoding="utf-8"))
+        with mock.patch("sys.stderr"):
+            self.assertEqual(2, queue.main(["--admit-matrix", "matrix.json", "--pending-json", "pending.json"]))
 
 
 if __name__ == "__main__":

@@ -28,6 +28,35 @@ The native shape this reproduces:
 * one lane per ``matrix.py --kind pr-anchors`` row, named by its artifact node (the native row id
   holds ``--``, which a kit unit id may not), with one obligation per scenario of the PR profile.
 
+The protected config names ``runtime_selection``, so a pull request's packaged lanes may run a
+narrowed scope (mod-base ``docs/BUILD-RUNTIME-SELECTION.md``). ``derive_scope`` is the selection
+policy, and it is Quick Skin's reviewed native policy, applied conservatively:
+
+* every changed path that the native E2E impact allowlist (``scripts/ci/e2e_impact.py``) calls
+  non-runtime (documentation, the site, AI review prompts, non-gate workflows) is set aside;
+* nothing left: every lane runs only the smoke scenario ``phase0-smoke``;
+* otherwise every remaining path must be a Java source of a feature module of the module graph
+  (``architecture/modules.json``). A path of a shared module (a ``java-library`` or the ``common``
+  assembly), a path no module owns, a resource, a build or harness file, or any path the native
+  selector (``e2e/selection.py``) cannot prove runs every scenario of every lane. When the native
+  selector proves an ``affected`` subset, every lane runs that subset and the smoke scenario.
+
+The selection code (this policy, the impact allowlist, the module graph reader and the selector)
+is listed in ``adapter.files``; the two documents it reads, the module graph and the optional-mod
+lock (``e2e/mod-compatibility-contract.json``, whose per-mod reference captures widen what counts
+as compatibility evidence), are extra ``plan_inputs`` (``module-graph`` and
+``mod-compatibility-contract``), read as data from ``validation-input/`` and bound by the plan. The
+kit runs ``derive_scope`` only for a pull request that changes none of its selection inputs (the
+config, any adapter file, the matrix, the scenario contract and every plan input: the kit's
+``scope.selection_inputs``), so the bytes it reads are always those of the protected base, which is
+the executing controller: a pull request that edits the graph or the lock runs in full, as one that
+edits the policy does. Being plan inputs rather than adapter files, they stay out of the policy
+digest, so the push of a merge that only edits them can reuse its pull request's full evidence.
+A narrowed lane's ``derive_runtime`` gives ``run_lane`` only its scenarios, and its
+``verify_runtime`` requires one passing result for exactly those scenarios, in profile order.
+Pushes, dispatches and releases always run in full, and a narrowed pull request never covers the
+push of its merge.
+
 Standard library and the protected native modules only, Python 3.11 or newer. Every JSON output is
 canonical: sorted keys, compact separators, UTF-8, one final newline.
 """
@@ -36,6 +65,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -51,8 +81,8 @@ import matrix as release_matrix  # noqa: E402
 import scenario_contract  # noqa: E402
 
 BUILD_ADAPTER_API = 1
-HOOKS = ("derive_plan", "policy", "build_target", "verify_target", "verify_build", "derive_runtime", "run_lane",
-         "verify_runtime")
+HOOKS = ("derive_plan", "policy", "build_target", "verify_target", "verify_build", "derive_scope", "derive_runtime",
+         "run_lane", "verify_runtime")
 #: The name the protected Build config stages ``gradle.properties`` under for the protected hooks.
 PROPERTIES_INPUT = "gradle-properties"
 INVENTORY_PATH = "release/release-matrix.json"
@@ -73,6 +103,31 @@ MAX_NATIVE_REPORT_BYTES = 4 * 1024 * 1024
 MAX_SBOM_BYTES = 16 * 1024 * 1024
 TARGET_CONTRACT = "quick-skin-target-v1"
 LANE_CONTRACT = "quick-skin-lane-v1"
+#: The format of the kit's ``derive_scope`` input that ``runtime_selection`` names.
+SCOPE_INPUT_FORMAT = "changed-paths-v1"
+#: The scenario every lane of a narrowed run keeps (mod-base: a lane nothing affects runs its smoke).
+SMOKE_SCENARIO = "phase0-smoke"
+#: The two documents ``derive_scope`` reads, as the plan inputs the protected config names them
+#: (``validation-input/<name>``), with the repository paths the config stages them from. The kit
+#: never runs ``derive_scope`` for a pull request that changes either, so their bytes are always
+#: the protected base's.
+GRAPH_INPUT = "module-graph"
+GRAPH_PATH = "architecture/modules.json"
+MAX_GRAPH_BYTES = 256 * 1024
+LOCK_INPUT = "mod-compatibility-contract"
+LOCK_PATH = "e2e/mod-compatibility-contract.json"
+#: ``e2e/mod_compatibility.py`` ``MAX_CONTRACT_BYTES`` and ``SCHEMA_VERSION``: a lock of another
+#: schema is not read here, so the selection runs every scenario until this reader follows it.
+MAX_LOCK_BYTES = 2 * 1024 * 1024
+LOCK_SCHEMA_VERSION = 8
+#: The keys of a lock's ``reference_captures`` and the grammar of a capture id
+#: (``mod_compatibility.CAPTURE_ID``).
+LOCK_REFERENCE_KEYS = ("apply_local_skin_with_mod", "baseline_with_mod")
+CAPTURE_ID_PATTERN = r"[a-z0-9][a-z0-9._-]{1,191}"
+#: The extra plan inputs, in the config's order (sorted by name), each bound by the plan.
+EXTRA_INPUTS = (PROPERTIES_INPUT, LOCK_INPUT, GRAPH_INPUT)
+#: Module kinds whose change runs every scenario: shared libraries and the assembly.
+SHARED_MODULE_KINDS = frozenset({"java-library", "minecraft-assembly"})
 
 
 class AdapterError(Exception):
@@ -339,17 +394,154 @@ def lane_target(mod: Mod, lane: str) -> str:
     raise AdapterError(f"the release matrix has no lane {lane!r}")
 
 
-def runtime_values(mod: Mod, lane: str) -> dict[str, str]:
+def profile_subset(mod: Mod, wanted: list[str], label: str) -> list[str]:
+    """``wanted`` when it is a non-empty selection of the PR profile's scenarios, in profile order
+    and without a repeat; anything else is a rejection."""
+
+    if (type(wanted) is not list or not wanted or any(type(item) is not str for item in wanted)
+            or wanted != [scenario for scenario in scenarios(mod) if scenario in set(wanted)]
+            or len(set(wanted)) != len(wanted)):
+        raise AdapterError(f"{label} is not a selection of the PR profile's scenarios in profile order")
+    return wanted
+
+
+def runtime_values(mod: Mod, lane: str, obligations: list[str] | None = None) -> dict[str, str]:
     """What ``run_lane`` receives: the native PR row of the lane, as ``matrix.py`` prints a row,
-    and the scenarios that row names."""
+    and the scenarios that row names, or only those of ``obligations`` for a narrowed lane."""
 
     row = runtime_rows(mod).get(lane)
     if row is None:
         raise AdapterError(f"lane {lane!r} has no PR runtime row")
     if row["scenarios"] != ",".join(scenarios(mod)):
         raise AdapterError(f"the runtime row of {lane} names other scenarios than the PR profile")
+    selected = row["scenarios"]
+    if obligations is not None:
+        wanted = [item.removeprefix("scenario/") for item in obligations]
+        if [obligation(item) for item in wanted] != obligations:
+            raise AdapterError(f"the runtime scope of {lane} names an obligation that is not a scenario")
+        selected = ",".join(profile_subset(mod, wanted, f"the runtime scope of {lane}"))
     return {"E2E_ROW_JSON": json.dumps(row, separators=(",", ":"), sort_keys=True, ensure_ascii=True),
-            "E2E_SCENARIOS": row["scenarios"]}
+            "E2E_SCENARIOS": selected}
+
+
+# -- Narrowed runtime scope ------------------------------------------------------------------------------
+
+
+def _native_selection_modules() -> tuple[Any, Any, Any]:
+    """The protected native impact allowlist, module graph and E2E selector, imported only by
+    ``derive_scope``. The selector is always handed the lock's reference captures
+    (:func:`lock_reference_captures`), so it never imports ``mod_compatibility``, which is no
+    adapter file."""
+
+    for directory in (ROOT / "scripts" / "ci", ROOT / "scripts" / "architecture"):
+        if str(directory) not in sys.path:
+            sys.path.insert(0, str(directory))
+    import e2e_impact
+    import module_graph
+    import selection
+    return e2e_impact, module_graph, selection
+
+
+def lock_reference_captures(raw: bytes) -> tuple[str, ...]:
+    """The clean reference captures the optional-mod lock substitutes per mod, sorted: what
+    ``selection._lock_reference_captures`` reads from the fully validated lock.
+
+    Only the selection reads this, and only to widen it, so it reads no more of the lock than that:
+    strict JSON within the native cap, the native schema version, a non-empty ``mods`` list whose
+    every entry has ``reference_captures``, either ``null`` or exactly the two native keys naming
+    capture ids. Anything else is an :class:`AdapterError`, which runs every scenario. The lock as
+    a whole is validated by the native suite of every pull request that changes it, and such a pull
+    request never reaches ``derive_scope``."""
+
+    data = decode(raw, "optional-mod lock", max_bytes=MAX_LOCK_BYTES)
+    if type(data) is not dict or data.get("schema_version") != LOCK_SCHEMA_VERSION:
+        raise AdapterError(f"the optional-mod lock is not of schema version {LOCK_SCHEMA_VERSION}")
+    mods = data.get("mods")
+    if type(mods) is not list or not mods:
+        raise AdapterError("the optional-mod lock declares no mods")
+    references: set[str] = set()
+    for index, item in enumerate(mods):
+        if type(item) is not dict or "reference_captures" not in item:
+            raise AdapterError(f"optional-mod lock mods[{index}] has no reference_captures")
+        value = item["reference_captures"]
+        if value is None:
+            continue
+        value = _object(value, LOCK_REFERENCE_KEYS, f"optional-mod lock mods[{index}].reference_captures")
+        for key in LOCK_REFERENCE_KEYS:
+            capture = value[key]
+            if type(capture) is not str or not re.fullmatch(CAPTURE_ID_PATTERN, capture):
+                raise AdapterError(f"optional-mod lock mods[{index}].reference_captures.{key} is not a capture id")
+            references.add(capture)
+    return tuple(sorted(references))
+
+
+def scope_selection(mod: Mod, changed_paths: Any, *, graph: bytes, lock: bytes) -> tuple[list[str] | None, str]:
+    """The PR-profile scenarios a pull request that changes ``changed_paths`` runs, in profile
+    order, or ``None`` for every scenario, with the reason (see the module docstring). ``graph``
+    and ``lock`` are the bytes of the module graph and the optional-mod lock the plan binds.
+
+    Every doubt is ``None``: a missing or malformed path list, a path the allowlist cannot classify,
+    a shared module, a path the native selector cannot prove, and any failure of the native
+    modules, of the module graph or of the lock."""
+
+    every = scenarios(mod)
+    if SMOKE_SCENARIO not in every:
+        return None, "no-smoke-scenario"
+    if type(changed_paths) is not list or not changed_paths or any(type(path) is not str for path in changed_paths):
+        return None, "missing-change-input"
+    try:
+        e2e_impact, module_graph, selection = _native_selection_modules()
+        runtime_paths = list(e2e_impact.classify(changed_paths).runtime_paths)
+        if not runtime_paths:
+            return [SMOKE_SCENARIO], "non-runtime-only"
+        if type(graph) is not bytes or not graph or len(graph) > MAX_GRAPH_BYTES:
+            raise AdapterError(f"the module graph must hold 1..{MAX_GRAPH_BYTES} bytes")
+        parsed = module_graph.parse_graph(graph)
+        for path in runtime_paths:
+            owners = [module for module in parsed.modules if path.startswith(module.path + "/")]
+            if len(owners) != 1:
+                return None, "unowned-path"
+            if owners[0].kind in SHARED_MODULE_KINDS:
+                return None, "shared-module"
+        selected = selection.select(mod.contract, parsed, runtime_paths, RUNTIME_PROFILE,
+                                    lock_references=lock_reference_captures(lock))
+    except Exception as error:  # noqa: BLE001 - any doubt about the selection runs every scenario
+        return None, f"selection-unavailable: {type(error).__name__}"
+    if selected.mode != "affected" or selected.reason != "affected-module-coverage":
+        return None, selected.reason
+    chosen = {run.scenario for run in selected.runs} | {SMOKE_SCENARIO}
+    return [scenario for scenario in every if scenario in chosen], selected.reason
+
+
+def derive_scope(mod: Mod, plan: dict[str, Any], changed_paths: Any, *, graph: bytes,
+                 lock: bytes) -> tuple[dict[str, Any], str]:
+    """``scope.json`` for ``plan``: every planned lane in plan order with the obligations it runs
+    (all of them when the selection is ``None``), and the reason of the selection."""
+
+    chosen, reason = scope_selection(mod, changed_paths, graph=graph, lock=lock)
+    lanes = []
+    for lane in plan["lanes"]:
+        names = list(lane["obligations"])
+        if chosen is not None:
+            names = [name for name in names if name.removeprefix("scenario/") in chosen]
+        lanes.append({"id": lane["id"], "scenarios": names})
+    return {"lanes": lanes}, reason
+
+
+def lane_scope(value: str | None, lane: str, obligations: list[str]) -> list[str]:
+    """The obligations ``lane`` runs: all of them without the kit's ``MB_RUNTIME_SCOPE``, else the
+    non-empty selection of them it names for this lane, in plan order."""
+
+    if value is None:
+        return list(obligations)
+    scope = _object(decode(value.encode("utf-8"), "MB_RUNTIME_SCOPE", max_bytes=64 * 1024),
+                    ("lane_id", "scenarios", "scope_sha256"), "MB_RUNTIME_SCOPE")
+    selected = scope["scenarios"]
+    if (scope["lane_id"] != lane or type(selected) is not list or not selected
+            or any(type(name) is not str for name in selected) or len(set(selected)) != len(selected)
+            or selected != [name for name in obligations if name in set(selected)]):
+        raise AdapterError(f"the runtime scope does not narrow lane {lane} to its own obligations in plan order")
+    return list(selected)
 
 
 # -- Build verification --------------------------------------------------------------------------------
@@ -524,19 +716,24 @@ def verify_run(mod: Mod, lane: str, obligations: list[str], *, production: bytes
     """Verify the sealed native results of one lane (``read(path below lanes/<lane>/) -> bytes``,
     ``files`` every path there) and return what the report records.
 
-    Every planned scenario must have exactly one passing result, in plan order, for this lane's
-    row, this scenario contract and the sealed production JAR (``production_name`` is its staged
-    file name), installed on the server and on every client the scenario has, each of which
-    reported a pass; each result's ``result.json`` must repeat it, no crash report may exist,
-    every screenshot must be a PNG, and every file must belong to the lane's summary or to one of
-    its scenario profiles."""
+    Every scenario of ``obligations`` (the lane's planned obligations, or the narrowed selection of
+    them its runtime scope names) must have exactly one passing result, in plan order, for this
+    lane's row, this scenario contract and the sealed production JAR (``production_name`` is its
+    staged file name), installed on the server and on every client the scenario has, each of which
+    reported a pass; no other scenario may have a result. Each result's ``result.json`` must repeat
+    it, no crash report may exist, every screenshot must be a PNG, and every file must belong to the
+    lane's summary or to one of its scenario profiles."""
 
     row = runtime_rows(mod).get(lane)
     if row is None:
         raise AdapterError(f"lane {lane!r} has no PR runtime row")
-    wanted = [item.removeprefix("scenario/") for item in obligations]
-    if [obligation(item) for item in wanted] != obligations or wanted != scenarios(mod):
+    wanted = [item.removeprefix("scenario/") for item in obligations] if type(obligations) is list else None
+    if wanted is None or [obligation(item) for item in wanted] != obligations:
         raise AdapterError(f"the obligations of {lane} are not this contract's PR scenarios")
+    try:
+        profile_subset(mod, wanted, f"the obligations of {lane}")
+    except AdapterError as error:
+        raise AdapterError(f"the obligations of {lane} are not this contract's PR scenarios") from error
     if not set(LANE_FILES) <= files:
         raise AdapterError(f"lane {lane} did not record {sorted(set(LANE_FILES) - files)}")
     summary = _object(decode(read("summary.json"), "summary.json", max_bytes=MAX_NATIVE_REPORT_BYTES),

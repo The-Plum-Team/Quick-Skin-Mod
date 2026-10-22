@@ -9,6 +9,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.Identifier;
 //?}
 
+import java.util.concurrent.ThreadLocalRandom;
+
 /**
  * Data holder for player preview rendering
  * Replaces GeoPlayerEntity - stores all info needed to render a player model in GUI
@@ -34,7 +36,16 @@ public class PreviewPlayerData {
 
     // Animation state
     private String currentAnimation; // For future animation support
+    private boolean showcaseIdle;
+    private boolean ownPose;
+    private boolean elytraPreview;
     private final float animationProgress;
+
+    // The move the skin menu's model makes when another skin is picked
+    private boolean drawn;
+    private SkinSwapAnimation.Variant skinSwapVariant;
+    private long skinSwapStartNanos;
+    private SkinSwapAnimation.Pose skinSwapPose = SkinSwapAnimation.Pose.REST;
 
     public PreviewPlayerData() {
         this.modelType = "classic";
@@ -85,8 +96,47 @@ public class PreviewPlayerData {
         // Clear 3D mesh cache if skin is changing
         if (this.skinLocation != null && !this.skinLocation.equals(skinLocation)) {
             SkinLayers3DIntegration.clearCache();
+            startSkinSwap();
         }
         this.skinLocation = skinLocation;
+    }
+
+    /**
+     * Starts the skin-change move on the skin menu's model. The skin a menu is opened with is set
+     * before its first draw and starts nothing, and a pick made while a move plays lets that move
+     * finish, so browsing quickly never stacks moves.
+     */
+    private void startSkinSwap() {
+        if (!showcaseIdle || !drawn || skinSwapVariant != null) {
+            return;
+        }
+        skinSwapVariant = SkinSwapAnimation.next(ThreadLocalRandom.current()::nextInt);
+        skinSwapStartNanos = System.nanoTime();
+    }
+
+    /**
+     * Samples the skin-change move for the draw starting at {@code nowNanos}, which then reads it
+     * through {@link #getSkinSwapPose()}. Also marks the preview as drawn.
+     */
+    public SkinSwapAnimation.Pose advanceSkinSwap(long nowNanos) {
+        drawn = true;
+        if (skinSwapVariant == null) {
+            skinSwapPose = SkinSwapAnimation.Pose.REST;
+            return skinSwapPose;
+        }
+        float seconds = (nowNanos - skinSwapStartNanos) / 1.0e9f;
+        if (seconds >= SkinSwapAnimation.duration(skinSwapVariant)) {
+            skinSwapVariant = null;
+            skinSwapPose = SkinSwapAnimation.Pose.REST;
+        } else {
+            skinSwapPose = SkinSwapAnimation.sample(skinSwapVariant, seconds);
+        }
+        return skinSwapPose;
+    }
+
+    /** The skin-change offsets of the current draw; {@link SkinSwapAnimation.Pose#REST} when none plays. */
+    public SkinSwapAnimation.Pose getSkinSwapPose() {
+        return skinSwapPose;
     }
 
     //? if <1.21.11 {
@@ -190,6 +240,43 @@ public class PreviewPlayerData {
 
     public String getCurrentAnimation() {
         return currentAnimation;
+    }
+
+    /**
+     * Whether "idle" uses the showcase stance: facing the viewer squarely, arms and legs a little
+     * apart, breathing slowly. The skin menu uses it to present the whole skin.
+     */
+    public boolean isShowcaseIdle() {
+        return showcaseIdle;
+    }
+
+    public void setShowcaseIdle(boolean showcaseIdle) {
+        this.showcaseIdle = showcaseIdle;
+    }
+
+    /**
+     * Whether the preview draws its own model in the chosen pose even in a world, instead of the
+     * live player doing whatever the player is doing. The skin menu uses it; the pause menu's
+     * preview keeps the live player.
+     */
+    public boolean isOwnPose() {
+        return ownPose;
+    }
+
+    public void setOwnPose(boolean ownPose) {
+        this.ownPose = ownPose;
+    }
+
+    /**
+     * Whether the preview draws the cape's texture on folded elytra wings instead of on the cape,
+     * as vanilla does for a player wearing both. Such a preview draws its own model.
+     */
+    public boolean isElytraPreview() {
+        return elytraPreview;
+    }
+
+    public void setElytraPreview(boolean elytraPreview) {
+        this.elytraPreview = elytraPreview;
     }
 
     public void setCurrentAnimation(String currentAnimation) {

@@ -11,7 +11,12 @@ derives with what the legacy workflows derive from the same files:
   its output into a plan whose targets, lanes and outputs are the native ones:
   ``scripts/release/build_matrix.py`` targets, ``matrix.py --kind pr-anchors`` lanes and the names
   ``verify_release.py`` stages;
-* ``derive_runtime`` hands each lane exactly its native runtime row and PR scenarios;
+* ``derive_runtime`` hands each lane exactly its native runtime row and PR scenarios, or the
+  scenarios its narrowed runtime scope names;
+* ``derive_scope`` (``runtime_selection``) narrows a pull request only as the reviewed native
+  policy allows: non-runtime paths keep the smoke scenario, a feature module's Java source keeps the
+  scenarios the native selector proves plus the smoke scenario, and anything else runs every
+  scenario;
 * ``verify_runtime``'s reader accepts the native evidence shape and refuses failed, missing,
   crashed, foreign or unaccounted results;
 * ``verify_target`` and ``verify_build`` accept what the native producer stages
@@ -83,7 +88,8 @@ def context_refusal(activation: dict[str, Any], contexts: dict[str, str], requir
 #: policy job and a 13m07s lane. The shared hooks must allow at least twice as much.
 NATIVE_SECONDS = {"target_seconds": 362, "policy_seconds": 1113, "runtime_seconds": 787}
 
-for directory in (ROOT / "scripts" / "ci", ROOT / "scripts" / "release", ROOT / "e2e"):
+for directory in (ROOT / "scripts" / "ci", ROOT / "scripts" / "release", ROOT / "e2e",
+                  ROOT / "scripts" / "architecture"):
     if str(directory) not in sys.path:
         sys.path.insert(0, str(directory))
 
@@ -93,6 +99,8 @@ import mod_base_build_adapter as adapter  # noqa: E402
 import mod_base_build_candidate as candidate  # noqa: E402
 import mod_base_build_dispatch as dispatch  # noqa: E402
 import mod_base_build_policy as policy  # noqa: E402
+import module_graph  # noqa: E402
+import selection  # noqa: E402
 import verify_release  # noqa: E402
 import visual_evidence  # noqa: E402
 
@@ -190,7 +198,8 @@ class Worker:
             "graph_version": kit_module.graph_version,
         }
 
-    def run(self, hook: str, *, unit: str | None = None) -> subprocess.CompletedProcess[bytes]:
+    def run(self, hook: str, *, unit: str | None = None,
+            extra: dict[str, str] | None = None) -> subprocess.CompletedProcess[bytes]:
         dispatcher = self.config.data["adapter"]["dispatcher"]
         if os.name == "posix":
             command = self.kit.adapter.hook_command(hook, python=sys.executable, checkout=str(self.controller),
@@ -207,6 +216,7 @@ class Worker:
                 environment[name] = os.environ[name]
         if unit is not None:
             environment[names[hook]] = unit
+        environment.update(extra or {})
         return subprocess.run(command, cwd=self.controller, env=environment, stdin=subprocess.DEVNULL,
                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=300, check=False)
 
@@ -241,7 +251,10 @@ class BuildConfigTests(unittest.TestCase):
         self.assertEqual((data["repository"], data["profile"]), (REPOSITORY, "quick-skin"))
         self.assertEqual((data["inventory"]["path"], data["scenario_contract"]["path"], data["plan_inputs"]),
                          (adapter.INVENTORY_PATH, adapter.CONTRACT_PATH,
-                          [{"name": adapter.PROPERTIES_INPUT, "path": adapter.PROPERTIES_PATH}]))
+                          [{"name": adapter.PROPERTIES_INPUT, "path": adapter.PROPERTIES_PATH},
+                           {"name": adapter.LOCK_INPUT, "path": adapter.LOCK_PATH},
+                           {"name": adapter.GRAPH_INPUT, "path": adapter.GRAPH_PATH}]))
+        self.assertEqual(tuple(item["name"] for item in data["plan_inputs"]), adapter.EXTRA_INPUTS)
         self.assertEqual(data["bundle"]["path"], "build/release")
         self.assertEqual(data["runtime"], {"system_profile": "xvfb-mesa"})
 
@@ -257,7 +270,8 @@ class BuildConfigTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             controller = protected_copy(Path(directory))
             probe = ("import json, sys; sys.path.insert(0, sys.argv[1]); import mod_base_build_adapter as a; "
-                     "a._native_release_modules(); import mod_base_build_dispatch; "
+                     "a._native_release_modules(); a._native_selection_modules(); "
+                     "import mod_base_build_dispatch; "
                      "print(json.dumps(sorted(m.__file__ for m in list(sys.modules.values()) "
                      "if (getattr(m, '__file__', None) or '').startswith(sys.argv[2]))))")
             process = subprocess.run([sys.executable, "-I", "-B", "-c", probe, str(controller / "scripts" / "ci"),
@@ -267,6 +281,26 @@ class BuildConfigTests(unittest.TestCase):
         listed = {item["path"] for item in config_document()["adapter"]["files"]}
         self.assertLessEqual(loaded, listed)
         self.assertIn("scripts/release/matrix.py", loaded)
+        self.assertLessEqual({"e2e/selection.py", "scripts/architecture/module_graph.py", "scripts/ci/e2e_impact.py"},
+                             loaded)
+        # The selector gets the lock's references from the adapter and never imports the native
+        # lock module (or the visual metrics it imports), so neither is policy.
+        self.assertEqual(loaded & {"e2e/mod_compatibility.py", "e2e/visual_similarity.py"}, set())
+        self.assertEqual(listed & {"e2e/mod_compatibility.py", "e2e/visual_similarity.py"}, set())
+
+    def test_the_config_enables_the_changed_paths_selection(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = self.kit.load_build_config(protected_copy(Path(directory)), repository=REPOSITORY)
+        self.assertEqual(config.data["runtime_selection"], {"input": adapter.SCOPE_INPUT_FORMAT})
+        self.assertIn("derive_scope", self.kit.adapter.OPTIONAL_HOOKS)
+        self.assertIn("derive_scope", adapter.HOOKS)
+        listed = {item["path"] for item in config_document()["adapter"]["files"]}
+        # The documents the selection reads are plan inputs, not policy: the kit binds them in the
+        # plan, and a pull request that changes one is a selection input the kit runs in full.
+        self.assertEqual(listed & {adapter.GRAPH_PATH, adapter.LOCK_PATH}, set())
+        from mod_base.build_ci.scope import selection_inputs
+        self.assertLessEqual({adapter.GRAPH_PATH, adapter.LOCK_PATH, "e2e/selection.py", "scripts/ci/e2e_impact.py",
+                              "scripts/architecture/module_graph.py"}, selection_inputs(config.data))
 
     def test_the_contexts_follow_the_activation_mode(self) -> None:
         """Q4 shadow publishes distinct names, so no required check can be met by them. The Q5
@@ -395,8 +429,10 @@ class PlanTests(unittest.TestCase):
         identity = self.plan["identity"]
         self.assertEqual(identity["inventory_sha256"], hashlib.sha256(git_bytes(ROOT / adapter.INVENTORY_PATH)).hexdigest())
         self.assertEqual(identity["scenario_sha256"], hashlib.sha256(git_bytes(ROOT / adapter.CONTRACT_PATH)).hexdigest())
-        self.assertEqual(self.plan["plan_inputs"], [{"name": adapter.PROPERTIES_INPUT, "sha256": hashlib.sha256(
-            git_bytes(ROOT / adapter.PROPERTIES_PATH)).hexdigest()}])
+        self.assertEqual(self.plan["plan_inputs"], [
+            {"name": name, "sha256": hashlib.sha256(git_bytes(ROOT / path)).hexdigest()}
+            for name, path in ((adapter.PROPERTIES_INPUT, adapter.PROPERTIES_PATH), (adapter.LOCK_INPUT, adapter.LOCK_PATH),
+                               (adapter.GRAPH_INPUT, adapter.GRAPH_PATH))])
 
     def test_runtime_values_are_the_native_rows(self) -> None:
         rows = {row["artifact_node"]: row
@@ -531,6 +567,244 @@ class RuntimeVerificationTests(unittest.TestCase):
         files["summary.json"] = b'{"results": [], "results": []}'
         self.refuse(files, "duplicate JSON key")
 
+
+def _narrowed(files: dict[str, bytes], keep: list[str]) -> dict[str, bytes]:
+    """``files`` (a lane's complete evidence) with only the results of the scenarios in ``keep``."""
+
+    summary = json.loads(files["summary.json"])
+    results = [result for result in summary["results"] if result["scenario"] in keep]
+    profiles = {result["profile"] for result in results}
+    narrowed = {path: data for path, data in files.items()
+                if path.startswith("profiles/") and "/".join(path.split("/")[:2]) in profiles}
+    narrowed["summary.json"] = (json.dumps({"results": results, "runtime_store": summary["runtime_store"]},
+                                           indent=2) + "\n").encode()
+    narrowed["resolved-matrix.json"] = json.dumps({"rows": [{key: result[key] for key in adapter._RESOLVED_KEYS}
+                                                            for result in results]}).encode()
+    narrowed["runtime-store.json"] = files["runtime-store.json"]
+    return narrowed
+
+
+class RuntimeScopeTests(unittest.TestCase):
+    """``derive_scope`` from the protected copy, with the kit's input line, and the narrowed
+    ``derive_runtime`` and ``verify_runtime``."""
+
+    SMOKE = ["scenario/phase0-smoke"]
+    HUD = "modules/hud-preview/src/main/java/io/github/quickskin/hud/HudPreview.java"
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.kit = kit()
+        cls.directory = tempfile.TemporaryDirectory()
+        cls.worker = Worker(Path(cls.directory.name), cls.kit)
+        cls.plan, _ = cls.worker.plan()
+        cls.mod = native_mod()
+        cls.every = [adapter.obligation(scenario) for scenario in adapter.scenarios(cls.mod)]
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.directory.cleanup()
+
+    def scope(self, paths: list[str]) -> tuple[list[list[str]], str]:
+        """The scenarios of every lane ``derive_scope`` selects for ``paths``, read by the kit's own
+        reader, and the hook's log."""
+
+        value = self.kit.canonical_json({"format": adapter.SCOPE_INPUT_FORMAT, "base_sha": "c" * 40,
+                                         "base_tree": "d" * 40, "tested_tree": "f" * 40,
+                                         "changed_paths": sorted(paths), "baseline": {}}).decode().rstrip("\n")
+        process = self.worker.run("derive_scope", extra=self.kit.adapter.hook_values("derive_scope", scope=value))
+        self.assertEqual(process.returncode, 0, process.stdout)
+        document = self.kit.adapter.parse_derived_scope(self.worker.output(self.kit.adapter.SCOPE_OUTPUT))
+        self.assertEqual([lane["id"] for lane in document["lanes"]], [lane["id"] for lane in self.plan["lanes"]])
+        for lane, planned in zip(document["lanes"], self.plan["lanes"]):
+            self.assertEqual(lane["scenarios"], [name for name in planned["obligations"] if name in lane["scenarios"]])
+        return [lane["scenarios"] for lane in document["lanes"]], process.stdout.decode("utf-8", "replace")
+
+    def assert_every_lane(self, paths: list[str], expected: list[str], reason: str) -> None:
+        selected, log = self.scope(paths)
+        self.assertEqual(selected, [expected] * len(self.plan["lanes"]))
+        self.assertIn(f"quick-skin derive_scope: {reason}", log)
+
+    def test_non_runtime_changes_keep_only_the_smoke_scenario(self) -> None:
+        self.assert_every_lane(["docs/ai/WORKFLOW.md", "README.md", "site/mod-base.json"], self.SMOKE,
+                               "non-runtime-only")
+
+    def test_a_feature_module_source_runs_the_scenarios_the_native_selector_proves(self) -> None:
+        native = selection.select(self.mod.contract, module_graph.load_graph(ROOT), [self.HUD], "pr")
+        self.assertEqual((native.mode, [run.scenario for run in native.runs]), ("affected", ["full"]))
+        self.assert_every_lane([self.HUD, "docs/README.md"], ["scenario/phase0-smoke", "scenario/full"],
+                               "affected-module-coverage")
+
+    def test_shared_code_runs_every_scenario(self) -> None:
+        for path in ("modules/content-core/src/main/java/io/github/quickskin/core/Thing.java",
+                     "common/src/main/java/io/github/quickskin/Common.java"):
+            with self.subTest(path=path):
+                self.assert_every_lane([path], self.every, "shared-module")
+
+    def test_unmapped_paths_run_every_scenario(self) -> None:
+        for paths, reason in (
+                ([".github/workflows/build-gate.yml"], "unowned-path"),
+                (["e2e/orchestrator.py", "docs/ai/WORKFLOW.md"], "unowned-path"),
+                (["gradle/libs.versions.toml"], "unowned-path"),
+                (["docs/diagram.png"], "unowned-path"),
+                (["modules/hud-preview/src/main/resources/assets/quickskin/lang/en_us.json"],
+                 "unknown-path-or-policy-change"),
+                (["modules/hud-preview/build.gradle"], "unknown-path-or-policy-change")):
+            with self.subTest(paths=paths):
+                self.assert_every_lane(paths, self.every, reason)
+
+    def test_a_change_that_reaches_compatibility_evidence_runs_every_scenario(self) -> None:
+        self.assert_every_lane(["modules/skin-menu/src/main/java/io/github/quickskin/menu/SkinMenu.java"], self.every,
+                               "compatibility-coverage")
+
+    def test_mixed_shared_and_feature_changes_run_every_scenario(self) -> None:
+        self.assert_every_lane([self.HUD, "modules/image-core/src/main/java/io/github/quickskin/image/Png.java"],
+                               self.every, "shared-module")
+
+    GRAPH = git_bytes(ROOT / adapter.GRAPH_PATH)
+    LOCK = git_bytes(ROOT / adapter.LOCK_PATH)
+
+    def select(self, paths: Any, *, graph: bytes | None = None, lock: bytes | None = None) -> tuple[Any, str]:
+        return adapter.scope_selection(self.mod, paths, graph=self.GRAPH if graph is None else graph,
+                                       lock=self.LOCK if lock is None else lock)
+
+    def test_a_missing_or_malformed_change_list_runs_every_scenario(self) -> None:
+        self.assertEqual(self.select([]), (None, "missing-change-input"))
+        self.assertEqual(self.select(None), (None, "missing-change-input"))
+        self.assertEqual(self.select(["docs/../README.md"]), (None, "selection-unavailable: ImpactError"))
+
+    def test_an_empty_or_malformed_graph_runs_every_scenario(self) -> None:
+        for graph in (b"", b"{}", b"x" * (adapter.MAX_GRAPH_BYTES + 1)):
+            with self.subTest(graph=graph[:8]):
+                self.assertEqual(self.select([self.HUD], graph=graph)[0], None)
+                self.assertTrue(self.select([self.HUD], graph=graph)[1].startswith("selection-unavailable: "))
+                self.assertEqual(self.select(["README.md"], graph=graph), (["phase0-smoke"], "non-runtime-only"))
+
+    def test_the_lock_references_are_the_native_ones(self) -> None:
+        """The adapter's narrow lock reader gives the selector exactly what the native one reads
+        from the fully validated lock, for the native schema version."""
+
+        import mod_compatibility
+        self.assertEqual(adapter.LOCK_SCHEMA_VERSION, mod_compatibility.SCHEMA_VERSION)
+        self.assertEqual(adapter.MAX_LOCK_BYTES, mod_compatibility.MAX_CONTRACT_BYTES)
+        self.assertEqual(adapter.CAPTURE_ID_PATTERN, mod_compatibility.CAPTURE_ID.pattern.strip("^$"))
+        self.assertEqual(tuple(sorted(vars(mod_compatibility.CompatibilityReferenceCaptures(
+            baseline_with_mod="a.b.c", apply_local_skin_with_mod="a.b.d")))), adapter.LOCK_REFERENCE_KEYS)
+        self.assertEqual(adapter.lock_reference_captures(self.LOCK), selection._lock_reference_captures())
+        self.assertTrue(adapter.lock_reference_captures(self.LOCK))
+        native = selection.select(self.mod.contract, module_graph.load_graph(ROOT), [self.HUD], "pr")
+        given = selection.select(self.mod.contract, module_graph.load_graph(ROOT), [self.HUD], "pr",
+                                 lock_references=adapter.lock_reference_captures(self.LOCK))
+        self.assertEqual(given, native)
+
+    def test_a_lock_it_cannot_read_runs_every_scenario(self) -> None:
+        data = json.loads(self.LOCK)
+        changed = []
+        for edit in (lambda d: d.update(schema_version=adapter.LOCK_SCHEMA_VERSION + 1),
+                     lambda d: d.update(mods=[]),
+                     lambda d: d["mods"][0].pop("reference_captures"),
+                     lambda d: d["mods"][0].update(reference_captures={"baseline_with_mod": "a.b.c"}),
+                     lambda d: d["mods"][0].update(reference_captures={key: "A.B" for key in adapter.LOCK_REFERENCE_KEYS}),
+                     lambda d: d["mods"][0].update(reference_captures={**{key: "a.b.c" for key in adapter.LOCK_REFERENCE_KEYS},
+                                                                       "third": "a.b.c"})):
+            document = json.loads(json.dumps(data))
+            edit(document)
+            changed.append(json.dumps(document).encode())
+        changed += [b"", self.LOCK[:-2], b'{"schema_version": 8, "schema_version": 8}']
+        for lock in changed:
+            with self.subTest(lock=lock[:60]):
+                with self.assertRaises(adapter.AdapterError):
+                    adapter.lock_reference_captures(lock)
+                self.assertEqual(self.select([self.HUD], lock=lock), (None, "selection-unavailable: AdapterError"))
+
+    def test_a_lock_reference_reaches_the_selection(self) -> None:
+        """A capture the lock substitutes is compatibility evidence: once the lock pairs a mod with
+        a HUD capture, a HUD change runs every scenario."""
+
+        self.assertEqual(self.select([self.HUD]), (["phase0-smoke", "full"], "affected-module-coverage"))
+        data = json.loads(self.LOCK)
+        data["mods"][0]["reference_captures"] = {key: "full.client_a.hud_preview_overlay"
+                                                 for key in adapter.LOCK_REFERENCE_KEYS}
+        self.assertEqual(self.select([self.HUD], lock=json.dumps(data).encode()), (None, "compatibility-coverage"))
+
+    def test_another_input_format_is_refused(self) -> None:
+        value = self.kit.canonical_json({"format": "changed-paths-v2", "changed_paths": ["README.md"]})
+        process = self.worker.run("derive_scope", extra={"MB_SCOPE_INPUT": value.decode().rstrip("\n")})
+        self.assertEqual(process.returncode, 1, process.stdout)
+        self.assertIn(b"changed-paths-v1 format", process.stdout)
+
+    def lane_value(self, lane: str, scenarios: list[str]) -> str:
+        return json.dumps({"lane_id": lane, "scenarios": scenarios, "scope_sha256": "5" * 64})
+
+    def test_a_narrowed_lane_receives_only_its_scenarios(self) -> None:
+        lane = self.plan["lanes"][0]["id"]
+        value = self.lane_value(lane, ["scenario/phase0-smoke", "scenario/full"])
+        process = self.worker.run("derive_runtime", unit=lane,
+                                  extra=self.kit.adapter.hook_values("derive_runtime", unit_id=lane, scope=value))
+        self.assertEqual(process.returncode, 0, process.stdout)
+        values = self.kit.adapter.parse_runtime_values(self.worker.output(self.kit.adapter.RUNTIME_OUTPUT))
+        self.assertEqual(values["E2E_SCENARIOS"], "phase0-smoke,full")
+        self.assertEqual(values["E2E_ROW_JSON"], adapter.runtime_values(self.mod, lane)["E2E_ROW_JSON"])
+
+    def test_a_scope_that_does_not_narrow_this_lane_is_refused(self) -> None:
+        lane, other = self.plan["lanes"][0]["id"], self.plan["lanes"][1]["id"]
+        for value in (self.lane_value(other, self.SMOKE), self.lane_value(lane, []),
+                      self.lane_value(lane, ["scenario/full", "scenario/phase0-smoke"]),
+                      self.lane_value(lane, ["scenario/phase0-smoke", "scenario/phase0-smoke"]),
+                      self.lane_value(lane, ["scenario/unknown"])):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(adapter.AdapterError, "does not narrow lane"):
+                    adapter.lane_scope(value, lane, self.plan["lanes"][0]["obligations"])
+                process = self.worker.run("derive_runtime", unit=lane, extra={"MB_RUNTIME_SCOPE": value})
+                self.assertEqual(process.returncode, 1, process.stdout)
+
+    def test_a_narrowed_lane_must_prove_exactly_its_scenarios(self) -> None:
+        lane, production = RuntimeVerificationTests.LANE, RuntimeVerificationTests.PRODUCTION
+        complete = _evidence(self.mod, lane, production)
+        narrowed = ["scenario/phase0-smoke", "scenario/full"]
+        files = _narrowed(complete, ["phase0-smoke", "full"])
+
+        def verify(obligations: list[str], evidence: dict[str, bytes]) -> dict[str, Any]:
+            return adapter.verify_run(self.mod, lane, obligations, production=production,
+                                      production_name=PRODUCTION_NAME, files=set(evidence),
+                                      read=lambda path: evidence[path])
+
+        report = verify(narrowed, files)
+        self.assertEqual((report["obligations"], sorted(report["scenarios"])), (narrowed, ["full", "phase0-smoke"]))
+        for obligations, evidence in ((narrowed, complete), (self.every, files),
+                                      (narrowed, _narrowed(complete, ["phase0-smoke"]))):
+            with self.subTest(obligations=obligations, scenarios=len(evidence)):
+                with self.assertRaisesRegex(adapter.AdapterError, "planned scenarios"):
+                    verify(obligations, evidence)
+        for obligations in ([], ["scenario/full", "scenario/phase0-smoke"], ["scenario/unknown"], ["full"]):
+            with self.subTest(obligations=obligations):
+                with self.assertRaisesRegex(adapter.AdapterError, "not this contract's PR scenarios"):
+                    verify(obligations, files)
+
+class CandidateScopeTests(unittest.TestCase):
+    """``run_lane`` (candidate code) runs the PR profile or a selection of it, never anything else;
+    the protected ``verify_runtime`` then proves the selection its runtime scope names."""
+
+    def test_run_lane_takes_only_a_selection_of_the_pr_profile(self) -> None:
+        mod, lane = native_mod(), RuntimeVerificationTests.LANE
+        values = adapter.runtime_values(mod, lane)
+
+        class Reached(Exception):
+            pass
+
+        def attempt(scenarios: str) -> None:
+            environment = {"E2E_ROW_JSON": values["E2E_ROW_JSON"], "E2E_SCENARIOS": scenarios}
+            with mock.patch.dict(os.environ, environment), mock.patch.object(candidate, "_config", return_value={}), \
+                    mock.patch.object(candidate, "_mod", return_value=mod), \
+                    mock.patch.object(candidate.adapter, "lane_target", side_effect=Reached):
+                candidate.run_lane(ROOT, lane, ROOT / "unused-export")
+
+        for accepted in (values["E2E_SCENARIOS"], "phase0-smoke", "phase0-smoke,full"):
+            with self.subTest(accepted=accepted), self.assertRaises(Reached):
+                attempt(accepted)
+        for refused in ("full,phase0-smoke", "phase0-smoke,phase0-smoke", "unknown", "phase0-smoke,"):
+            with self.subTest(refused=refused), self.assertRaisesRegex(candidate.CandidateError,
+                                                                       "do not describe lane"):
+                attempt(refused)
 
 class CandidateHygieneTests(unittest.TestCase):
     def setUp(self) -> None:

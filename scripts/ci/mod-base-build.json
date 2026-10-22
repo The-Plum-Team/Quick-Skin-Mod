@@ -7,16 +7,28 @@
         "sha256": "60a15e5020ec1ffd11851c4c36f84fd63f4b4d982c4c8c1ffedbaa7107ed1b69"
       },
       {
+        "path": "e2e/selection.py",
+        "sha256": "9341d2cb221579b2b19868399bb2c43ad8258611c688925314048aacbe1a0fba"
+      },
+      {
+        "path": "scripts/architecture/module_graph.py",
+        "sha256": "0b6d29957ac50f04082e1504954ef84f5ba90ce34d3b21af6c8d8e7a14ae6eb6"
+      },
+      {
+        "path": "scripts/ci/e2e_impact.py",
+        "sha256": "04ff0f55f5ba76d84ec7e26f43f4f588353d4e009fa05525c2f6bbd2f9dea49c"
+      },
+      {
         "path": "scripts/ci/mod_base_build_adapter.py",
-        "sha256": "a733f8953bdf245b607f7665a7960df749a0c3b089b2270e57f22b498fdfeb9d"
+        "sha256": "ba1ed7dbfaaecf7b990dd4705fa01667363fbd0d49be3d20358d6e18bf5b4668"
       },
       {
         "path": "scripts/ci/mod_base_build_candidate.py",
-        "sha256": "42c258bcfb104c64b1971f0b2a08b4b50dfa1fc398c2925a79ba6976f94dba06"
+        "sha256": "cdfa6ef678e2c3d1d46322b44b8dbf655bcc9288e613f2e81e1a2991e769b31e"
       },
       {
         "path": "scripts/ci/mod_base_build_dispatch.py",
-        "sha256": "200b92a5ccbcd7f9829e8e38fc53c98227e45d0f18a52823754f1bcda8ed05ec"
+        "sha256": "dc0adad1c76fa8ab4376bce6c3874ee92cdf6f9ebc2e3ca65bf397e86b06557b"
       },
       {
         "path": "scripts/ci/mod_base_build_policy.py",
@@ -40,7 +52,7 @@
       },
       {
         "path": "scripts/release/verify_release.py",
-        "sha256": "a9921094d6729af40dd28411bf00a1084551d74b95a829daf6f0551ec71d4289"
+        "sha256": "efc7fd70699dfb112bfccef5ce67cfb284392d5ecd15acd6ac5d807c2fe00e42"
       }
     ],
     "path": "scripts/ci/mod_base_build_adapter.py",
@@ -62,12 +74,23 @@
     {
       "name": "gradle-properties",
       "path": "gradle.properties"
+    },
+    {
+      "name": "mod-compatibility-contract",
+      "path": "e2e/mod-compatibility-contract.json"
+    },
+    {
+      "name": "module-graph",
+      "path": "architecture/modules.json"
     }
   ],
   "profile": "quick-skin",
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "runtime": {
     "system_profile": "xvfb-mesa"
+  },
+  "runtime_selection": {
+    "input": "changed-paths-v1"
   },
   "scenario_contract": {
     "path": "e2e/scenario-contract.json"

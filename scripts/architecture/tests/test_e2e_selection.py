@@ -82,8 +82,8 @@ class E2ESelectionTest(unittest.TestCase):
             plan = select(self.contract, self.graph, [self.editor_path])
         projected = project_contract(self.contract, plan)
         self.assertEqual(self.contract.sha256, projected.sha256)
-        self.assertEqual(45, len(projected.captures))
-        self.assertEqual(67, len(projected.expected_steps("full", "client_a")))
+        self.assertEqual(46, len(projected.captures))
+        self.assertEqual(68, len(projected.expected_steps("full", "client_a")))
         self.assertEqual(plan.role("full", "client_a").captures,
                          projected.expected_capture_steps("full", "client_a"))
         self.assertEqual(set(projected.capture_ids), set(projected.review_regions))

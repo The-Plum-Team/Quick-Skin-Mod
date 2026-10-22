@@ -91,7 +91,7 @@ jobs:
         run: |
           set -euo pipefail
           (cd gradle/wrapper && sha256sum --check --strict gradle-wrapper.jar.sha256)
-          distribution_hash="$(tr -d '\r\n' < gradle/wrapper/gradle-9.8.0-bin.zip.sha256)"
+          distribution_hash="$(tr -d '\r\n' < gradle/wrapper/gradle-9.8.1-bin.zip.sha256)"
           grep --fixed-strings --line-regexp "distributionSha256Sum=$distribution_hash" \
             gradle/wrapper/gradle-wrapper.properties
 
@@ -220,7 +220,7 @@ jobs:
 
       - name: Upload immutable release bundle
         id: bundle
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-${{ steps.release.outputs.release_id }}
           path: build/release/
@@ -230,7 +230,7 @@ jobs:
 
       - name: Upload release-build diagnostics
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-build-diagnostics
           path: |
@@ -270,6 +270,9 @@ jobs:
           scenarios: ${{ matrix.scenarios }}
           release-target: ${{ needs.build.outputs.target }}
           evidence-name: release-behavior-${{ matrix.id }}
+          # The release bundle is built by this run from github.sha. Only a rehearsal dispatched on
+          # protected master passes the writer policy; a tag run restores read-only.
+          runtime-store-writer: "true"
 
   stage-github-release:
     name: Stage exact GitHub Release assets
@@ -303,7 +306,7 @@ jobs:
           python-version: "3.13"
 
       - name: Download immutable release bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-${{ needs.build.outputs.release_id }}
           path: build/release
@@ -365,7 +368,7 @@ jobs:
           python-version: "3.13"
 
       - name: Download immutable release bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-${{ needs.build.outputs.release_id }}
           path: build/release
@@ -443,7 +446,7 @@ jobs:
           --record "build/publication/${{ matrix.id }}.json"
 
       - name: Upload publication receipt
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: publication-${{ matrix.id }}
           path: build/publication/${{ matrix.id }}.json
@@ -482,7 +485,7 @@ jobs:
           python-version: "3.13"
 
       - name: Download immutable release bundle
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-${{ needs.build.outputs.release_id }}
           path: build/release

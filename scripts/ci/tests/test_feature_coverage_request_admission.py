@@ -116,7 +116,14 @@ class ProducerShellAdmissionTest(unittest.TestCase):
         self.environment = {"PATH": os.defpath, "GITHUB_SHA": SHA, "GITHUB_REF": "refs/heads/master",
             "GITHUB_RUN_ID": "100", "GITHUB_REPOSITORY": REPOSITORY, "FIXTURE_HEAD": SHA,
             "FIXTURE_LAYOUT": "shared", "FIXTURE_REQUEST_EXIT": "0", "FIXTURE_CALLS": str(self.calls),
-            "PRODUCER_RUN_ID": "", "SOURCE_RUN_ID": ""}
+            "PRODUCER_RUN_ID": "", "SOURCE_RUN_ID": "", "FIXTURE_ADMISSION": "0"}
+        # The recovery sources the protected helper by relative path; this fixture replaces only
+        # its background quota admission (tested itself in test_github_api_retry.py).
+        helper = self.folder / "scripts" / "ci" / "github_api_retry.sh"
+        helper.parent.mkdir(parents=True)
+        helper.write_text('github_api_background_admission() {\n'
+                          '  [[ "$1" == "feature coverage request recovery" ]] || return 95\n'
+                          '  return "$FIXTURE_ADMISSION"\n}\n', encoding="utf-8")
         # Execute the actual checked-in shell. Stub only its external git/Python boundary;
         # no network-capable executable, runtime or provider is invoked by these fixtures.
         self.boundary = '''
@@ -205,6 +212,19 @@ gh() { return 94; }
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertEqual(["scripts/ci/feature_coverage_request.py", *identity,
                     "--github-repository", REPOSITORY, "--source-sha", SHA], arguments)
+
+    def test_recovery_defers_below_the_background_quota_reserve_before_any_readiness_scan(self):
+        result, arguments = self.shell("feature-coverage-request.yml", recovery=True,
+                                       overrides={"FIXTURE_ADMISSION": "75"})
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual([], arguments)
+        result, arguments = self.shell("feature-coverage-request.yml", recovery=True,
+                                       overrides={"FIXTURE_ADMISSION": "2"})
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual([], arguments)
+        block = job_block("feature-coverage-request.yml", "request")
+        self.assertLess(block.index("github_api_background_admission"),
+                        block.index("scripts/ci/feature_coverage_request.py"))
 
     def test_recovery_input_is_one_literal_argument_and_never_shell_source(self):
         hostile = f"55; touch {self.folder / 'executed'}; $(exit 3)"

@@ -157,7 +157,7 @@ class CapeEditorSourcesTest {
 
         new CapeImportWorkflow(List.of(standard, adjusted), capes(), cache(), null, NO_GIF,
                 Runnable::run,
-                (prepared, apply, cancel) -> apply.accept(atlas(1, 0xff117788)),
+                (prepared, apply, cancel) -> apply.accept(atlas(1, 0xff117788), null),
                 finished::complete).start();
 
         assertEquals(2, finished.get(30, TimeUnit.SECONDS).succeeded());

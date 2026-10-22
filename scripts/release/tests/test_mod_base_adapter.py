@@ -219,7 +219,11 @@ class ConfigTest(unittest.TestCase):
                                                 CONFIG.images["webp_method"]))
         family = CONFIG.family(FAMILY)
         self.assertEqual(compatibility_evidence.PROJECTION_IMAGE_POLICY, family["image_policy"])
-        self.assertEqual(sorted(collect_compatibility.REVIEW_EVENTS), family["producer"]["events"])
+        # Only a run that can publish is a producer: a scheduled sweep would only fill the kit's window of
+        # producer runs at the head and push a wave's earlier handoffs out of it.
+        self.assertEqual(sorted(collect_compatibility.PUBLICATION_EVENTS), family["producer"]["events"])
+        self.assertLess(collect_compatibility.PUBLICATION_EVENTS, collect_compatibility.REVIEW_EVENTS)
+        self.assertNotIn("schedule", family["producer"]["events"])
         self.assertEqual(collect_compatibility.REVIEW_WORKFLOW, family["producer"]["workflow"])
         self.assertTrue(family["carry_forward"])
 
@@ -261,7 +265,7 @@ class ExpectationHookTest(Scratch):
                                                                                   "branch": "feature/x"},
                                                  "extensions": {}}, scratch=self.scratch)
                 validate_expectation(value, image_policy=CONFIG.image_policy())
-                self.assertEqual((14, 180, 76),
+                self.assertEqual((14, 182, 76),
                                  (len(value["lanes"]), len(value["captures"]), len(value["comparisons"])))
                 self.assertEqual({"kind": "complete"}, value["scope"])
                 self.assertEqual(REPOSITORY, value["repository"])
@@ -273,7 +277,7 @@ class ExpectationHookTest(Scratch):
                     self.assertIsNone(value["anchor"])
                 if target["key"] in (KEY, NEWEST):
                     frames += len(value["captures"])
-        self.assertEqual(360, frames)
+        self.assertEqual(364, frames)
 
     def test_capture_identity_and_order_follow_the_contract(self) -> None:
         value = expectation_of(KEY, self.scratch)
@@ -301,7 +305,7 @@ class ExpectationHookTest(Scratch):
         expected = sum(step.capture is not None for scenario in projected.scenarios for role in scenario.roles
                        for step in role.steps) * 2
         self.assertEqual(expected, len(value["captures"]))
-        self.assertLess(len(value["captures"]), 180)
+        self.assertLess(len(value["captures"]), 182)
         self.assertIsNone(value["anchor"])
         complete = expectation_of(KEY, self.scratch)
         orders = {item["frame_id"]: item["capture_order"] for item in complete["captures"]}
@@ -340,7 +344,7 @@ class CollectHookTest(Scratch):
 
     def test_collect_is_a_pure_function_of_the_declared_runtime_subset(self) -> None:
         first = self.collect(self.e2e)
-        self.assertEqual(14 + 180, len(first["runtime_files"]))
+        self.assertEqual(14 + 182, len(first["runtime_files"]))
         self.assertTrue(all(name.startswith("profiles/fabric-1.20.1--") or name.startswith("profiles/forge-1.20.1--")
                             for name in first["runtime_files"]))
         copied = self.scratch / "runtime"
@@ -526,7 +530,7 @@ REAL_SELECT = feature_evidence.select
 def whole_scenario_select(contract: Any, graph: Any, paths: Any, profile: str) -> Any:
     """The hud-preview selection, re-capturing every capture of each scenario it runs.
 
-    Today's only selective module (``hud-preview``) re-captures 2 of the 63 ``full`` checkpoints,
+    Today's only selective module (``hud-preview``) re-captures 2 of the 64 ``full`` checkpoints,
     so its composed lanes mix both epochs (``test_partially_recaptured_lane_passes_r3``); this
     whole-scenario variant exercises the other shape, lanes wholly from the selected generation."""
 
@@ -641,11 +645,11 @@ class ComposedEvidenceTest(unittest.TestCase):
         validate_compact(manifest)
         self.assertEqual("composed", manifest["scope"]["kind"])
         self.assertEqual(self.baseline["name"], manifest["scope"]["components"]["baseline"]["name"])
-        self.assertEqual(180, len(manifest["frames"]))
+        self.assertEqual(182, len(manifest["frames"]))
         selected = [frame for frame in manifest["frames"] if frame["epoch"] == "selected"]
         older = [frame for frame in manifest["frames"] if frame["epoch"] == "baseline"]
         self.assertEqual({"full"}, {frame["scenario"] for frame in selected})
-        self.assertEqual(126, len(selected))
+        self.assertEqual(128, len(selected))
         self.assertEqual({self.WHOLE_RUN}, {frame["tested"]["run_id"] for frame in selected})
         self.assertEqual({self.BASELINE_RUN}, {frame["tested"]["run_id"] for frame in older})
         baseline = {frame["frame_id"]: frame for frame in json.loads(
@@ -661,7 +665,7 @@ class ComposedEvidenceTest(unittest.TestCase):
         self.assertIn("compose", self.host.calls)
 
     def test_partially_recaptured_lane_passes_r3(self) -> None:
-        """Quick Skin's real selection re-captures individual checkpoints (hud-preview: 2 of the 63
+        """Quick Skin's real selection re-captures individual checkpoints (hud-preview: 2 of the 64
         ``full`` captures). Each such lane is the selected execution's record and keeps the
         baseline execution of its older frames as ``baseline_run``; every frame keeps the run and
         JAR its pixels came from, and R3 re-verified both epochs."""

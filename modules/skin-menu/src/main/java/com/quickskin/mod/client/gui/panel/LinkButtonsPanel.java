@@ -1,6 +1,6 @@
 package com.quickskin.mod.client.gui.panel;
 
-import com.quickskin.mod.client.gui.widget.LinkButton;
+import com.quickskin.mod.client.gui.widget.FieldLinkButton;
 import net.minecraft.client.Minecraft;
 //? if <26.1 {
 import net.minecraft.client.gui.GuiGraphics;
@@ -17,13 +17,14 @@ import net.minecraft.resources.Identifier;
 //?}
 
 /**
- * Panel that manages the link buttons in the top-right corner
- * (Modrinth, CurseForge, Discord, Settings)
+ * The skin menu's link buttons, in a row at its top right on the search row, left to right:
+ * Modrinth, CurseForge, Discord and Settings. They are drawn flat like the Search button.
  */
 public class LinkButtonsPanel extends AbstractWidget {
 
-    private static final int SPACING = 4;
-    private static final int BUTTON_SIZE = 20;
+    /** The gap between the buttons, as between the search field and its button. */
+    private static final int SPACING = 3;
+    private static final int BUTTON_SIZE = ActionButtonsPanel.ICON_BUTTON_SIZE;
 
     // Icon textures
     //? if <1.21.11 {
@@ -50,22 +51,56 @@ public class LinkButtonsPanel extends AbstractWidget {
     private static final String CURSEFORGE_URL = "https://www.curseforge.com/minecraft/mc-mods/quick-skin";
     private static final String MODRINTH_URL = "https://modrinth.com/mod/quick-skin";
 
-    public LinkButtonsPanel(int x, int y, int width, int height) {
-        super(x, y, width, height, Component.empty());
+    /** The row's width. */
+    public static int rowWidth() {
+        return BUTTON_SIZE * 4 + SPACING * 3;
+    }
+
+    public LinkButtonsPanel(int x, int y) {
+        super(x, y, rowWidth(), BUTTON_SIZE, Component.empty());
     }
 
     /**
-     * Initialize the panel and create all child widgets
+     * Initialize the panel and create all child widgets, left to right: Modrinth, CurseForge,
+     * Discord, Settings
      */
     public void init(com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen screen) {
-        int linkButtonY = getY();
-        int currentX = getX() + width - BUTTON_SIZE; // Start from right edge
+        int y = getY();
+        int currentX = getX();
 
-        // Settings button (far right)
-        screen.registerForegroundControl(new LinkButton(
+        screen.registerForegroundControl(new FieldLinkButton(
             currentX,
-            linkButtonY,
+            y,
             BUTTON_SIZE,
+            MODRINTH_ICON,
+            MODRINTH_URL,
+            Component.translatable("quickskin.button.modrinth")
+        ));
+
+        currentX += BUTTON_SIZE + SPACING;
+        screen.registerForegroundControl(new FieldLinkButton(
+            currentX,
+            y,
+            BUTTON_SIZE,
+            CURSEFORGE_ICON,
+            CURSEFORGE_URL,
+            Component.translatable("quickskin.button.curseforge")
+        ));
+
+        currentX += BUTTON_SIZE + SPACING;
+        screen.registerForegroundControl(new FieldLinkButton(
+            currentX,
+            y,
+            BUTTON_SIZE,
+            DISCORD_ICON,
+            DISCORD_URL,
+            Component.translatable("quickskin.button.discord")
+        ));
+
+        currentX += BUTTON_SIZE + SPACING;
+        screen.registerForegroundControl(new FieldLinkButton(
+            currentX,
+            y,
             BUTTON_SIZE,
             SETTINGS_ICON,
             null, // No URL, will be handled differently
@@ -78,7 +113,6 @@ public class LinkButtonsPanel extends AbstractWidget {
             public void onPress(net.minecraft.client.input.InputWithModifiers input) {
             //?}
                 // Open settings screen
-                screen.setOpeningSubScreen(true);
                 //? if <26.2 {
                 Minecraft.getInstance().setScreen(
                 //?} else {
@@ -88,42 +122,6 @@ public class LinkButtonsPanel extends AbstractWidget {
                 );
             }
         });
-
-        // Discord button (left of settings)
-        currentX -= (BUTTON_SIZE + SPACING);
-        screen.registerForegroundControl(new LinkButton(
-            currentX,
-            linkButtonY,
-            BUTTON_SIZE,
-            BUTTON_SIZE,
-            DISCORD_ICON,
-            DISCORD_URL,
-            Component.translatable("quickskin.button.discord")
-        ));
-
-        // CurseForge button (left of Discord)
-        currentX -= (BUTTON_SIZE + SPACING);
-        screen.registerForegroundControl(new LinkButton(
-            currentX,
-            linkButtonY,
-            BUTTON_SIZE,
-            BUTTON_SIZE,
-            CURSEFORGE_ICON,
-            CURSEFORGE_URL,
-            Component.translatable("quickskin.button.curseforge")
-        ));
-
-        // Modrinth button (left of CurseForge)
-        currentX -= (BUTTON_SIZE + SPACING);
-        screen.registerForegroundControl(new LinkButton(
-            currentX,
-            linkButtonY,
-            BUTTON_SIZE,
-            BUTTON_SIZE,
-            MODRINTH_ICON,
-            MODRINTH_URL,
-            Component.translatable("quickskin.button.modrinth")
-        ));
     }
 
     @Override

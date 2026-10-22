@@ -21,6 +21,54 @@ github_api_budget_snapshot() {
   fi
 }
 
+# Admission for background work only: queue drains, sweeps, recovery and Pages wakes. Never call it
+# from a required gate (Build, Packaged E2E, mod-base gate status) or a release workflow. It reads
+# GET /rate_limit with the caller's credential, which spends no primary quota, and returns 75 when
+# the REST core remaining budget is below GITHUB_API_BACKGROUND_RESERVE_PERCENT (default 40) of its
+# limit; the caller then settles successfully and leaves its durable work queued for a later sweep.
+# It logs only the numeric counters. Unavailable or malformed telemetry admits the work: the retry
+# wrappers still classify a real exhaustion, and a broken advisory read must not stall every queue.
+github_api_background_admission() {
+  local label="${1:-}" reserve="${GITHUB_API_BACKGROUND_RESERVE_PERCENT:-40}"
+  local snapshot counters limit used remaining reset now wait percent line
+  if [[ ! "$label" =~ ^[A-Za-z0-9][A-Za-z0-9\ ._/-]{0,79}$ ]]; then
+    printf 'GitHub API background admission needs a short plain label.\n' >&2
+    return 2
+  fi
+  if [[ ! "$reserve" =~ ^[1-9][0-9]?$ ]]; then
+    printf 'GitHub API background reserve must be a percentage from 1 to 99.\n' >&2
+    return 2
+  fi
+  if ! snapshot="$(gh api rate_limit --jq '.resources.core | {limit,used,remaining,reset}' 2>/dev/null)" \
+      || ! counters="$(jq -er '
+        if type == "object" and
+           ([.limit,.used,.remaining,.reset] | all(type == "number" and floor == . and . >= 0 and
+             . < 100000000000)) and
+           .limit > 0 and .reset > 0 and .remaining <= .limit
+        then [.limit,.used,.remaining,.reset] | map(tostring) | join(" ")
+        else error("invalid budget counters") end
+      ' <<< "$snapshot" 2>/dev/null)" \
+      || ! read -r limit used remaining reset <<< "$counters"; then
+    printf 'GitHub API background admission: %s admitted; core budget telemetry unavailable.\n' \
+      "$label" >&2
+    return 0
+  fi
+  now="$(date +%s)"
+  wait=$(( reset > now ? reset - now : 0 ))
+  percent=$(( remaining * 100 / limit ))
+  if (( remaining * 100 < limit * reserve )); then
+    line="GitHub API background admission: $label deferred; core remaining $remaining of $limit"
+    line+=" ($percent%) is below the $reserve% reserve, used $used, resets in ${wait}s."
+    printf '%s\n' "$line" >&2
+    if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+      printf '%s Durable work stays queued for the next sweep.\n' "$line" >> "$GITHUB_STEP_SUMMARY"
+    fi
+    return 75
+  fi
+  printf 'GitHub API background admission: %s admitted; core remaining %s of %s (%s%%), reserve %s%%, used %s, resets in %ss.\n' \
+    "$label" "$remaining" "$limit" "$percent" "$reserve" "$used" "$wait" >&2
+}
+
 # Opt-in typed retention signal for protected callers. When GITHUB_API_RETRY_UNAVAILABLE_SIGNAL
 # names a file, it describes only the most recent wrapper call: the empty file exists after that
 # call stopped on a response classified below as transient (rate limit, HTTP 408/429/5xx or a

@@ -12,7 +12,8 @@
     "MixinAbstractClientPlayer",
     "MixinSkinManager",
     "PanoramaRendererMixin",
-    "PreviewEquipmentMixin"
+    "PreviewEquipmentMixin",
+    "PreviewSkinSwapPoseMixin"
   ],
   "mixins": [
     "ChunkMapAccessor",
