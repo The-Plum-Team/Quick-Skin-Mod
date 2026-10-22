@@ -1845,12 +1845,12 @@
               }
             },
             {
-              "id": "catalog_delete",
+              "id": "catalog_delete_protected",
               "assertion_required": true,
               "capture": {
-                "title": "External skin deleted",
-                "review_tier": "key",
-                "expectation": "After the real delete confirmation, the renamed external skin's tile is gone and the hidden own skin is back: the skin column shows only the purple own-skin tile, with the import zone filling the column below it.",
+                "title": "Last skin deletion refused",
+                "review_tier": "all",
+                "expectation": "An error toast with a red strip and cross icon, saying that the list has to keep at least one skin, is visible over the skin menu while the renamed external skin's tile, the only skin listed, remains in the skin column. That the hidden own skin stays hidden and the external skin's file is kept is proven by the runtime evidence.",
                 "probes": []
               },
               "requires": [
@@ -1867,16 +1867,16 @@
               }
             },
             {
-              "id": "catalog_delete_protected",
+              "id": "catalog_delete",
               "assertion_required": true,
               "capture": {
-                "title": "Own skin deletion refused",
-                "review_tier": "all",
-                "expectation": "An error toast with a red strip and cross icon, saying that the account's skin can't be deleted while it is the only skin in the list, is visible over the skin menu while the purple own-skin tile, the only skin, remains in the skin column.",
+                "title": "External skin deleted",
+                "review_tier": "key",
+                "expectation": "After a spare skin was dropped into the skins folder and the real delete confirmation was given, the renamed external skin's tile is gone: the skin column shows exactly one skin tile, the dropped spare skin's, without the purple own-skin frame, with the import zone filling the column below it. The own skin stays hidden, as the runtime evidence proves.",
                 "probes": []
               },
               "requires": [
-                "catalog_delete"
+                "catalog_delete_protected"
               ],
               "requires_captures": [],
               "covers": {
@@ -2219,7 +2219,7 @@
               "capture": {
                 "title": "Cape editor",
                 "review_tier": "all",
-                "expectation": "The Quick Skin cape-adjustment editor is open: a slate header strip carries the readable Adjust Cape Image title on the left and the Drag to move \u00b7 Scroll to zoom instructions on the right. Its framed canvas shows the 64x32 test cape: a flat navy base with an orange, green-striped Front panel and labelled Front, Cape Back and Elytra region outlines; there are no grid lines. Under the canvas a Zoom panel holds the source size, a zoom-out button, the zoom slider with its percentage and a zoom-in button. A panel on the right opens with Cape and Elytra view buttons, Cape selected in blue, above a 3D player wearing the cape from behind, then the Resolution buttons 1x to 16x with the output size under them, the Position buttons Center, Snap and Mirror, and the Opaque fill switch with its colour swatch. Cancel and a green Apply Cape button sit at the bottom right.",
+                "expectation": "The Quick Skin cape-adjustment editor is open: a slate header strip carries the readable Adjust Cape Image title on the left and the Drag to move · Scroll to zoom instructions on the right. Its framed canvas shows the 64x32 test cape: a flat navy base with an orange, green-striped Front panel and labelled Front, Cape Back and Elytra region outlines; there are no grid lines. Under the canvas a Zoom panel holds the source size, a zoom-out button, the zoom slider with its percentage and a zoom-in button. A panel on the right opens with Cape and Elytra view buttons, Cape selected in blue, above a 3D player wearing the cape from behind, then the Resolution buttons 1x to 16x with the output size under them, the Position buttons Center, Snap and Mirror, and the Opaque fill switch with its colour swatch. Cancel and a green Apply Cape button sit at the bottom right.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
