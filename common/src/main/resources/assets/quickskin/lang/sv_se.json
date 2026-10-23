@@ -268,5 +268,5 @@
   "quickskin.network.upload_too_large.skin": "[Snabbt Skin] Ditt skin (%s) är större än den här serverns uppladdningsgräns (%s). Det syns bara på din skärm; andra spelare ser det inte.",
   "quickskin.network.upload_too_large.cape": "[Snabbt Skin] Din mantel (%s) är större än den här serverns uppladdningsgräns (%s). Den syns bara på din skärm; andra spelare ser den inte.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "[Quick Skin] Den här servern använder Quick Skin för egna skins och mantlar. Installera modden för att se dem och bära dina egna."
+  "quickskin.server.missing_mod_notice": "Den här servern använder Quick Skin för egna skins och mantlar. Installera modden för att se dem och bära dina egna."
 }

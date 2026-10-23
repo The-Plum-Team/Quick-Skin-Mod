@@ -268,5 +268,5 @@
   "quickskin.network.upload_too_large.skin": "[Швидкий скін] Ваш скін (%s) перевищує ліміт завантаження цього сервера (%s). Його видно лише на вашому екрані; інші гравці його не бачать.",
   "quickskin.network.upload_too_large.cape": "[Швидкий скін] Ваш плащ (%s) перевищує ліміт завантаження цього сервера (%s). Його видно лише на вашому екрані; інші гравці його не бачать.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "[Quick Skin] Цей сервер використовує Quick Skin для власних скінів і плащів. Встановіть мод, щоб бачити їх і носити свої."
+  "quickskin.server.missing_mod_notice": "Цей сервер використовує Quick Skin для власних скінів і плащів. Встановіть мод, щоб бачити їх і носити свої."
 }

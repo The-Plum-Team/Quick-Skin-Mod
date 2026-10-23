@@ -268,5 +268,5 @@
   "quickskin.network.upload_too_large.skin": "[Hızlı Skin] Skinin (%s) bu sunucunun yükleme sınırını (%s) aşıyor. Yalnızca senin ekranında görünür; diğer oyuncular onu görmez.",
   "quickskin.network.upload_too_large.cape": "[Hızlı Skin] Pelerinin (%s) bu sunucunun yükleme sınırını (%s) aşıyor. Yalnızca senin ekranında görünür; diğer oyuncular onu görmez.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "[Quick Skin] Bu sunucu özel skinler ve pelerinler için Quick Skin kullanıyor. Onları görmek ve kendininkini giymek için modu yükle."
+  "quickskin.server.missing_mod_notice": "Bu sunucu özel skinler ve pelerinler için Quick Skin kullanıyor. Onları görmek ve kendininkini giymek için modu yükle."
 }

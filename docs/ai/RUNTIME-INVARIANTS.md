@@ -165,8 +165,12 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   (`MissingModNotice`, on by default as `notifyPlayersWithoutQuickSkin`). The join itself proves
   nothing, since the hello follows the client's channel discovery. Bedrock players (a Floodgate
   UUID, upper half zero) are never told. Their game lacks Quick Skin's translations, so the server
-  sends plain text from its own bundled language files in the language the client reported (kept
+  sends literal text from its own bundled language files in the language the client reported (kept
   by `ServerPlayerLanguageMixin` on 1.20.1, where vanilla discards it), falling back to English.
+  Their game has no Quick Skin resource either: `MissingModNoticeLayout` draws the Plum mascot
+  from vanilla `█` characters, one chat line per row, and breaks the title, text and link beside
+  it by the vanilla default font's widths for the default chat width. From 1.21.4 each pixel's
+  shadow takes its own colour so the pixels join; before, the dark shadow shows as a grid.
   The record of who was told is one empty file per UUID in `<world>/quickskin/missing_mod_notices`
   (`MissingModNoticeLedger`), written on the cache-I/O worker; an unusable folder tells nobody.
   These settings never travel in the synchronized server configuration.

@@ -4,16 +4,19 @@ import com.quickskin.mod.config.ServerConfig;
 import com.quickskin.mod.networking.protocol.ProtocolProfile;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.server.storage.MissingModNoticeLedger;
+import com.quickskin.mod.server.vanilla.MissingModNoticeLayout;
 import com.quickskin.mod.server.vanilla.MissingModNoticeText;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 //? if <1.21 {
@@ -107,18 +110,49 @@ public final class MissingModNotice {
         ServerConfig config = ServerConfig.getInstance();
         String custom = config.playersWithoutQuickSkinMessage;
         String text = custom == null || custom.isBlank() ? TEXT.text(language(player)) : custom;
-        MutableComponent message = Component.literal(text);
         String link = MissingModNoticeText.validLink(config.playersWithoutQuickSkinLink);
-        if (link != null) {
-            message.append(" ").append(Component.literal(link).withStyle(style -> style
-                    .withColor(ChatFormatting.AQUA)
-                    .withUnderlined(true)
-                    .withClickEvent(openUrl(link))));
-        }
-        player.sendSystemMessage(message);
+        player.sendSystemMessage(message(text, link));
         MissingModNoticeLedger.getInstance().recordNotified(player.getUUID());
         QuickSkinInfo.LOGGER.info("Told {} that this server uses Quick Skin: their client does not run it",
                 player.getName().getString());
+    }
+
+    /** The mascot beside the text, one chat line per row of {@link MissingModNoticeLayout}. */
+    static Component message(String text, String link) {
+        MutableComponent message = Component.empty();
+        List<List<MissingModNoticeLayout.Segment>> lines = MissingModNoticeLayout.lines(text, link);
+        for (int row = 0; row < lines.size(); row++) {
+            if (row > 0) message.append("\n");
+            for (MissingModNoticeLayout.Segment segment : lines.get(row)) {
+                switch (segment.kind()) {
+                    // A space advances 4 pixels and a bold one 5: together, one empty pixel.
+                    case BLANK -> {
+                        String spaces = " ".repeat(segment.cells());
+                        message.append(spaces).append(Component.literal(spaces)
+                                .withStyle(style -> style.withBold(true)));
+                    }
+                    case PIXEL -> message.append(Component.literal(segment.text())
+                            .withStyle(style -> pixelStyle(style, segment.rgb())));
+                    case TITLE -> message.append(Component.literal(segment.text())
+                            .withStyle(style -> style.withColor(segment.rgb()).withBold(true)));
+                    case LINK -> message.append(Component.literal(segment.text()).withStyle(style -> style
+                            .withColor(ChatFormatting.AQUA)
+                            .withUnderlined(true)
+                            .withClickEvent(openUrl(link))));
+                    case TEXT -> message.append(segment.text());
+                }
+            }
+        }
+        return message;
+    }
+
+    private static Style pixelStyle(Style style, int rgb) {
+        //? if >=1.21.4 {
+        // A shadow of the pixel's own colour fills the gap to the next pixel and the next line.
+        return style.withColor(rgb).withShadowColor(0xFF000000 | rgb);
+        //?} else {
+        return style.withColor(rgb);
+        //?}
     }
 
     private static String language(ServerPlayer player) {

@@ -268,5 +268,5 @@
   "quickskin.network.upload_too_large.skin": "[Skin Veloce] La tua skin (%s) supera il limite di caricamento di questo server, %s. È visibile solo sul tuo schermo; gli altri giocatori non la vedono.",
   "quickskin.network.upload_too_large.cape": "[Skin Veloce] Il tuo mantello (%s) supera il limite di caricamento di questo server, %s. È visibile solo sul tuo schermo; gli altri giocatori non lo vedono.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "[Quick Skin] Questo server usa Quick Skin per skin e mantelli personalizzati. Installa la mod per vederli e indossare i tuoi."
+  "quickskin.server.missing_mod_notice": "Questo server usa Quick Skin per skin e mantelli personalizzati. Installa la mod per vederli e indossare i tuoi."
 }

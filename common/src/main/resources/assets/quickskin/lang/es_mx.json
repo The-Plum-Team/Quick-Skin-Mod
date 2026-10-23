@@ -276,5 +276,5 @@
   "quickskin.network.upload_too_large.skin": "[Skin rápida] Tu skin (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no la ven.",
   "quickskin.network.upload_too_large.cape": "[Skin rápida] Tu capa (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no la ven.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "[Quick Skin] Este servidor usa Quick Skin para skins y capas personalizadas. Instala el mod para verlas y usar las tuyas."
+  "quickskin.server.missing_mod_notice": "Este servidor usa Quick Skin para skins y capas personalizadas. Instala el mod para verlas y usar las tuyas."
 }

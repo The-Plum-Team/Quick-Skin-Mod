@@ -23,14 +23,14 @@ import java.util.regex.Pattern;
  *
  * <p>That player's game has none of Quick Skin's translations, so the server picks the text in the
  * language the client reported from the language files bundled in its own jar, and sends it
- * as plain text. A language without the text, or one the server cannot read, falls back to
- * English.</p>
+ * as literal text, beside the mascot of {@link MissingModNoticeLayout}. A language without the
+ * text, or one the server cannot read, falls back to English.</p>
  */
 public final class MissingModNoticeText {
     public static final String KEY = "quickskin.server.missing_mod_notice";
     static final String DEFAULT_LANGUAGE = "en_us";
-    static final String BUILT_IN_ENGLISH = "[Quick Skin] This server uses Quick Skin for custom skins"
-            + " and capes. Install the mod to see them and to wear your own.";
+    static final String BUILT_IN_ENGLISH = "This server uses Quick Skin for custom skins and capes."
+            + " Install the mod to see them and to wear your own.";
     private static final int MAX_LANGUAGE_FILE_BYTES = 512 * 1024;
     private static final int MAX_TEXT_LENGTH = 512;
     private static final int MAX_CACHED_LANGUAGES = 64;

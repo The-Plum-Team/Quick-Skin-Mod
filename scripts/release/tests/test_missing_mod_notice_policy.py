@@ -41,9 +41,10 @@ class MissingModNoticeTranslationsTest(unittest.TestCase):
             with self.subTest(locale=path.name):
                 text = json.loads(path.read_text(encoding="utf-8")).get(KEY)
                 self.assertIsInstance(text, str, f"{path.name} lacks {KEY}")
-                # The player has to search for it by this name to install it.
-                self.assertTrue(text.startswith("[Quick Skin] "), text)
-                self.assertIn("Quick Skin", text[len("[Quick Skin] ") :])
+                # The player has to search for it by this name to install it. The title above the
+                # text already names it, so the text carries no "[Quick Skin]" prefix.
+                self.assertIn("Quick Skin", text)
+                self.assertFalse(text.startswith("["), text)
                 self.assertNotIn("%", text, "sent as plain text: nothing is substituted")
                 self.assertLessEqual(len(text), 512)
                 if path.name != "en_us.json":

@@ -276,5 +276,5 @@
   "quickskin.network.upload_too_large.skin": "[Quick Skin] Your skin (%s) is over this server's %s upload limit. It stays on your screen only; other players do not see it.",
   "quickskin.network.upload_too_large.cape": "[Quick Skin] Your cape (%s) is over this server's %s upload limit. It stays on your screen only; other players do not see it.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "[Quick Skin] This server uses Quick Skin for custom skins and capes. Install the mod to see them and to wear your own."
+  "quickskin.server.missing_mod_notice": "This server uses Quick Skin for custom skins and capes. Install the mod to see them and to wear your own."
 }

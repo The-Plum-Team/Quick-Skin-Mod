@@ -135,8 +135,8 @@ their whole appearance (skin, cape and model) does not sync until they update or
 texture, and the server cannot change that. Lower the limit only when those players can update.
 
 A server with Quick Skin tells each player who joins without it, once per world, that the server
-uses Quick Skin and where to get it: one chat message in the language of their game, with a link
-to the Modrinth page. A minute after the join, so a client that does run Quick Skin has time to
+uses Quick Skin and where to get it: one chat message in the language of their game, beside a
+little pixel-art Plum, with a link to the Modrinth page. A minute after the join, so a client that does run Quick Skin has time to
 say so; Bedrock players joining through Geyser are not told, since they cannot install it. In
 `config/quickskin-server.json`, `notifyPlayersWithoutQuickSkin` turns it off,
 `playersWithoutQuickSkinMessage` replaces the text (the link follows it) and

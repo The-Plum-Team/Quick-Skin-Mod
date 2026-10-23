@@ -268,5 +268,5 @@
   "quickskin.network.upload_too_large.skin": "[Szybka Skórka] Twoja skórka (%s) przekracza limit przesyłania tego serwera (%s). Widzisz ją tylko na swoim ekranie; inni gracze jej nie widzą.",
   "quickskin.network.upload_too_large.cape": "[Szybka Skórka] Twoja peleryna (%s) przekracza limit przesyłania tego serwera (%s). Widzisz ją tylko na swoim ekranie; inni gracze jej nie widzą.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "[Quick Skin] Ten serwer używa Quick Skin do własnych skórek i peleryn. Zainstaluj moda, aby je widzieć i nosić własne."
+  "quickskin.server.missing_mod_notice": "Ten serwer używa Quick Skin do własnych skórek i peleryn. Zainstaluj moda, aby je widzieć i nosić własne."
 }
