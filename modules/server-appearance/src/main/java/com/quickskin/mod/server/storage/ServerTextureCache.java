@@ -350,6 +350,12 @@ public class ServerTextureCache {
         return primary != null && textureCache.containsKey(primary) ? primary : null;
     }
 
+    /** The appearance id unchanged, or empty when it names a local texture this cache does not hold. */
+    public String heldTextureOrEmpty(String appearanceId, String prefix) {
+        if (appearanceId == null || !appearanceId.startsWith(prefix)) return appearanceId;
+        return resolveContentId(appearanceId.substring(prefix.length())) == null ? "" : appearanceId;
+    }
+
     /** Translates only aliases proven to describe the same cached canonical PNG. */
     public synchronized @Nullable String contentIdFor(
             String contentId, ContentId.Algorithm algorithm) {

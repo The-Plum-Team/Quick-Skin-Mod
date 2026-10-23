@@ -642,7 +642,7 @@ public class ServerNetworkHandler {
             return;
         }
 
-        PlayerAppearance appearance = ServerPlayerAppearanceRepository.getInstance().getAppearance(targetPlayerId);
+        PlayerAppearance appearance = ServerPlayerAppearanceRepository.getInstance().getAppearanceToShare(targetPlayerId);
 
         if (appearance != null) {
             if (!NetworkSecurity.isValidLocalAppearanceId(appearance.getSkinId(), "skin")

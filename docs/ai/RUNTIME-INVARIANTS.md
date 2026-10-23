@@ -201,6 +201,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Keep cache accounting weighted by bytes/pixels where relevant, not only entry count. Active server
   appearance blobs remain pinned only within the hard global pinned-byte budget; reject an
   over-budget appearance gracefully instead of weakening the cap.
+- The server also shares the last appearance of players who are not connected, so other mods
+  (BlockPops' player figures) can draw them: `ServerRuntime` loads the most recently saved
+  appearance files at start, and a disconnect keeps the player's appearance instead of dropping
+  it. These offline appearances never pin a texture, so they cannot take budget from a connected
+  player and the cache may evict their textures; `getAppearanceToShare` sends such a texture's id
+  empty once the cache no longer holds it. They are bounded by
+  `ServerPlayerAppearanceRepository.MAX_OFFLINE_APPEARANCES` (whoever left first is dropped), an
+  appearance without skin or cape is not kept, and a join replaces the player's offline appearance
+  with the pinned one it restores. `hasAppearance` still means a connected player.
 - Server cache deletion belongs on the bounded cache-I/O executor. Remove a cache entry from the
   live namespace before scheduling deletion so a concurrent replacement cannot be deleted.
 - A committed server appearance change is saved at once on that same executor, not only at
