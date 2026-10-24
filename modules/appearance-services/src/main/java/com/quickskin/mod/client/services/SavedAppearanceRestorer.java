@@ -19,7 +19,7 @@ public final class SavedAppearanceRestorer {
                 net.minecraft.client.Minecraft.getInstance().getConnection())) {
             PlayerAppearanceService appearances = PlayerAppearanceService.getInstance();
             String wornSkinHash = com.quickskin.mod.config.ClientConfig.getInstance().activeSkinHash;
-            if (!appearances.hasActiveSkin(targetPlayerId) && !wornSkinHash.isEmpty()) {
+            if (!appearances.hasOwnActiveSkin(targetPlayerId) && !wornSkinHash.isEmpty()) {
                 appearances.applySkin(targetPlayerId, "local_skin:" + wornSkinHash,
                         LocalAssetManager.getInstance().getSkinModelPreference(wornSkinHash));
             }

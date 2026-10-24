@@ -91,9 +91,12 @@ public final class PlayerOwnSkinBootstrap {
                 .fetchSkinByUsername(playerName)
                 .thenAccept(skinData -> {
                     if (!closed && minecraft != null) {
+                        // Compared here, off the client thread: Mojang serves an account without a
+                        // skin of its own one of Minecraft's default skins
+                        boolean defaultSkin = skinData != null && MinecraftDefaultSkins.matches(skinData.image);
                         minecraft.execute(() -> {
                             if (!closed && skinData != null) {
-                                handlePlayerOwnSkinFetched(skinData, account, null);
+                                handlePlayerOwnSkinFetched(skinData, account, null, defaultSkin);
                             }
                         });
                     }
@@ -112,10 +115,14 @@ public final class PlayerOwnSkinBootstrap {
     /**
      * Handle the fetched player's own skin data
      * Smart mode: checks if skin already exists before saving a duplicate
+     *
+     * <p>{@code defaultSkin} says Mojang served one of Minecraft's default skins, which it gives an
+     * account without a skin of its own: no skin the player chose, so it never takes the place
+     * of an own skin already listed. Without one, it is listed as the own skin as before.
      */
     private static void handlePlayerOwnSkinFetched(
             com.quickskin.mod.client.services.MojangApiService.MojangSkinData skinData, String account,
-            @org.jetbrains.annotations.Nullable String replacedSkin) {
+            @org.jetbrains.annotations.Nullable String replacedSkin, boolean defaultSkin) {
         try {
             // The same Mojang texture as the listed own skin: nothing changed. Its stored copy
             // may have been flattened by the transparency setting, so the texture's address is
@@ -125,6 +132,13 @@ public final class PlayerOwnSkinBootstrap {
             if (!wearsReplaced && !skinData.textureUrl.isEmpty()
                     && skinData.textureUrl.equals(ownConfig.playerOwnSkinTexture)
                     && LocalAssetManager.getInstance().getMetadata(ownConfig.playerOwnSkinHash) != null) {
+                return;
+            }
+            // The account has no skin of its own at Mojang right now: the own skin it had stays
+            if (defaultSkin && replacedSkin == null && !ownConfig.playerOwnSkinHash.isEmpty()
+                    && LocalAssetManager.getInstance().getMetadata(ownConfig.playerOwnSkinHash) != null) {
+                QuickSkinInfo.LOGGER.info("Mojang serves a default skin for '{}'; keeping the own skin already listed",
+                        skinData.username);
                 return;
             }
 
@@ -245,7 +259,7 @@ public final class PlayerOwnSkinBootstrap {
                 .thenAccept(image -> minecraft.execute(() -> {
                     if (!closed && image != null) {
                         handlePlayerOwnSkinFetched(new MojangApiService.MojangSkinData(
-                                playerName, profileId, image, model, textureUrl), account, uploadedHash);
+                                playerName, profileId, image, model, textureUrl), account, uploadedHash, false);
                     }
                 }))
                 .exceptionally(throwable -> {

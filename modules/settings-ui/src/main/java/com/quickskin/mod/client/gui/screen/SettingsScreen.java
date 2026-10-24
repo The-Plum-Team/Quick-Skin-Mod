@@ -36,6 +36,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
 /**
  * Modal settings dialog for QuickSkin configuration
@@ -151,6 +152,7 @@ public class SettingsScreen extends Screen {
     // Server setting checkboxes
     private Checkbox serverDisableSkinTransparencyCheckbox;
     private EditBox skinChangeCooldownEditBox;
+    private Button playerSkinsButton;
 
     // --- NEW --- Modpack setting widgets
     private Checkbox enablePlayerOwnSkinSystemCheckbox;
@@ -459,7 +461,28 @@ public class SettingsScreen extends Screen {
         serverSettingWidgets.add(skinChangeCooldownEditBox);
 
         // Label for cooldown EditBox
-        serverSettingWidgets.add(new AbstractWidget(leftColumnX, currentY, contentWidth - editBoxWidth - editBoxSpacing - 1, 20, Component.translatable("quickskin.settings.cooldown_seconds")) {
+        serverSettingWidgets.add(rowLabel(leftColumnX, currentY, contentWidth - editBoxWidth - editBoxSpacing - 1,
+                Component.translatable("quickskin.settings.cooldown_seconds"), () -> skinChangeCooldownEditBox.active));
+        currentY += spacing;
+
+        // Player skins: the panel where an admin gives players a skin for now (ADR 0016), on a
+        // server that lets this player hand them out
+        int openWidth = 60;
+        boolean handsOutSkins = isAdmin
+                && com.quickskin.mod.client.api.ClientNetworkApi.actions().skinAdminView() != null;
+        playerSkinsButton = DialogFrame.button(leftColumnX + contentWidth - openWidth - 1, currentY,
+                openWidth, 20, Component.translatable("quickskin.settings.player_skins.open"), button -> openPlayerSkins());
+        playerSkinsButton.active = handsOutSkins;
+        playerSkinsButton.setTooltip(Tooltip.create(Component.translatable(
+                handsOutSkins ? "quickskin.tooltip.player_skins" : "quickskin.player_skins.unavailable")));
+        serverSettingWidgets.add(playerSkinsButton);
+        serverSettingWidgets.add(rowLabel(leftColumnX, currentY, contentWidth - openWidth - editBoxSpacing - 1,
+                Component.translatable("quickskin.button.player_skins"), () -> playerSkinsButton.active));
+    }
+
+    /** A row's label beside the control on its right, dimmed while that control is inactive. */
+    private AbstractWidget rowLabel(int x, int y, int width, Component label, BooleanSupplier controlActive) {
+        return new AbstractWidget(x, y, width, 20, label) {
             @Override
             //? if <26.1 {
             public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
@@ -467,7 +490,7 @@ public class SettingsScreen extends Screen {
             public void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
             //?}
                 drawRowLabel(guiGraphics, this.getMessage().getString(), this.getX(), this.getWidth(),
-                        this.getY() + this.height / 2, skinChangeCooldownEditBox.active ? ROW_TEXT : ROW_TEXT_DISABLED);
+                        this.getY() + this.height / 2, controlActive.getAsBoolean() ? ROW_TEXT : ROW_TEXT_DISABLED);
             }
 
             @Override
@@ -483,7 +506,23 @@ public class SettingsScreen extends Screen {
             //?}
                 return false;
             }
-        });
+        };
+    }
+
+    /**
+     * Opens the panel where an admin gives players a skin for now, over this dialog, which it
+     * returns to; the cooldown typed so far is applied first, since the dialog is built again.
+     */
+    private void openPlayerSkins() {
+        if (minecraft == null) {
+            return;
+        }
+        applyCooldownSetting();
+        //? if <26.2 {
+        minecraft.setScreen(new PlayerSkinsScreen(this));
+        //?} else {
+        minecraft.gui.setScreen(new PlayerSkinsScreen(this));
+        //?}
     }
 
     private void createModpackSettings() {
@@ -576,9 +615,9 @@ public class SettingsScreen extends Screen {
         graphics.fill(dialogX + 2, sidebarTop, dialogX + SIDEBAR_WIDTH, sidebarBottom, SIDEBAR_BG);
         graphics.fill(dialogX + SIDEBAR_WIDTH, sidebarTop, dialogX + SIDEBAR_WIDTH + 1, sidebarBottom, SIDEBAR_EDGE);
 
-        // A line under each row that is not a checkbox: the keybind and the cooldown
+        // A line under each row that is not a checkbox: the keybind, the cooldown and player skins
         for (AbstractWidget widget : activeTabWidgets()) {
-            if (widget == keybindButton || widget == skinChangeCooldownEditBox) {
+            if (widget == keybindButton || widget == skinChangeCooldownEditBox || widget == playerSkinsButton) {
                 int lineY = widget.getY() + widget.getHeight() + ROW_PADDING;
                 graphics.fill(contentX - ROW_PADDING * 2, lineY, contentX + contentWidth + ROW_PADDING * 2, lineY + 1, ROW_LINE);
             }

@@ -95,7 +95,9 @@ report, even when that selection happens to contain all authored steps.
 closed-state guard, and persisted own-skin selection. It checks the account's Mojang texture on
 every start, recognising the listed own skin by that texture's address, and lists a new one as the
 own skin, which whoever wore the previous one then wears; the previous one stays in the list,
-and the new one is listed even when the player had hidden the previous one.
+and the new one is listed even when the player had hidden the previous one. One of Minecraft's
+default skins, which Mojang serves an account without a skin of its own, never replaces an own
+skin already listed (`MinecraftDefaultSkins` compares its pixels with the game's own).
 `skin-upload` reports every accepted upload with the active texture of Mojang's reply
 (`MojangSkinUploader.UploadListener`), which `ClientFeatureBindings` hands to the bootstrap, since
 Mojang may retouch an uploaded skin (the `uploaded-skin-adoption` binding). `SavedAppearanceRestorer` belongs to
@@ -111,6 +113,27 @@ hands it over and sends the service's `accountSkinVisibility` with the server co
 `AccountSkinProfileTarget`, the `common` bridge that owns the `ChunkMap`, tracked-entity and
 `Player.gameProfile` accessors and the player-info and entity-pairing packets (ADR 0012).
 `skin-upload` reports a successful upload through `ClientNetworkActions`.
+
+Nicknames (ADR 0015) follow the same split. `Nickname` (content-core) owns the rules;
+`AccountNicknames` (configuration) the client's per-account choice; `LocalNicknameService`
+(appearance-services) the skin menu's way to it through `ClientNetworkActions`; `NameTagButton`
+and `NicknameScreen` (skin-menu) the menu. `ServerNicknameStore` (server-appearance) persists the
+world's nicknames and decides each request. Networking owns the `nicknames` capability's payloads,
+the client's `NicknameSyncService` and `PlayerNicknameRepository` (client-foundation) writes, and
+`ServerNicknames`, which answers requests, syncs Quick Skin clients and sends per-viewer tab-list
+names. `common` owns `NicknameDisplay` and the four mixins in `com.quickskin.mod.mixin.nickname`,
+which NeoForge loads from its own `quickskin-nicknames.mixins.json`. The admin commands
+(`QuickSkinCommands`, networking) are registered by `CommonEvents`; `NicknamePool`
+(server-appearance) reads the names `random` hands out.
+
+Assigned skins (ADR 0016) follow the same split. protocol-core owns the `assigned-skins` values
+(`SkinAdminAction`, `SkinAdminStatus`, `PoolSkinEntry`); server-appearance owns
+`ServerSkinAssignmentStore` (persistence), `SkinPoolFolder` (the skin folder) and the texture
+cache's skin pins; networking owns the payloads, `ServerSkinAssignments` (server thread: gives,
+pins, substitution, admin state) and the client's `SkinAdminClient` (assigned skin and admin
+requests with their uploads). appearance-services draws the assigned skin on the local player
+behind `RemoteAppearanceTarget.applyAssignedSkin`/`ownAppearance`, and settings-ui owns the
+`PlayerSkinsScreen` panel, opened from the Server tab of `SettingsScreen`.
 
 `PlatformHelper` is now a stable API in `platform-api`; Architectury binds its loader methods
 after the modules are assembled. Its old rendering forwards belong to `MinecraftCompat` in

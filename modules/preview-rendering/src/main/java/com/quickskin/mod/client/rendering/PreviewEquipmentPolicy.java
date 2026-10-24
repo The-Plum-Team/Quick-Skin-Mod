@@ -30,8 +30,9 @@ import java.util.Set;
  * above never shrinks, a draw opts out of single slots for its own duration. It exists for the
  * in-game HUD preview, which mirrors the live player: a gun mod that poses the arms around its
  * weapon reads the same main hand the preview answers as empty, so the model either held nothing
- * in a rifle stance or dropped the stance the world shows. The caller decides when that applies;
- * every other preview, and every other slot, keeps reading empty.
+ * in a rifle stance or dropped the stance the world shows. The pause menu's preview, which shows
+ * the live player as the world does, leaves every slot visible. The caller decides when that
+ * applies; every other preview, and every other slot, keeps reading empty.
  *
  * <p>Deliberately free of Minecraft types, so the rule and the scoping stay unit testable in the
  * loader-independent test source set, in the same spirit as {@link PreviewCapeBindings}.

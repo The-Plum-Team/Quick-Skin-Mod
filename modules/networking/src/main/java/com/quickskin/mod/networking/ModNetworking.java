@@ -98,6 +98,15 @@ public class ModNetworking implements NetworkTransport {
         NetworkManager.registerReceiver(
                 NetworkManager.c2s(), AccountSkinChangedPayload.TYPE,
                 AccountSkinChangedPayload.CODEC, ServerNetworkHandler::handleAccountSkinChanged);
+        NetworkManager.registerReceiver(
+                NetworkManager.c2s(), SetNicknamePayload.TYPE,
+                SetNicknamePayload.CODEC, ServerNetworkHandler::handleSetNickname);
+        NetworkManager.registerReceiver(
+                NetworkManager.c2s(), ArmorVisibilityPayload.TYPE,
+                ArmorVisibilityPayload.CODEC, ServerNetworkHandler::handleArmorVisibility);
+        NetworkManager.registerReceiver(
+                NetworkManager.c2s(), SkinAdminPayload.TYPE,
+                SkinAdminPayload.CODEC, ServerNetworkHandler::handleSkinAdmin);
 
         // Register S2C (Server to Client) payload types ONLY on servers (not clients)
         // On clients, ClientNetworking.registerReceiver() handles both type and handler registration
@@ -121,6 +130,16 @@ public class ModNetworking implements NetworkTransport {
                     SendTextureChunkV2Payload.TYPE, SendTextureChunkV2Payload.CODEC);
             NetworkManager.registerS2CPayloadType(
                     SendAnimationMetadataV2Payload.TYPE, SendAnimationMetadataV2Payload.CODEC);
+            NetworkManager.registerS2CPayloadType(
+                    NicknameResultPayload.TYPE, NicknameResultPayload.CODEC);
+            NetworkManager.registerS2CPayloadType(
+                    SyncNicknamesPayload.TYPE, SyncNicknamesPayload.CODEC);
+            NetworkManager.registerS2CPayloadType(
+                    AssignedSkinPayload.TYPE, AssignedSkinPayload.CODEC);
+            NetworkManager.registerS2CPayloadType(
+                    SkinAdminResultPayload.TYPE, SkinAdminResultPayload.CODEC);
+            NetworkManager.registerS2CPayloadType(
+                    SkinAdminStatePayload.TYPE, SkinAdminStatePayload.CODEC);
         }
     }
 

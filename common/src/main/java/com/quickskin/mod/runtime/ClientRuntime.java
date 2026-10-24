@@ -109,6 +109,10 @@ public final class ClientRuntime implements AutoCloseable {
         AccountSkinSession.getInstance().begin(localPlayerId, sessionIdentity,
                 com.quickskin.mod.client.compat.ReplayModHelper.isInReplay()
                         || selectAccountSkin());
+        com.quickskin.mod.networking.NicknameSyncService.getInstance().beginSession(
+                localPlayerId, sessionIdentity, com.quickskin.mod.client.compat.ReplayModHelper.isInReplay());
+        com.quickskin.mod.networking.HiddenArmorSyncService.getInstance().beginSession(
+                localPlayerId, sessionIdentity, com.quickskin.mod.client.compat.ReplayModHelper.isInReplay());
         com.quickskin.mod.networking.NetworkSyncService.getInstance()
                 .beginAppearanceSnapshotRequest(localPlayerId, sessionIdentity);
     }
@@ -170,6 +174,16 @@ public final class ClientRuntime implements AutoCloseable {
         runCleanup("clear deferred network UI work", ClientNetworkHandler::clearTransientState);
         runCleanup("clear pending appearance uploads",
                 com.quickskin.mod.networking.NetworkSyncService.getInstance()::clearSession);
+        runCleanup("clear nickname requests",
+                com.quickskin.mod.networking.NicknameSyncService.getInstance()::clearSession);
+        runCleanup("clear hidden armour session",
+                com.quickskin.mod.networking.HiddenArmorSyncService.getInstance()::clearSession);
+        runCleanup("clear player nicknames",
+                com.quickskin.mod.common.data.PlayerNicknameRepository.getInstance()::clear);
+        runCleanup("clear assigned skins and skin admin state",
+                com.quickskin.mod.networking.SkinAdminClient.getInstance()::clearSession);
+        runCleanup("clear the local player's assigned skin",
+                com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()::clearAssignedSkin);
         runCleanup("clear account skin session", AccountSkinSession.getInstance()::clear);
         runCleanup("clear client texture ingress budget",
                 ClientTextureIngressLimiter.getInstance()::clear);

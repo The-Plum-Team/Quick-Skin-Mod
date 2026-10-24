@@ -44,6 +44,16 @@ public class PlayerAppearanceService implements IPlayerAppearanceService, Remote
     private final InternalEventBus eventBus;
     private boolean reloadingTransparency;
     private boolean applyingNetworkUpdate;
+    private boolean applyingAssignedSkin;
+    /**
+     * While the server shows the local player a skin an admin gave them: the skin and requested
+     * model the player chose, kept for when it is taken back and synced meanwhile. Null otherwise.
+     */
+    @Nullable
+    private volatile OwnLook ownLook;
+
+    private record OwnLook(UUID playerId, String skinId, String model) {
+    }
     private SkinApplicationListener skinApplicationListener;
 
     public void configureSkinListener(SkinApplicationListener listener) {
@@ -97,6 +107,19 @@ public class PlayerAppearanceService implements IPlayerAppearanceService, Remote
         if (skinId != null && !skinId.isEmpty() && !applyingNetworkUpdate && !reloadingTransparency
                 && CpmLookArbiter.withholdsSkin(playerId)) {
             skinId = "";
+        }
+
+        // While a skin an admin gave shows on the local player, their own choices only replace the
+        // look kept for later (and synced); the cape still changes at once
+        OwnLook own = ownLook;
+        if (own != null && own.playerId().equals(playerId) && !applyingAssignedSkin && !reloadingTransparency) {
+            if (skinId != null || model != null) {
+                own = new OwnLook(playerId, skinId != null ? skinId : own.skinId(),
+                        skinId != null ? (model != null ? model : "auto") : model);
+                ownLook = own;
+            }
+            skinId = null;
+            model = null;
         }
 
         // Get or create appearance
@@ -222,13 +245,74 @@ public class PlayerAppearanceService implements IPlayerAppearanceService, Remote
         Minecraft mc = Minecraft.getInstance();
         if (!reloadingTransparency && !applyingNetworkUpdate && mc.player != null
                 && playerId.equals(mc.player.getUUID())) {
+            PlayerAppearance synced = ownAppearance(playerId);
             com.quickskin.mod.client.api.ClientNetworkApi.actions().syncAppearance(
                 playerId,
-                appearance.getSkinId(),
-                appearance.getCapeId(),
-                appearance.getModel()
+                synced.getSkinId(),
+                synced.getCapeId(),
+                synced.getModel()
             );
         }
+    }
+
+    @Override
+    public void applyAssignedSkin(UUID localPlayerId, String skinId, String model) {
+        if (localPlayerId == null) return;
+        OwnLook own = ownLook;
+        if (skinId == null || skinId.isEmpty()) {
+            if (own == null || !own.playerId().equals(localPlayerId)) return;
+            // Taken back: the player's own look shows again, as a choice of theirs
+            ownLook = null;
+            applyLook(localPlayerId, own.skinId(), null, own.model());
+            return;
+        }
+        if (own == null || !own.playerId().equals(localPlayerId)) {
+            PlayerAppearance current = repository.getAppearance(localPlayerId);
+            String requested = modelService.getModelOverride(localPlayerId);
+            ownLook = new OwnLook(localPlayerId,
+                    current != null && current.getSkinId() != null ? current.getSkinId() : "",
+                    requested != null ? requested : current != null ? current.getModel() : "auto");
+        }
+        boolean previousAssigned = applyingAssignedSkin;
+        boolean previousNetwork = applyingNetworkUpdate;
+        applyingAssignedSkin = true;
+        // Not a choice of the player: it never syncs back, and a CPM look does not withhold it
+        applyingNetworkUpdate = true;
+        try {
+            applyLook(localPlayerId, skinId, null, model);
+        } finally {
+            applyingAssignedSkin = previousAssigned;
+            applyingNetworkUpdate = previousNetwork;
+        }
+    }
+
+    @Override
+    @Nullable
+    public PlayerAppearance ownAppearance(UUID localPlayerId) {
+        PlayerAppearance shown = repository.getAppearance(localPlayerId);
+        OwnLook own = ownLook;
+        if (own == null || !own.playerId().equals(localPlayerId)) return shown;
+        return new PlayerAppearance(localPlayerId, own.skinId(),
+                shown != null ? shown.getCapeId() : "",
+                modelService.getModelType(localPlayerId, own.skinId(), own.model()));
+    }
+
+    /** Whether the player wears a Quick Skin skin of their own, whatever an admin gave them. */
+    public boolean hasOwnActiveSkin(UUID playerId) {
+        OwnLook own = ownLook;
+        if (own != null && own.playerId().equals(playerId)) return !own.skinId().isEmpty();
+        return hasActiveSkin(playerId);
+    }
+
+    /** Whether the local player shows a skin an admin gave them on this server. */
+    public boolean hasAssignedSkin(UUID playerId) {
+        OwnLook own = ownLook;
+        return own != null && own.playerId().equals(playerId);
+    }
+
+    /** The session ended: the next one learns its assigned skin afresh. */
+    public void clearAssignedSkin() {
+        ownLook = null;
     }
 
     /**

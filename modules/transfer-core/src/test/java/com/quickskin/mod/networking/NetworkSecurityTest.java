@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import com.quickskin.mod.common.data.AnimationMetadata;
+import com.quickskin.mod.common.data.Nickname;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -27,6 +28,19 @@ class NetworkSecurityTest {
 
     @TempDir
     Path temporaryDirectory;
+
+    @Test
+    void nicknamesOnTheWireAreCanonicalAndFitTheCodec() {
+        // Each of the 32 units may take three UTF-8 bytes; both codec eras accept the same names
+        assertEquals(3 * Nickname.MAX_LENGTH, TextureTransferLimits.MAX_NICKNAME_BYTES);
+        assertTrue(NetworkSecurity.isValidNickname(""));
+        assertTrue(NetworkSecurity.isValidNickname("Sir Lancelot"));
+        assertTrue(NetworkSecurity.isValidNickname("\u82B1".repeat(Nickname.MAX_LENGTH)));
+        assertFalse(NetworkSecurity.isValidNickname(null));
+        assertFalse(NetworkSecurity.isValidNickname(" Sir Lancelot"));
+        assertFalse(NetworkSecurity.isValidNickname("\u00A7cRed"));
+        assertFalse(NetworkSecurity.isValidNickname("A".repeat(Nickname.MAX_LENGTH + 1)));
+    }
 
     @Test
     void theLargestValidAnimationFitsTheMetadataBound() {

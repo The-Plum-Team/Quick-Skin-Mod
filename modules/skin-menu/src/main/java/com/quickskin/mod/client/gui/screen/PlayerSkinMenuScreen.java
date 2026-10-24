@@ -2,10 +2,7 @@ package com.quickskin.mod.client.gui.screen;
 
 import com.quickskin.mod.client.gui.util.UiText;
 import com.mojang.blaze3d.platform.InputConstants;
-//? if <26.1 {
-//?} else {
 import com.quickskin.mod.client.gui.GuiCompat;
-//?}
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
@@ -21,6 +18,7 @@ import com.quickskin.mod.client.gui.widget.ErrorToast;
 import com.quickskin.mod.client.gui.widget.FieldIconButton;
 import com.quickskin.mod.client.gui.widget.IconButton;
 import com.quickskin.mod.client.gui.widget.ImportTileButton;
+import com.quickskin.mod.client.gui.widget.NameTagButton;
 //? if <1.21 {
 //?} else {
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
@@ -31,6 +29,9 @@ import com.quickskin.mod.client.gui.widget.SkinListWidget;
 import com.quickskin.mod.client.services.CooldownService;
 import com.quickskin.mod.client.services.LocalAssetFolderWatch;
 import com.quickskin.mod.client.services.LocalAssetManager;
+import com.quickskin.mod.client.services.LocalHiddenArmor;
+import com.quickskin.mod.client.services.LocalNicknameService;
+import com.quickskin.mod.client.api.ClientNetworkActions;
 import com.quickskin.mod.client.services.MojangApiService;
 //? if <1.21 {
 //?} else {
@@ -52,6 +53,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 //?}
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 //? if <1.21.11 {
 import net.minecraft.resources.ResourceLocation;
 //?} else {
@@ -119,6 +121,14 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private int skinHeaderY;
     /** Bottom edge of the search row, which the name tag keeps its distance from. */
     private int searchBottom;
+    /** The player's name above the model, which opens the nickname dialog. */
+    private NameTagButton nameTagButton;
+    /** What the tag's tooltip was made for (name and whether the tag works), so it is made once. */
+    private String nameTagTooltipFor;
+    /** The last nickname answer a skin menu looked at; only a newer one can become a toast. */
+    private static int nicknameAnswerShown;
+    /** Whether this menu sent a nickname whose answer it shows, whatever it is. */
+    private boolean awaitingNicknameAnswer;
     private int skinListBottom;
 
     // Picks up skins copied into the uploads folder from outside the game
@@ -142,12 +152,24 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     // Dragging the model turns it (from 1.21; before, the model widget turns itself)
     private boolean rotatingModel;
+    /** The armour piece a left click pressed on the model, which a release in place toggles. */
+    private int armorPressPiece;
+    private double armorPressX;
+    private double armorPressY;
+    /** The piece drawn see-through on the model, its alpha, and when the mouse came onto it. */
+    private int ghostPiece;
+    private float ghostAlpha = 1.0f;
+    private long ghostSinceNanos;
+    private long ghostFrameNanos;
+    /** A piece just clicked, shown as it now is until the mouse leaves it. */
+    private int ghostSettledPiece;
     private double rotationDragStartX;
     private float rotationDragStartYaw;
     private static final float ROTATION_DRAG_SENSITIVITY = 0.8f;
 
     // Error toasts
     private final List<ErrorToast> errorToasts = new ArrayList<>();
+    private boolean assignedSkinHintShown;
 
     // Mojang search widgets
     private EditBox usernameSearchField;
@@ -181,6 +203,16 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         }
         updateConfirmButtonState();
         pollLocalAssetFolder();
+        pollNicknameAnswer();
+        // Once per opening: a skin an admin gave shows instead of what is picked here
+        if (!assignedSkinHintShown) {
+            assignedSkinHintShown = true;
+            if (this.minecraft != null && this.minecraft.player != null
+                    && com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
+                            .hasAssignedSkin(this.minecraft.player.getUUID())) {
+                showToast(Component.translatable("quickskin.skin.assigned_hint"), ErrorToast.Kind.INFO);
+            }
+        }
     }
 
     /**
@@ -524,6 +556,11 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         LinkButtonsPanel linkButtonsPanel = new LinkButtonsPanel(linkRowX, searchY);
         linkButtonsPanel.init(this);
 
+        // The name above the model opens the nickname dialog; it is laid out every frame
+        nameTagButton = new NameTagButton(button -> showNicknameDialog());
+        nameTagTooltipFor = null;
+        registerForegroundControl(nameTagButton);
+
         // Last, so it is drawn over every other control
         skinContextMenu = new com.quickskin.mod.client.gui.widget.SkinContextMenu(
                 new com.quickskin.mod.client.gui.widget.SkinContextMenu.Actions() {
@@ -563,6 +600,14 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     /** Height of the drawn player per unit of model scale: a player is 1.8 blocks, plus the hat and a margin. */
     private static final float MODEL_HEIGHT_PER_SCALE = 2.0f;
+    /** How opaque a ghost is under the mouse, how far it breathes either way, and in how long. */
+    private static final float GHOST_ALPHA = 0.45f;
+    private static final float GHOST_BREATH = 0.10f;
+    private static final float GHOST_BREATH_SECONDS = 1.0f;
+    /** How quickly a ghost fades in and out, as the time constant of an exponential approach. */
+    private static final float GHOST_EASE_SECONDS = 0.05f;
+    private static final int[] ARMOR_PIECES_BY_PRIORITY = {
+            LocalHiddenArmor.HEAD, LocalHiddenArmor.CHEST, LocalHiddenArmor.FEET, LocalHiddenArmor.LEGS};
     /** Half the drawn player's width per unit of model scale, arms included. */
     private static final float HALF_WIDTH_PER_SCALE = 0.55f;
     /**
@@ -795,6 +840,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
 //?}
         layoutImportZone();
+        layoutNameTag();
 
         // Render widgets (buttons, etc.)
 //? if <1.21 {
@@ -817,7 +863,6 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
 
         renderSkinHeader(graphics);
-        renderNameTag(graphics);
 
         // Foreground controls and error toasts go above the player preview. Up to 1.21.5 the GUI
         // is depth tested: the model sits at z 50 and reaches forward by its scale (200 at most),
@@ -844,12 +889,224 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         if (actionButtonsPanel != null) {
             actionButtonsPanel.renderLeftTooltips(graphics, this.font, mouseX, mouseY);
         }
+        renderArmorGhost(graphics, mouseX, mouseY);
 
         // Render error toasts (on top of everything)
         renderErrorToasts(graphics);
 //? if <1.21.6 {
         graphics.pose().popPose();
 //?}
+    }
+
+    /**
+     * The armour piece the model wears under the mouse, as a {@link LocalHiddenArmor} bit, or 0:
+     * the model's height splits into the helmet, the chestplate, the leggings and the boots, each
+     * about as wide as the part it covers. Only a piece the player has on counts, shown or hidden.
+     */
+    private int armorPieceAt(double mouseX, double mouseY) {
+        if (this.minecraft == null || this.minecraft.player == null || playerPreviewPanel == null) {
+            return 0;
+        }
+        com.quickskin.mod.client.gui.widget.PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
+        if (widget == null || !widget.visible) {
+            return 0;
+        }
+        if (!com.quickskin.mod.client.rendering.PreviewEquipment.outline(LocalHiddenArmor.HEAD, false).isEmpty()) {
+            // A piece is where it is seen: the traced piece nearest the viewer under the mouse,
+            // unless the model itself is nearer there (the chest in front of an elytra)
+            int[] traced = new int[ARMOR_PIECES_BY_PRIORITY.length];
+            int count = 0;
+            for (int candidate : ARMOR_PIECES_BY_PRIORITY) {
+                if (!armorItem(candidate).isEmpty()
+                        && com.quickskin.mod.client.rendering.PreviewArmorSilhouette.of(candidate) != null) {
+                    traced[count++] = candidate;
+                }
+            }
+            int seen = com.quickskin.mod.client.rendering.PreviewArmorSilhouette.pieceAt(
+                    mouseX, mouseY, java.util.Arrays.copyOf(traced, count));
+            if (seen != 0) {
+                return seen;
+            }
+            boolean onModel = com.quickskin.mod.client.rendering.PreviewArmorSilhouette.bodyCovers(mouseX, mouseY);
+            // Beside the model, a piece's outline still counts, and a piece that could not be
+            // traced keeps its boxes; the head first and the boots before the leggings
+            for (int candidate : ARMOR_PIECES_BY_PRIORITY) {
+                if (armorItem(candidate).isEmpty()) {
+                    continue;
+                }
+                com.quickskin.mod.client.rendering.PreviewArmorSilhouette silhouette =
+                        com.quickskin.mod.client.rendering.PreviewArmorSilhouette.of(candidate);
+                if (silhouette != null ? !onModel && silhouette.contains(mouseX, mouseY)
+                        : insideAny(armorOutline(candidate), mouseX, mouseY, -1)) {
+                    return candidate;
+                }
+            }
+            return 0;
+        }
+        float height = widget.getEffectiveScale() * MODEL_HEIGHT_PER_SCALE;
+        if (height <= 0) {
+            return 0;
+        }
+        double fromTop = (mouseY - (widget.getLayoutFeetY() - height)) / height;
+        double sideways = Math.abs(mouseX - widget.getLayoutCenterX()) / height;
+        int piece;
+        double halfWidth;
+        if (fromTop < 0 || fromTop > 1) {
+            return 0;
+        } else if (fromTop < 0.25) {
+            piece = LocalHiddenArmor.HEAD;
+            halfWidth = 0.16;
+        } else if (fromTop < 0.6) {
+            piece = LocalHiddenArmor.CHEST;
+            halfWidth = 0.28;
+        } else if (fromTop < 0.84) {
+            piece = LocalHiddenArmor.LEGS;
+            halfWidth = 0.14;
+        } else {
+            piece = LocalHiddenArmor.FEET;
+            halfWidth = 0.15;
+        }
+        return sideways <= halfWidth && !armorItem(piece).isEmpty() ? piece : 0;
+    }
+
+    /** The outline of a worn piece on the model, one convex polygon per box it covers. */
+    private java.util.List<float[]> armorOutline(int piece) {
+        boolean elytra = piece == LocalHiddenArmor.CHEST
+                && armorItem(piece).is(net.minecraft.world.item.Items.ELYTRA);
+        return com.quickskin.mod.client.rendering.PreviewEquipment.outline(piece, elytra);
+    }
+
+    /** Whether a point lies in one of the convex polygons, the one at {@code skip} aside. */
+    private static boolean insideAny(java.util.List<float[]> polygons, double x, double y, int skip) {
+        for (int p = 0; p < polygons.size(); p++) {
+            if (p == skip) {
+                continue;
+            }
+            float[] polygon = polygons.get(p);
+            int n = polygon.length / 2;
+            int sign = 0;
+            boolean inside = n >= 3;
+            for (int i = 0; i < n && inside; i++) {
+                double ax = polygon[i * 2], ay = polygon[i * 2 + 1];
+                double bx = polygon[(i + 1) % n * 2], by = polygon[(i + 1) % n * 2 + 1];
+                double cross = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
+                int s = cross > 0 ? 1 : cross < 0 ? -1 : 0;
+                if (s != 0) {
+                    if (sign == 0) {
+                        sign = s;
+                    } else if (s != sign) {
+                        inside = false;
+                    }
+                }
+            }
+            if (inside) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** What the player has on in a piece's slot. */
+    private net.minecraft.world.item.ItemStack armorItem(int piece) {
+        net.minecraft.world.entity.EquipmentSlot slot = switch (piece) {
+            case LocalHiddenArmor.HEAD -> net.minecraft.world.entity.EquipmentSlot.HEAD;
+            case LocalHiddenArmor.CHEST -> net.minecraft.world.entity.EquipmentSlot.CHEST;
+            case LocalHiddenArmor.LEGS -> net.minecraft.world.entity.EquipmentSlot.LEGS;
+            default -> net.minecraft.world.entity.EquipmentSlot.FEET;
+        };
+        return this.minecraft.player.getItemBySlot(slot);
+    }
+
+    /** Hides a shown piece from everyone, or shows a hidden one, where the server can. */
+    private void toggleArmorPiece(int piece) {
+        ClientNetworkActions.ArmorHiding hiding = LocalHiddenArmor.hiding();
+        if (hiding == ClientNetworkActions.ArmorHiding.ACTIVE) {
+            LocalHiddenArmor.toggle(piece);
+        } else if (hiding == ClientNetworkActions.ArmorHiding.NOT_ALLOWED) {
+            showError(Component.translatable("quickskin.armor.not_allowed"));
+        } else if (hiding == ClientNetworkActions.ArmorHiding.UNSUPPORTED) {
+            showError(Component.translatable("quickskin.armor.unsupported"));
+        }
+    }
+
+    /**
+     * Turns the armour piece under the mouse into a see-through ghost of itself on the model, so
+     * the skin beneath shows, as hiding it would; a hidden piece appears as the same ghost. It fades
+     * in, breathes a little while the mouse stays, and fades back to how the piece is drawn when the
+     * mouse leaves; a piece just clicked fades to its new state and stays so until the mouse leaves
+     * it. A faint edge and a light tint over the piece's own silhouette keep the ghost readable.
+     * The model draws the ghost from the next frame on ({@code PreviewEquipment.setGhost}).
+     */
+//? if <26.1 {
+    private void renderArmorGhost(GuiGraphics graphics, int mouseX, int mouseY) {
+//?} else {
+    private void renderArmorGhost(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+//?}
+        boolean onMenu = !rotatingModel && this.minecraft != null && GuiCompat.currentScreen() == this;
+        int hovered = onMenu ? armorPieceAt(mouseX, mouseY) : 0;
+        long now = System.nanoTime();
+        float elapsed = ghostFrameNanos == 0 ? 0.0f : Math.min(0.1f, (now - ghostFrameNanos) / 1.0e9f);
+        ghostFrameNanos = now;
+        if (hovered != ghostSettledPiece) {
+            ghostSettledPiece = 0;
+        }
+        boolean ghosting = hovered != 0 && hovered != ghostSettledPiece;
+        if (ghosting && hovered != ghostPiece) {
+            // A new piece starts from how it is drawn now
+            ghostPiece = hovered;
+            ghostAlpha = restingAlpha(hovered);
+            ghostSinceNanos = now;
+        }
+        if (ghostPiece == 0) {
+            com.quickskin.mod.client.rendering.PreviewEquipment.setGhost(0, 1.0f);
+            return;
+        }
+        boolean held = ghosting && hovered == ghostPiece;
+        float target = held
+                ? GHOST_ALPHA + GHOST_BREATH * (float) Math.sin(2.0 * Math.PI * ((now - ghostSinceNanos) / 1.0e9f) / GHOST_BREATH_SECONDS)
+                : restingAlpha(ghostPiece);
+        ghostAlpha += (target - ghostAlpha) * (1.0f - (float) Math.exp(-elapsed / GHOST_EASE_SECONDS));
+        if (!held && Math.abs(ghostAlpha - target) < 0.01f) {
+            ghostPiece = 0;
+            ghostAlpha = 1.0f;
+            com.quickskin.mod.client.rendering.PreviewEquipment.setGhost(0, 1.0f);
+            return;
+        }
+        com.quickskin.mod.client.rendering.PreviewEquipment.setGhost(ghostPiece, ghostAlpha);
+
+        // How far the piece is from how it rests, 0 to 1
+        float rest = restingAlpha(ghostPiece);
+        float ghostliness = Math.min(1.0f, Math.abs(rest - ghostAlpha) / Math.abs(rest - GHOST_ALPHA));
+        com.quickskin.mod.client.rendering.PreviewArmorSilhouette silhouette =
+                com.quickskin.mod.client.rendering.PreviewArmorSilhouette.of(ghostPiece);
+        if (silhouette == null || ghostliness <= 0.01f || this.minecraft == null || this.minecraft.player == null) {
+            return;
+        }
+        // Only where the ghost is seen: not where the model or another piece drawn on it is nearer
+        int[] drawn = new int[ARMOR_PIECES_BY_PRIORITY.length];
+        int count = 0;
+        for (int piece : ARMOR_PIECES_BY_PRIORITY) {
+            if (piece != ghostPiece && restingAlpha(piece) > 0.0f && !armorItem(piece).isEmpty()) {
+                drawn[count++] = piece;
+            }
+        }
+        com.quickskin.mod.client.rendering.PreviewArmorSilhouette.Seen seen =
+                silhouette.seen(java.util.Arrays.copyOf(drawn, count));
+        int tint = Math.round(0.12f * ghostliness * 255) << 24 | 0xD2F0FF;
+        int[] spans = seen.spans();
+        for (int i = 0; i < spans.length; i += 3) {
+            graphics.fill(spans[i], spans[i + 2], spans[i + 1], spans[i + 2] + 1, tint);
+        }
+        int edge = Math.round(0.30f * ghostliness * 255) << 24 | 0xE1F5FF;
+        int[] ring = seen.ring();
+        for (int i = 0; i < ring.length; i += 2) {
+            graphics.fill(ring[i], ring[i + 1], ring[i] + 1, ring[i + 1] + 1, edge);
+        }
+    }
+
+    /** How opaque a piece is drawn when no ghost: hidden from everyone, it is not drawn at all. */
+    private static float restingAlpha(int piece) {
+        return (LocalHiddenArmor.inEffect() & piece) != 0 ? 0.0f : 1.0f;
     }
 
     /**
@@ -874,51 +1131,150 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         UiText.draw(graphics, this.font, count, skinColumnX, countY, 0xFFC8C8C8);
     }
 
-    /** The player's name above the model, like a name tag in the world. */
-//? if <26.1 {
-    private void renderNameTag(GuiGraphics graphics) {
-//?} else {
-    private void renderNameTag(GuiGraphicsExtractor graphics) {
-//?}
-        if (playerPreviewPanel == null || playerPreviewPanel.getPlayerWidget() == null
-                || !playerPreviewPanel.getPlayerWidget().visible || this.minecraft == null) {
+    /**
+     * Places the player's name above the model, like a name tag in the world: their nickname, or
+     * their account name. The tag opens the nickname dialog, except during a replay or for an
+     * account whose identity cannot be stored.
+     */
+    private void layoutNameTag() {
+        if (nameTagButton == null) {
             return;
         }
-        com.quickskin.mod.client.gui.widget.PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
-        String name = this.minecraft.player != null
-                ? this.minecraft.player.getName().getString()
-                : this.minecraft.getUser().getName();
-        int textWidth = this.font.width(name);
+        com.quickskin.mod.client.gui.widget.PlayerWidget widget =
+                playerPreviewPanel != null ? playerPreviewPanel.getPlayerWidget() : null;
+        nameTagButton.visible = widget != null && widget.visible && this.minecraft != null;
+        if (!nameTagButton.visible) {
+            return;
+        }
+        String fullName = LocalNicknameService.shownName();
         int centerX = widget.getLayoutCenterX();
+        // A long nickname is cut to the room between the skin column and the right edge, pencil
+        // included, so the tag never covers another control
+        int leftRoom = centerX - (skinColumnX + skinColumnWidth + SIDE_GAP);
+        int rightRoom = this.width - MARGIN - NameTagButton.PENCIL_ROOM - centerX;
+        int maxTextWidth = (int) (2 * Math.max(0, Math.min(leftRoom, rightRoom)) / NAME_TAG_SCALE) - 4;
+        String name = fullName;
+        if (this.font.width(fullName) > maxTextWidth) {
+            name = this.font.plainSubstrByWidth(fullName, Math.max(0, maxTextWidth - this.font.width("\u2026")))
+                    .stripTrailing() + "\u2026";
+        }
         int headTop = widget.getLayoutFeetY() - (int) (widget.getEffectiveScale() * MODEL_HEIGHT_PER_SCALE);
         // The name's capitals sit halfway between the search row and the head
         float middle = (searchBottom + headTop) / 2.0f;
-        float top = middle - NAME_TAG_CAPITALS_MIDDLE * NAME_TAG_SCALE;
-//? if <1.21.6 {
-        graphics.pose().pushPose();
-        graphics.pose().translate(centerX, top, 0.0F);
-        graphics.pose().scale(NAME_TAG_SCALE, NAME_TAG_SCALE, 1.0F);
+        nameTagButton.place(this.font, name, centerX, middle - NAME_TAG_CAPITALS_MIDDLE * NAME_TAG_SCALE);
+        // An admin's name or lock leaves nothing to choose, so the tag only says why
+        ClientNetworkActions.NicknameAnswer.Outcome fixedBy = LocalNicknameService.fixedByAdmin();
+        nameTagButton.active = LocalNicknameService.canChoose() && fixedBy == null
+                && !com.quickskin.mod.client.compat.ReplayModHelper.isInReplay();
+        String tooltipFor = fullName + '\u0000' + nameTagButton.active + '\u0000' + fixedBy;
+        if (!tooltipFor.equals(nameTagTooltipFor)) {
+            nameTagTooltipFor = tooltipFor;
+            if (fixedBy != null) {
+                nameTagButton.setTooltip(Tooltip.create(Component.translatable(
+                        fixedBy == ClientNetworkActions.NicknameAnswer.Outcome.ASSIGNED
+                                ? "quickskin.nickname.assigned" : "quickskin.nickname.locked")));
+            } else if (!nameTagButton.active) {
+                // A tag that cannot change says nothing a click would not do
+                nameTagButton.setTooltip(null);
+            } else {
+                MutableComponent tooltip = Component.empty();
+                if (!name.equals(fullName)) {
+                    tooltip.append(fullName).append("\n");
+                }
+                tooltip.append(Component.translatable("quickskin.nickname.tooltip"));
+                String accountName = LocalNicknameService.accountName();
+                if (!fullName.equals(accountName)) {
+                    tooltip.append("\n").append(Component.translatable("quickskin.nickname.tooltip_account", accountName));
+                }
+                nameTagButton.setTooltip(Tooltip.create(tooltip));
+            }
+        }
+    }
+
+    /** Opens the dialog where the player picks the nickname others see them by. */
+    private void showNicknameDialog() {
+        if (minecraft == null) {
+            return;
+        }
+//? if <26.2 {
+        minecraft.setScreen(new NicknameScreen(
 //?} else {
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(centerX, top);
-        graphics.pose().scale(NAME_TAG_SCALE, NAME_TAG_SCALE);
+        minecraft.gui.setScreen(new NicknameScreen(
 //?}
-        graphics.fill(-textWidth / 2 - 2, 0, (textWidth + 1) / 2 + 2, 10, 0x40000000);
-//? if <26.1 {
-        graphics.drawString(this.font, name, -textWidth / 2, 1, 0xFFFFFFFF, false);
-//?} else {
-        graphics.text(this.font, name, -textWidth / 2, 1, 0xFFFFFFFF, false);
-//?}
-//? if <1.21.6 {
-        graphics.pose().popPose();
-//?} else {
-        graphics.pose().popMatrix();
-//?}
+                this,
+                LocalNicknameService.accountName(),
+                LocalNicknameService.nickname(),
+                // The dialog returns to this menu right after the callback
+                this::chooseNickname));
+    }
+
+    /** Keeps the nickname for this account and tells the player where it shows. */
+    private void chooseNickname(String typed) {
+        ClientNetworkActions.NicknameDelivery delivery = LocalNicknameService.choose(typed);
+        nameTagTooltipFor = null;
+        if (delivery == null) {
+            showError(Component.translatable("quickskin.nickname.invalid"));
+            return;
+        }
+        boolean hasNickname = !LocalNicknameService.nickname().isEmpty();
+        switch (delivery) {
+            case SENT, PENDING -> awaitingNicknameAnswer = true;
+            case NOT_CONNECTED -> {
+                if (hasNickname) {
+                    showToast(Component.translatable("quickskin.nickname.saved_offline"), ErrorToast.Kind.INFO);
+                }
+            }
+            case UNSUPPORTED -> {
+                if (hasNickname) {
+                    showToast(Component.translatable("quickskin.nickname.unsupported"), ErrorToast.Kind.INFO);
+                }
+            }
+            case DISABLED -> showError(Component.translatable("quickskin.nickname.disabled"));
+        }
+    }
+
+    /**
+     * Shows each answer of the server to the player's nickname once: every answer to a nickname
+     * this menu sent, and a refusal of one sent by itself (when joining, or after a wait), which
+     * the player would not hear about otherwise.
+     */
+    private void pollNicknameAnswer() {
+        ClientNetworkActions.NicknameAnswer answer = LocalNicknameService.lastAnswer();
+        if (answer == null || answer.sequence() == nicknameAnswerShown) {
+            return;
+        }
+        nicknameAnswerShown = answer.sequence();
+        nameTagTooltipFor = null;
+        ClientNetworkActions.NicknameAnswer.Outcome outcome = answer.outcome();
+        boolean refused = outcome != ClientNetworkActions.NicknameAnswer.Outcome.ACCEPTED
+                && outcome != ClientNetworkActions.NicknameAnswer.Outcome.UNCHANGED
+                && outcome != ClientNetworkActions.NicknameAnswer.Outcome.COOLDOWN;
+        if (!awaitingNicknameAnswer && !refused) {
+            return;
+        }
+        // After a wait the nickname is sent again by itself, and that answer still comes here
+        awaitingNicknameAnswer = outcome == ClientNetworkActions.NicknameAnswer.Outcome.COOLDOWN;
+        switch (outcome) {
+            case ACCEPTED -> showToast(answer.nickname().isEmpty()
+                            ? Component.translatable("quickskin.nickname.cleared")
+                            : Component.translatable("quickskin.nickname.accepted", answer.nickname()),
+                    ErrorToast.Kind.SUCCESS);
+            case UNCHANGED -> {
+            }
+            case TAKEN -> showError(Component.translatable("quickskin.nickname.taken"));
+            case INVALID -> showError(Component.translatable("quickskin.nickname.refused"));
+            case COOLDOWN -> showToast(Component.translatable("quickskin.nickname.cooldown",
+                    Math.max(1L, (answer.retryAfterMillis() + 999L) / 1000L)), ErrorToast.Kind.INFO);
+            case DISABLED -> showError(Component.translatable("quickskin.nickname.disabled"));
+            case LOCKED -> showError(Component.translatable("quickskin.nickname.locked"));
+            case ASSIGNED -> showError(Component.translatable("quickskin.nickname.assigned"));
+        }
     }
 
     @Override
     public void removed() {
         BackgroundRenderer.cleanup();
+        com.quickskin.mod.client.rendering.PreviewEquipment.forgetPreview();
         // The next screen, a dialog or the world opens at the player's own scale
         if (this.minecraft != null) {
             MenuGuiScale.restore(this.minecraft);
@@ -1083,6 +1439,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         if (playerPreviewPanel != null) {
             playerPreviewPanel.closePoseListUnlessOver(mouseX, mouseY);
         }
+        // A click on a piece of armour the model wears hides or shows it once released in place
+        armorPressPiece = button == InputConstants.MOUSE_BUTTON_LEFT ? armorPieceAt(mouseX, mouseY) : 0;
+        armorPressX = mouseX;
+        armorPressY = mouseY;
         // Handle debug positioning mode
         if (com.quickskin.mod.client.rendering.PlayerModelRenderer.handleDebugMousePressed((int)mouseX, (int)mouseY, button)) {
             return true;
@@ -1197,6 +1557,16 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         // Handle debug positioning mode
         if (com.quickskin.mod.client.rendering.PlayerModelRenderer.handleDebugMouseReleased((int)mouseX, (int)mouseY, button)) {
             return true;
+        }
+        if (button == InputConstants.MOUSE_BUTTON_LEFT && armorPressPiece != 0) {
+            int piece = armorPressPiece;
+            armorPressPiece = 0;
+            // A press that turned the model is no click
+            if (Math.abs(mouseX - armorPressX) <= 2 && Math.abs(mouseY - armorPressY) <= 2) {
+                toggleArmorPiece(piece);
+                // It shows its new state until the mouse leaves it
+                ghostSettledPiece = piece;
+            }
         }
         if (rotatingModel && button == InputConstants.MOUSE_BUTTON_LEFT) {
             rotatingModel = false;
@@ -1617,7 +1987,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
                 com.quickskin.mod.client.services.PlayerAppearanceService appearances =
                         com.quickskin.mod.client.services.PlayerAppearanceService.getInstance();
-                if (targetUUID != null && appearances.hasActiveSkin(targetUUID)) {
+                if (targetUUID != null && appearances.hasOwnActiveSkin(targetUUID)) {
                     appearances.applySkin(targetUUID, "", null);
                 }
             }
@@ -1795,6 +2165,11 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
      */
     public void showError(Component message) {
         errorToasts.add(new ErrorToast(message));
+    }
+
+    /** Shows a toast of the given kind, such as a confirmation. */
+    public void showToast(Component message, ErrorToast.Kind kind) {
+        errorToasts.add(new ErrorToast(message, kind));
     }
 
     /** The import zone's least height that holds its icon and text; below it, it is a bar. */
@@ -2171,6 +2546,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             case NOT_FOUND -> Component.translatable("quickskin.error.player_not_found", username);
             case NO_CUSTOM_SKIN -> Component.translatable("quickskin.error.no_custom_skin");
             case INVALID_RESPONSE, RESPONSE_TOO_LARGE -> Component.translatable("quickskin.error.invalid_skin_response");
+            case RATE_LIMITED -> Component.translatable("quickskin.error.mojang_rate_limited");
             case HTTP, NETWORK -> Component.translatable(switch (failure.stage()) {
                 case LOOKUP -> "quickskin.error.lookup_unavailable";
                 case PROFILE -> "quickskin.error.profile_unavailable";

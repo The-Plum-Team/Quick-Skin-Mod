@@ -29,6 +29,7 @@ public class PreviewPlayerData {
     private String capeId;
     private boolean capeAuthoritative;
     private boolean heldGunVisible;
+    private boolean equipmentVisible;
     private SkinResolution resolution;
     private float yRotation; // Y-axis rotation in degrees
     private float headYaw; // Head yaw for looking around
@@ -203,6 +204,20 @@ public class PreviewPlayerData {
     /** Asks the renderer to keep a held gun of a gun mod visible in this preview. */
     public void markHeldGunVisible() {
         this.heldGunVisible = true;
+    }
+
+    /**
+     * Whether this preview shows what the live local player wears and holds (armour, elytra, held
+     * items, a worn head), as the world does, without the armour pieces the player hides from
+     * everyone. The pause menu's and the skin menu's previews do; the cape menus hide it, and so
+     * does any preview of a player other than the live local one.
+     */
+    public boolean isEquipmentVisible() {
+        return equipmentVisible;
+    }
+
+    public void setEquipmentVisible(boolean equipmentVisible) {
+        this.equipmentVisible = equipmentVisible;
     }
 
     public String getModelType() {

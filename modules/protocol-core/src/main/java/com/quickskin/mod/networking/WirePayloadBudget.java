@@ -22,6 +22,7 @@ public final class WirePayloadBudget {
     public static final int ENVELOPE_BYTES = 2 * (64 + 1);
     private static final int UUID_BYTES = 16;
     private static final int INT_BYTES = 4;
+    private static final int LONG_BYTES = 8;
 
     private WirePayloadBudget() {
     }
@@ -81,5 +82,61 @@ public final class WirePayloadBudget {
     /** {@code sync_server_config}: one configuration document. */
     public static int serverConfig() {
         return ENVELOPE_BYTES + string(TextureTransferLimits.MAX_JSON_BYTES);
+    }
+
+    /** {@code set_nickname}: player, request number and the nickname. */
+    public static int setNickname() {
+        return ENVELOPE_BYTES + UUID_BYTES + INT_BYTES
+                + string(TextureTransferLimits.MAX_NICKNAME_BYTES);
+    }
+
+    /** {@code armor_visibility}: player and the armour pieces it hides. */
+    public static int armorVisibility() {
+        return ENVELOPE_BYTES + UUID_BYTES + 1;
+    }
+
+    /** {@code nickname_result}: request number, status, the nickname kept and the wait. */
+    public static int nicknameResult() {
+        return ENVELOPE_BYTES + INT_BYTES + 1
+                + string(TextureTransferLimits.MAX_NICKNAME_BYTES) + LONG_BYTES;
+    }
+
+    /** {@code assigned_skin}: the skin id and model the server gave the player ({@code ""}: none). */
+    public static int assignedSkin() {
+        return ENVELOPE_BYTES + string(TextureTransferLimits.MAX_APPEARANCE_ID_BYTES)
+                + string(TextureTransferLimits.MAX_MODEL_BYTES);
+    }
+
+    /**
+     * {@code skin_admin}: request number, action, a count and up to
+     * {@code MAX_SKIN_ADMIN_PLAYERS} players, a skin id, a model and a pool skin's name (counted
+     * as three bytes per character, as the 1.20.1 codec may).
+     */
+    public static int skinAdmin() {
+        return ENVELOPE_BYTES + INT_BYTES + 1 + INT_BYTES
+                + TextureTransferLimits.MAX_SKIN_ADMIN_PLAYERS * UUID_BYTES
+                + string(TextureTransferLimits.MAX_APPEARANCE_ID_BYTES)
+                + string(TextureTransferLimits.MAX_MODEL_BYTES)
+                + string(3 * TextureTransferLimits.MAX_POOL_SKIN_NAME_CHARS);
+    }
+
+    /** {@code skin_admin_result}: request number, status and how many players or skins it touched. */
+    public static int skinAdminResult() {
+        return ENVELOPE_BYTES + INT_BYTES + 1 + INT_BYTES;
+    }
+
+    /** {@code skin_admin_state}: the pool's skins, then the players who have an assigned skin. */
+    public static int skinAdminState() {
+        return ENVELOPE_BYTES + INT_BYTES + TextureTransferLimits.MAX_POOL_SKINS
+                * (string(3 * TextureTransferLimits.MAX_POOL_SKIN_NAME_CHARS)
+                        + string(TextureTransferLimits.MAX_APPEARANCE_ID_BYTES)
+                        + string(TextureTransferLimits.MAX_MODEL_BYTES))
+                + INT_BYTES + TextureTransferLimits.MAX_ASSIGNED_SKIN_ENTRIES * UUID_BYTES;
+    }
+
+    /** {@code sync_nicknames}: a count and up to {@code MAX_NICKNAME_ENTRIES} players' nicknames. */
+    public static int syncNicknames() {
+        return ENVELOPE_BYTES + INT_BYTES + TextureTransferLimits.MAX_NICKNAME_ENTRIES
+                * (UUID_BYTES + string(TextureTransferLimits.MAX_NICKNAME_BYTES));
     }
 }

@@ -134,7 +134,11 @@ public final class ImportZone {
         }
     }
 
-    /** An L-shaped mark in each corner, one pixel thick. */
+    /**
+     * An L-shaped mark in each corner, one pixel thick. The vertical arm stops short of the
+     * corner pixel, which the horizontal arm draws: the colour is translucent, so a pixel drawn
+     * twice would show brighter at the tip.
+     */
     //? if <26.1 {
     private static void drawCorners(GuiGraphics graphics, int left, int top, int right, int bottom, int color) {
     //?} else {
@@ -142,13 +146,13 @@ public final class ImportZone {
     //?}
         int length = Math.max(2, Math.min(CORNER_LENGTH, Math.min(right - left, bottom - top) / 3));
         graphics.fill(left, top, left + length, top + 1, color);
-        graphics.fill(left, top, left + 1, top + length, color);
+        graphics.fill(left, top + 1, left + 1, top + length, color);
         graphics.fill(right - length, top, right, top + 1, color);
-        graphics.fill(right - 1, top, right, top + length, color);
+        graphics.fill(right - 1, top + 1, right, top + length, color);
         graphics.fill(left, bottom - 1, left + length, bottom, color);
-        graphics.fill(left, bottom - length, left + 1, bottom, color);
+        graphics.fill(left, bottom - length, left + 1, bottom - 1, color);
         graphics.fill(right - length, bottom - 1, right, bottom, color);
-        graphics.fill(right - 1, bottom - length, right, bottom, color);
+        graphics.fill(right - 1, bottom - length, right, bottom - 1, color);
     }
 
     /** Splits the text into lines no wider than {@code maxWidth}, cutting a word that does not fit. */
