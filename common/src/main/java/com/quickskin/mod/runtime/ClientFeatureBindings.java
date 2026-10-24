@@ -53,6 +53,9 @@ public final class ClientFeatureBindings {
         // A skin uploaded to Mojang becomes the own skin as Mojang keeps it
         com.quickskin.mod.client.util.MojangSkinUploader.setUploadListener(
                 com.quickskin.mod.client.importing.PlayerOwnSkinBootstrap::adoptUploadedSkin);
+        // Name tags show the nicknames the connected server announced
+        NicknameDisplay.bindClientNicknames(
+                com.quickskin.mod.common.data.PlayerNicknameRepository.getInstance()::nickname);
         installed = true;
     }
 

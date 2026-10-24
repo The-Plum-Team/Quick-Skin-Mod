@@ -114,6 +114,21 @@ public class ClientNetworking {
                 NetworkManager.s2c(), SendAnimationMetadataV2Payload.TYPE,
                 SendAnimationMetadataV2Payload.CODEC,
                 ClientNetworkHandler::handleSendAnimationMetadataV2);
+        NetworkManager.registerReceiver(
+                NetworkManager.s2c(), NicknameResultPayload.TYPE,
+                NicknameResultPayload.CODEC, ClientNetworkHandler::handleNicknameResult);
+        NetworkManager.registerReceiver(
+                NetworkManager.s2c(), SyncNicknamesPayload.TYPE,
+                SyncNicknamesPayload.CODEC, ClientNetworkHandler::handleSyncNicknames);
+        NetworkManager.registerReceiver(
+                NetworkManager.s2c(), AssignedSkinPayload.TYPE,
+                AssignedSkinPayload.CODEC, ClientNetworkHandler::handleAssignedSkin);
+        NetworkManager.registerReceiver(
+                NetworkManager.s2c(), SkinAdminResultPayload.TYPE,
+                SkinAdminResultPayload.CODEC, ClientNetworkHandler::handleSkinAdminResult);
+        NetworkManager.registerReceiver(
+                NetworkManager.s2c(), SkinAdminStatePayload.TYPE,
+                SkinAdminStatePayload.CODEC, ClientNetworkHandler::handleSkinAdminState);
         //?}
 
     }

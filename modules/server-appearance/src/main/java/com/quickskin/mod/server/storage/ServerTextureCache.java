@@ -302,6 +302,29 @@ public class ServerTextureCache {
         pinnedTextures.releasePlayer(playerId);
     }
 
+    /**
+     * Atomically moves the pins of a holder other than a connected player's appearance (a skin an
+     * admin assigned, the skin pool) to these skins, which must be stored as skins whoever owns
+     * them. The bytes count against the same budget; a refused replacement keeps the old pins.
+     *
+     * @param holder an id no player has, one per purpose
+     */
+    public synchronized boolean tryReplaceSkinPins(UUID holder, java.util.Collection<String> hashes) {
+        if (holder == null || hashes == null) return false;
+        LinkedHashMap<String, Integer> requested = new LinkedHashMap<>();
+        for (String hash : hashes) {
+            if (!NetworkSecurity.isValidContentId(hash) || !isRequestable(hash, "skin")) return false;
+            String primary = resolvePrimary(hash);
+            requested.putIfAbsent(primary, textureCache.get(primary).data.length);
+        }
+        return pinnedTextures.tryReplace(holder, requested);
+    }
+
+    /** Whether the cache holds this content id as a skin, whoever uploaded it. */
+    public boolean isSkin(String hash) {
+        return isRequestable(hash, "skin");
+    }
+
     public boolean isPinned(String hash) {
         String primary = resolvePrimary(hash);
         return primary != null && pinnedTextures.isPinned(primary);

@@ -1,0 +1,21 @@
+{
+  "required": true,
+  "package": "com.quickskin.mod.mixin.armor",
+  "compatibilityLevel": "JAVA_17",
+  "minVersion": "0.8",
+  "client": [
+    "EntityRenderDispatcherPlayersMixin",
+    "LivingEntityRendererLayersMixin",
+    "LocalArmorLayerMixin",
+    "LocalArmorRenderMixin",
+    "LocalElytraLayerMixin",
+    "LocalHeadLayerMixin",
+    "PreviewArmorPoseMixin"
+  ],
+  "mixins": [
+    "ServerEquipmentFilterMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

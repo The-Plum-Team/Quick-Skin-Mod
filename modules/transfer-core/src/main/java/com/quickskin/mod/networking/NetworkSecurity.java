@@ -2,6 +2,7 @@ package com.quickskin.mod.networking;
 
 import com.quickskin.mod.common.data.AnimationMetadata;
 import com.quickskin.mod.common.data.ContentId;
+import com.quickskin.mod.common.data.Nickname;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -37,6 +38,28 @@ public final class NetworkSecurity {
     public static boolean isValidLegacyContentId(String contentId) {
         ContentId parsed = ContentId.parse(contentId);
         return parsed != null && parsed.algorithm() == ContentId.Algorithm.SHA1;
+    }
+
+    /**
+     * A nickname on the wire: canonical by {@link Nickname}'s rules ({@code ""} means none) and
+     * within the codec's byte bound.
+     */
+    public static boolean isValidNickname(String nickname) {
+        return nickname != null
+                && nickname.getBytes(StandardCharsets.UTF_8).length
+                        <= TextureTransferLimits.MAX_NICKNAME_BYTES
+                && Nickname.isCanonical(nickname);
+    }
+
+    /**
+     * A nickname another peer announced, which this client shows: {@code ""} for none, or within
+     * the byte bound and {@link Nickname#isSafeToShow}, which do not depend on which letters this
+     * Java version knows. The sender already applied the full rules with its own tables.
+     */
+    public static boolean isShowableNickname(String nickname) {
+        return nickname != null && (nickname.isEmpty()
+                || (nickname.getBytes(StandardCharsets.UTF_8).length <= TextureTransferLimits.MAX_NICKNAME_BYTES
+                && Nickname.isSafeToShow(nickname)));
     }
 
     public static boolean isValidTextureType(String textureType) {

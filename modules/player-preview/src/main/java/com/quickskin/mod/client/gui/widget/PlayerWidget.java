@@ -461,6 +461,10 @@ public class PlayerWidget extends AbstractWidget {
         this.context = context;
         // The skin menu presents the whole skin: a squarely facing stance for its idle.
         this.previewData.setShowcaseIdle(context == WidgetContext.SKIN_MENU);
+        // The pause menu and the skin menu show the player as the world does, with what they wear
+        // and hold (ADR 0017); the cape menus show the cape
+        this.previewData.setEquipmentVisible(
+                context == WidgetContext.PAUSE_MENU || context == WidgetContext.SKIN_MENU);
 //? if <1.21 {
     }
 

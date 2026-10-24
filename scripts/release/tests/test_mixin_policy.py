@@ -17,7 +17,7 @@ OVERLAY_RESOURCES = tuple(
     ROOT / "common" / "src" / name / "resources" for name in OVERLAY_NAMES
 )
 MIXIN_MARKER = re.compile(r"@Mixin\s*\(")
-INJECTOR_MARKER = re.compile(r"@(Inject|ModifyArg|Redirect)\s*\(")
+INJECTOR_MARKER = re.compile(r"@(Inject|ModifyArg|ModifyVariable|Redirect)\s*\(")
 HANDLER_MARKER = re.compile(r"\b(quickskin\$[A-Za-z0-9_$]+)\s*\(")
 JAVA_COMMENT = re.compile(r"//[^\n]*|/\*.*?\*/", re.DOTALL)
 
@@ -55,11 +55,35 @@ CRITICAL_MIXINS = {
 DEGRADABLE_MIXINS = {
     "main:com/quickskin/mod/mixin/GuiSkinRendererMixin.java",
     "main:com/quickskin/mod/mixin/PanoramaRendererMixin.java",
+    # Nicknames (ADR 0015): a hook that fails leaves account names showing, never anything worse.
+    "main:com/quickskin/mod/mixin/nickname/PlayerDisplayNameMixin.java",
+    "main:com/quickskin/mod/mixin/nickname/PlayerListJoinMessageMixin.java",
+    "main:com/quickskin/mod/mixin/nickname/ServerGamePacketListenerLeaveMessageMixin.java",
+    "main:com/quickskin/mod/mixin/nickname/ServerPlayerTabNameMixin.java",
+    # Hidden armour (ADR 0017): a hook that fails leaves the armour showing, as before.
+    "main:com/quickskin/mod/mixin/armor/LocalArmorLayerMixin.java",
+    "main:com/quickskin/mod/mixin/armor/LocalArmorRenderMixin.java",
+    "main:com/quickskin/mod/mixin/armor/LocalElytraLayerMixin.java",
+    "main:com/quickskin/mod/mixin/armor/LocalHeadLayerMixin.java",
+    "main:com/quickskin/mod/mixin/armor/PreviewArmorPoseMixin.java",
+    "main:com/quickskin/mod/mixin/armor/ServerEquipmentFilterMixin.java",
     "main:com/quickskin/mod/mixin/PreviewEquipmentMixin.java",
     "main:com/quickskin/mod/mixin/PreviewSkinSwapPoseMixin.java",
     # 1.20.1 only: without it the notice for players without Quick Skin is in English.
     "main:com/quickskin/mod/mixin/ServerPlayerLanguageMixin.java",
 }
+
+# Like the nickname mixins, NeoForge loads the hidden-armour mixins from their own config.
+ARMOR_MIXIN_PACKAGE = "com.quickskin.mod.mixin.armor"
+NEOFORGE_ARMOR_CONFIG = ROOT / "neoforge" / "src" / "main" / "resources" / "quickskin-armor.mixins.json"
+
+# NeoForge never reads quickskin.mixins.json, so it loads the nickname mixins from their own config.
+NICKNAME_MIXIN_PACKAGE = "com.quickskin.mod.mixin.nickname"
+NEOFORGE_NICKNAME_CONFIG = ROOT / "neoforge" / "src" / "main" / "resources" / "quickskin-nicknames.mixins.json"
+NEOFORGE_MOD_TOMLS = (
+    ROOT / "neoforge" / "src" / "main" / "resources" / "META-INF" / "neoforge.mods.toml",
+    ROOT / "neoforge" / "src" / "legacy26_1" / "resources" / "META-INF" / "neoforge.mods.toml",
+)
 
 # Third-party integrations remain fail-local in production. Their targets are either selected by
 # the optional-config plugin or are harmless vanilla interception points whose handlers no-op when
@@ -87,11 +111,24 @@ ACCESSOR_ONLY_MIXINS: set[str] = {
     "main:com/quickskin/mod/mixin/ChunkMapAccessor.java",
     "main:com/quickskin/mod/mixin/PlayerGameProfileAccessor.java",
     "main:com/quickskin/mod/mixin/TrackedEntityAccessor.java",
+    # The skin menu's preview borrows the player renderers' equipment layers (ADR 0017).
+    "main:com/quickskin/mod/mixin/armor/EntityRenderDispatcherPlayersMixin.java",
+    "main:com/quickskin/mod/mixin/armor/LivingEntityRendererLayersMixin.java",
 }
 
 # CPM changed the call made by playerRenderPre. Both optional injection points are kept so one
 # source supports both eras, which means neither alternative can truthfully declare expect=1.
 ALTERNATIVE_HOOKS = {
+    # Before 1.21.2 vanilla and Forge draw an armour piece through the six-argument overload and
+    # NeoForge through one that adds the animation values; each loader calls exactly one of them.
+    (
+        "main:com/quickskin/mod/mixin/armor/LocalArmorLayerMixin.java",
+        "quickskin$skipHiddenPiece",
+    ),
+    (
+        "main:com/quickskin/mod/mixin/armor/LocalArmorLayerMixin.java",
+        "quickskin$skipHiddenPieceWithAnimation",
+    ),
     (
         "main:com/quickskin/mod/mixin/compat/CpmRenderDepthMixin.java",
         "quickskin$cpmLegacyPlayerRenderStart",
@@ -112,6 +149,12 @@ ALTERNATIVE_HOOKS = {
 # TaCZ 1.1.8-hotfix asks for the camera type once in each of its four gun-event handlers; the one
 # redirect names all four and takes the first call of each, so four is also the most it can match.
 INJECTION_COUNT_OVERRIDES = {
+    # Audited mapped Minecraft JARs and their Forge/NeoForge builds: placeNewPlayer names the
+    # player twice, once in each branch of the join message.
+    (
+        "main:com/quickskin/mod/mixin/nickname/PlayerListJoinMessageMixin.java",
+        "quickskin$nameWithAccountName",
+    ): {2},
     # Audited mapped Minecraft JARs of every matrix target: the panorama's render method (from 26.1
     # extractRenderState) reads its spin field exactly twice, to advance it and to draw it.
     (
@@ -313,6 +356,59 @@ class MixinPolicyTest(unittest.TestCase):
             with self.subTest(resources=relative(resource_root)):
                 self.assertTrue(compat_mixins.isdisjoint(core_names))
                 self.assertTrue(compat_mixins <= optional_names | dynamic_names)
+
+    def test_neoforge_loads_the_nickname_mixins_every_core_config_lists(self) -> None:
+        nickname_sources = {
+            path.stem
+            for path in (CANONICAL_JAVA / "com/quickskin/mod/mixin/nickname").glob("*.java")
+            if MIXIN_MARKER.search(path.read_text(encoding="utf-8"))
+        }
+        self.assertTrue(nickname_sources)
+        for path in self.configs_named("quickskin.mixins.json"):
+            with self.subTest(config=relative(path)):
+                config = json.loads(path.read_text(encoding="utf-8"))
+                listed = {
+                    name.split(".", 1)[1]
+                    for name in config["mixins"]
+                    if name.startswith("nickname.")
+                }
+                self.assertEqual(listed, nickname_sources)
+        neoforge = json.loads(NEOFORGE_NICKNAME_CONFIG.read_text(encoding="utf-8"))
+        self.assertEqual(neoforge["package"], NICKNAME_MIXIN_PACKAGE)
+        self.assertIs(neoforge["required"], True)
+        self.assertEqual(set(neoforge["mixins"]), nickname_sources)
+        self.assertNotIn("client", neoforge)
+        for toml in NEOFORGE_MOD_TOMLS:
+            with self.subTest(toml=relative(toml)):
+                self.assertIn(
+                    'config = "quickskin-nicknames.mixins.json"', toml.read_text(encoding="utf-8")
+                )
+
+    def test_every_loader_loads_the_armor_mixins(self) -> None:
+        armor_sources = {
+            path.stem
+            for path in (CANONICAL_JAVA / "com/quickskin/mod/mixin/armor").glob("*.java")
+            if MIXIN_MARKER.search(path.read_text(encoding="utf-8"))
+        }
+        self.assertTrue(armor_sources)
+        for path in self.configs_named("quickskin.mixins.json"):
+            with self.subTest(config=relative(path)):
+                config = json.loads(path.read_text(encoding="utf-8"))
+                listed = {
+                    name.split(".", 1)[1]
+                    for name in config["mixins"] + config["client"]
+                    if name.startswith("armor.")
+                }
+                self.assertEqual(listed, armor_sources)
+                self.assertIn("armor.ServerEquipmentFilterMixin", config["mixins"])
+        neoforge = json.loads(NEOFORGE_ARMOR_CONFIG.read_text(encoding="utf-8"))
+        self.assertEqual(neoforge["package"], ARMOR_MIXIN_PACKAGE)
+        self.assertIs(neoforge["required"], True)
+        self.assertEqual(set(neoforge["mixins"]) | set(neoforge["client"]), armor_sources)
+        self.assertEqual(neoforge["mixins"], ["ServerEquipmentFilterMixin"])
+        for toml in NEOFORGE_MOD_TOMLS:
+            with self.subTest(toml=relative(toml)):
+                self.assertIn('config = "quickskin-armor.mixins.json"', toml.read_text(encoding="utf-8"))
 
     def test_ears_five_lookup_selects_every_overload(self) -> None:
         source = (

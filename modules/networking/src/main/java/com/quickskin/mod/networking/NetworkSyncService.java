@@ -135,6 +135,8 @@ public class NetworkSyncService {
             protocolHelloAttempts = 0;
             protocolHelloRetryAtMillis = 0L;
             snapshotRetryAtMillis = 0L;
+            NicknameSyncService.getInstance().onProtocolAcknowledged(connection);
+            HiddenArmorSyncService.getInstance().onProtocolAcknowledged(connection);
         }
     }
 
@@ -437,6 +439,8 @@ public class NetworkSyncService {
 
     /** Emits a bounded number of already-prepared packets from the client tick. */
     public synchronized void tick() {
+        NicknameSyncService.getInstance().tick();
+        SkinAdminClient.getInstance().tick();
         tickChannelDiscovery();
         tickProtocolHandshake();
         tickAppearanceSnapshotRequest();

@@ -22,6 +22,14 @@ config = "quickskin-neoforge.mixins.json"
 [[mixins]]
 config = "quickskin-ears.mixins.json"
 
+# NeoForge never reads quickskin.mixins.json; the nickname mixins live in common
+[[mixins]]
+config = "quickskin-nicknames.mixins.json"
+
+# Hidden armour: the server's equipment filter and the local player's own draw (ADR 0017)
+[[mixins]]
+config = "quickskin-armor.mixins.json"
+
 [[mixins]]
 config = "quickskin-architectury-26_1-compat.mixins.json"
 

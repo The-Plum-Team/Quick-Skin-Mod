@@ -14,6 +14,7 @@ import com.quickskin.mod.networking.payloads.CooldownUpdatePayload;
 import com.quickskin.mod.server.data.ServerCooldownManager;
 import com.quickskin.mod.server.storage.ServerAppearanceStorage;
 import com.quickskin.mod.runtime.ServerRuntime;
+import dev.architectury.event.events.common.CommandRegistrationEvent;
 import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.PlayerEvent;
 import dev.architectury.event.events.common.TickEvent;
@@ -62,6 +63,8 @@ public class CommonEvents {
 
             // Send QuickSkin data only to players that have the mod installed
             ServerPlayer serverPlayer = (ServerPlayer) player;
+            // A skin an admin gave this player is pinned again before anyone is sent it
+            com.quickskin.mod.networking.ServerSkinAssignments.playerJoined(serverPlayer);
             ProtocolNetwork.classifyServerPeer(serverPlayer);
             boolean hasQuickSkin = ProtocolNetwork.canReceive(serverPlayer);
 
@@ -97,6 +100,10 @@ public class CommonEvents {
             // This ensures that existing players (like the host) see the joining player's appearance
             // (sendAppearanceToAllPlayers internally checks canReceiveQuickSkin for each recipient)
             ServerNetworkHandler.sendAppearanceToAllPlayers(serverPlayer);
+
+            // Vanilla's join packets named the player in the tab list; operators also see the
+            // account name of whoever uses a nickname
+            com.quickskin.mod.networking.ServerNicknames.playerJoined(serverPlayer);
         });
 
         // Player quits server
@@ -134,6 +141,9 @@ public class CommonEvents {
 
         TickEvent.SERVER_POST.register(ServerNetworkHandler::tickTextureResponses);
         TickEvent.SERVER_POST.register(MissingModNotice::tick);
+
+        // Admin commands: /quickskin nickname ...
+        CommandRegistrationEvent.EVENT.register(com.quickskin.mod.networking.QuickSkinCommands::register);
 
         // Server starting
         LifecycleEvent.SERVER_STARTING.register(server -> {

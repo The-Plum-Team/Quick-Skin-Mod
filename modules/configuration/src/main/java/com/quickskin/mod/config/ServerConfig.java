@@ -87,6 +87,22 @@ public class ServerConfig {
     public String playersWithoutQuickSkinLink = DEFAULT_NOTICE_LINK;
 
     /**
+     * Let players pick a cosmetic nickname in the skin menu. The server shows it in chat, in death
+     * and advancement messages and in the tab list, and adds the account name in join and leave
+     * messages and, for operators, in the tab list; commands keep using account names (ADR 0015).
+     * When off, every nickname is hidden and changes are refused; the nicknames already chosen
+     * are kept for when it is turned back on.
+     */
+    public boolean allowNicknames = true;
+
+    /**
+     * Let players hide pieces of their armour from everyone: the server leaves a hidden piece out
+     * of the equipment it sends other players, Quick Skin or not (ADR 0017). The piece is still
+     * worn and protects as usual, so a PvP server may want this off; off, everyone's armour shows.
+     */
+    public boolean allowHiddenArmor = true;
+
+    /**
      * Runtime fact the server sends to Quick Skin clients, never read from or written to the
      * file: what players without Quick Skin on this server see after an upload to Mojang. One of
      * the {@code ACCOUNT_SKIN_*} values, or {@code null} when unknown (an older server).

@@ -9,6 +9,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 
 //? if <1.21 {
+import java.util.List;
 import java.util.UUID;
 //?}
 public interface NetworkTransport {
@@ -67,12 +68,22 @@ public interface NetworkTransport {
     void sendAnimationMetadataV2ToServer(String contentId, String metadataJson);
     void requestTextureV2FromServer(UUID playerId, String textureType, String contentId);
     void sendAccountSkinChangedToServer(UUID playerId);
+    void sendNicknameToServer(UUID playerId, int requestId, String nickname);
+    void sendArmorVisibilityToServer(UUID playerId, int hidden);
+    void sendSkinAdminToServer(
+            int requestId, int action, List<UUID> players, String skinId, String model, String name);
     //?} else {
     boolean canServerReceive(CustomPacketPayload.Type<?> type);
     //?}
 
     //? if <1.21 {
     void sendCooldownToPlayer(ServerPlayer player, long cooldownEndTime);
+    void sendNicknameResultToPlayer(
+            ServerPlayer player, int requestId, int status, String nickname, long retryAfterMillis);
+    void sendNicknamesToPlayer(ServerPlayer player, List<NicknameEntry> entries);
+    void sendAssignedSkinToPlayer(ServerPlayer player, String skinId, String model);
+    void sendSkinAdminResultToPlayer(ServerPlayer player, int requestId, int status, int count);
+    void sendSkinAdminStateToPlayer(ServerPlayer player, List<PoolSkinEntry> pool, List<UUID> assigned);
     void sendTextureToPlayer(ServerPlayer player, String textureType, String hash, byte[] imageData);
     void sendTextureChunkToPlayer(
             ServerPlayer player, String hash, String textureType,

@@ -12,6 +12,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -58,6 +59,12 @@ public class ModNetworking implements NetworkTransport {
         new ResourceLocation(QuickSkinInfo.MOD_ID, "upload_animation_metadata_v2");
     public static final ResourceLocation ACCOUNT_SKIN_CHANGED =
         new ResourceLocation(QuickSkinInfo.MOD_ID, "account_skin_changed");
+    public static final ResourceLocation SET_NICKNAME =
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "set_nickname");
+    public static final ResourceLocation SKIN_ADMIN =
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "skin_admin");
+    public static final ResourceLocation ARMOR_VISIBILITY =
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "armor_visibility");
 
     // Server to Client packets (S2C)
     public static final ResourceLocation SYNC_APPEARANCE =
@@ -91,6 +98,16 @@ public class ModNetworking implements NetworkTransport {
         new ResourceLocation(QuickSkinInfo.MOD_ID, "send_texture_chunk_v2");
     public static final ResourceLocation SEND_ANIMATION_METADATA_V2 =
         new ResourceLocation(QuickSkinInfo.MOD_ID, "send_animation_metadata_v2");
+    public static final ResourceLocation NICKNAME_RESULT =
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "nickname_result");
+    public static final ResourceLocation SYNC_NICKNAMES =
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "sync_nicknames");
+    public static final ResourceLocation ASSIGNED_SKIN =
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "assigned_skin");
+    public static final ResourceLocation SKIN_ADMIN_RESULT =
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "skin_admin_result");
+    public static final ResourceLocation SKIN_ADMIN_STATE =
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "skin_admin_state");
 
     /**
      * Initializes networking (registers server-side receivers)
@@ -164,6 +181,12 @@ public class ModNetworking implements NetworkTransport {
         NetworkManager.registerReceiver(
             NetworkManager.c2s(), ACCOUNT_SKIN_CHANGED,
             ServerNetworkHandler::handleAccountSkinChanged);
+        NetworkManager.registerReceiver(
+            NetworkManager.c2s(), SET_NICKNAME, ServerNetworkHandler::handleSetNickname);
+        NetworkManager.registerReceiver(
+            NetworkManager.c2s(), SKIN_ADMIN, ServerNetworkHandler::handleSkinAdmin);
+        NetworkManager.registerReceiver(
+            NetworkManager.c2s(), ARMOR_VISIBILITY, ServerNetworkHandler::handleArmorVisibility);
 
     }
 
@@ -218,6 +241,16 @@ public class ModNetworking implements NetworkTransport {
         NetworkManager.registerReceiver(
             NetworkManager.s2c(), SEND_ANIMATION_METADATA_V2,
             ClientNetworkHandler::handleSendAnimationMetadataV2);
+        NetworkManager.registerReceiver(
+            NetworkManager.s2c(), NICKNAME_RESULT, ClientNetworkHandler::handleNicknameResult);
+        NetworkManager.registerReceiver(
+            NetworkManager.s2c(), SYNC_NICKNAMES, ClientNetworkHandler::handleSyncNicknames);
+        NetworkManager.registerReceiver(
+            NetworkManager.s2c(), ASSIGNED_SKIN, ClientNetworkHandler::handleAssignedSkin);
+        NetworkManager.registerReceiver(
+            NetworkManager.s2c(), SKIN_ADMIN_RESULT, ClientNetworkHandler::handleSkinAdminResult);
+        NetworkManager.registerReceiver(
+            NetworkManager.s2c(), SKIN_ADMIN_STATE, ClientNetworkHandler::handleSkinAdminState);
     }
 
     @Override
@@ -392,6 +425,100 @@ public class ModNetworking implements NetworkTransport {
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         buffer.writeUUID(playerId);
         NetworkManager.sendToServer(ACCOUNT_SKIN_CHANGED, buffer);
+    }
+
+    @Override
+    public void sendNicknameToServer(UUID playerId, int requestId, String nickname) {
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        buffer.writeUUID(playerId);
+        buffer.writeInt(requestId);
+        buffer.writeUtf(nickname, TextureTransferLimits.MAX_NICKNAME_CHARS);
+        NetworkManager.sendToServer(SET_NICKNAME, buffer);
+    }
+
+    @Override
+    public void sendArmorVisibilityToServer(UUID playerId, int hidden) {
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        buffer.writeUUID(playerId);
+        buffer.writeByte(hidden);
+        NetworkManager.sendToServer(ARMOR_VISIBILITY, buffer);
+    }
+
+    @Override
+    public void sendSkinAdminToServer(
+            int requestId, int action, List<UUID> players, String skinId, String model, String name) {
+        if (players.size() > TextureTransferLimits.MAX_SKIN_ADMIN_PLAYERS) {
+            throw new IllegalArgumentException("Too many players in one request: " + players.size());
+        }
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        buffer.writeInt(requestId);
+        buffer.writeByte(action);
+        buffer.writeInt(players.size());
+        for (UUID player : players) buffer.writeUUID(player);
+        buffer.writeUtf(skinId, TextureTransferLimits.MAX_APPEARANCE_ID_BYTES);
+        buffer.writeUtf(model, TextureTransferLimits.MAX_MODEL_BYTES);
+        buffer.writeUtf(name, TextureTransferLimits.MAX_POOL_SKIN_NAME_CHARS);
+        NetworkManager.sendToServer(SKIN_ADMIN, buffer);
+    }
+
+    @Override
+    public void sendAssignedSkinToPlayer(ServerPlayer player, String skinId, String model) {
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        buffer.writeUtf(skinId, TextureTransferLimits.MAX_APPEARANCE_ID_BYTES);
+        buffer.writeUtf(model, TextureTransferLimits.MAX_MODEL_BYTES);
+        NetworkManager.sendToPlayer(player, ASSIGNED_SKIN, buffer);
+    }
+
+    @Override
+    public void sendSkinAdminResultToPlayer(ServerPlayer player, int requestId, int status, int count) {
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        buffer.writeInt(requestId);
+        buffer.writeByte(status);
+        buffer.writeInt(count);
+        NetworkManager.sendToPlayer(player, SKIN_ADMIN_RESULT, buffer);
+    }
+
+    @Override
+    public void sendSkinAdminStateToPlayer(ServerPlayer player, List<PoolSkinEntry> pool, List<UUID> assigned) {
+        if (pool.size() > TextureTransferLimits.MAX_POOL_SKINS
+                || assigned.size() > TextureTransferLimits.MAX_ASSIGNED_SKIN_ENTRIES) {
+            throw new IllegalArgumentException("Skin admin state over its bounds");
+        }
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        buffer.writeInt(pool.size());
+        for (PoolSkinEntry entry : pool) {
+            buffer.writeUtf(entry.name(), TextureTransferLimits.MAX_POOL_SKIN_NAME_CHARS);
+            buffer.writeUtf(entry.skinId(), TextureTransferLimits.MAX_APPEARANCE_ID_BYTES);
+            buffer.writeUtf(entry.model(), TextureTransferLimits.MAX_MODEL_BYTES);
+        }
+        buffer.writeInt(assigned.size());
+        for (UUID playerId : assigned) buffer.writeUUID(playerId);
+        NetworkManager.sendToPlayer(player, SKIN_ADMIN_STATE, buffer);
+    }
+
+    @Override
+    public void sendNicknameResultToPlayer(
+            ServerPlayer player, int requestId, int status, String nickname, long retryAfterMillis) {
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        buffer.writeInt(requestId);
+        buffer.writeByte(status);
+        buffer.writeUtf(nickname, TextureTransferLimits.MAX_NICKNAME_CHARS);
+        buffer.writeLong(retryAfterMillis);
+        NetworkManager.sendToPlayer(player, NICKNAME_RESULT, buffer);
+    }
+
+    @Override
+    public void sendNicknamesToPlayer(ServerPlayer player, List<NicknameEntry> entries) {
+        if (entries.size() > TextureTransferLimits.MAX_NICKNAME_ENTRIES) {
+            throw new IllegalArgumentException("Too many nicknames in one packet: " + entries.size());
+        }
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        buffer.writeInt(entries.size());
+        for (NicknameEntry entry : entries) {
+            buffer.writeUUID(entry.playerId());
+            buffer.writeUtf(entry.nickname(), TextureTransferLimits.MAX_NICKNAME_CHARS);
+        }
+        NetworkManager.sendToPlayer(player, SYNC_NICKNAMES, buffer);
     }
 
     @Override

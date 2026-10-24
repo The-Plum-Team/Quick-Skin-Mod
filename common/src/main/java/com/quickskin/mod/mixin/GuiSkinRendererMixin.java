@@ -8,6 +8,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 //?}
 import com.mojang.math.Axis;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
+import com.quickskin.mod.client.rendering.PreviewEquipment;
 import com.quickskin.mod.platform.CapeRenderTypes;
 import com.quickskin.mod.client.rendering.SkinLayers3DIntegration;
 //? if <26.2 {
@@ -130,15 +131,54 @@ public class GuiSkinRendererMixin {
                 PlayerModelRenderer.consumePendingCape(
                         state.playerModel(), state.texture(), state.rotationX(), state.rotationY(),
                         state.pivotY(), state.x0(), state.y0(), state.x1(), state.y1(), state.scale());
-        if (cape == null || cape.texture() == null
-                || cape.bodyModel() == null || cape.capeModel() == null) {
 //?} else {
                 PlayerModelRenderer.consumePendingCape(state.playerModel());
-        if (cape == null) {
 //?}
+        if (cape == null) {
             return;
         }
+        if (cape.worn() != null && cape.bodyModel() != null) {
+            // What the player wears, as the world shows it (ADR 0017)
+//? if <1.21.9 {
+            PreviewEquipment.render(cape.worn(), cape.bodyModel(), poseStack, bufferSource);
+//?} else if <26.2 {
+            var features = Minecraft.getInstance().gameRenderer.getFeatureRenderDispatcher();
+            PreviewEquipment.submit(cape.worn(), cape.bodyModel(), poseStack, features.getSubmitNodeStorage());
+            features.renderAllFeatures();
+//?} else {
+            PreviewEquipment.submit(cape.worn(), cape.bodyModel(), poseStack, collector);
+//?}
+        }
+        if (cape.texture() != null && cape.bodyModel() != null && cape.capeModel() != null) {
+//? if <26.2 {
+            quickskin$drawCape(cape, poseStack, bufferSource);
+//?} else {
+            quickskin$drawCape(cape, poseStack, collector);
+//?}
+        }
+        if (cape.worn() != null && cape.bodyModel() != null) {
+            // The piece the skin menu shows see-through goes last, over the cape (ADR 0017)
+//? if <1.21.9 {
+            PreviewEquipment.renderGhost(cape.worn(), cape.bodyModel(), poseStack, bufferSource);
+//?} else if <26.2 {
+            var features = Minecraft.getInstance().gameRenderer.getFeatureRenderDispatcher();
+            if (PreviewEquipment.submitGhost(cape.worn(), cape.bodyModel(), poseStack, features.getSubmitNodeStorage())) {
+                features.renderAllFeatures();
+            }
+//?} else {
+            PreviewEquipment.submitGhost(cape.worn(), cape.bodyModel(), poseStack, collector);
+//?}
+        }
+    }
 
+    /** Draws the preview's cape, or its texture on folded elytra wings when the preview asked for them. */
+//? if <26.2 {
+    private static void quickskin$drawCape(PlayerModelRenderer.PreviewCapeState cape, PoseStack poseStack,
+                                           MultiBufferSource.BufferSource bufferSource) {
+//?} else {
+    private static void quickskin$drawCape(PlayerModelRenderer.PreviewCapeState cape, PoseStack poseStack,
+                                           SubmitNodeCollector collector) {
+//?}
         RenderType capeRenderType = CapeRenderTypes.translucent(cape.texture());
 //? if <26.2 {
         VertexConsumer capeConsumer = bufferSource.getBuffer(capeRenderType);
