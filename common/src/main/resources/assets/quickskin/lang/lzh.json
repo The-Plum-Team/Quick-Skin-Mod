@@ -105,6 +105,7 @@
   "quickskin.error.lookup_unavailable": "不能通 Mojang 以尋此名。宜察網路而再試",
   "quickskin.error.profile_unavailable": "不能通 Mojang 以讀此錄。宜察網路而再試",
   "quickskin.error.download_unavailable": "不能通 Mojang 以下此皮。宜察網路而再試",
+  "quickskin.error.mojang_rate_limited": "Mojang 今限其尋。宜少待而再試",
   "quickskin.error.invalid_skin_response": "Mojang 所返之皮不可讀。宜後再試",
   "quickskin.error.skin_search_failed": "不能尋皮。宜察網路而再試",
   "quickskin.error.save_searched_skin": "%s 之皮不能存於汝列。宜再試",

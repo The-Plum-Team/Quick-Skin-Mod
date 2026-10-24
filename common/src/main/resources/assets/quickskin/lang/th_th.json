@@ -105,6 +105,7 @@
   "quickskin.error.lookup_unavailable": "เชื่อมต่อ Mojang เพื่อค้นหาชื่อนี้ไม่ได้ ตรวจการเชื่อมต่อแล้วลองอีกครั้ง",
   "quickskin.error.profile_unavailable": "เชื่อมต่อ Mojang เพื่ออ่านโปรไฟล์นี้ไม่ได้ ตรวจการเชื่อมต่อแล้วลองอีกครั้ง",
   "quickskin.error.download_unavailable": "เชื่อมต่อ Mojang เพื่อดาวน์โหลดสกินนี้ไม่ได้ ตรวจการเชื่อมต่อแล้วลองอีกครั้ง",
+  "quickskin.error.mojang_rate_limited": "ตอนนี้ Mojang จำกัดการค้นหาอยู่ รอสักหนึ่งนาทีแล้วลองอีกครั้ง",
   "quickskin.error.invalid_skin_response": "Mojang ส่งสกินที่อ่านไม่ได้กลับมา ลองใหม่ภายหลัง",
   "quickskin.error.skin_search_failed": "ค้นหาสกินไม่ได้ ตรวจการเชื่อมต่อแล้วลองอีกครั้ง",
   "quickskin.error.save_searched_skin": "บันทึกสกินของ %s ลงในรายการไม่ได้ ลองอีกครั้ง",
