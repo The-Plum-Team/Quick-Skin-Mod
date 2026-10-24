@@ -120,6 +120,9 @@ public final class AccountSkinProfileTarget implements AccountSkinShareService.T
             observer.connection.send(removal);
             observer.connection.send(addition);
         }
+        // The re-added entry carries the tab-list name everyone sees; operators also see the
+        // account name of a player with a nickname (ADR 0015)
+        com.quickskin.mod.networking.ServerNicknames.sendOperatorView(player, observers);
 
         Object tracked = ((ChunkMapAccessor) ((ServerLevel) player.level()).getChunkSource().chunkMap)
                 .quickskin$entityMap().get(player.getId());

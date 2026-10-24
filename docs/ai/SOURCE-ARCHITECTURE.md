@@ -114,6 +114,27 @@ hands it over and sends the service's `accountSkinVisibility` with the server co
 `Player.gameProfile` accessors and the player-info and entity-pairing packets (ADR 0012).
 `skin-upload` reports a successful upload through `ClientNetworkActions`.
 
+Nicknames (ADR 0015) follow the same split. `Nickname` (content-core) owns the rules;
+`AccountNicknames` (configuration) the client's per-account choice; `LocalNicknameService`
+(appearance-services) the skin menu's way to it through `ClientNetworkActions`; `NameTagButton`
+and `NicknameScreen` (skin-menu) the menu. `ServerNicknameStore` (server-appearance) persists the
+world's nicknames and decides each request. Networking owns the `nicknames` capability's payloads,
+the client's `NicknameSyncService` and `PlayerNicknameRepository` (client-foundation) writes, and
+`ServerNicknames`, which answers requests, syncs Quick Skin clients and sends per-viewer tab-list
+names. `common` owns `NicknameDisplay` and the four mixins in `com.quickskin.mod.mixin.nickname`,
+which NeoForge loads from its own `quickskin-nicknames.mixins.json`. The admin commands
+(`QuickSkinCommands`, networking) are registered by `CommonEvents`; `NicknamePool`
+(server-appearance) reads the names `random` hands out.
+
+Assigned skins (ADR 0016) follow the same split. protocol-core owns the `assigned-skins` values
+(`SkinAdminAction`, `SkinAdminStatus`, `PoolSkinEntry`); server-appearance owns
+`ServerSkinAssignmentStore` (persistence), `SkinPoolFolder` (the skin folder) and the texture
+cache's skin pins; networking owns the payloads, `ServerSkinAssignments` (server thread: gives,
+pins, substitution, admin state) and the client's `SkinAdminClient` (assigned skin and admin
+requests with their uploads). appearance-services draws the assigned skin on the local player
+behind `RemoteAppearanceTarget.applyAssignedSkin`/`ownAppearance`, and settings-ui owns the
+`PlayerSkinsScreen` panel, opened from the Server tab of `SettingsScreen`.
+
 `PlatformHelper` is now a stable API in `platform-api`; Architectury binds its loader methods
 after the modules are assembled. Its old rendering forwards belong to `MinecraftCompat` in
 `minecraft-adapter`. That facade selects four implementations by Minecraft API family: immediate

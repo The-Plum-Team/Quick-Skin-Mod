@@ -10,7 +10,23 @@ public enum ProtocolCapability {
      * The client may report that it changed its own Mojang account skin, so a server that shares
      * account skins with players without Quick Skin can refresh the signed vanilla profile.
      */
-    ACCOUNT_SKIN_REFRESH("account-skin-refresh", 1L << 4);
+    ACCOUNT_SKIN_REFRESH("account-skin-refresh", 1L << 4),
+    /**
+     * The client may tell the server its cosmetic nickname, and the server sends the nicknames of
+     * the players online so the client can show them on name tags.
+     */
+    NICKNAMES("nicknames", 1L << 5),
+    /**
+     * The server may give a player a skin for now, which others see instead of theirs, and tells
+     * that player's client so it shows it too; an admin's client may hand out such skins and keep
+     * the server's skin pool.
+     */
+    ASSIGNED_SKINS("assigned-skins", 1L << 6),
+    /**
+     * The client may tell the server which of its armour pieces to hide, and the server leaves
+     * them out of the equipment it sends every other player, Quick Skin or not.
+     */
+    HIDDEN_ARMOR("hidden-armor", 1L << 7);
 
     private final String id;
     private final long mask;

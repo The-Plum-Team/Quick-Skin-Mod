@@ -589,7 +589,8 @@ public class ClientNetworkHandler {
                     || oldServerConfig.skinChangeCooldownSeconds
                             != serverConfig.skinChangeCooldownSeconds
                     || !java.util.Objects.equals(oldServerConfig.accountSkinVisibility,
-                            serverConfig.accountSkinVisibility);
+                            serverConfig.accountSkinVisibility)
+                    || oldServerConfig.allowNicknames != serverConfig.allowNicknames;
             if (configChanged) {
                 clientConfig.applyServerOverride(serverConfig);
             }
@@ -619,8 +620,9 @@ public class ClientNetworkHandler {
         UUID playerId = mc.player.getUUID();
         // Held back until the server's record of this player is known; see adoptOwnServerAppearance.
         if (NetworkSyncService.getInstance().awaitsOwnServerState(playerId, mc.getConnection())) return;
+        // The player's own look: while an admin's skin is drawn on them, that is not the one to upload
         com.quickskin.mod.common.data.PlayerAppearance currentAppearance =
-            com.quickskin.mod.common.data.PlayerAppearanceRepository.getInstance().getAppearance(playerId);
+            appearanceTarget().ownAppearance(playerId);
         if (currentAppearance == null) return;
         appearanceBootstrapSent = true;
         NetworkSyncService.getInstance().syncAppearance(
@@ -805,6 +807,180 @@ public class ClientNetworkHandler {
                 releaseHeldAppearance(sourceConnection);
             }
         });
+    }
+
+    /** The server's answer to this session's latest nickname request. */
+    //? if <1.21 {
+    public static void handleNicknameResult(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
+        int requestId = buf.readInt();
+        int statusCode = buf.readUnsignedByte();
+        String nickname = PacketHelper.readString(buf, TextureTransferLimits.MAX_NICKNAME_CHARS);
+        long retryAfterMillis = buf.readLong();
+    //?} else {
+    public static void handleNicknameResult(
+            NicknameResultPayload payload, NetworkManager.PacketContext context) {
+        int requestId = payload.requestId();
+        int statusCode = payload.status();
+        String nickname = payload.nickname();
+        long retryAfterMillis = payload.retryAfterMillis();
+    //?}
+        NicknameStatus status = NicknameStatus.fromCode(statusCode);
+        Object sourceConnection = packetConnectionIdentity(context);
+        if (status == null || sourceConnection == null || !isCurrentConnection(sourceConnection)
+                || !acceptsNicknames(sourceConnection)
+                || !ClientTextureIngressLimiter.getInstance().allowControlBytes(
+                        Integer.BYTES + 1 + Long.BYTES + controlBytes(nickname))) return;
+        // A nickname this client cannot show still answers the request
+        String shown = NetworkSecurity.isShowableNickname(nickname) ? nickname : "";
+        context.queue(() -> {
+            if (!isCurrentConnection(sourceConnection)) return;
+            NicknameSyncService.getInstance().onAnswer(
+                    sourceConnection, requestId, status, shown, retryAfterMillis);
+        });
+    }
+
+    /** The nicknames of players on the server, which name tags show instead of their names. */
+    //? if <1.21 {
+    public static void handleSyncNicknames(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
+        int count = buf.readInt();
+        if (count < 0 || count > TextureTransferLimits.MAX_NICKNAME_ENTRIES) return;
+        java.util.List<NicknameEntry> entries = new java.util.ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            entries.add(new NicknameEntry(
+                    PacketHelper.readPlayerId(buf),
+                    PacketHelper.readString(buf, TextureTransferLimits.MAX_NICKNAME_CHARS)));
+        }
+    //?} else {
+    public static void handleSyncNicknames(
+            SyncNicknamesPayload payload, NetworkManager.PacketContext context) {
+        java.util.List<NicknameEntry> entries = payload.entries();
+    //?}
+        Object sourceConnection = packetConnectionIdentity(context);
+        if (sourceConnection == null || !isCurrentConnection(sourceConnection)
+                || !acceptsNicknames(sourceConnection)) return;
+        int bytes = Integer.BYTES;
+        java.util.List<NicknameEntry> shown = new java.util.ArrayList<>(entries.size());
+        for (NicknameEntry entry : entries) {
+            bytes += 16 + controlBytes(entry.nickname());
+            // One nickname this client cannot show only clears that player's
+            shown.add(NetworkSecurity.isShowableNickname(entry.nickname())
+                    ? entry : new NicknameEntry(entry.playerId(), ""));
+        }
+        if (!ClientTextureIngressLimiter.getInstance().allowControlBytes(bytes)) return;
+        context.queue(() -> {
+            if (!isCurrentConnection(sourceConnection)) return;
+            Minecraft minecraft = Minecraft.getInstance();
+            java.util.UUID ownId = minecraft.player != null ? minecraft.player.getUUID() : null;
+            for (NicknameEntry entry : shown) {
+                com.quickskin.mod.common.data.PlayerNicknameRepository.getInstance()
+                        .set(entry.playerId(), entry.nickname());
+                if (entry.playerId().equals(ownId)) {
+                    NicknameSyncService.getInstance().onOwnNickname(sourceConnection, entry.nickname());
+                }
+            }
+        });
+    }
+
+    /** The skin an admin gave the local player on this server ({@code ""}: none any more). */
+    //? if <1.21 {
+    public static void handleAssignedSkin(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
+        String skinId = PacketHelper.readString(buf, TextureTransferLimits.MAX_APPEARANCE_ID_BYTES);
+        String model = PacketHelper.readString(buf, TextureTransferLimits.MAX_MODEL_BYTES);
+    //?} else {
+    public static void handleAssignedSkin(
+            AssignedSkinPayload payload, NetworkManager.PacketContext context) {
+        String skinId = payload.skinId();
+        String model = payload.model();
+    //?}
+        Object sourceConnection = packetConnectionIdentity(context);
+        boolean valid = skinId.isEmpty() || (skinId.startsWith("local_skin:")
+                && NetworkSecurity.isValidV2AppearanceId(skinId, "skin")
+                && ("classic".equals(model) || "slim".equals(model)));
+        if (!valid || sourceConnection == null || !isCurrentConnection(sourceConnection)
+                || !acceptsAssignedSkins(sourceConnection)
+                || !ClientTextureIngressLimiter.getInstance().allowControlBytes(controlBytes(skinId, model))) return;
+        context.queue(() -> {
+            if (!isCurrentConnection(sourceConnection)) return;
+            SkinAdminClient.getInstance().onAssignedSkin(sourceConnection, skinId, model, appearanceTarget());
+        });
+    }
+
+    /** The server's answer to a skin request this admin's client made. */
+    //? if <1.21 {
+    public static void handleSkinAdminResult(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
+        int requestId = buf.readInt();
+        int statusCode = buf.readUnsignedByte();
+        int count = buf.readInt();
+    //?} else {
+    public static void handleSkinAdminResult(
+            SkinAdminResultPayload payload, NetworkManager.PacketContext context) {
+        int requestId = payload.requestId();
+        int statusCode = payload.status();
+        int count = payload.count();
+    //?}
+        SkinAdminStatus status = SkinAdminStatus.fromCode(statusCode);
+        Object sourceConnection = packetConnectionIdentity(context);
+        if (status == null || sourceConnection == null || !isCurrentConnection(sourceConnection)
+                || !acceptsAssignedSkins(sourceConnection)
+                || !ClientTextureIngressLimiter.getInstance().allowControlBytes(2 * Integer.BYTES + 1)) return;
+        context.queue(() -> {
+            if (!isCurrentConnection(sourceConnection)) return;
+            SkinAdminClient.getInstance().onAnswer(sourceConnection, requestId, status, count);
+        });
+    }
+
+    /** The server's skin pool and who has an assigned skin, for an admin's client. */
+    //? if <1.21 {
+    public static void handleSkinAdminState(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
+        int poolSize = buf.readInt();
+        if (poolSize < 0 || poolSize > TextureTransferLimits.MAX_POOL_SKINS) return;
+        java.util.List<PoolSkinEntry> pool = new java.util.ArrayList<>(poolSize);
+        for (int i = 0; i < poolSize; i++) {
+            pool.add(new PoolSkinEntry(
+                    PacketHelper.readString(buf, TextureTransferLimits.MAX_POOL_SKIN_NAME_CHARS),
+                    PacketHelper.readString(buf, TextureTransferLimits.MAX_APPEARANCE_ID_BYTES),
+                    PacketHelper.readString(buf, TextureTransferLimits.MAX_MODEL_BYTES)));
+        }
+        int assignedSize = buf.readInt();
+        if (assignedSize < 0 || assignedSize > TextureTransferLimits.MAX_ASSIGNED_SKIN_ENTRIES) return;
+        java.util.List<java.util.UUID> assigned = new java.util.ArrayList<>(assignedSize);
+        for (int i = 0; i < assignedSize; i++) assigned.add(PacketHelper.readPlayerId(buf));
+    //?} else {
+    public static void handleSkinAdminState(
+            SkinAdminStatePayload payload, NetworkManager.PacketContext context) {
+        java.util.List<PoolSkinEntry> pool = payload.pool();
+        java.util.List<java.util.UUID> assigned = payload.assigned();
+    //?}
+        Object sourceConnection = packetConnectionIdentity(context);
+        if (sourceConnection == null || !isCurrentConnection(sourceConnection)
+                || !acceptsAssignedSkins(sourceConnection)) return;
+        int bytes = 2 * Integer.BYTES + 16 * assigned.size();
+        java.util.List<PoolSkinEntry> valid = new java.util.ArrayList<>(pool.size());
+        for (PoolSkinEntry entry : pool) {
+            bytes += controlBytes(entry.name(), entry.skinId(), entry.model());
+            // A pool skin this client cannot name or show is left out on its own
+            if (PoolSkinEntry.isValidName(entry.name()) && entry.skinId().startsWith("local_skin:")
+                    && NetworkSecurity.isValidV2AppearanceId(entry.skinId(), "skin")
+                    && ("classic".equals(entry.model()) || "slim".equals(entry.model()))) {
+                valid.add(entry);
+            }
+        }
+        if (!ClientTextureIngressLimiter.getInstance().allowControlBytes(bytes)) return;
+        java.util.List<java.util.UUID> assignedPlayers = java.util.List.copyOf(assigned);
+        context.queue(() -> {
+            if (!isCurrentConnection(sourceConnection)) return;
+            SkinAdminClient.getInstance().onState(sourceConnection, valid, assignedPlayers);
+        });
+    }
+
+    private static boolean acceptsAssignedSkins(Object connection) {
+        ProtocolProfile profile = ProtocolSessions.getInstance().clientProfile(connection);
+        return acceptsWireMode(connection, true) && profile.supports(ProtocolCapability.ASSIGNED_SKINS);
+    }
+
+    private static boolean acceptsNicknames(Object connection) {
+        ProtocolProfile profile = ProtocolSessions.getInstance().clientProfile(connection);
+        return acceptsWireMode(connection, true) && profile.supports(ProtocolCapability.NICKNAMES);
     }
 
     private static int controlBytes(String... values) {

@@ -13,12 +13,24 @@
     "ItemInHandRendererMixin",
     "PanoramaRendererMixin",
     "PreviewEquipmentMixin",
-    "PreviewSkinSwapPoseMixin"
+    "PreviewSkinSwapPoseMixin",
+    "armor.EntityRenderDispatcherPlayersMixin",
+    "armor.LivingEntityRendererLayersMixin",
+    "armor.LocalArmorLayerMixin",
+    "armor.LocalArmorRenderMixin",
+    "armor.LocalElytraLayerMixin",
+    "armor.LocalHeadLayerMixin",
+    "armor.PreviewArmorPoseMixin"
   ],
   "mixins": [
     "ChunkMapAccessor",
     "PlayerGameProfileAccessor",
-    "TrackedEntityAccessor"
+    "TrackedEntityAccessor",
+    "nickname.PlayerDisplayNameMixin",
+    "nickname.PlayerListJoinMessageMixin",
+    "nickname.ServerGamePacketListenerLeaveMessageMixin",
+    "nickname.ServerPlayerTabNameMixin",
+    "armor.ServerEquipmentFilterMixin"
   ],
   "injectors": {
     "defaultRequire": 1

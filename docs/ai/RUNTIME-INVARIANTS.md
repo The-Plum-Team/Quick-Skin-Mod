@@ -18,7 +18,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   predates per-account storage goes to the first account that joins, once.
   `CpmModelWorkflow.activateSkin` records one, which includes the skin menu's programmatic
   selections; the own-skin auto-selection of `PlayerOwnSkinBootstrap` / `SavedAppearanceRestorer`
-  and a skin adopted from the server do not. Capes and CPM models stay instance-wide.
+  and a skin adopted from the server do not. Capes and CPM models stay instance-wide. A
+  cosmetic nickname belongs to the launcher account too (`ClientConfig.accountNicknames`, same
+  key); only the skin menu's nickname dialog records one.
 - A session whose account has no selection uploads nothing until it has seen the server's record
   of its own player (`AccountSkinSession`), and only on a negotiated connection that completes
   appearance snapshots; the latest sync requested meanwhile is held, never dropped. A saved
@@ -138,6 +140,78 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   texture deletion must remove metadata, authority, and identity together.
 - Appearance and animation convergence depends on exact acknowledgements and bounded retry. Do not
   replace it with optimistic send-once synchronization.
+- A player may hide armour pieces from everyone (ADR 0017): the client sends its per-account mask
+  in `armor_visibility` on a session that negotiated `hidden-armor`, and `ServerHiddenArmor`, fed by
+  a mixin on the play connection's `send(Packet)`, empties those pieces in every other player's
+  copy of the equipment packet, alone or in a bundle, for every client, Quick Skin or not. The item
+  stays worn; nothing is written to the player. `allowHiddenArmor` (default on) turns it off. The
+  player's own client hides the pieces only where the server does. On NeoForge these mixins load
+  from `quickskin-armor.mixins.json`.
+- A cosmetic nickname (ADR 0015) is text, not an appearance, and reaches every client through
+  display names; account names keep every other role. `Nickname` (content-core) is the only rule
+  set, applied by the client's text box, the wire check (`NetworkSecurity.isValidNickname`, 32
+  UTF-16 units and 96 bytes so both codec eras accept the same names) and the server. A client
+  sends its own nickname (`set_nickname`) only on a negotiated v2 session with `nicknames` (bit
+  5), once when the session negotiates (an empty one too) and after each change, never during a
+  replay. The server admits it only from that exact session about the sender itself, behind the
+  storage-mutation rate limit, and `ServerNicknameStore` decides on the server thread: refused
+  while `allowNicknames` is off, for a locked player, while an admin's nickname shows
+  (`ASSIGNED`), within 10 seconds of the player's last change (kept across reconnects), or when
+  it reads like
+  (`Nickname.readsAs`: accents, case and look-alike Cyrillic and Greek letters set aside) another
+  online player's account name, an operator's or whitelisted name, or the account name or
+  nickname of any player the store remembers; never through a profile-cache lookup, which can
+  block on Mojang. A join records the account name and clears other players' nicknames that
+  read like it. The answer (`nickname_result`) goes to the sender; changes are logged with the
+  account name and UUID and announced to everyone with `translatableWithFallback`, so clients
+  without Quick Skin read English. A client checks announced nicknames one by one with
+  `NetworkSecurity.isShowableNickname`, which does not depend on the Java version's Unicode
+  tables, and never rewrites the player's stored choice from a server's answer. Display hooks change
+  only the name inside `Player.getDisplayName()`'s team formatting (yielding to another mod's
+  `NameFormat`), the player in the join and leave messages ("Nick (Account)", vanilla keys), and
+  a tab-list name no other mod set; never the profile, `getName`, `getPlainTextName` or
+  `getScoreboardName`, which commands, selectors, scoreboards and suggestions use. Operators
+  (permission level 2) receive a separate tab-list packet with the account name, after joins,
+  nickname, team and operator changes (the last two looked at every second) and after the
+  account-skin refresh re-lists a player for vanilla clients. Quick Skin clients
+  learn the online players' nicknames (`sync_nicknames`, at most 256 per packet, sent when the
+  session becomes ready and then each tick's changes) only over `nicknames`, keep them per
+  session (`PlayerNicknameRepository`) and show them on name tags; the server's sends check the
+  recipient's exact profile for v2 and `nicknames`, never a channel probe, so v1 peers get none.
+  The nickname mixins are degradable and NeoForge loads them from
+  `quickskin-nicknames.mixins.json`, because it never reads `quickskin.mixins.json`.
+- `/quickskin` (`QuickSkinCommands`, networking) is Quick Skin's only command root, registered
+  through Architectury's `CommandRegistrationEvent` and offered only to permission level 2. An
+  admin's nickname is a separate layer of the player's store entry (`assigned`): it shows
+  instead of the player's own, which is kept, follows the same rules without the cooldown,
+  blocks no one's choice but the player's, and is told only to that player and through vanilla's
+  operator feedback, never announced, so a game can hand out names without saying who is who.
+  `allowNicknames` gates only the names players choose. `random` reads
+  `config/quickskin-nicknames.txt` (`NicknamePool`, bounded, written with defaults when missing)
+  on each run and gives each player a different free name, after taking back their earlier
+  admin names; players it cannot name are reported, never given a repeat. An absent player's
+  admin name stays theirs, and blocks it, until a `reset` without players takes back everyone's.
+- An assigned skin (ADR 0016) never replaces a player's own appearance: the repository keeps the
+  record the player's client uploaded and acknowledges, and `ServerSkinAssignments.shownToOthers`
+  swaps in the assigned skin and model only for recipients other than that player, so echoes,
+  uploads, cooldowns and adoption keep their meaning. The player's own client learns it from
+  `assigned_skin` (capability `assigned-skins`, bit 6) and draws it through
+  `PlayerAppearanceService.applyAssignedSkin`; while it shows, every local write for that player
+  (menu choices, saved-look restores, CPM withdrawals, adoption) only replaces the own look kept
+  aside, every sync and the bootstrap upload send that own look (`ownAppearance`), never the
+  assigned id, and taking the skin back applies the own look as the player's choice. Logic that
+  asks whether the player wears a Quick Skin skin of their own reads `hasOwnActiveSkin`; the
+  renderer reads the assigned one. `skin_admin` requests are admitted on the network thread from a
+  v2 session with `assigned-skins` behind the storage-mutation rate limit, name at most 256
+  players, and run on the server thread only for permission level 2, checked again when a request
+  that waited for its upload runs; at most four requests per admin wait, 30 seconds each, for the
+  upload of the skin they name. Every assigned and pool skin is a strong `local_skin:` id held as
+  a skin, with an explicit model. A connected player's assigned skin is pinned under a holder UUID
+  of its own against the shared pinned-byte budget, released when the player leaves (an absent
+  player's appearance pins nothing) and pinned again at the join, or taken back when the cache no
+  longer holds it or the budget has no room; the pool pins as many of its held skins as the budget
+  takes under one holder. A give the budget cannot hold is refused, and taking a skin back releases
+  its pin. A skin the cache does not hold is never substituted, handed out or announced.
 - Quick Skin appearances reach only Quick Skin clients. The one exception is the opt-in
   `shareAccountSkinWithVanillaClients` server option (ADR 0012): after an explicit, successful
   Upload to Mojang, a client whose v2 session negotiated `account-skin-refresh` reports
@@ -221,6 +295,21 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   most one queued save per player holding its latest change, and write under the storage lock so a
   later synchronous disconnect/shutdown save is never overwritten by an older queued one. A full or
   stopped queue defers the save to the disconnect; a queued save never writes into a released world.
+- Nicknames are kept per world in `quickskin/nicknames.json` (`ServerNicknameStore`) with the
+  account name of every player who joined: read with `BoundedFileReader` before any player
+  joins, because the join message is built before a client can send anything; at most 4096
+  players, the one seen longest ago forgotten first; each change and join saved atomically on
+  the cache-I/O executor and the store saved again at stop. A file that cannot be read leaves the
+  store empty and is never saved over; a single invalid entry is dropped, while one that is only
+  unknown to this Java version's Unicode tables is kept. An admin's nickname (`assigned`) and a
+  lock (`locked`) are kept the same way.
+- Assigned skins and the skin pool are kept per world in `quickskin/assigned-skins.json`
+  (`ServerSkinAssignmentStore`): at most 4096 players (a new player is refused, nobody is
+  evicted) and 64 pool skins, read before anyone joins and kept even when the texture cache does
+  not hold a skin now; saved atomically on the cache-I/O executor after each change and again at
+  stop; a file that cannot be read leaves them empty and is never saved over. `SkinPoolFolder` adds the PNG skins of `config/quickskin-skins/`
+  (regular files only, at most 64, each within the upload limit, 64x64 or an HD size and checked
+  like an upload) at start, and off the server thread on `skin pool reload`.
 - Cape atlases produced by the editor or custom import paths must keep the complete vanilla Elytra
   alpha envelope at every supported scale and in every animation frame. That envelope includes
   the transparent inner 10x20 face as well as the tapered outer face; otherwise an opaque source
@@ -336,7 +425,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.
-- A preview hides everything the previewed player wears or holds. The cape editor's Elytra view
+- A preview hides everything the previewed player wears or holds, except the pause menu's and the
+  skin menu's previews, which show the live local player's armour, elytra, held items and worn head
+  as the world does, without the pieces the player hides (`PreviewPlayerData.isEquipmentVisible`,
+  never for a cached player of a world that was left). The skin menu's own posed model borrows the
+  equipment layers of the player renderer of its model type (`PreviewEquipment`, ADR 0017). The cape editor's Elytra view
   is no exception: it draws its own model with vanilla's folded wings wearing the edited cape's
   texture (`PreviewPlayerData.isElytraPreview`), never the elytra the player has equipped. The
   one exception is the HUD preview keeping a held TaCZ (Timeless and Classics Zero) gun readable, so TaCZ poses and draws
@@ -495,7 +588,7 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   at their own scale, chosen from the window size so they look the same at any option, by setting
   only the window's scale while they are shown (`MenuGuiScale`), and put back the option's scale
   in `removed()`, so every other screen and the world open at the player's own scale. A Quick
-  Skin dialog drawn over a menu (Delete, Rename, Settings, Upload to Mojang) takes the menu's
+  Skin dialog drawn over a menu (Delete, Rename, Nickname, Player skins, Settings, Upload to Mojang) takes the menu's
   scale instead (`MenuGuiScale.follow`), so the menu behind it keeps its size, and puts back the
   player's scale when it goes away. The
   skin menu's packaged checkpoint asserts both the menu's scale on the window and the unchanged

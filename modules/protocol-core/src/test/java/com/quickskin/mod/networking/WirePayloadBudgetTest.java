@@ -69,6 +69,26 @@ class WirePayloadBudgetTest {
     }
 
     @Test
+    void nicknamePacketsFitTheirDirection() {
+        assertTrue(WirePayloadBudget.setNickname() <= VANILLA_SERVERBOUND_PAYLOAD_BYTES);
+        assertTrue(WirePayloadBudget.armorVisibility() <= VANILLA_SERVERBOUND_PAYLOAD_BYTES);
+        assertTrue(WirePayloadBudget.nicknameResult() <= VANILLA_CLIENTBOUND_PAYLOAD_BYTES);
+        assertTrue(WirePayloadBudget.syncNicknames() <= VANILLA_CLIENTBOUND_PAYLOAD_BYTES);
+        // A full roster packet stays small next to the client's control-byte budget
+        assertTrue(WirePayloadBudget.syncNicknames() <= TextureTransferLimits.MAX_JSON_BYTES);
+        // 32 UTF-16 units of up to three UTF-8 bytes: both codec eras accept the same names
+        assertEquals(3 * 32, TextureTransferLimits.MAX_NICKNAME_BYTES);
+    }
+
+    @Test
+    void assignedSkinPacketsFitTheirDirection() {
+        assertTrue(WirePayloadBudget.skinAdmin() <= VANILLA_SERVERBOUND_PAYLOAD_BYTES);
+        assertTrue(WirePayloadBudget.assignedSkin() <= VANILLA_CLIENTBOUND_PAYLOAD_BYTES);
+        assertTrue(WirePayloadBudget.skinAdminResult() <= VANILLA_CLIENTBOUND_PAYLOAD_BYTES);
+        assertTrue(WirePayloadBudget.skinAdminState() <= VANILLA_CLIENTBOUND_PAYLOAD_BYTES);
+    }
+
+    @Test
     void aLegacyServerRelayOfTheLargestAllowedUploadFitsOneClientboundPayload() {
         // A 2.x server relays each stored texture whole as quickskin:send_texture.
         assertTrue(WirePayloadBudget.directTexture(TextureTransferLimits.MAX_LEGACY_UPLOAD_BYTES)

@@ -31,8 +31,6 @@ public final class DialogFrame {
     private static final int BORDER = 0xFF6E6F73;
     private static final int FACE = 0xFF2E2F32;
     private static final int LIP = 0xFF1C1D1F;
-    private static final int ICON_COLOR = 0xFFFFFFFF;
-    private static final int ICON_SHADOW = 0xFF2A2A2A;
     private static final int TITLE_COLOR = 0xFFFFFFFF;
 
     /** The header's strip and the line under it. */
@@ -51,13 +49,12 @@ public final class DialogFrame {
         }
     }
 
-    /** Nine-pixel icons for the header. */
+    /** Nine-pixel white icons for the header. */
     public static final String[] ICON_BIN = {
             "..#####..", "#########", ".#######.", ".#.#.#.#.", ".#.#.#.#.",
             ".#.#.#.#.", ".#.#.#.#.", ".#.#.#.#.", ".#######."};
-    public static final String[] ICON_PENCIL = {
-            "......##.", ".....####", "....####.", "...####..", "..####...",
-            ".####....", "#.##.....", "##.......", "###......"};
+    /** The edit dialogs' pencil, in colour. */
+    public static final PixelIcon ICON_PENCIL = PixelIcon.PENCIL;
     public static final String[] ICON_GEAR = {
             "....#....", ".#.###.#.", "..#####..", ".##...##.", "###...###",
             ".##...##.", "..#####..", ".#.###.#.", "....#...."};
@@ -83,6 +80,17 @@ public final class DialogFrame {
             GuiGraphicsExtractor graphics,
             //?}
             Font font, int x, int y, int width, int height, Accent accent, String[] icon, Component title) {
+        draw(graphics, font, x, y, width, height, accent, PixelIcon.white(icon), title, FACE);
+    }
+
+    /** As {@link #draw}, with an icon of any colours. */
+    public static void draw(
+            //? if <26.1 {
+            GuiGraphics graphics,
+            //?} else {
+            GuiGraphicsExtractor graphics,
+            //?}
+            Font font, int x, int y, int width, int height, Accent accent, PixelIcon icon, Component title) {
         draw(graphics, font, x, y, width, height, accent, icon, title, FACE);
     }
 
@@ -94,6 +102,18 @@ public final class DialogFrame {
             GuiGraphicsExtractor graphics,
             //?}
             Font font, int x, int y, int width, int height, Accent accent, String[] icon, Component title,
+            int face) {
+        draw(graphics, font, x, y, width, height, accent, PixelIcon.white(icon), title, face);
+    }
+
+    /** As {@link #draw}, with an icon of any colours and the panel's face in the given colour. */
+    public static void draw(
+            //? if <26.1 {
+            GuiGraphics graphics,
+            //?} else {
+            GuiGraphicsExtractor graphics,
+            //?}
+            Font font, int x, int y, int width, int height, Accent accent, PixelIcon icon, Component title,
             int face) {
         int right = x + width;
         int bottom = y + height;
@@ -109,23 +129,12 @@ public final class DialogFrame {
 
         int middle = (y + 2 + lineY) / 2;
         int iconX = x + 10;
-        int iconY = middle - icon.length / 2;
-        for (int pass = 0; pass < 2; pass++) {
-            int offset = pass == 0 ? 1 : 0;
-            for (int row = 0; row < icon.length; row++) {
-                for (int column = 0; column < icon[row].length(); column++) {
-                    if (icon[row].charAt(column) == '#') {
-                        int px = iconX + column + offset;
-                        int py = iconY + row + offset;
-                        graphics.fill(px, py, px + 1, py + 1, pass == 0 ? ICON_SHADOW : ICON_COLOR);
-                    }
-                }
-            }
-        }
+        int iconY = middle - icon.height() / 2;
+        icon.draw(graphics, iconX, iconY);
 
         // The title in the pixel font, its capitals centred on the strip
         Component text = ConfirmButton.pixelText(title);
-        int textX = iconX + icon[0].length() + 6;
+        int textX = iconX + icon.width() + 6;
         int textY = Math.round(middle + 0.5f - ConfirmButton.pixelCapitalsMiddle());
         //? if <26.1 {
         graphics.drawString(font, text, textX, textY, TITLE_COLOR, true);

@@ -57,12 +57,12 @@ public final class CpmLookArbiter {
             UUID local = minecraft.player.getUUID();
             PlayerAppearanceService appearances = PlayerAppearanceService.getInstance();
             if (owner.withholdsQuickSkinSkin()) {
-                if (appearances.hasActiveSkin(local)) {
+                if (appearances.hasOwnActiveSkin(local)) {
                     CPMLOG.info("A CPM model is the look ({}); withdrawing the Quick Skin skin", owner);
                     appearances.applySkin(local, "", null);
                 }
             } else if (lastOwner != null && lastOwner.withholdsQuickSkinSkin()
-                    && !appearances.hasActiveSkin(local)) {
+                    && !appearances.hasOwnActiveSkin(local)) {
                 CPMLOG.info("The look is Quick Skin's again; restoring the saved Quick Skin look");
                 SavedAppearanceRestorer.restore(local);
             }

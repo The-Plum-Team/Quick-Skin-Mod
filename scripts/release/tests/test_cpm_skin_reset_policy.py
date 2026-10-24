@@ -318,7 +318,8 @@ class CpmSkinResetPolicyTest(unittest.TestCase):
         withdraw = model_branch.index('appearances.applySkin(targetUUID, "", null);')
         self.assertLess(refused, model_branch.index("return false;", refused))
         self.assertLess(model_branch.index("return false;", refused), withdraw)
-        self.assertIn("appearances.hasActiveSkin(targetUUID)", model_branch)
+        # A skin an admin assigned is not the player's own: only their own is withdrawn
+        self.assertIn("appearances.hasOwnActiveSkin(targetUUID)", model_branch)
         self.assertIn("ReplayModHelper.getTargetPlayerUUID()", model_branch)
 
         restorer = SAVED_APPEARANCE_RESTORER.read_text(encoding="utf-8")
