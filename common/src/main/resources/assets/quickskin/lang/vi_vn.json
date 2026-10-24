@@ -105,6 +105,7 @@
   "quickskin.error.lookup_unavailable": "Không kết nối được với Mojang để tìm tên đó. Hãy kiểm tra kết nối và thử lại",
   "quickskin.error.profile_unavailable": "Không kết nối được với Mojang để đọc hồ sơ đó. Hãy kiểm tra kết nối và thử lại",
   "quickskin.error.download_unavailable": "Không kết nối được với Mojang để tải skin đó. Hãy kiểm tra kết nối và thử lại",
+  "quickskin.error.mojang_rate_limited": "Mojang đang giới hạn lượt tìm kiếm. Hãy đợi một phút rồi thử lại",
   "quickskin.error.invalid_skin_response": "Mojang trả về một skin không đọc được. Hãy thử lại sau",
   "quickskin.error.skin_search_failed": "Không tìm được skin. Hãy kiểm tra kết nối và thử lại",
   "quickskin.error.save_searched_skin": "Không lưu được skin của %s vào danh sách. Hãy thử lại",

@@ -105,6 +105,7 @@
   "quickskin.error.lookup_unavailable": "無法連線到 Mojang 查詢這個名稱。請檢查網路後再試一次",
   "quickskin.error.profile_unavailable": "無法連線到 Mojang 讀取這個檔案資料。請檢查網路後再試一次",
   "quickskin.error.download_unavailable": "無法連線到 Mojang 下載這個外觀。請檢查網路後再試一次",
+  "quickskin.error.mojang_rate_limited": "Mojang 目前正在限制查詢。請等一分鐘後再試一次",
   "quickskin.error.invalid_skin_response": "Mojang 傳回了一個無法讀取的外觀。請稍後再試",
   "quickskin.error.skin_search_failed": "無法搜尋外觀。請檢查網路後再試一次",
   "quickskin.error.save_searched_skin": "無法將 %s 的外觀儲存到你的清單。請再試一次",

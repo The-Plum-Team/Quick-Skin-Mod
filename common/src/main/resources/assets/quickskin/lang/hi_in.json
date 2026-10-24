@@ -105,6 +105,7 @@
   "quickskin.error.lookup_unavailable": "वह नाम खोजने के लिए Mojang से जुड़ नहीं सके। अपना कनेक्शन जाँचें और फिर से कोशिश करें",
   "quickskin.error.profile_unavailable": "वह प्रोफ़ाइल पढ़ने के लिए Mojang से जुड़ नहीं सके। अपना कनेक्शन जाँचें और फिर से कोशिश करें",
   "quickskin.error.download_unavailable": "वह स्किन डाउनलोड करने के लिए Mojang से जुड़ नहीं सके। अपना कनेक्शन जाँचें और फिर से कोशिश करें",
+  "quickskin.error.mojang_rate_limited": "Mojang अभी खोजों को सीमित कर रहा है। एक मिनट रुकें और फिर से कोशिश करें",
   "quickskin.error.invalid_skin_response": "Mojang ने ऐसी स्किन भेजी जो पढ़ी नहीं जा सकती। बाद में कोशिश करें",
   "quickskin.error.skin_search_failed": "स्किन खोजी नहीं जा सकी। अपना कनेक्शन जाँचें और फिर से कोशिश करें",
   "quickskin.error.save_searched_skin": "%s की स्किन आपकी सूची में सहेजी नहीं जा सकी। फिर से कोशिश करें",

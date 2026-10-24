@@ -105,6 +105,7 @@
   "quickskin.error.lookup_unavailable": "Não foi possível ligar à Mojang para procurar esse nome. Verifica a tua ligação e tenta outra vez",
   "quickskin.error.profile_unavailable": "Não foi possível ligar à Mojang para ler esse perfil. Verifica a tua ligação e tenta outra vez",
   "quickskin.error.download_unavailable": "Não foi possível ligar à Mojang para transferir essa skin. Verifica a tua ligação e tenta outra vez",
+  "quickskin.error.mojang_rate_limited": "A Mojang está a limitar as pesquisas neste momento. Espera um minuto e tenta outra vez",
   "quickskin.error.invalid_skin_response": "A Mojang devolveu uma skin que não se consegue ler. Tenta mais tarde",
   "quickskin.error.skin_search_failed": "Não foi possível procurar a skin. Verifica a tua ligação e tenta outra vez",
   "quickskin.error.save_searched_skin": "Não foi possível guardar a skin de %s na tua lista. Tenta outra vez",

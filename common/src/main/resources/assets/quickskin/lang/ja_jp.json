@@ -105,6 +105,7 @@
   "quickskin.error.lookup_unavailable": "名前を検索するために Mojang に接続できませんでした。接続を確認してもう一度お試しください",
   "quickskin.error.profile_unavailable": "プロフィールを読むために Mojang に接続できませんでした。接続を確認してもう一度お試しください",
   "quickskin.error.download_unavailable": "スキンをダウンロードするために Mojang に接続できませんでした。接続を確認してもう一度お試しください",
+  "quickskin.error.mojang_rate_limited": "現在 Mojang が検索を制限しています。1 分ほど待ってからもう一度お試しください",
   "quickskin.error.invalid_skin_response": "Mojang から読み込めないスキンが返ってきました。後でもう一度お試しください",
   "quickskin.error.skin_search_failed": "スキンを検索できませんでした。接続を確認してもう一度お試しください",
   "quickskin.error.save_searched_skin": "%s のスキンをリストに保存できませんでした。もう一度お試しください",

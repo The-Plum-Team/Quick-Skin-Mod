@@ -39,7 +39,8 @@ class MojangApiServiceTest {
                 var transport = successfulTransport(false);
                 transport.responses.set(stage, new Reply(status, utf8("untrusted upstream body")));
                 var failure = requireFailure(transport.service().fetchSkinByUsername("Alice"), STAGES[stage],
-                        stage == 0 && (status == 404 || status == 204) ? NOT_FOUND : HTTP, status);
+                        stage == 0 && (status == 404 || status == 204) ? NOT_FOUND
+                                : status == 429 ? RATE_LIMITED : HTTP, status);
                 assertFalse(failure.getMessage().contains("untrusted upstream body"));
                 assertEquals(stage + 1, transport.opened.size(), "no request after failed stage " + stage);
                 transport.assertClosed();
@@ -144,8 +145,9 @@ class MojangApiServiceTest {
             var connection = transport.opened.get(index);
             assertFalse(connection.getInstanceFollowRedirects());
             assertEquals("GET", connection.getRequestMethod());
-            assertEquals(index == 2 ? 10000 : 5000, connection.getReadTimeout());
-            assertEquals(connection.getReadTimeout(), connection.getConnectTimeout());
+            // Mojang can hold its first byte for several seconds (6.5 s measured on 2026-10-23)
+            assertEquals(15_000, connection.getReadTimeout());
+            assertEquals(5_000, connection.getConnectTimeout());
             assertEquals("application/json,image/png", connection.getRequestProperty("Accept"));
         }
     }

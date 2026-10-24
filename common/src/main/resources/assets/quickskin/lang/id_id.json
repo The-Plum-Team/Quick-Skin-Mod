@@ -105,6 +105,7 @@
   "quickskin.error.lookup_unavailable": "Tidak bisa terhubung ke Mojang untuk mencari nama itu. Periksa koneksimu dan coba lagi",
   "quickskin.error.profile_unavailable": "Tidak bisa terhubung ke Mojang untuk membaca profil itu. Periksa koneksimu dan coba lagi",
   "quickskin.error.download_unavailable": "Tidak bisa terhubung ke Mojang untuk mengunduh skin itu. Periksa koneksimu dan coba lagi",
+  "quickskin.error.mojang_rate_limited": "Mojang sedang membatasi pencarian. Tunggu satu menit lalu coba lagi",
   "quickskin.error.invalid_skin_response": "Mojang mengirim skin yang tidak bisa dibaca. Coba lagi nanti",
   "quickskin.error.skin_search_failed": "Skin tidak bisa dicari. Periksa koneksimu dan coba lagi",
   "quickskin.error.save_searched_skin": "Skin %s tidak bisa disimpan ke daftarmu. Coba lagi",
