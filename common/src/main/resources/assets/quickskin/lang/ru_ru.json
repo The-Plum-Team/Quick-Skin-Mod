@@ -105,6 +105,7 @@
   "quickskin.error.lookup_unavailable": "Не удалось связаться с Mojang, чтобы найти это имя. Проверьте подключение и попробуйте ещё раз",
   "quickskin.error.profile_unavailable": "Не удалось связаться с Mojang, чтобы прочитать этот профиль. Проверьте подключение и попробуйте ещё раз",
   "quickskin.error.download_unavailable": "Не удалось связаться с Mojang, чтобы скачать этот скин. Проверьте подключение и попробуйте ещё раз",
+  "quickskin.error.mojang_rate_limited": "Mojang сейчас ограничивает поиск. Подождите минуту и попробуйте ещё раз",
   "quickskin.error.invalid_skin_response": "Mojang вернул скин, который не удаётся прочитать. Попробуйте позже",
   "quickskin.error.skin_search_failed": "Не удалось найти скин. Проверьте подключение и попробуйте ещё раз",
   "quickskin.error.save_searched_skin": "Не удалось сохранить скин %s в вашем списке. Попробуйте ещё раз",

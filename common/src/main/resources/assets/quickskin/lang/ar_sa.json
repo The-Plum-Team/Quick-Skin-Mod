@@ -105,6 +105,7 @@
   "quickskin.error.lookup_unavailable": "تعذّر الاتصال بـ Mojang للبحث عن هذا الاسم. تحقق من اتصالك وحاول مرة أخرى",
   "quickskin.error.profile_unavailable": "تعذّر الاتصال بـ Mojang لقراءة هذا الملف الشخصي. تحقق من اتصالك وحاول مرة أخرى",
   "quickskin.error.download_unavailable": "تعذّر الاتصال بـ Mojang لتنزيل هذا السكن. تحقق من اتصالك وحاول مرة أخرى",
+  "quickskin.error.mojang_rate_limited": "تحدّ Mojang من عمليات البحث حاليًا. انتظر دقيقة وحاول مرة أخرى",
   "quickskin.error.invalid_skin_response": "أعادت Mojang سكنًا لا يمكن قراءته. حاول لاحقًا",
   "quickskin.error.skin_search_failed": "تعذّر البحث عن السكن. تحقق من اتصالك وحاول مرة أخرى",
   "quickskin.error.save_searched_skin": "تعذّر حفظ سكن %s في قائمتك. حاول مرة أخرى",

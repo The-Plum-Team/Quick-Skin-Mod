@@ -105,6 +105,7 @@
   "quickskin.error.lookup_unavailable": "이름을 찾으려고 Mojang에 연결하지 못했습니다. 연결을 확인하고 다시 시도하세요",
   "quickskin.error.profile_unavailable": "프로필을 읽으려고 Mojang에 연결하지 못했습니다. 연결을 확인하고 다시 시도하세요",
   "quickskin.error.download_unavailable": "스킨을 내려받으려고 Mojang에 연결하지 못했습니다. 연결을 확인하고 다시 시도하세요",
+  "quickskin.error.mojang_rate_limited": "지금 Mojang이 검색을 제한하고 있습니다. 1분 정도 기다린 후 다시 시도하세요",
   "quickskin.error.invalid_skin_response": "Mojang이 읽을 수 없는 스킨을 보냈습니다. 나중에 다시 시도하세요",
   "quickskin.error.skin_search_failed": "스킨을 찾지 못했습니다. 연결을 확인하고 다시 시도하세요",
   "quickskin.error.save_searched_skin": "%s의 스킨을 목록에 저장하지 못했습니다. 다시 시도하세요",

@@ -105,6 +105,7 @@
   "quickskin.error.lookup_unavailable": "Bu adı aramak için Mojang'a bağlanılamadı. Bağlantını kontrol edip tekrar dene",
   "quickskin.error.profile_unavailable": "Bu profili okumak için Mojang'a bağlanılamadı. Bağlantını kontrol edip tekrar dene",
   "quickskin.error.download_unavailable": "Bu skini indirmek için Mojang'a bağlanılamadı. Bağlantını kontrol edip tekrar dene",
+  "quickskin.error.mojang_rate_limited": "Mojang şu anda aramaları sınırlıyor. Bir dakika bekleyip tekrar dene",
   "quickskin.error.invalid_skin_response": "Mojang okunamayan bir skin gönderdi. Daha sonra tekrar dene",
   "quickskin.error.skin_search_failed": "Skin aranamadı. Bağlantını kontrol edip tekrar dene",
   "quickskin.error.save_searched_skin": "%s adlı oyuncunun skini listene kaydedilemedi. Tekrar dene",

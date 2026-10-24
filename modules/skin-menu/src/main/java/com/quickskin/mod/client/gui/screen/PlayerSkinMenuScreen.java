@@ -2097,6 +2097,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             case NOT_FOUND -> Component.translatable("quickskin.error.player_not_found", username);
             case NO_CUSTOM_SKIN -> Component.translatable("quickskin.error.no_custom_skin");
             case INVALID_RESPONSE, RESPONSE_TOO_LARGE -> Component.translatable("quickskin.error.invalid_skin_response");
+            case RATE_LIMITED -> Component.translatable("quickskin.error.mojang_rate_limited");
             case HTTP, NETWORK -> Component.translatable(switch (failure.stage()) {
                 case LOOKUP -> "quickskin.error.lookup_unavailable";
                 case PROFILE -> "quickskin.error.profile_unavailable";

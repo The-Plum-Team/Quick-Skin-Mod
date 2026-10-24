@@ -105,6 +105,7 @@
   "quickskin.error.lookup_unavailable": "Nie udało się połączyć z Mojang, żeby wyszukać tę nazwę. Sprawdź połączenie i spróbuj ponownie",
   "quickskin.error.profile_unavailable": "Nie udało się połączyć z Mojang, żeby odczytać ten profil. Sprawdź połączenie i spróbuj ponownie",
   "quickskin.error.download_unavailable": "Nie udało się połączyć z Mojang, żeby pobrać tę skórkę. Sprawdź połączenie i spróbuj ponownie",
+  "quickskin.error.mojang_rate_limited": "Mojang ogranicza teraz wyszukiwania. Poczekaj minutę i spróbuj ponownie",
   "quickskin.error.invalid_skin_response": "Mojang zwrócił skórkę, której nie da się odczytać. Spróbuj później",
   "quickskin.error.skin_search_failed": "Nie udało się wyszukać skórki. Sprawdź połączenie i spróbuj ponownie",
   "quickskin.error.save_searched_skin": "Nie udało się zapisać skórki gracza %s na liście. Spróbuj ponownie",

@@ -33,6 +33,9 @@ public final class MojangApiService {
 
     private static final String MOJANG_API_BASE = "https://api.mojang.com";
     private static final String SESSION_SERVER_BASE = "https://sessionserver.mojang.com";
+    /** Mojang answers at once, but its first byte can take several seconds to come. */
+    static final int CONNECT_TIMEOUT_MILLIS = 5_000;
+    static final int READ_TIMEOUT_MILLIS = 15_000;
     private static final int MAX_JSON_BYTES = 64 * 1024;
     private static final int MAX_SKIN_BYTES = 2 * 1024 * 1024;
     private static final Pattern USERNAME = Pattern.compile("[A-Za-z0-9_]{1,16}");
@@ -42,7 +45,9 @@ public final class MojangApiService {
     public enum Stage { LOOKUP, PROFILE, DOWNLOAD }
 
     public enum Reason {
-        INVALID_USERNAME, NOT_FOUND, NO_CUSTOM_SKIN, HTTP, NETWORK, INVALID_RESPONSE, RESPONSE_TOO_LARGE
+        INVALID_USERNAME, NOT_FOUND, NO_CUSTOM_SKIN, HTTP, NETWORK, INVALID_RESPONSE, RESPONSE_TOO_LARGE,
+        /** Mojang answered 429: too many requests from this address for now. Retrying makes it last. */
+        RATE_LIMITED
     }
 
     /** Bounded diagnostic categories; response bodies and exception text are never user messages. */
@@ -106,7 +111,7 @@ public final class MojangApiService {
         }
         return ClientIoExecutor.supplyAsync(() -> {
             byte[] body = readResponse(MOJANG_API_BASE + "/users/profiles/minecraft/" + username,
-                    Stage.LOOKUP, 5000, MAX_JSON_BYTES);
+                    Stage.LOOKUP, MAX_JSON_BYTES);
             try {
                 String id = requiredString(parseObject(body), "id");
                 if (!id.matches("[0-9a-fA-F]{32}")) throw new IllegalArgumentException("Invalid UUID");
@@ -129,7 +134,7 @@ public final class MojangApiService {
         }
         return ClientIoExecutor.supplyAsync(() -> {
             byte[] body = readResponse(SESSION_SERVER_BASE + "/session/minecraft/profile/"
-                    + uuid.toString().replace("-", ""), Stage.PROFILE, 5000, MAX_JSON_BYTES);
+                    + uuid.toString().replace("-", ""), Stage.PROFILE, MAX_JSON_BYTES);
             try {
                 JsonElement properties = parseObject(body).get("properties");
                 if (properties == null || !properties.isJsonArray()) {
@@ -184,7 +189,7 @@ public final class MojangApiService {
             } catch (Exception malformed) {
                 throw new ImportFailure(Stage.DOWNLOAD, Reason.INVALID_RESPONSE, null, malformed);
             }
-            byte[] body = readResponse(url.toString(), Stage.DOWNLOAD, 10000, MAX_SKIN_BYTES);
+            byte[] body = readResponse(url.toString(), Stage.DOWNLOAD, MAX_SKIN_BYTES);
             try {
                 return SafeImageReader.readSkin(body);
             } catch (IOException | RuntimeException malformed) {
@@ -227,17 +232,17 @@ public final class MojangApiService {
         return (to - from) / 1_000_000L;
     }
 
-    private byte[] readResponse(String url, Stage stage, int timeout, int maximum) {
+    private byte[] readResponse(String url, Stage stage, int maximum) {
         HttpURLConnection connection = null;
         Integer status = null;
         try {
-            connection = openConnection(new URL(url), timeout);
+            connection = openConnection(new URL(url));
             status = connection.getResponseCode();
             if (status != 200) {
                 // The name lookup answers a missing player with 404 (an empty 204 before Mojang
                 // changed it). Any other status is a failed request rather than a missing player.
-                Reason reason = stage == Stage.LOOKUP && (status == 404 || status == 204)
-                        ? Reason.NOT_FOUND : Reason.HTTP;
+                Reason reason = stage == Stage.LOOKUP && (status == 404 || status == 204) ? Reason.NOT_FOUND
+                        : status == 429 ? Reason.RATE_LIMITED : Reason.HTTP;
                 throw new ImportFailure(stage, reason, status, null);
             }
             return readBody(connection, maximum, stage);
@@ -266,16 +271,15 @@ public final class MojangApiService {
         return value.getAsJsonObject();
     }
 
-    private HttpURLConnection openConnection(URL url, int timeoutMillis)
-            throws IOException {
+    private HttpURLConnection openConnection(URL url) throws IOException {
         if (!"https".equalsIgnoreCase(url.getProtocol())) {
             throw new IOException("Mojang request must use HTTPS");
         }
         HttpURLConnection connection = connections.open(url);
         connection.setInstanceFollowRedirects(false);
         connection.setRequestMethod("GET");
-        connection.setConnectTimeout(timeoutMillis);
-        connection.setReadTimeout(timeoutMillis);
+        connection.setConnectTimeout(CONNECT_TIMEOUT_MILLIS);
+        connection.setReadTimeout(READ_TIMEOUT_MILLIS);
         connection.setRequestProperty("Accept", "application/json,image/png");
         connection.setRequestProperty("User-Agent", "QuickSkin");
         return connection;

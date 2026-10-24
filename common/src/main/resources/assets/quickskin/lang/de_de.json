@@ -105,6 +105,7 @@
   "quickskin.error.lookup_unavailable": "Mojang ist nicht erreichbar, um den Namen zu suchen. Prüfe deine Verbindung und versuch es noch einmal",
   "quickskin.error.profile_unavailable": "Mojang ist nicht erreichbar, um das Profil zu lesen. Prüfe deine Verbindung und versuch es noch einmal",
   "quickskin.error.download_unavailable": "Mojang ist nicht erreichbar, um den Skin herunterzuladen. Prüfe deine Verbindung und versuch es noch einmal",
+  "quickskin.error.mojang_rate_limited": "Mojang begrenzt gerade die Suchanfragen. Warte eine Minute und versuch es noch einmal",
   "quickskin.error.invalid_skin_response": "Mojang hat einen Skin geschickt, der nicht lesbar ist. Versuch es später noch einmal",
   "quickskin.error.skin_search_failed": "Die Skin-Suche ist fehlgeschlagen. Prüfe deine Verbindung und versuch es noch einmal",
   "quickskin.error.save_searched_skin": "Der Skin von %s konnte nicht in deine Liste übernommen werden. Versuch es noch einmal",
