@@ -220,13 +220,14 @@ public class HDTextureProcessor {
     }
 
     /**
-     * Convert a right limb to a left limb with proper face rearrangement
+     * Convert a right limb to a left limb with proper face rearrangement, as vanilla's
+     * {@code HttpTexture.processLegacySkin} does
      *
      * Limb texture layout (each limb is 16x16 pixels at 1x scale):
-     * - Columns 0-3:   Top (rows 0-3) and Right side (rows 4-15)
-     * - Columns 4-7:   Bottom (rows 0-3) and Front (rows 4-15)
-     * - Columns 8-11:  Left side (rows 4-15)
-     * - Columns 12-15: Back (rows 4-15)
+     * - Columns 0-3:   nothing (rows 0-3) and Right side (rows 4-15)
+     * - Columns 4-7:   Top (rows 0-3) and Front (rows 4-15)
+     * - Columns 8-11:  Bottom (rows 0-3) and Left side (rows 4-15)
+     * - Columns 12-15: nothing (rows 0-3) and Back (rows 4-15)
      *
      * When mirroring right limb to left limb:
      * - Right side ↔ Left side (swap and mirror)
@@ -257,17 +258,15 @@ public class HDTextureProcessor {
         int topHeight = 4 * scale;     // Top/bottom faces are 4 pixels tall
         int sideHeight = 12 * scale;   // Side faces are 12 pixels tall
 
-        // Copy and mirror Top face (top-left 4x4)
-        // Right limb top (srcX, srcY) → Left limb top (dstX, dstY), mirrored horizontally
-        copyAreaRGBA(src, dst,
-                srcX, srcY, faceWidth, topHeight,
-                dstX, dstY, true, false);
-
-        // Copy and mirror Bottom face (top, columns 4-7)
-        // Right limb bottom (srcX+4, srcY) → Left limb bottom (dstX+4, dstY), mirrored horizontally
+        // Copy and mirror the Top face (columns 4-7 of the first rows)
         copyAreaRGBA(src, dst,
                 srcX + faceWidth, srcY, faceWidth, topHeight,
                 dstX + faceWidth, dstY, true, false);
+
+        // Copy and mirror the Bottom face (columns 8-11): the sole of the foot, the end of the hand
+        copyAreaRGBA(src, dst,
+                srcX + (faceWidth * 2), srcY, faceWidth, topHeight,
+                dstX + (faceWidth * 2), dstY, true, false);
 
         // IMPORTANT: For the side faces, we need to swap left and right
 

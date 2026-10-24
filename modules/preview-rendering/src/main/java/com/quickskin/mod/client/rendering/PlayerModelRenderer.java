@@ -137,14 +137,17 @@ public class PlayerModelRenderer {
             new LinkedHashMap<>(16, 0.75f, true);
     private static final int MAX_PENDING_CAPES = 128;
 
-    /** {@code elytra} is the wings to draw in the cape's place, or {@code null} for the cape. */
+    /**
+     * {@code elytra} is the wings to draw in the cape's place, or {@code null} for the cape;
+     * {@code texture} is null when only {@code worn}, what the player wears, is drawn.
+     */
     public record PreviewCapeState(
 //? if <1.21.11 {
             ResourceLocation texture, PlayerModel bodyModel, PlayerCapeModel capeModel,
 //?} else {
             Identifier texture, PlayerModel bodyModel, PlayerCapeModel capeModel,
 //?}
-            ModelPart elytra) {
+            ModelPart elytra, PreviewEquipment.Worn worn) {
     }
 
     private record PreviewCapeKey(
@@ -160,11 +163,13 @@ public class PlayerModelRenderer {
 //? if <1.21.11 {
             PlayerModel bodyModel, ResourceLocation skin, float rotationX, float rotationY, float pivotY,
             int x0, int y0, int x1, int y1, float scale,
-            ResourceLocation texture, PlayerCapeModel playerCapeModel, ModelPart elytra) {
+            ResourceLocation texture, PlayerCapeModel playerCapeModel, ModelPart elytra,
+            PreviewEquipment.Worn worn) {
 //?} else {
             PlayerModel bodyModel, Identifier skin, float rotationX, float rotationY, float pivotY,
             int x0, int y0, int x1, int y1, float scale,
-            Identifier texture, PlayerCapeModel playerCapeModel, ModelPart elytra) {
+            Identifier texture, PlayerCapeModel playerCapeModel, ModelPart elytra,
+            PreviewEquipment.Worn worn) {
 //?}
         synchronized (PENDING_CAPES) {
             PreviewCapeKey key = new PreviewCapeKey(
@@ -173,7 +178,7 @@ public class PlayerModelRenderer {
                 var oldest = PENDING_CAPES.keySet().iterator();
                 if (oldest.hasNext()) PENDING_CAPES.remove(oldest.next());
             }
-            PENDING_CAPES.put(key, new PreviewCapeState(texture, bodyModel, playerCapeModel, elytra));
+            PENDING_CAPES.put(key, new PreviewCapeState(texture, bodyModel, playerCapeModel, elytra, worn));
         }
     }
 
@@ -209,12 +214,16 @@ public class PlayerModelRenderer {
     private static final Map<Model.Simple, PreviewCapeState> PENDING_CAPES = new IdentityHashMap<>();
     private static final int MAX_PENDING_CAPES = 128;
 
-    /** {@code elytra} is the wings to draw in the cape's place, or {@code null} for the cape. */
+    /**
+     * {@code elytra} is the wings to draw in the cape's place, or {@code null} for the cape;
+     * {@code texture} is null when only {@code worn}, what the player wears, is drawn.
+     */
     public record PreviewCapeState(
             Identifier texture,
             PlayerModel bodyModel,
             PlayerCapeModel capeModel,
-            ModelPart elytra
+            ModelPart elytra,
+            PreviewEquipment.Worn worn
     ) {
     }
 
@@ -223,9 +232,10 @@ public class PlayerModelRenderer {
             Identifier texture,
             PlayerModel bodyModel,
             PlayerCapeModel playerCapeModel,
-            ModelPart elytra
+            ModelPart elytra,
+            PreviewEquipment.Worn worn
     ) {
-        if (texture == null || bodyModel == null || playerCapeModel == null) {
+        if (bodyModel == null || (worn == null && (texture == null || playerCapeModel == null))) {
             return;
         }
 
@@ -236,7 +246,7 @@ public class PlayerModelRenderer {
                     PENDING_CAPES.remove(oldest.next());
                 }
             }
-            PENDING_CAPES.put(renderModel, new PreviewCapeState(texture, bodyModel, playerCapeModel, elytra));
+            PENDING_CAPES.put(renderModel, new PreviewCapeState(texture, bodyModel, playerCapeModel, elytra, worn));
         }
     }
 
@@ -463,6 +473,8 @@ public class PlayerModelRenderer {
             new PreviewEquipmentPolicy.Scope<>();
 
     private static final Set<PreviewEquipmentPolicy.Slot> NO_VISIBLE_SLOTS = Collections.emptySet();
+    private static final Set<PreviewEquipmentPolicy.Slot> ALL_SLOTS =
+            Collections.unmodifiableSet(EnumSet.allOf(PreviewEquipmentPolicy.Slot.class));
     private static final Set<PreviewEquipmentPolicy.Slot> HELD_GUN_SLOTS =
             Collections.unmodifiableSet(EnumSet.of(PreviewEquipmentPolicy.Slot.MAIN_HAND));
     private static final PreviewHeldGunPresence HELD_GUN_PRESENCE =
@@ -509,6 +521,10 @@ public class PlayerModelRenderer {
      */
     private static Set<PreviewEquipmentPolicy.Slot> previewVisibleSlots(
             Player player, PreviewPlayerData playerData) {
+        if (showsEquipment(player, playerData)) {
+            // As the world shows the player: without the armour pieces they hide from everyone
+            return slotsShownWithout(com.quickskin.mod.client.services.LocalHiddenArmor.inEffect());
+        }
         if (!playerData.isHeldGunVisible() || player != Minecraft.getInstance().player) {
             return NO_VISIBLE_SLOTS;
         }
@@ -517,6 +533,70 @@ public class PlayerModelRenderer {
         }
         HELD_GUN_PRESENCE.drawn(player);
         return HELD_GUN_SLOTS;
+    }
+
+    /** Every slot but the armour pieces {@code hidden} names ({@code HiddenArmor} bits). */
+    private static Set<PreviewEquipmentPolicy.Slot> slotsShownWithout(int hidden) {
+        if (hidden == 0) {
+            return ALL_SLOTS;
+        }
+        EnumSet<PreviewEquipmentPolicy.Slot> shown = EnumSet.allOf(PreviewEquipmentPolicy.Slot.class);
+        if ((hidden & 8) != 0) shown.remove(PreviewEquipmentPolicy.Slot.HEAD);
+        if ((hidden & 4) != 0) shown.remove(PreviewEquipmentPolicy.Slot.CHEST);
+        if ((hidden & 2) != 0) shown.remove(PreviewEquipmentPolicy.Slot.LEGS);
+        if ((hidden & 1) != 0) shown.remove(PreviewEquipmentPolicy.Slot.FEET);
+        return shown;
+    }
+
+    /**
+     * Whether a layer drawing {@code entity}'s {@code slot} skips it: the entity is the local
+     * player and hides that armour piece from everyone where the server does too (ADR 0017). The
+     * layer hooks before 1.21.2 ask; from 1.21.2 the extracted render state already lacks it.
+     */
+    public static boolean hidesOwnPiece(Object entity, EquipmentSlot slot) {
+        if (entity == null || entity != Minecraft.getInstance().player || PreviewEquipment.isCapturing()) {
+            return false;
+        }
+        if (PreviewEquipment.leavesOutGhost(slot)) {
+            // The skin menu draws it see-through once the preview is drawn
+            return true;
+        }
+        int hidden = com.quickskin.mod.client.services.LocalHiddenArmor.inEffect();
+        if (hidden == 0) {
+            return false;
+        }
+        if (slot == EquipmentSlot.HEAD) return (hidden & 8) != 0;
+        if (slot == EquipmentSlot.CHEST) return (hidden & 4) != 0;
+        if (slot == EquipmentSlot.LEGS) return (hidden & 2) != 0;
+        if (slot == EquipmentSlot.FEET) return (hidden & 1) != 0;
+        return false;
+    }
+
+    /**
+     * Runs a draw of {@code player} in which only the armour slot of {@code piece} ({@code
+     * HiddenArmor} bit) reads as worn: the layers draw that one piece. Used before 1.21.2, where the
+     * layers read the entity, to capture a piece's outline.
+     */
+    static void withOnlyPiece(Player player, int piece, Runnable draw) {
+        PreviewEquipmentPolicy.Slot slot = piece == 8 ? PreviewEquipmentPolicy.Slot.HEAD
+                : piece == 4 ? PreviewEquipmentPolicy.Slot.CHEST
+                : piece == 2 ? PreviewEquipmentPolicy.Slot.LEGS
+                : PreviewEquipmentPolicy.Slot.FEET;
+        beginPreviewEquipment(player, EnumSet.of(slot));
+        try {
+            draw.run();
+        } finally {
+            endPreviewEquipment(player);
+        }
+    }
+
+    /**
+     * Whether this draw shows everything {@code player} wears and holds: the preview asked for it
+     * (the pause menu) and draws the live local player, never the cached player of a world that
+     * was left.
+     */
+    private static boolean showsEquipment(Object player, PreviewPlayerData playerData) {
+        return playerData.isEquipmentVisible() && player != null && player == Minecraft.getInstance().player;
     }
 
     /**
@@ -564,6 +644,64 @@ public class PlayerModelRenderer {
         if (slot == EquipmentSlot.OFFHAND) return PreviewEquipmentPolicy.Slot.OFF_HAND;
         return null;
     }
+//? if >=1.21.2 {
+
+    /**
+     * Leaves the armour pieces the local player hides from everyone out of a render state just
+     * extracted from that player, so the player does not see them either (ADR 0017). Called at
+     * the end of the player renderer's extraction, for the world and for previews of the live
+     * player alike; every other entity is left alone.
+     */
+    public static void hideOwnArmor(Object entity,
+            net.minecraft.client.renderer.entity.state.EntityRenderState state) {
+        if (entity == null || entity != Minecraft.getInstance().player || PreviewEquipment.isCapturing()) {
+            return;
+        }
+        blankPieces(state, com.quickskin.mod.client.services.LocalHiddenArmor.inEffect());
+    }
+
+    /** Leaves the armour pieces {@code pieces} names ({@code HiddenArmor} bits) out of a render state. */
+    static void blankPieces(net.minecraft.client.renderer.entity.state.EntityRenderState state, int pieces) {
+        int hidden = pieces;
+        if (hidden == 0
+                || !(state instanceof net.minecraft.client.renderer.entity.state.HumanoidRenderState humanoid)) {
+            return;
+        }
+//? if <1.21.4 {
+        // The head slot's item, armour or not, is drawn from these two
+        if ((hidden & 8) != 0) {
+            humanoid.headItem = ItemStack.EMPTY;
+            humanoid.headItemModel = null;
+        }
+        if ((hidden & 4) != 0) {
+            humanoid.chestItem = ItemStack.EMPTY;
+        }
+        if ((hidden & 2) != 0) {
+            humanoid.legsItem = ItemStack.EMPTY;
+        }
+        if ((hidden & 1) != 0) {
+            humanoid.feetItem = ItemStack.EMPTY;
+        }
+//?} else {
+        if ((hidden & 8) != 0) {
+            // A worn head or pumpkin is drawn from its own fields, not from the slot
+            humanoid.headEquipment = ItemStack.EMPTY;
+            humanoid.headItem.clear();
+            humanoid.wornHeadType = null;
+            humanoid.wornHeadProfile = null;
+        }
+        if ((hidden & 4) != 0) {
+            humanoid.chestEquipment = ItemStack.EMPTY;
+        }
+        if ((hidden & 2) != 0) {
+            humanoid.legsEquipment = ItemStack.EMPTY;
+        }
+        if ((hidden & 1) != 0) {
+            humanoid.feetEquipment = ItemStack.EMPTY;
+        }
+//?}
+    }
+//?}
 //? if <1.21.6 {
 //?} else {
 
@@ -945,8 +1083,11 @@ public class PlayerModelRenderer {
             }
 
             // The state was extracted from the live player, so it arrived carrying whatever that
-            // player is wearing and holding. A preview shows the skin and the cape, so blank it.
-            scrubPreviewEquipment(renderState);
+            // player is wearing and holding. A preview shows the skin and the cape, so blank it,
+            // unless it shows the player as the world does (the pause menu).
+            if (!showsEquipment(playerToRender, playerData)) {
+                scrubPreviewEquipment(renderState);
+            }
 
             // The picture-in-picture pass renders this state after the frame is extracted, so the
             // preview cape is keyed by the state itself and released by the cape layer that reads it.
@@ -994,8 +1135,11 @@ public class PlayerModelRenderer {
             }
 
             // The state was extracted from the live player, so it arrived carrying whatever that
-            // player is wearing and holding. A preview shows the skin and the cape, so blank it.
-            scrubPreviewEquipment(renderState);
+            // player is wearing and holding. A preview shows the skin and the cape, so blank it,
+            // unless it shows the player as the world does (the pause menu).
+            if (!showsEquipment(playerToRender, playerData)) {
+                scrubPreviewEquipment(renderState);
+            }
 
             // The picture-in-picture pass renders this state after the frame is extracted, so the
             // preview cape is keyed by the state itself and released by the cape layer that reads it.
@@ -1042,8 +1186,11 @@ public class PlayerModelRenderer {
             }
 
             // The state was extracted from the live player, so it arrived carrying whatever that
-            // player is wearing and holding. A preview shows the skin and the cape, so blank it.
-            scrubPreviewEquipment(renderState);
+            // player is wearing and holding. A preview shows the skin and the cape, so blank it,
+            // unless it shows the player as the world does (the pause menu).
+            if (!showsEquipment(playerToRender, playerData)) {
+                scrubPreviewEquipment(renderState);
+            }
 
             // The picture-in-picture pass renders this state after the frame is extracted, so the
             // preview cape is keyed by the state itself and released by the cape layer that reads it.
@@ -1255,6 +1402,13 @@ public class PlayerModelRenderer {
 
         // Setup model pose with idle animation
         setupModelPoseWithAnimation(model, playerData, mouseX, mouseY, followMouse, x, y, mc);
+//? if <1.21.6 {
+        // Where the model lands on screen, for the skin menu's armour outline (ADR 0017)
+        if (playerData.isEquipmentVisible()) {
+            PreviewEquipment.rememberPreview(model, new Matrix4f(poseStack.last().pose()),
+                    "slim".equals(playerData.getModelType() != null ? playerData.getModelType().toLowerCase(Locale.ROOT) : null));
+        }
+//?}
 
 //? if <1.21 {
         // Render the model with skin texture
@@ -1280,6 +1434,12 @@ public class PlayerModelRenderer {
             if (injectedSkinLayers) {
                 SkinLayers3DIntegration.clearInjectedPreview(model);
             }
+        }
+
+        // What the player wears, as the world shows it (ADR 0017)
+        PreviewEquipment.Worn worn = PreviewEquipment.prepare(playerData, isSlimModel);
+        if (worn != null) {
+            PreviewEquipment.render(worn, model, poseStack, bufferSource);
         }
 
         // Render cape AFTER model if present
@@ -1308,6 +1468,12 @@ public class PlayerModelRenderer {
             }
         }
 
+        // What the player wears, as the world shows it (ADR 0017)
+        PreviewEquipment.Worn worn = PreviewEquipment.prepare(playerData, isSlimModel);
+        if (worn != null) {
+            PreviewEquipment.render(worn, model, poseStack, bufferSource);
+        }
+
         // Render cape AFTER model if present
 //?} else if <1.21.11 {
         // Set cape data for the GuiSkinRendererMixin to pick up during renderToTexture.
@@ -1328,6 +1494,10 @@ public class PlayerModelRenderer {
 //? if <1.21.6 {
             ResourceLocation finalCapeTexture = CapeAnimationHelper.resolveVisibleFrame(
                     capeAtlasLocation, capeId);
+            if (worn != null && worn.wings()) {
+                // The elytra the player wears is drawn in the cape's place, as the world does
+                finalCapeTexture = null;
+            }
 //?} else {
 //?}
 //? if <1.21.2 {
@@ -1391,16 +1561,33 @@ public class PlayerModelRenderer {
 //?}
 
 //? if <1.21.6 {
+        // The piece the skin menu shows see-through, over the cape (ADR 0017)
+        PreviewEquipment.renderGhost(worn, model, poseStack, bufferSource);
         // Flush buffers - matches guiGraphics.flush() in InventoryScreen
         bufferSource.endBatch();
 //?} else {
-        // Submit to PiP system - cape rendering injected by GuiSkinRendererMixin
+        // Submit to PiP system - cape rendering injected by GuiSkinRendererMixin, and what the
+        // player wears, as the world shows it (ADR 0017)
+        PreviewEquipment.Worn worn = PreviewEquipment.prepare(playerData,
+                "slim".equals(playerData.getModelType() != null ? playerData.getModelType().toLowerCase(Locale.ROOT) : null));
         int boxHeight = (int)(scale * 2.3f);
         int boxHalfWidth = (int)(scale * 1.0f);
         // The skin-change move's scale and lift; the box sits on whole GUI pixels.
         SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
         float swapScale = swap.get(SkinSwapAnimation.Whole.SCALE);
         y -= Math.round(swap.get(SkinSwapAnimation.Whole.LIFT) * scale);
+        if (playerData.isEquipmentVisible()) {
+            // Where the picture-in-picture pass puts the model on screen, for the skin menu's
+            // armour outline (ADR 0017): its box's bottom centre, its scale and turn, and the
+            // GUI skin renderer's own drop
+            float outlineScale = (float) (int) scale * swapScale + scaleNudge;
+            PreviewEquipment.rememberPreview(model, new Matrix4f()
+                    .translate(x, y, 0.0F)
+                    .scale(outlineScale, outlineScale, -outlineScale)
+                    .rotateY((float) Math.toRadians(45.0F - yRotation))
+                    .translate(0.0F, -1.601F, 0.0F),
+                    "slim".equals(playerData.getModelType() != null ? playerData.getModelType().toLowerCase(Locale.ROOT) : null));
+        }
 //?}
 
 //? if <1.21 {
@@ -1429,8 +1616,8 @@ public class PlayerModelRenderer {
         );
         registerPendingCape(model, playerData.getSkinLocation(), rotationXNudge,
                 submittedRotationY, -1.0625f, x - boxHalfWidth, y - boxHeight,
-                x + boxHalfWidth, y, submittedScale, capeTexture, capeModel,
-                playerData.isElytraPreview() ? elytraModel : null);
+                x + boxHalfWidth, y, submittedScale, worn != null && worn.wings() ? null : capeTexture, capeModel,
+                playerData.isElytraPreview() ? elytraModel : null, worn);
 //?} else if <26.2 {
         float submittedScale = (float)(int) scale * swapScale + scaleNudge;
         float submittedRotationY = -45.0f + yRotation;
@@ -1448,8 +1635,8 @@ public class PlayerModelRenderer {
         );
         registerPendingCape(model, playerData.getSkinLocation(), rotationXNudge,
                 submittedRotationY, -1.0625f, x - boxHalfWidth, y - boxHeight,
-                x + boxHalfWidth, y, submittedScale, capeTexture, capeModel,
-                playerData.isElytraPreview() ? elytraModel : null);
+                x + boxHalfWidth, y, submittedScale, worn != null && worn.wings() ? null : capeTexture, capeModel,
+                playerData.isElytraPreview() ? elytraModel : null, worn);
 //?} else {
         Model.Simple renderModel = new Model.Simple(
                 model.root(), net.minecraft.client.renderer.rendertype.RenderTypes::entityTranslucent);
@@ -1465,8 +1652,8 @@ public class PlayerModelRenderer {
                 x + boxHalfWidth,
                 y
         );
-        registerPendingCape(renderModel, capeTexture, model, capeModel,
-                playerData.isElytraPreview() ? elytraModel : null);
+        registerPendingCape(renderModel, worn != null && worn.wings() ? null : capeTexture, model, capeModel,
+                playerData.isElytraPreview() ? elytraModel : null, worn);
 //?}
     }
 

@@ -476,6 +476,7 @@
         "client-textures",
         "configuration",
         "cpm-integration",
+        "image-core",
         "minecraft-adapter",
         "platform-api",
         "skinlayers-integration",
@@ -645,7 +646,9 @@
       "api": [],
       "implementation": [
         "appearance-services",
+        "asset-catalog",
         "client-api",
+        "client-foundation",
         "client-input",
         "configuration",
         "minecraft-adapter",

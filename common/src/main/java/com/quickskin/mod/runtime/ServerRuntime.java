@@ -2,13 +2,17 @@ package com.quickskin.mod.runtime;
 
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.config.ServerConfig;
+import com.quickskin.mod.networking.MissingModNotice;
 import com.quickskin.mod.networking.ServerNetworkHandler;
 import com.quickskin.mod.networking.TextureTransferLimits;
 import com.quickskin.mod.networking.protocol.ProtocolSessions;
 import com.quickskin.mod.server.concurrent.ServerTextureIngressExecutor;
 import com.quickskin.mod.server.concurrent.ServerCacheIoExecutor;
 import com.quickskin.mod.server.data.ServerCooldownManager;
+import com.quickskin.mod.server.data.ServerNicknameStore;
+import com.quickskin.mod.server.data.ServerSkinAssignmentStore;
 import com.quickskin.mod.server.data.ServerPlayerAppearanceRepository;
+import com.quickskin.mod.server.storage.MissingModNoticeLedger;
 import com.quickskin.mod.server.storage.ServerAnimationCache;
 import com.quickskin.mod.server.storage.ServerAppearanceStorage;
 import com.quickskin.mod.server.storage.ServerTextureCache;
@@ -91,11 +95,28 @@ public final class ServerRuntime implements AutoCloseable {
         textureCache.init(worldPath);
         animationCache.init(worldPath);
         appearanceStorage.init(worldPath);
+        MissingModNoticeLedger.getInstance().init(worldPath);
         int offlineAppearances = appearanceStorage.loadOfflineAppearances();
         if (offlineAppearances > 0) {
             QuickSkinInfo.LOGGER.info("Quick Skin shares the saved appearance of {} players who are"
                     + " not connected", offlineAppearances);
         }
+        // Before anyone joins: a returning player's join message already shows their nickname
+        ServerNicknameStore.getInstance().init(worldPath);
+        int nicknames = ServerNicknameStore.getInstance().load();
+        if (nicknames > 0) {
+            QuickSkinInfo.LOGGER.info("Quick Skin read the nicknames of {} players", nicknames);
+        }
+        // The names /quickskin nickname random hands out, for admins to edit
+        com.quickskin.mod.server.data.NicknamePool.writeDefaultIfMissing(
+                com.quickskin.mod.platform.PlatformHelper.getConfigDirectory()
+                        .resolve(com.quickskin.mod.server.data.NicknamePool.FILE_NAME));
+        // Skins admins gave players, and the skin pool with the skin folder's PNGs, all pinned
+        ServerSkinAssignmentStore.getInstance().init(worldPath);
+        ServerSkinAssignmentStore.getInstance().load();
+        com.quickskin.mod.networking.ServerSkinAssignments.start(
+                com.quickskin.mod.platform.PlatformHelper.getConfigDirectory()
+                        .resolve(com.quickskin.mod.server.data.SkinPoolFolder.DIRECTORY_NAME));
         ServerTextureIngressExecutor.getInstance().start();
         AccountSkinProfileTarget accountSkinTarget = new AccountSkinProfileTarget(server);
         AccountSkinShareService.getInstance().start(accountSkinTarget);
@@ -130,6 +151,8 @@ public final class ServerRuntime implements AutoCloseable {
             appearanceStorage.savePlayerAppearance(player.getUUID());
         }
         textureCache.saveAll();
+        ServerNicknameStore.getInstance().saveNow();
+        ServerSkinAssignmentStore.getInstance().saveNow();
         ServerConfig.getInstance().save();
     }
 
@@ -150,14 +173,17 @@ public final class ServerRuntime implements AutoCloseable {
             // state now belongs to the replacement connection.
             ServerNetworkHandler.onPlayerDisconnected(playerId, connection);
             AccountSkinShareService.getInstance().playerDisconnected(playerId, connection);
+            MissingModNotice.playerDisconnected(connection);
             return false;
         }
         appearanceStorage.savePlayerAppearance(playerId);
         // Players who join later still see this player's appearance, now without pins
         appearanceRepository.playerLeft(playerId);
+        com.quickskin.mod.networking.ServerSkinAssignments.playerGone(playerId);
         cooldownManager.removePlayer(playerId);
         ServerNetworkHandler.onPlayerDisconnected(playerId, connection);
         AccountSkinShareService.getInstance().playerDisconnected(playerId, connection);
+        MissingModNotice.playerDisconnected(connection);
         return true;
     }
 
@@ -179,8 +205,12 @@ public final class ServerRuntime implements AutoCloseable {
         runCleanup("clear server animation metadata", animationCache::clear);
         runCleanup("clear server appearances", appearanceRepository::clear);
         runCleanup("release server appearance storage", appearanceStorage::clear);
+        runCleanup("release nicknames", ServerNicknameStore.getInstance()::clear);
+        runCleanup("release assigned skins", ServerSkinAssignmentStore.getInstance()::clear);
         runCleanup("clear server cooldowns", cooldownManager::clear);
         runCleanup("clear transient network transfers", ServerNetworkHandler::clearTransientNetworkState);
+        runCleanup("forget pending Quick Skin notices", MissingModNotice::clear);
+        runCleanup("release the Quick Skin notice record", MissingModNoticeLedger.getInstance()::clear);
     }
 
     private static void runCleanup(String operation, Runnable action) {

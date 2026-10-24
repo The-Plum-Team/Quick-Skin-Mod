@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "package": "com.quickskin.mod.mixin.nickname",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "mixins": [
+    "PlayerDisplayNameMixin",
+    "PlayerListJoinMessageMixin",
+    "ServerGamePacketListenerLeaveMessageMixin",
+    "ServerPlayerTabNameMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

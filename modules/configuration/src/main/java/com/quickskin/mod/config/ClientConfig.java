@@ -109,6 +109,8 @@ public class ClientConfig {
     public String playerOwnSkinTexture = ""; // Mojang texture address the own skin was downloaded from
     public String playerOwnSkinAccount = ""; // Launcher account that playerOwnSkinHash was downloaded for
     public AccountSkinPreferences accountSkins = new AccountSkinPreferences(); // Skin selection per launcher account
+    public AccountNicknames accountNicknames = new AccountNicknames(); // Cosmetic nickname per launcher account
+    public AccountHiddenArmor accountHiddenArmor = new AccountHiddenArmor(); // Armour pieces each launcher account hides
 
     // Server Config Override (set by server, not saved to file)
     public transient volatile ServerConfig serverOverride = null;
@@ -384,6 +386,10 @@ public class ClientConfig {
         if (playerOwnSkinHash.isEmpty()) playerOwnSkinHidden = false;
         if (accountSkins == null) accountSkins = new AccountSkinPreferences();
         accountSkins.normalize();
+        if (accountNicknames == null) accountNicknames = new AccountNicknames();
+        accountNicknames.normalize();
+        if (accountHiddenArmor == null) accountHiddenArmor = new AccountHiddenArmor();
+        accountHiddenArmor.normalize();
     }
 
     private static void writeAtomically(Path target, String content) throws IOException {

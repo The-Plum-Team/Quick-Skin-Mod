@@ -96,6 +96,12 @@ certify those images. Version-branch synchronization is retired under the shared
 - Preview appearances in an interactive 3D player widget.
 - Synchronize Quick Skin appearances between players who run Quick Skin when the mod is also
   installed on the server.
+- Pick a cosmetic nickname for roleplay by clicking your name above the model in the skin menu;
+  admins can give players nicknames, or random names for a game, with commands.
+- As an admin, give players a skin for now (yours, from the server's pool, random or swapped) from
+  the Player skins panel in the settings' Server tab or with commands, for games and roleplay.
+- See what you wear and hold on the skin menu's and pause menu's model, and click a piece of
+  armour there to hide it from everyone, players without Quick Skin included.
 - Use optional integrations with Customizable Player Models (`.cpmmodel`), Ears, 3D Skin Layers,
   CustomNPCs, Essential, ReplayMod, FancyMenu (whose layouts can hide, move, and resize the
   title and pause player preview) and JourneyMap (whose player icons show the Quick Skin face)
@@ -134,6 +140,16 @@ on Quick Skin 3.1.0 or older are the exception: while one of their textures is o
 their whole appearance (skin, cape and model) does not sync until they update or choose a smaller
 texture, and the server cannot change that. Lower the limit only when those players can update.
 
+A server with Quick Skin tells each player who joins without it, once per world, that the server
+uses Quick Skin and where to get it: one chat message in the language of their game, beside a
+little pixel-art Plum, with a link to the Modrinth page. A minute after the join, so a client that does run Quick Skin has time to
+say so; Bedrock players joining through Geyser are not told, since they cannot install it. In
+`config/quickskin-server.json`, `notifyPlayersWithoutQuickSkin` turns it off,
+`playersWithoutQuickSkinMessage` replaces the text (the link follows it) and
+`playersWithoutQuickSkinLink` changes the link (an `http` or `https` address; empty sends no
+link). The players already told are listed in the world's `quickskin/missing_mod_notices` folder;
+delete a player's file there to tell them again.
+
 Players who do not run Quick Skin never see a Quick Skin appearance, even on a server that has
 Quick Skin. An unmodded client only shows a skin that Mojang hosts and signs, so those players see
 your Mojang account skin, or a default skin on an offline-mode server. With a paid account on an
@@ -159,6 +175,89 @@ re-adds you in those players' tab list; a vanish mod that filters player-list pa
 hidden, but one that does not could reveal you, so leave the option off on such servers. See
 [ADR 0011](docs/architecture/decisions/0011-show-quick-skin-appearances-only-to-quick-skin-clients.md)
 and [ADR 0012](docs/architecture/decisions/0012-share-uploaded-account-skins-with-unmodded-players.md).
+
+### Nicknames
+
+Click your name above the model in the skin menu to pick a nickname, a purely cosmetic name for
+roleplay; "Use My Name" removes it. It is kept per launcher account. A server that runs Quick Skin
+shows it to everyone, with or without Quick Skin, in chat, death and advancement messages and the
+tab list, and announces each change. The join and leave messages show both names, "Nick (Account)
+joined the game", and operators (permission level 2) also see the account name in the tab list.
+Commands, selectors and tab completion keep using account names, and hovering a name in chat
+still shows it. Players with Quick Skin also see nicknames on name tags; players without it see
+account names above heads.
+
+Because Minecraft announces a player before their client can send anything, the server remembers
+nicknames per world (`quickskin/nicknames.json`): the first join after you choose one still shows
+the previous name, followed by the announcement. A nickname holds up to 32 letters (any script),
+digits, spaces and `_ - . , '`, and it can change every 10 seconds. It may not read like (ignoring
+case, accents and look-alike letters) the name of a player online, an operator or a whitelisted
+player, nor the name or nickname of anyone who joined the world before; a nickname that reads like
+a player's name is cleared when that player joins. Server owners stop players from choosing
+nicknames with `"allowNicknames": false` in `config/quickskin-server.json`; names an admin gives
+still show. A mod that sets its own tab-list names (TAB, Styled Player List) keeps them. See
+[ADR 0015](docs/architecture/decisions/0015-show-cosmetic-nicknames-through-display-names.md).
+
+Admins (permission level 2) manage nicknames with commands, which target account names and
+selectors as usual:
+
+| Command | Effect |
+|---|---|
+| `/quickskin nickname set <player> <nickname>` | Gives the player that nickname for now: it shows instead of their own until taken back, and they cannot change theirs meanwhile. |
+| `/quickskin nickname random <players>` | Gives each player a different name from `config/quickskin-nicknames.txt`, for a game where nobody should know who is who. |
+| `/quickskin nickname reset [players]` | Takes back the names an admin gave; players show their own nickname again. With no players, of everyone, also of players who are not online, whose names are then free again. |
+| `/quickskin nickname clear <players>` | Removes every nickname the players have, so their account names show. |
+| `/quickskin nickname lock <players>` / `unlock <players>` | Stops, or lets again, players change their own nickname. |
+
+Only the player and the operators hear about a name an admin gives, so a round of a game can hand
+out names without announcing who is who; the operators still see the account names in the tab
+list. Names an admin gives follow the same rules, without the 10-second wait. The server writes
+`config/quickskin-nicknames.txt` with about ninety given names that suit anyone the first time it
+starts; edit it freely (one name per line, `#` starts a comment), for example with the NATO
+alphabet for code names. To clear a player's nickname for good, run `clear` and then `lock`.
+
+### Player skins (admins)
+
+Admins (permission level 2) can give players a skin for now, which other players with Quick Skin
+see instead of theirs until it is taken back; the players see it on themselves too, and what
+they pick in the skin menu meanwhile shows once it is taken back. In the settings, the Server tab's
+Player skins row opens a panel, for admins on a server that hands out skins: pick players on the
+left, then click one of your skins, or a skin of the server's pool, to give it to them.
+Random gives each picked player a pool skin, Shuffle swaps their own skins so that nobody keeps
+theirs, and Restore takes the given skins back. A skin's `+` adds it to the server's pool, a pool
+skin's `×` removes it. The same works with commands, which take selectors:
+
+| Command | Effect |
+|---|---|
+| `/quickskin skin set <players> <pool skin>` | Gives the players that pool skin for now. |
+| `/quickskin skin copy <players> <player>` | Gives them the skin that player shows. |
+| `/quickskin skin random <players>` | Gives each a random pool skin, all different while the pool has enough. |
+| `/quickskin skin shuffle <players>` | Swaps their own Quick Skin skins among them. |
+| `/quickskin skin reset [players]` | Takes the given skins back; with no players, everyone's, also of players who are not online. |
+| `/quickskin skin pool list` / `add <name> <player>` / `remove <name>` / `reload` | Lists the pool, adds the skin a player shows, removes one, or reads the skin folder again. |
+
+The server keeps the skins it gave and its pool per world (`quickskin/assigned-skins.json`), so
+they last across reconnects and restarts until taken back. PNG skins (64x64 or an HD size) placed
+in `config/quickskin-skins/` join the pool when the server starts or on `skin pool reload`, named
+after their file; a name ending in `_slim` or `_classic` sets the arms, which are read from the
+skin otherwise. The pool holds up to 64 skins. Players without Quick Skin keep seeing everyone's
+Mojang skins, a CPM model stays the look of whoever wears one, and capes are not changed. See
+[ADR 0016](docs/architecture/decisions/0016-assign-skins-over-players-own-appearances.md).
+
+### Hidden armour
+
+In a world, the skin menu's and the pause menu's model wear what you wear and hold: armour,
+elytra, a worn head and the items in your hands. Hovering a piece of armour on the skin menu's
+model turns it into a see-through ghost, so you see your skin as hiding it would show it (a hidden
+piece appears as the same ghost), as long as nothing stands in front of it, as your chest does of an
+elytra; click it to hide it from everyone, and click it again to show it. Each piece
+(helmet, chestplate or elytra, leggings and boots) hides on its own, and the choice is kept per
+account. A hidden piece is still worn and protects as usual: the server leaves it out of the
+equipment it sends other players, so nobody sees it, players without Quick Skin included, and you
+no longer see it in third person, in your inventory or in the menus either. This needs Quick Skin
+on the server; a server owner who prefers everyone's armour to show, for example for PvP, sets
+`"allowHiddenArmor": false` in `config/quickskin-server.json`. See
+[ADR 0017](docs/architecture/decisions/0017-hide-armour-pieces-from-everyone.md).
 
 ## Using Quick Skin
 

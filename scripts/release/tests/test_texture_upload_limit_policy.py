@@ -245,8 +245,14 @@ class OversizedUploadTest(unittest.TestCase):
                         re.findall(r"%(?:\d+\$)?[sd%]", english[key]),
                         re.findall(r"%(?:\d+\$)?[sd%]", translated[key]),
                     )
-                # In en_us order: the section closes every file, as it closes en_us.
-                self.assertEqual(english_keys[-3:], list(translated)[-3:])
+                # In en_us order: the section's keys follow each other in every file.
+                start = english_keys.index("_comment_upload_limit")
+                translated_keys = list(translated)
+                at = translated_keys.index("_comment_upload_limit")
+                self.assertEqual(
+                    english_keys[start : start + 3],
+                    translated_keys[at : at + 3],
+                )
 
 
 class ServerRuntimeOrderTest(unittest.TestCase):

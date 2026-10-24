@@ -66,6 +66,78 @@ public final class NetworkClientActions implements ClientNetworkActions {
         return visibility(ClientConfig.getInstance().getServerOverride());
     }
 
+    @Override
+    public NicknameDelivery updateNickname(String nickname) {
+        return NicknameSyncService.getInstance().update(nickname);
+    }
+
+    @Override
+    public NicknameAnswer lastNicknameAnswer() {
+        return NicknameSyncService.getInstance().lastAnswer();
+    }
+
+    @Override
+    public String nicknameShownByServer() {
+        return NicknameSyncService.getInstance().shownByServer();
+    }
+
+    @Override
+    public NicknameAnswer.Outcome nicknameFixedByAdmin() {
+        return NicknameSyncService.getInstance().fixedByAdmin();
+    }
+
+    @Override
+    public ArmorHiding armorHiding() {
+        return HiddenArmorSyncService.getInstance().hiding();
+    }
+
+    @Override
+    public void updateHiddenArmor(int hidden) {
+        HiddenArmorSyncService.getInstance().update(hidden);
+    }
+
+    @Override
+    public int hiddenArmorInEffect() {
+        return HiddenArmorSyncService.getInstance().inEffect();
+    }
+
+    @Override
+    public SkinAdminView skinAdminView() {
+        return SkinAdminClient.getInstance().view();
+    }
+
+    @Override
+    public boolean giveLocalSkin(java.util.Collection<UUID> players, String localHash, String model) {
+        return SkinAdminClient.getInstance().giveLocalSkin(players, localHash, model);
+    }
+
+    @Override
+    public boolean addLocalSkinToPool(String name, String localHash, String model) {
+        return SkinAdminClient.getInstance().addLocalSkinToPool(name, localHash, model);
+    }
+
+    @Override
+    public boolean skinAdminAction(SkinAdminRequest request, java.util.Collection<UUID> players, String poolSkinName) {
+        SkinAdminAction action = switch (request) {
+            case GIVE_POOL_SKIN -> SkinAdminAction.APPLY;
+            case RANDOM -> SkinAdminAction.RANDOM;
+            case SHUFFLE -> SkinAdminAction.SHUFFLE;
+            case RESET -> SkinAdminAction.RESET;
+            case REMOVE_FROM_POOL -> SkinAdminAction.POOL_REMOVE;
+        };
+        return SkinAdminClient.getInstance().action(action, players, poolSkinName == null ? "" : poolSkinName);
+    }
+
+    @Override
+    public int skinAdminAnswerSequence() {
+        return SkinAdminClient.getInstance().answerSequence();
+    }
+
+    @Override
+    public java.util.List<SkinAdminAnswer> skinAdminAnswersAfter(int sequence) {
+        return SkinAdminClient.getInstance().answersAfter(sequence);
+    }
+
     /** Reads what the connected server announced in its synchronized configuration. */
     static AccountSkinVisibility visibility(ServerConfig serverConfig) {
         String announced = serverConfig == null ? null : serverConfig.accountSkinVisibility;

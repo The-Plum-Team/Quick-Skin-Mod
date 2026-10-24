@@ -68,6 +68,40 @@ public class ServerConfig {
      */
     public boolean shareAccountSkinWithVanillaClients = false;
 
+    /** Longest {@link #playersWithoutQuickSkinMessage} and {@link #playersWithoutQuickSkinLink}. */
+    public static final int MAX_NOTICE_TEXT_LENGTH = 512;
+    /** The default {@link #playersWithoutQuickSkinLink}: Quick Skin's Modrinth page. */
+    public static final String DEFAULT_NOTICE_LINK = "https://modrinth.com/mod/quick-skin";
+
+    /**
+     * Tell a player who joins without Quick Skin, once per player and world, that this server
+     * uses it and where to get it. Never read by clients and never sent to them.
+     */
+    public boolean notifyPlayersWithoutQuickSkin = true;
+    /**
+     * Replaces the built-in text of that message, which is in each player's own language; the
+     * link follows it. Empty uses the built-in text.
+     */
+    public String playersWithoutQuickSkinMessage = "";
+    /** The http(s) address the message links to; empty sends the message without a link. */
+    public String playersWithoutQuickSkinLink = DEFAULT_NOTICE_LINK;
+
+    /**
+     * Let players pick a cosmetic nickname in the skin menu. The server shows it in chat, in death
+     * and advancement messages and in the tab list, and adds the account name in join and leave
+     * messages and, for operators, in the tab list; commands keep using account names (ADR 0015).
+     * When off, every nickname is hidden and changes are refused; the nicknames already chosen
+     * are kept for when it is turned back on.
+     */
+    public boolean allowNicknames = true;
+
+    /**
+     * Let players hide pieces of their armour from everyone: the server leaves a hidden piece out
+     * of the equipment it sends other players, Quick Skin or not (ADR 0017). The piece is still
+     * worn and protects as usual, so a PvP server may want this off; off, everyone's armour shows.
+     */
+    public boolean allowHiddenArmor = true;
+
     /**
      * Runtime fact the server sends to Quick Skin clients, never read from or written to the
      * file: what players without Quick Skin on this server see after an upload to Mojang. One of
@@ -223,10 +257,14 @@ public class ServerConfig {
     /**
      * Convert to JSON for network transmission, together with what players without Quick Skin
      * see after an upload to Mojang on this server ({@code ACCOUNT_SKIN_*}, or {@code null}).
+     * The message for players without Quick Skin stays on the server.
      */
     public synchronized String toJson(String accountSkinVisibility) {
         normalize();
         JsonObject json = GSON.toJsonTree(this).getAsJsonObject();
+        json.remove("notifyPlayersWithoutQuickSkin");
+        json.remove("playersWithoutQuickSkinMessage");
+        json.remove("playersWithoutQuickSkinLink");
         String visibility = knownVisibility(accountSkinVisibility);
         if (visibility == null) {
             json.remove("accountSkinVisibility");
@@ -263,6 +301,14 @@ public class ServerConfig {
         maxTextureUploadKilobytes = Math.max(MIN_TEXTURE_UPLOAD_KILOBYTES,
                 Math.min(maxTextureUploadKilobytes, MAX_TEXTURE_UPLOAD_KILOBYTES));
         accountSkinVisibility = knownVisibility(accountSkinVisibility);
+        playersWithoutQuickSkinMessage = boundedText(playersWithoutQuickSkinMessage);
+        playersWithoutQuickSkinLink = playersWithoutQuickSkinLink == null
+                ? DEFAULT_NOTICE_LINK : boundedText(playersWithoutQuickSkinLink.trim());
+    }
+
+    private static String boundedText(String value) {
+        if (value == null) return "";
+        return value.length() > MAX_NOTICE_TEXT_LENGTH ? value.substring(0, MAX_NOTICE_TEXT_LENGTH) : value;
     }
 
     /** The configured per-texture upload limit in bytes. */
