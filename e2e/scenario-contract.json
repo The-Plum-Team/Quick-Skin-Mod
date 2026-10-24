@@ -2151,7 +2151,7 @@
               "capture": {
                 "title": "Cape menu",
                 "review_tier": "all",
-                "expectation": "The Quick Skin cape menu is open with readable My Capes and Default Capes section headings, the import zone beside the My Capes tiles (corner marks and a tray icon beside Drop cape files here / or click to import), the grid of built-in cape tiles, a rear 3D player preview and the Import Cape, Remove Cape and Done buttons. A hover tooltip for the built-in tile under the resting mouse (such as BMO Cape) may be shown.",
+                "expectation": "The Quick Skin cape menu is open with readable My Capes and Quick Skin Exclusives section headings (more built-in sections, such as New, may follow below them), the import zone beside the My Capes tiles (corner marks and a tray icon beside Drop cape files here / or click to import), the grid of built-in cape tiles, a rear 3D player preview and the Import Cape, Remove Cape and Done buttons. A hover tooltip for the built-in tile under the resting mouse (such as BMO Cape) may be shown.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
@@ -2887,7 +2887,7 @@
               "capture": {
                 "title": "Cape menu with local capes",
                 "review_tier": "key",
-                "expectation": "The cape menu's My Capes section lists the imported local capes, each with a small blue-violet marker square in its lower-right corner: the animated GIF tile carries a cyan GIF badge and the yellow selection outline after being clicked, the magenta-and-yellow HD cape tile sits beside it, the Animation Speed slider is visible below the buttons, and a scrollbar thumb at the right edge of the list shows that the built-in Default Capes section overflows. The teal imported tile's own yellow border is cape art, not a selection outline, and a hover tooltip for the GIF tile may be shown.",
+                "expectation": "The cape menu's My Capes section lists the imported local capes, each with a small blue-violet marker square in its lower-right corner: the animated GIF tile carries a cyan GIF badge and the yellow selection outline after being clicked, the magenta-and-yellow HD cape tile sits beside it, the Animation Speed slider is visible below the buttons, and a scrollbar thumb at the right edge of the list shows that the built-in cape sections overflow. The teal imported tile's own yellow border is cape art, not a selection outline, and a hover tooltip for the GIF tile may be shown.",
                 "probes": []
               },
               "requires": [

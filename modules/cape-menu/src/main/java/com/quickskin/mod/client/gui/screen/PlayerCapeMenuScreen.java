@@ -178,7 +178,15 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
     // Sectioned cape lists
     private final List<CapeEntry> localCapes = new ArrayList<>(); // Contains "None" and local capes
-    private final List<CapeEntry> knownCapes = new ArrayList<>(); // Contains known/default capes
+    /** Every built-in cape, in the order the sections below list them. */
+    private final List<CapeEntry> knownCapes = new ArrayList<>();
+    /** The built-in capes by where they come from, each section under its own heading. */
+    private final List<CapeSection> builtInSections = new ArrayList<>();
+    /** Space above each built-in section's heading. */
+    private static final int SECTION_GAP = 20;
+
+    private record CapeSection(String titleKey, List<CapeEntry> capes) {
+    }
 
     /** What the menu has to say (imports, edits, deletions, failures), as toasts in the top-right corner. */
     private final List<ErrorToast> toasts = new ArrayList<>();
@@ -421,6 +429,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     public void refreshCapeList() {
         this.localCapes.clear();
         this.knownCapes.clear();
+        this.builtInSections.clear();
 
         // --- Section 1: My Capes ---
         // Add "None" option first
@@ -435,14 +444,20 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                     localCape, CapeEditorSources.find(cacheDirectory, localCape.hash())));
         }
 
-        // --- Section 2: Default Capes ---
-        // Add all known capes except NONE (that's in My Capes section)
-        // Only populate if user hasn't hidden built-in capes
+        // --- Then the built-in capes, a section for each place they come from ---
+        // None is in My Capes. Only listed if the player hasn't hidden built-in capes.
         ClientConfig config = ClientConfig.getInstance();
         if (!config.hideBuiltInCapes) {
-            for (KnownCapes knownCape : KnownCapes.values()) {
-                if (!knownCape.isNoCape()) {
-                    this.knownCapes.add(CapeEntry.fromKnown(knownCape));
+            for (KnownCapes.Category category : KnownCapes.Category.values()) {
+                List<CapeEntry> capes = new ArrayList<>();
+                for (KnownCapes knownCape : KnownCapes.values()) {
+                    if (knownCape.category() == category) {
+                        capes.add(CapeEntry.fromKnown(knownCape));
+                    }
+                }
+                if (!capes.isEmpty()) {
+                    this.builtInSections.add(new CapeSection(category.titleKey(), capes));
+                    this.knownCapes.addAll(capes);
                 }
             }
         }
@@ -583,11 +598,11 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             totalHeight += localRows * (capeDisplaySize + capePadding);
         }
 
-        // "Default Capes" section height
-        if (!this.knownCapes.isEmpty()) {
-            totalHeight += HEADER_HEIGHT + 20; // Extra spacing between sections
-            int knownRows = (int) Math.ceil((double) this.knownCapes.size() / capesPerRow);
-            totalHeight += knownRows * (capeDisplaySize + capePadding);
+        // The built-in sections, each with space above its heading
+        for (CapeSection section : this.builtInSections) {
+            totalHeight += SECTION_GAP + HEADER_HEIGHT;
+            int rows = (int) Math.ceil((double) section.capes().size() / capesPerRow);
+            totalHeight += rows * (capeDisplaySize + capePadding);
         }
 
         this.totalContentHeight = totalHeight + capePadding;
@@ -1217,9 +1232,10 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             currentY = renderSection(graphics, "quickskin.cape.section.my_capes", localCapes, currentY, mouseX, mouseY, true);
         }
 
-        // --- SECTION 2: DEFAULT CAPES ---
-        if (!knownCapes.isEmpty()) {
-            renderSection(graphics, "quickskin.cape.section.default_capes", knownCapes, currentY + 20, mouseX, mouseY, false);
+        // --- THE BUILT-IN SECTIONS ---
+        for (CapeSection section : builtInSections) {
+            currentY = renderSection(graphics, section.titleKey(), section.capes(), currentY + SECTION_GAP,
+                    mouseX, mouseY, false);
         }
     }
 
@@ -1861,22 +1877,20 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                 CapeEntry cape = findCapeInGrid(mouseX, mouseY, absoluteMouseY, currentY, localCapes);
                 if (cape != null) return cape;
             }
-            currentY += sectionHeight;
+            // The next section starts where renderSection ends, without the trailing padding
+            currentY += sectionHeight - capePadding;
         }
 
-        // --- Check "Default Capes" section ---
-        if (!knownCapes.isEmpty()) {
-            // The rendering logic in renderCapeGridOptimized adds a 20px gap before this section.
-            // We must add it here as well to keep the click detection synchronized with the visuals.
-            currentY += 20;
-
-            currentY += HEADER_HEIGHT;
-            int rows = (int) Math.ceil((double) knownCapes.size() / capesPerRow);
-            int sectionHeight = rows * (capeDisplaySize + capePadding) + capePadding;
-
-            if (absoluteMouseY >= currentY && absoluteMouseY < currentY + sectionHeight) {
-                return findCapeInGrid(mouseX, mouseY, absoluteMouseY, currentY, knownCapes);
+        // --- Check the built-in sections, spaced as renderCapeGrid draws them ---
+        for (CapeSection section : builtInSections) {
+            currentY += SECTION_GAP + HEADER_HEIGHT;
+            int rows = (int) Math.ceil((double) section.capes().size() / capesPerRow);
+            int gridHeight = rows * (capeDisplaySize + capePadding);
+            if (absoluteMouseY >= currentY && absoluteMouseY < currentY + gridHeight + capePadding) {
+                CapeEntry cape = findCapeInGrid(mouseX, mouseY, absoluteMouseY, currentY, section.capes());
+                if (cape != null) return cape;
             }
+            currentY += gridHeight;
         }
 
         return null;
@@ -1923,11 +1937,10 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             currentY += rows * (capeDisplaySize + capePadding);
         }
 
-        // Check "Default Capes" section
-        if (!knownCapes.isEmpty()) {
-            currentY += 20; // Extra spacing
-            currentY += HEADER_HEIGHT;
-            int index = knownCapes.indexOf(cape);
+        // Check the built-in sections
+        for (CapeSection section : builtInSections) {
+            currentY += SECTION_GAP + HEADER_HEIGHT;
+            int index = section.capes().indexOf(cape);
             if (index != -1) {
                 int row = index / capesPerRow;
                 int col = index % capesPerRow;
@@ -1935,6 +1948,8 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                 int y = currentY + capePadding + row * (capeDisplaySize + capePadding);
                 return new int[]{x, y};
             }
+            int rows = (int) Math.ceil((double) section.capes().size() / capesPerRow);
+            currentY += rows * (capeDisplaySize + capePadding);
         }
         return null;
     }
