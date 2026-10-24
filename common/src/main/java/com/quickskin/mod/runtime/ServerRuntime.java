@@ -2,6 +2,7 @@ package com.quickskin.mod.runtime;
 
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.config.ServerConfig;
+import com.quickskin.mod.networking.MissingModNotice;
 import com.quickskin.mod.networking.ServerNetworkHandler;
 import com.quickskin.mod.networking.TextureTransferLimits;
 import com.quickskin.mod.networking.protocol.ProtocolSessions;
@@ -9,6 +10,7 @@ import com.quickskin.mod.server.concurrent.ServerTextureIngressExecutor;
 import com.quickskin.mod.server.concurrent.ServerCacheIoExecutor;
 import com.quickskin.mod.server.data.ServerCooldownManager;
 import com.quickskin.mod.server.data.ServerPlayerAppearanceRepository;
+import com.quickskin.mod.server.storage.MissingModNoticeLedger;
 import com.quickskin.mod.server.storage.ServerAnimationCache;
 import com.quickskin.mod.server.storage.ServerAppearanceStorage;
 import com.quickskin.mod.server.storage.ServerTextureCache;
@@ -91,6 +93,7 @@ public final class ServerRuntime implements AutoCloseable {
         textureCache.init(worldPath);
         animationCache.init(worldPath);
         appearanceStorage.init(worldPath);
+        MissingModNoticeLedger.getInstance().init(worldPath);
         int offlineAppearances = appearanceStorage.loadOfflineAppearances();
         if (offlineAppearances > 0) {
             QuickSkinInfo.LOGGER.info("Quick Skin shares the saved appearance of {} players who are"
@@ -150,6 +153,7 @@ public final class ServerRuntime implements AutoCloseable {
             // state now belongs to the replacement connection.
             ServerNetworkHandler.onPlayerDisconnected(playerId, connection);
             AccountSkinShareService.getInstance().playerDisconnected(playerId, connection);
+            MissingModNotice.playerDisconnected(connection);
             return false;
         }
         appearanceStorage.savePlayerAppearance(playerId);
@@ -158,6 +162,7 @@ public final class ServerRuntime implements AutoCloseable {
         cooldownManager.removePlayer(playerId);
         ServerNetworkHandler.onPlayerDisconnected(playerId, connection);
         AccountSkinShareService.getInstance().playerDisconnected(playerId, connection);
+        MissingModNotice.playerDisconnected(connection);
         return true;
     }
 
@@ -181,6 +186,8 @@ public final class ServerRuntime implements AutoCloseable {
         runCleanup("release server appearance storage", appearanceStorage::clear);
         runCleanup("clear server cooldowns", cooldownManager::clear);
         runCleanup("clear transient network transfers", ServerNetworkHandler::clearTransientNetworkState);
+        runCleanup("forget pending Quick Skin notices", MissingModNotice::clear);
+        runCleanup("release the Quick Skin notice record", MissingModNoticeLedger.getInstance()::clear);
     }
 
     private static void runCleanup(String operation, Runnable action) {

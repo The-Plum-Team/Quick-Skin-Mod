@@ -57,6 +57,8 @@ DEGRADABLE_MIXINS = {
     "main:com/quickskin/mod/mixin/PanoramaRendererMixin.java",
     "main:com/quickskin/mod/mixin/PreviewEquipmentMixin.java",
     "main:com/quickskin/mod/mixin/PreviewSkinSwapPoseMixin.java",
+    # 1.20.1 only: without it the notice for players without Quick Skin is in English.
+    "main:com/quickskin/mod/mixin/ServerPlayerLanguageMixin.java",
 }
 
 # Third-party integrations remain fail-local in production. Their targets are either selected by
