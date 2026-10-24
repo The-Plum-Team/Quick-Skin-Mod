@@ -267,5 +267,7 @@
 
   "_comment_upload_limit": "=== Upload Size Limit ===",
   "quickskin.network.upload_too_large.skin": "[त्वरित स्किन] आपकी स्किन (%s) इस सर्वर की %s अपलोड सीमा से बड़ी है। यह केवल आपकी स्क्रीन पर दिखती है; अन्य खिलाड़ी इसे नहीं देखते।",
-  "quickskin.network.upload_too_large.cape": "[त्वरित स्किन] आपका केप (%s) इस सर्वर की %s अपलोड सीमा से बड़ा है। यह केवल आपकी स्क्रीन पर दिखता है; अन्य खिलाड़ी इसे नहीं देखते।"
+  "quickskin.network.upload_too_large.cape": "[त्वरित स्किन] आपका केप (%s) इस सर्वर की %s अपलोड सीमा से बड़ा है। यह केवल आपकी स्क्रीन पर दिखता है; अन्य खिलाड़ी इसे नहीं देखते।",
+  "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
+  "quickskin.server.missing_mod_notice": "यह सर्वर कस्टम स्किन और केप के लिए Quick Skin का उपयोग करता है। उन्हें देखने और अपनी पहनने के लिए मॉड इंस्टॉल करें।"
 }

@@ -18,6 +18,7 @@
   "mixins": [
     "ChunkMapAccessor",
     "PlayerGameProfileAccessor",
+    "ServerPlayerLanguageMixin",
     "TrackedEntityAccessor"
   ],
   "injectors": {

@@ -172,6 +172,17 @@ public final class ProtocolNetwork {
         return !helloCapable && legacyCapable;
     }
 
+    /** Whether the peer registers a receiver of either protocol, so it runs some Quick Skin. */
+    public static boolean advertisesQuickSkinChannels(ServerPlayer player) {
+        //? if <1.21 {
+        return NetworkTransport.INSTANCE.canPlayerReceiveProtocolAck(player)
+                || NetworkTransport.INSTANCE.canPlayerReceiveLegacyProtocol(player);
+        //?} else {
+        return NetworkTransport.INSTANCE.canPlayerReceive(player, ProtocolAckPayload.TYPE)
+                || NetworkTransport.INSTANCE.canPlayerReceive(player, SyncAppearancePayload.TYPE);
+        //?}
+    }
+
     public static String translateContentId(ServerPlayer recipient, String contentId) {
         ProtocolProfile profile = profile(recipient);
         ContentId.Algorithm algorithm;
