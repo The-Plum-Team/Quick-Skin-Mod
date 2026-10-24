@@ -134,4 +134,63 @@ class ProtocolNegotiatorTest {
         assertFalse(withOlderPeer.supports(ProtocolCapability.ACCOUNT_SKIN_REFRESH));
         assertTrue(withCurrentPeer.supports(ProtocolCapability.ACCOUNT_SKIN_REFRESH));
     }
+
+    @Test
+    void nicknamesIsAnOptionalCapabilityThatOlderPeersDrop() {
+        assertTrue((QuickSkinProtocol.CAPABILITIES
+                & ProtocolCapability.NICKNAMES.mask()) != 0L);
+        assertEquals(0L, QuickSkinProtocol.REQUIRED_CAPABILITIES
+                & ProtocolCapability.NICKNAMES.mask());
+
+        long olderPeer = ProtocolCapability.SHA256_CONTENT_IDS.mask()
+                | ProtocolCapability.CHUNKED_TEXTURE_TRANSFER.mask()
+                | ProtocolCapability.ANIMATION_METADATA.mask()
+                | ProtocolCapability.APPEARANCE_SNAPSHOT_ACK.mask()
+                | ProtocolCapability.ACCOUNT_SKIN_REFRESH.mask();
+        ProtocolProfile withOlderPeer = ProtocolNegotiator.negotiate(
+                QuickSkinProtocol.POLICY,
+                new ProtocolOffer(2, 2, olderPeer, 1024 * 1024, 30 * 1024));
+        ProtocolProfile withCurrentPeer = ProtocolNegotiator.negotiate(
+                QuickSkinProtocol.POLICY,
+                new ProtocolOffer(2, 2, QuickSkinProtocol.CAPABILITIES, 1024 * 1024, 30 * 1024));
+
+        assertTrue(withOlderPeer.negotiated());
+        assertTrue(withOlderPeer.supports(ProtocolCapability.ACCOUNT_SKIN_REFRESH));
+        assertFalse(withOlderPeer.supports(ProtocolCapability.NICKNAMES));
+        assertTrue(withCurrentPeer.supports(ProtocolCapability.NICKNAMES));
+    }
+
+    @Test
+    void assignedSkinsIsAnOptionalCapabilityThatOlderPeersDrop() {
+        assertTrue((QuickSkinProtocol.CAPABILITIES
+                & ProtocolCapability.ASSIGNED_SKINS.mask()) != 0L);
+        assertEquals(0L, QuickSkinProtocol.REQUIRED_CAPABILITIES
+                & ProtocolCapability.ASSIGNED_SKINS.mask());
+
+        long nicknamePeer = QuickSkinProtocol.CAPABILITIES & ~ProtocolCapability.ASSIGNED_SKINS.mask();
+        ProtocolProfile withNicknamePeer = ProtocolNegotiator.negotiate(
+                QuickSkinProtocol.POLICY,
+                new ProtocolOffer(2, 2, nicknamePeer, 1024 * 1024, 30 * 1024));
+
+        assertTrue(withNicknamePeer.negotiated());
+        assertTrue(withNicknamePeer.supports(ProtocolCapability.NICKNAMES));
+        assertFalse(withNicknamePeer.supports(ProtocolCapability.ASSIGNED_SKINS));
+    }
+
+    @Test
+    void hiddenArmorIsAnOptionalCapabilityThatOlderPeersDrop() {
+        assertTrue((QuickSkinProtocol.CAPABILITIES
+                & ProtocolCapability.HIDDEN_ARMOR.mask()) != 0L);
+        assertEquals(0L, QuickSkinProtocol.REQUIRED_CAPABILITIES
+                & ProtocolCapability.HIDDEN_ARMOR.mask());
+
+        long olderPeer = QuickSkinProtocol.CAPABILITIES & ~ProtocolCapability.HIDDEN_ARMOR.mask();
+        ProtocolProfile withOlderPeer = ProtocolNegotiator.negotiate(
+                QuickSkinProtocol.POLICY,
+                new ProtocolOffer(2, 2, olderPeer, 1024 * 1024, 30 * 1024));
+
+        assertTrue(withOlderPeer.negotiated());
+        assertTrue(withOlderPeer.supports(ProtocolCapability.ASSIGNED_SKINS));
+        assertFalse(withOlderPeer.supports(ProtocolCapability.HIDDEN_ARMOR));
+    }
 }

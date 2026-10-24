@@ -92,6 +92,8 @@ public class ServerNetworkHandler {
     /** Completes bootstrap after the exact live connection selects a protocol schema. */
     private static void onProtocolReady(ServerPlayer player) {
         sendAllAppearancesToPlayer(player);
+        ServerNicknames.sendSnapshot(player);
+        ServerSkinAssignments.sessionReady(player);
         sendServerConfigToPlayer(player);
         int cooldownSeconds = ServerConfig.getInstance().skinChangeCooldownSeconds;
         if (cooldownSeconds > 0
@@ -266,6 +268,60 @@ public class ServerNetworkHandler {
         Object connection = sender.connection;
         context.queue(() -> AccountSkinRefreshRequests.submit(
                 activePlayer(server, playerId, connection)));
+    }
+
+    /** A Quick Skin client asks for its own cosmetic nickname ({@code ""}: none). */
+    public static void handleSetNickname(
+            FriendlyByteBuf buf, NetworkManager.PacketContext context) {
+        UUID reportedPlayerId = PacketHelper.readPlayerId(buf);
+        int requestId = buf.readInt();
+        String nickname = PacketHelper.readString(buf, TextureTransferLimits.MAX_NICKNAME_CHARS);
+        ServerPlayer sender = (ServerPlayer) context.getPlayer();
+        if (!ServerNicknames.admits(sender, reportedPlayerId)
+                || !TextureTransferRateLimiter.getInstance().allowStorageMutation(
+                        sender.getUUID(), sender.connection)) return;
+        MinecraftServer server = sender.server;
+        UUID playerId = sender.getUUID();
+        Object connection = sender.connection;
+        context.queue(() -> ServerNicknames.request(
+                activePlayer(server, playerId, connection), requestId, nickname));
+    }
+
+    /** A Quick Skin client says which of its own armour pieces it hides from everyone. */
+    public static void handleArmorVisibility(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
+        UUID reportedPlayerId = PacketHelper.readPlayerId(buf);
+        int hidden = buf.readUnsignedByte();
+        ServerPlayer sender = (ServerPlayer) context.getPlayer();
+        if (!ServerHiddenArmor.admits(sender, reportedPlayerId) || !HiddenArmor.isValid(hidden)
+                || !TextureTransferRateLimiter.getInstance().allowStorageMutation(
+                        sender.getUUID(), sender.connection)) return;
+        MinecraftServer server = sender.server;
+        UUID playerId = sender.getUUID();
+        Object connection = sender.connection;
+        context.queue(() -> ServerHiddenArmor.request(activePlayer(server, playerId, connection), hidden));
+    }
+
+    /** An admin's Quick Skin client hands out skins or keeps the skin pool. */
+    public static void handleSkinAdmin(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
+        int requestId = buf.readInt();
+        SkinAdminAction action = SkinAdminAction.fromCode(buf.readUnsignedByte());
+        int count = buf.readInt();
+        if (count < 0 || count > TextureTransferLimits.MAX_SKIN_ADMIN_PLAYERS) return;
+        java.util.List<UUID> players = new java.util.ArrayList<>(count);
+        for (int i = 0; i < count; i++) players.add(PacketHelper.readPlayerId(buf));
+        String skinId = PacketHelper.readString(buf, TextureTransferLimits.MAX_APPEARANCE_ID_BYTES);
+        String model = PacketHelper.readString(buf, TextureTransferLimits.MAX_MODEL_BYTES);
+        String name = PacketHelper.readString(buf, TextureTransferLimits.MAX_POOL_SKIN_NAME_CHARS);
+        ServerPlayer sender = (ServerPlayer) context.getPlayer();
+        if (action == null || !ServerSkinAssignments.admits(sender)
+                || !TextureTransferRateLimiter.getInstance().allowStorageMutation(
+                        sender.getUUID(), sender.connection)) return;
+        MinecraftServer server = sender.server;
+        UUID playerId = sender.getUUID();
+        Object connection = sender.connection;
+        ServerSkinAssignments.Request request = new ServerSkinAssignments.Request(
+                requestId, action, java.util.List.copyOf(players), skinId, model, name);
+        context.queue(() -> ServerSkinAssignments.request(activePlayer(server, playerId, connection), request));
     }
 
     /**
@@ -530,6 +586,7 @@ public class ServerNetworkHandler {
             LOGGER.warn("Unable to commit a prepared texture upload", error);
         } finally {
             retryDeferredPackets(player, UPLOAD_COORDINATOR.finishUpload(ticket));
+            ServerSkinAssignments.uploadFinished(player);
         }
     }
 
@@ -601,9 +658,14 @@ public class ServerNetworkHandler {
             com.quickskin.mod.config.ServerConfig serverConfig =
                 com.quickskin.mod.config.ServerConfig.getInstance();
 
+            boolean nicknamesToggled = false;
             switch (key) {
                 case "disableSkinTransparency":
                     serverConfig.disableSkinTransparency = value;
+                    break;
+                case "allowNicknames":
+                    nicknamesToggled = serverConfig.allowNicknames != value;
+                    serverConfig.allowNicknames = value;
                     break;
                 default:
                     return;
@@ -614,6 +676,7 @@ public class ServerNetworkHandler {
 
             // Broadcast config change to ALL clients (including the admin who made the change)
             broadcastServerConfigToAllPlayers(player.server);
+            if (nicknamesToggled) ServerNicknames.nicknamesToggled(player.server);
         });
     }
 
@@ -643,6 +706,11 @@ public class ServerNetworkHandler {
         }
 
         PlayerAppearance appearance = ServerPlayerAppearanceRepository.getInstance().getAppearanceToShare(targetPlayerId);
+        // Others see a skin an admin assigned; the player's own client keeps its own appearance,
+        // whose echo acknowledges its uploads, and learns the assigned skin separately
+        if (!recipient.getUUID().equals(targetPlayerId)) {
+            appearance = ServerSkinAssignments.shownToOthers(targetPlayerId, appearance);
+        }
 
         if (appearance != null) {
             if (!NetworkSecurity.isValidLocalAppearanceId(appearance.getSkinId(), "skin")
@@ -691,6 +759,10 @@ public class ServerNetworkHandler {
      * Used when a player joins to notify existing players of the new player's appearance
      * @param player The player whose appearance to send
      */
+    static void appearanceShownChanged(UUID playerId) {
+        APPEARANCE_COORDINATOR.notifyAppearance(playerId);
+    }
+
     public static void sendAppearanceToAllPlayers(ServerPlayer player) {
         if (player != null
                 && ServerPlayerAppearanceRepository.getInstance()
@@ -788,6 +860,8 @@ public class ServerNetworkHandler {
     public static void tickTextureResponses(MinecraftServer server) {
         tickLatePeerClassification(server);
         tickAppearanceControls(server);
+        ServerNicknames.tick(server);
+        ServerSkinAssignments.tick(server);
         drainPreparedTextureUploads(server);
         int packetsRemaining = MAX_RESPONSE_PACKETS_PER_TICK;
         int bytesRemaining = MAX_RESPONSE_BYTES_PER_TICK;
@@ -1144,6 +1218,9 @@ public class ServerNetworkHandler {
         discardPreparedTextureUploads(playerId, connection);
         TextureTransferRateLimiter.getInstance().removeSession(playerId, connection);
         TextureChunkAssembler.getInstance().discardSession(playerId, connection);
+        ServerNicknames.playerLeft(playerId, connection);
+        ServerSkinAssignments.playerLeft(playerId, connection);
+        ServerHiddenArmor.playerLeft(playerId, connection);
     }
 
     public static void clearTransientNetworkState() {
@@ -1155,6 +1232,9 @@ public class ServerNetworkHandler {
         discardAllPreparedTextureUploads();
         TextureTransferRateLimiter.getInstance().clear();
         TextureChunkAssembler.getInstance().clear();
+        ServerNicknames.clear();
+        ServerSkinAssignments.clear();
+        ServerHiddenArmor.clear();
     }
 
     /**

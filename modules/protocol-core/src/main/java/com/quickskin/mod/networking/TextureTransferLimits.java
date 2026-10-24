@@ -16,6 +16,23 @@ public final class TextureTransferLimits {
     public static final int MAX_MODEL_BYTES = 16;
     public static final int MAX_CONFIG_KEY_BYTES = 64;
     public static final int MAX_JSON_BYTES = 32 * 1024 - 1;
+    /** Longest nickname in UTF-16 units, which the 1.20.1 string codec counts. */
+    public static final int MAX_NICKNAME_CHARS = 32;
+    /**
+     * Largest encoded nickname: each unit takes at most three UTF-8 bytes, so the 1.20.1 codec,
+     * which counts units, and the later one, which counts bytes, accept the same names.
+     */
+    public static final int MAX_NICKNAME_BYTES = 3 * MAX_NICKNAME_CHARS;
+    /** Most nicknames one {@code sync_nicknames} packet carries; longer rosters take several. */
+    public static final int MAX_NICKNAME_ENTRIES = 256;
+    /** Most players one {@code skin_admin} request names. */
+    public static final int MAX_SKIN_ADMIN_PLAYERS = 256;
+    /** Most skins in a server's skin pool, all of which one {@code skin_admin_state} lists. */
+    public static final int MAX_POOL_SKINS = 64;
+    /** Longest name of a pool skin, in ASCII characters ({@code PoolSkinEntry#isValidName}). */
+    public static final int MAX_POOL_SKIN_NAME_CHARS = 32;
+    /** Most players with an assigned skin that one {@code skin_admin_state} names. */
+    public static final int MAX_ASSIGNED_SKIN_ENTRIES = 1024;
 
     public static final int CHUNK_BYTES = 30 * 1024;
     public static final int MAX_WIRE_CHUNK_BYTES = 32 * 1024;
