@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "Tampilkan sebagai kisi",
   "quickskin.tooltip.delete_mode": "Pilih skin untuk dihapus",
   "quickskin.button.delete_count": "Hapus (%s)",
+  "quickskin.context.favorite": "Tambahkan ke favorit",
+  "quickskin.context.unfavorite": "Hapus dari favorit",
+  "quickskin.context.rename": "Ganti nama",
+  "quickskin.context.delete": "Hapus",
+  "quickskin.context.delete_confirm": "Yakin? Hapus",
   "quickskin.screen.delete_many.title": "Hapus Skin?",
   "quickskin.dialog.confirm_delete_many": "Yakin ingin menghapus %s skin?",
 

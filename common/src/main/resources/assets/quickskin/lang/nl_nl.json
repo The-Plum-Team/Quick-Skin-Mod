@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "Als raster tonen",
   "quickskin.tooltip.delete_mode": "Kies skins om te verwijderen",
   "quickskin.button.delete_count": "Verwijderen (%s)",
+  "quickskin.context.favorite": "Aan favorieten toevoegen",
+  "quickskin.context.unfavorite": "Uit favorieten halen",
+  "quickskin.context.rename": "Hernoemen",
+  "quickskin.context.delete": "Verwijderen",
+  "quickskin.context.delete_confirm": "Zeker? Verwijderen",
   "quickskin.screen.delete_many.title": "Skins verwijderen?",
   "quickskin.dialog.confirm_delete_many": "Weet je zeker dat je %s skins wilt verwijderen?",
 

@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "Показати сіткою",
   "quickskin.tooltip.delete_mode": "Вибрати скіни для видалення",
   "quickskin.button.delete_count": "Видалити (%s)",
+  "quickskin.context.favorite": "До обраного",
+  "quickskin.context.unfavorite": "Прибрати з обраного",
+  "quickskin.context.rename": "Перейменувати",
+  "quickskin.context.delete": "Видалити",
+  "quickskin.context.delete_confirm": "Точно? Видалити",
   "quickskin.screen.delete_many.title": "Видалити скіни?",
   "quickskin.dialog.confirm_delete_many": "Видалити скіни (%s)?",
 

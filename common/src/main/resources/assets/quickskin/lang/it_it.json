@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "Mostra come griglia",
   "quickskin.tooltip.delete_mode": "Scegli le skin da eliminare",
   "quickskin.button.delete_count": "Elimina (%s)",
+  "quickskin.context.favorite": "Aggiungi ai preferiti",
+  "quickskin.context.unfavorite": "Togli dai preferiti",
+  "quickskin.context.rename": "Rinomina",
+  "quickskin.context.delete": "Elimina",
+  "quickskin.context.delete_confirm": "Sicuro? Elimina",
   "quickskin.screen.delete_many.title": "Eliminare le skin?",
   "quickskin.dialog.confirm_delete_many": "Vuoi davvero eliminare %s skin?",
 

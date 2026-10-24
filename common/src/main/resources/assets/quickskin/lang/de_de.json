@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "Als Raster anzeigen",
   "quickskin.tooltip.delete_mode": "Skins zum Löschen auswählen",
   "quickskin.button.delete_count": "Löschen (%s)",
+  "quickskin.context.favorite": "Zu Favoriten",
+  "quickskin.context.unfavorite": "Aus Favoriten entfernen",
+  "quickskin.context.rename": "Umbenennen",
+  "quickskin.context.delete": "Löschen",
+  "quickskin.context.delete_confirm": "Sicher? Löschen",
   "quickskin.screen.delete_many.title": "Skins löschen?",
   "quickskin.dialog.confirm_delete_many": "Möchtest du wirklich %s Skins löschen?",
 

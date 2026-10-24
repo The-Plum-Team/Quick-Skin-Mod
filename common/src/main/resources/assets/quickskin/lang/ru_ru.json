@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "Показать сеткой",
   "quickskin.tooltip.delete_mode": "Выбрать скины для удаления",
   "quickskin.button.delete_count": "Удалить (%s)",
+  "quickskin.context.favorite": "В избранное",
+  "quickskin.context.unfavorite": "Убрать из избранного",
+  "quickskin.context.rename": "Переименовать",
+  "quickskin.context.delete": "Удалить",
+  "quickskin.context.delete_confirm": "Точно? Удалить",
   "quickskin.screen.delete_many.title": "Удалить скины?",
   "quickskin.dialog.confirm_delete_many": "Удалить скины (%s)?",
 

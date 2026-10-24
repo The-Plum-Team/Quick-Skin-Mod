@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "グリッド表示",
   "quickskin.tooltip.delete_mode": "削除するスキンを選択",
   "quickskin.button.delete_count": "削除 (%s)",
+  "quickskin.context.favorite": "お気に入りに追加",
+  "quickskin.context.unfavorite": "お気に入りから外す",
+  "quickskin.context.rename": "名前を変更",
+  "quickskin.context.delete": "削除",
+  "quickskin.context.delete_confirm": "本当に？削除",
   "quickskin.screen.delete_many.title": "スキンを削除しますか?",
   "quickskin.dialog.confirm_delete_many": "%s 個のスキンを削除してもよろしいですか?",
 

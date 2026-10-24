@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "以网格显示",
   "quickskin.tooltip.delete_mode": "选择要删除的皮肤",
   "quickskin.button.delete_count": "删除 (%s)",
+  "quickskin.context.favorite": "加入收藏",
+  "quickskin.context.unfavorite": "取消收藏",
+  "quickskin.context.rename": "重命名",
+  "quickskin.context.delete": "删除",
+  "quickskin.context.delete_confirm": "确定？删除",
   "quickskin.screen.delete_many.title": "删除皮肤？",
   "quickskin.dialog.confirm_delete_many": "确定要删除 %s 个皮肤吗？",
 

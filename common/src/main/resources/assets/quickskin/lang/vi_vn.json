@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "Xem dạng lưới",
   "quickskin.tooltip.delete_mode": "Chọn skin để xóa",
   "quickskin.button.delete_count": "Xóa (%s)",
+  "quickskin.context.favorite": "Thêm vào yêu thích",
+  "quickskin.context.unfavorite": "Bỏ khỏi yêu thích",
+  "quickskin.context.rename": "Đổi tên",
+  "quickskin.context.delete": "Xóa",
+  "quickskin.context.delete_confirm": "Chắc chưa? Xóa",
   "quickskin.screen.delete_many.title": "Xóa Skin?",
   "quickskin.dialog.confirm_delete_many": "Bạn có chắc muốn xóa %s skin?",
 

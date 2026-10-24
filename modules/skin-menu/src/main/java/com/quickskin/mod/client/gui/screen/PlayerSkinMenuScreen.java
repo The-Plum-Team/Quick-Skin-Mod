@@ -99,6 +99,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     // Controls that stay above the player preview (drawn after it, clicked before it)
     private final List<AbstractWidget> foregroundControls = new ArrayList<>();
+    /** The menu a right click on a skin opens; drawn above every other control. */
+    private com.quickskin.mod.client.gui.widget.SkinContextMenu skinContextMenu;
 
     // Layout of the panel-free menu, recomputed by init()
     private static final int MARGIN = 8;
@@ -353,6 +355,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         skinHeaderY = searchY + SEARCH_HEIGHT + MARGIN;
         int listTop = skinHeaderY + CONTROL_HEIGHT + 4;
         skinListBottom = Math.max(listTop + tileSize, this.height - MARGIN - CONTROL_HEIGHT - 4);
+        // Rebuilt when a dialog returns here: the skins it deleted are still falling
+        SkinListWidget previousList = skinListPanel == null ? null : skinListPanel.getSkinListWidget();
         skinListPanel = new SkinListPanel(
                 skinColumnX,
                 listTop,
@@ -363,6 +367,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 this::onSkinSelected
         );
         skinListPanel.init(this);
+        if (previousList != null && skinListPanel.getSkinListWidget() != null) {
+            skinListPanel.getSkinListWidget().continueAnimations(previousList);
+        }
 
         // The header is as wide as its widest line and its two buttons, at least as wide as the tiles
         String widestCount = skinListPanel.size() + "/" + skinListPanel.size();
@@ -516,6 +523,26 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
         LinkButtonsPanel linkButtonsPanel = new LinkButtonsPanel(linkRowX, searchY);
         linkButtonsPanel.init(this);
+
+        // Last, so it is drawn over every other control
+        skinContextMenu = new com.quickskin.mod.client.gui.widget.SkinContextMenu(
+                new com.quickskin.mod.client.gui.widget.SkinContextMenu.Actions() {
+                    @Override
+                    public void toggleFavorite(AssetMetadata metadata) {
+                        PlayerSkinMenuScreen.this.toggleFavorite(metadata);
+                    }
+
+                    @Override
+                    public void rename(AssetMetadata metadata) {
+                        showRenameDialog(metadata);
+                    }
+
+                    @Override
+                    public void delete(AssetMetadata metadata) {
+                        deleteSkin(metadata);
+                    }
+                });
+        registerForegroundControl(skinContextMenu);
 
         // Restore the previewed look and the active cape
         restoreSavedState();
@@ -739,6 +766,15 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?} else {
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
 //?}
+        // While a skin's menu is open nothing else lights up under the mouse: a click elsewhere
+        // only closes the menu. The menu itself still follows the mouse.
+        int menuMouseX = mouseX;
+        int menuMouseY = mouseY;
+        if (skinContextMenu != null && skinContextMenu.isOpen()) {
+            mouseX = -10_000;
+            mouseY = -10_000;
+        }
+
         // Render the animated background
         this.renderBackgroundEffects(graphics, partialTick);
 
@@ -796,10 +832,12 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         graphics.nextStratum();
 //?}
         for (AbstractWidget control : foregroundControls) {
+            int controlMouseX = control == skinContextMenu ? menuMouseX : mouseX;
+            int controlMouseY = control == skinContextMenu ? menuMouseY : mouseY;
 //? if <26.1 {
-            control.render(graphics, mouseX, mouseY, partialTick);
+            control.render(graphics, controlMouseX, controlMouseY, partialTick);
 //?} else {
-            control.extractRenderState(graphics, mouseX, mouseY, partialTick);
+            control.extractRenderState(graphics, controlMouseX, controlMouseY, partialTick);
 //?}
         }
 
@@ -958,9 +996,11 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
         int keyCode = GuiCompat.keyCode(event);
 //?}
-        // ESC leaves the delete mode, and otherwise closes the menu
+        // ESC closes a skin's menu, leaves the delete mode, and otherwise closes the menu
         if (keyCode == InputConstants.KEY_ESCAPE) {
-            if (deleteMode) {
+            if (skinContextMenu != null && skinContextMenu.isOpen()) {
+                skinContextMenu.close();
+            } else if (deleteMode) {
                 setDeleteMode(false);
             } else {
                 this.onClose();
@@ -1090,6 +1130,14 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
      * Offer a click to the foreground controls before the player preview can take it
      */
     private boolean clickForegroundControls(int button, java.util.function.Predicate<AbstractWidget> click) {
+        // An open skin menu takes the click first, if only to close itself
+        if (skinContextMenu != null && skinContextMenu.isOpen()) {
+            if (click.test(skinContextMenu)) {
+                this.setFocused(skinContextMenu);
+                return true;
+            }
+            return false;
+        }
         for (AbstractWidget control : foregroundControls) {
             if (click.test(control)) {
                 this.setFocused(control);
@@ -1629,6 +1677,25 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     /**
+     * Opens the menu of a skin the player right-clicked in the skin column: favorite, rename and
+     * delete. Not in the delete mode, where clicks mark skins.
+     */
+    public void openSkinContextMenu(AssetMetadata metadata, int mouseX, int mouseY) {
+        if (skinContextMenu == null || deleteMode) {
+            return;
+        }
+        skinContextMenu.open(metadata, isPlayerOwnSkin(metadata),
+                LocalAssetManager.getInstance().isFavorite(metadata.hash()), mouseX, mouseY, width, height);
+    }
+
+    /** Closes the skin menu, as the column scrolls under it. */
+    public void closeSkinContextMenu() {
+        if (skinContextMenu != null) {
+            skinContextMenu.close();
+        }
+    }
+
+    /**
      * Public wrapper for addRenderableWidget to allow panels to add widgets
      */
     public <T extends net.minecraft.client.gui.components.events.GuiEventListener & net.minecraft.client.gui.components.Renderable & net.minecraft.client.gui.narration.NarratableEntry> void registerWidget(T widget) {
@@ -1701,11 +1768,15 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
      */
     public void toggleFavorite(AssetMetadata metadata) {
         LocalAssetManager assets = LocalAssetManager.getInstance();
-        assets.setFavorite(metadata.hash(), !assets.isFavorite(metadata.hash()));
+        boolean favorite = !assets.isFavorite(metadata.hash());
+        assets.setFavorite(metadata.hash(), favorite);
         if (skinListPanel == null) {
             return;
         }
         refreshSkinList();
+        if (favorite) {
+            skinListPanel.celebrateFavorite(metadata.hash());
+        }
         skinListPanel.reveal(metadata.hash());
     }
 
@@ -1906,6 +1977,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         boolean deletedAny = false;
         boolean wasApplied = false;
         boolean hideOwnSkin = false;
+        if (skinListPanel != null) {
+            skinListPanel.prepareDeparture(skins.stream().map(AssetMetadata::hash).toList());
+        }
         for (AssetMetadata metadata : skins) {
             if (isPlayerOwnSkin(metadata)) {
                 hideOwnSkin = true;

@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "Mostrar em grade",
   "quickskin.tooltip.delete_mode": "Selecionar skins para excluir",
   "quickskin.button.delete_count": "Excluir (%s)",
+  "quickskin.context.favorite": "Adicionar aos favoritos",
+  "quickskin.context.unfavorite": "Tirar dos favoritos",
+  "quickskin.context.rename": "Renomear",
+  "quickskin.context.delete": "Apagar",
+  "quickskin.context.delete_confirm": "Certeza? Apagar",
   "quickskin.screen.delete_many.title": "Excluir Skins?",
   "quickskin.dialog.confirm_delete_many": "Tem certeza de que deseja excluir %s skins?",
 

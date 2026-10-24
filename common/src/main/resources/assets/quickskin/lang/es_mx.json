@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "Ver como cuadrícula",
   "quickskin.tooltip.delete_mode": "Elegir aspectos para eliminar",
   "quickskin.button.delete_count": "Eliminar (%s)",
+  "quickskin.context.favorite": "Marcar como favorita",
+  "quickskin.context.unfavorite": "Quitar de favoritas",
+  "quickskin.context.rename": "Renombrar",
+  "quickskin.context.delete": "Borrar",
+  "quickskin.context.delete_confirm": "¿Seguro? Borrar",
   "quickskin.screen.delete_many.title": "¿Eliminar aspectos?",
   "quickskin.dialog.confirm_delete_many": "¿Seguro que quieres eliminar %s aspectos?",
 

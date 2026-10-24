@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "แสดงเป็นตาราง",
   "quickskin.tooltip.delete_mode": "เลือกสกินที่จะลบ",
   "quickskin.button.delete_count": "ลบ (%s)",
+  "quickskin.context.favorite": "เพิ่มในรายการโปรด",
+  "quickskin.context.unfavorite": "เอาออกจากรายการโปรด",
+  "quickskin.context.rename": "เปลี่ยนชื่อ",
+  "quickskin.context.delete": "ลบ",
+  "quickskin.context.delete_confirm": "แน่ใจไหม? ลบ",
   "quickskin.screen.delete_many.title": "ลบสกิน?",
   "quickskin.dialog.confirm_delete_many": "แน่ใจหรือไม่ว่าต้องการลบสกิน %s รายการ?",
 

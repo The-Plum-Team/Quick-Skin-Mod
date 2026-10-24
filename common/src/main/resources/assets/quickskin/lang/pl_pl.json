@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "Pokaż jako siatkę",
   "quickskin.tooltip.delete_mode": "Wybierz skórki do usunięcia",
   "quickskin.button.delete_count": "Usuń (%s)",
+  "quickskin.context.favorite": "Dodaj do ulubionych",
+  "quickskin.context.unfavorite": "Usuń z ulubionych",
+  "quickskin.context.rename": "Zmień nazwę",
+  "quickskin.context.delete": "Usuń",
+  "quickskin.context.delete_confirm": "Na pewno? Usuń",
   "quickskin.screen.delete_many.title": "Usunąć skórki?",
   "quickskin.dialog.confirm_delete_many": "Czy na pewno chcesz usunąć skórki (%s)?",
 

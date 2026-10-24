@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "Visa som rutnät",
   "quickskin.tooltip.delete_mode": "Välj skins att ta bort",
   "quickskin.button.delete_count": "Ta bort (%s)",
+  "quickskin.context.favorite": "Lägg till i favoriter",
+  "quickskin.context.unfavorite": "Ta bort från favoriter",
+  "quickskin.context.rename": "Byt namn",
+  "quickskin.context.delete": "Ta bort",
+  "quickskin.context.delete_confirm": "Säker? Ta bort",
   "quickskin.screen.delete_many.title": "Ta bort skins?",
   "quickskin.dialog.confirm_delete_many": "Vill du verkligen ta bort %s skins?",
 

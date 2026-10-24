@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "Mostrar em grelha",
   "quickskin.tooltip.delete_mode": "Selecionar peles para eliminar",
   "quickskin.button.delete_count": "Eliminar (%s)",
+  "quickskin.context.favorite": "Adicionar aos favoritos",
+  "quickskin.context.unfavorite": "Tirar dos favoritos",
+  "quickskin.context.rename": "Mudar o nome",
+  "quickskin.context.delete": "Apagar",
+  "quickskin.context.delete_confirm": "Tens a certeza? Apagar",
   "quickskin.screen.delete_many.title": "Eliminar Peles?",
   "quickskin.dialog.confirm_delete_many": "Tens a certeza de que queres eliminar %s peles?",
 

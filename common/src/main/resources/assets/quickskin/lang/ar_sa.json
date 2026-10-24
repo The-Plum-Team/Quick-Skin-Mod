@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "عرض كشبكة",
   "quickskin.tooltip.delete_mode": "اختر المظاهر لحذفها",
   "quickskin.button.delete_count": "حذف (%s)",
+  "quickskin.context.favorite": "إضافة إلى المفضلة",
+  "quickskin.context.unfavorite": "إزالة من المفضلة",
+  "quickskin.context.rename": "إعادة التسمية",
+  "quickskin.context.delete": "حذف",
+  "quickskin.context.delete_confirm": "متأكد؟ حذف",
   "quickskin.screen.delete_many.title": "حذف المظاهر؟",
   "quickskin.dialog.confirm_delete_many": "هل أنت متأكد من حذف %s مظاهر؟",
 

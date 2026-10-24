@@ -41,6 +41,11 @@
   "quickskin.tooltip.view_grid": "Izgara olarak göster",
   "quickskin.tooltip.delete_mode": "Silinecek skinleri seç",
   "quickskin.button.delete_count": "Sil (%s)",
+  "quickskin.context.favorite": "Favorilere ekle",
+  "quickskin.context.unfavorite": "Favorilerden çıkar",
+  "quickskin.context.rename": "Yeniden adlandır",
+  "quickskin.context.delete": "Sil",
+  "quickskin.context.delete_confirm": "Emin misin? Sil",
   "quickskin.screen.delete_many.title": "Skinler Silinsin mi?",
   "quickskin.dialog.confirm_delete_many": "%s skini silmek istediğinden emin misin?",
 
