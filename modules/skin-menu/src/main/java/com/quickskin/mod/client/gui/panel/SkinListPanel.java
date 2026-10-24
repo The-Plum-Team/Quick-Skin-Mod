@@ -83,9 +83,11 @@ public class SkinListPanel extends AbstractWidget {
             return;
         }
 
-        // Clear and reload, keeping the selected skin selected wherever it lands
+        // Clear and reload, keeping the selected skin selected wherever it lands, and animate
+        // what changed
         SkinEntry selected = skinListWidget.getSelected();
         String selectedHash = selected != null ? selected.getMetadata().hash() : null;
+        skinListWidget.rememberLayout();
         skinListWidget.clearSkinEntries();
         loadSkins();
         if (selectedHash != null) {
@@ -95,6 +97,21 @@ public class SkinListPanel extends AbstractWidget {
                     break;
                 }
             }
+        }
+        skinListWidget.animateChanges();
+    }
+
+    /** Flashes a skin just marked as a favorite. */
+    public void celebrateFavorite(String hash) {
+        if (skinListWidget != null) {
+            skinListWidget.celebrateFavorite(hash);
+        }
+    }
+
+    /** Keeps what the skins about to be deleted need to fall out of the column. */
+    public void prepareDeparture(java.util.Collection<String> hashes) {
+        if (skinListWidget != null) {
+            skinListWidget.prepareDeparture(hashes);
         }
     }
 

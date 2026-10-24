@@ -12,6 +12,9 @@ import java.util.Locale;
 /**
  * Enum containing all known official Minecraft capes, sorted from most common to rarest.
  * Each cape has a corresponding texture file in assets/quickskin/textures/capes/
+ *
+ * <p>The cape menu lists them by {@link Category}, in the order of that enum, and within each
+ * category in the order they are declared here.</p>
  */
 public enum KnownCapes {
     // --- Special Option ---
@@ -36,6 +39,15 @@ public enum KnownCapes {
     WAFFLE("Waffle Cape", "waffle", "A custom mod cape", true),
     WARDEN("Warden Cape", "warden", "A custom mod cape", true),
 
+    // --- New official capes, newest first ---
+    AURORA("Aurora Cape", "aurora", "Promotion cape from 2026", false),
+    HERO("Hero Cape", "hero", "Minecraft Dungeons II, for Minecraft Dungeons players", false),
+    TWISTED("Twisted Cape", "twisted", "Minecraft Dungeons II pre-order bonus", false),
+    BUILDER("Builder Cape", "builder", "TwitchCon Europe 2026 viewers", false),
+    CRAFTER("Crafter Cape", "crafter", "In-person event cape from 2026", false),
+    MOONLIGHT_TRAIL("Moonlight Trail Cape", "moonlight_trail", "Minecraft Experience: Moonlight Trail, 2026", false),
+    ZOMBIE_HORSE("Zombie Horse Cape", "zombie_horse", "Promotion cape from 2025", false),
+
     // --- Common (500,001+ owners) ---
     // Capes owned by millions of players.
     MIGRATOR("Migrator Cape", "migrator", "Red cape with gold trim", false),
@@ -55,7 +67,7 @@ public enum KnownCapes {
     HOME("Home Cape", "home", "Light blue cape", false),
     YEARN("Yearn Cape", "yearn", "Gray cape", false),
     MCC_15TH_YEAR("MCC 15th Year", "mcc_15th", "Minecraft Championship cape", false),
-    COPPER("Copper Cape", "copper", "New official copper-themed cape", false),
+    COPPER("Copper Cape", "copper", "Copper golem promotion, 2025", false),
 
     // --- Rare (1,001 - 50,000 owners) ---
     // Capes from early MineCons or special events. No longer obtainable.
@@ -77,6 +89,7 @@ public enum KnownCapes {
     // --- Legendary (1-100 owners) ---
     // The absolute rarest capes, mostly given to single individuals.
     TRANSLATOR("Translator Cape", "translator", "For translation contributors", false),
+    TRANSLATOR_CHINESE("Chinese Translator Cape", "translator_chinese", "For Chinese translation proofreaders", false),
     MOJIRA_MODERATOR("Mojira Moderator", "mojira", "Bug tracker moderators", false),
     MOJANG_CLASSIC("Mojang (Classic)", "mojang_classic", "Old Mojang cape", false),
     COBALT("Cobalt Cape", "cobalt", "Cobalt game champion", false),
@@ -94,7 +107,31 @@ public enum KnownCapes {
     BACON("Bacon Cape", "bacon", "Personal cape for Miclee", false),
     CUBED("Cubed Cape", "cubed", "Personal cape for Dr. Cubed", false),
     FROG("Frog Cape", "frog", "Personal cape for Grumm", false),
-    SNAIL("Snail Cape", "snail", "Personal cape for Bile", false);
+    SNAIL("Snail Cape", "snail", "Personal cape for Bile", false),
+    CHEAPSH0T("Cheapsh0t's Cape", "cheapsh0t", "Personal cape for cheapsh0t", false),
+    BLUEPRINT("Blueprint Cape", "blueprint", "Customer support test cape", false);
+
+    /** Where a cape comes from: the cape menu's sections, in this order. */
+    public enum Category {
+        QUICK_SKIN("quickskin.cape.section.quick_skin"),
+        NEW("quickskin.cape.section.new"),
+        EVERYONE("quickskin.cape.section.everyone"),
+        EVENTS("quickskin.cape.section.events"),
+        IN_PERSON("quickskin.cape.section.in_person"),
+        MOJANG("quickskin.cape.section.mojang"),
+        PERSONAL("quickskin.cape.section.personal");
+
+        private final String titleKey;
+
+        Category(String titleKey) {
+            this.titleKey = titleKey;
+        }
+
+        /** The translation key of the section's heading. */
+        public String titleKey() {
+            return titleKey;
+        }
+    }
 
     private final String displayName;
     private final String id;
@@ -177,6 +214,27 @@ public enum KnownCapes {
 
     public boolean isCustom() {
         return isCustom;
+    }
+
+    /** The cape menu's section for this cape; {@code null} for {@link #NONE}, which is in My Capes. */
+    public Category category() {
+        if (this == NONE) {
+            return null;
+        }
+        if (isCustom) {
+            return Category.QUICK_SKIN;
+        }
+        return switch (this) {
+            case AURORA, HERO, TWISTED, BUILDER, CRAFTER, MOONLIGHT_TRAIL, ZOMBIE_HORSE, COPPER -> Category.NEW;
+            case MIGRATOR, VANILLA, PAN, COMMON -> Category.EVERYONE;
+            case ANNIVERSARY_15TH, FOLLOWERS, CHERRY_BLOSSOM, PURPLE_HEART, PRIDE, MENACE, MOJANG_OFFICE, HOME,
+                    YEARN, MCC_15TH_YEAR, FOUNDERS -> Category.EVENTS;
+            case MINECRAFT_EXPERIENCE, MINECON_2016, MINECON_2015, MINECON_2013, MINECON_2012, MINECON_2011 ->
+                    Category.IN_PERSON;
+            case MOJANG_CLASSIC, MOJANG, MOJANG_STUDIOS, XBOX, TRANSLATOR, TRANSLATOR_CHINESE, MOJIRA_MODERATOR,
+                    REALMS_MAPMAKER -> Category.MOJANG;
+            default -> Category.PERSONAL;
+        };
     }
 
     public boolean isAnimated() {

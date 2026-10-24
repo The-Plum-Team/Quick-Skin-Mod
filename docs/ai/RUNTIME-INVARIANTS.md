@@ -525,7 +525,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   exactly 1920x1080, use deterministic fixture names, clear transient Vanilla overlays, and wait for
   two complete rendered passes after the ready/settle condition before dispatching the screenshot.
   CI disables cloud rendering and locks daylight/weather; E2E-only clocks pin authored stars,
-  title panoramas, and preview/player poses without changing ordinary gameplay.
+  title panoramas, and preview/player poses without changing ordinary gameplay, and the skin
+  column's add, favorite and delete animations are off, so a capture never catches a skin on its way.
 - Animated-cape evidence must use a valid cape-frame atlas, hold explicitly selected distinct
   frames through screenshot settlement, and compare the rendered cape region by a material pixel
   threshold. A changing logical frame counter alone does not prove that Minecraft sampled the

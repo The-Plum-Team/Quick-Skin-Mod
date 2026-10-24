@@ -31,6 +31,8 @@ import net.minecraft.resources.Identifier;
  * One skin in the skin column: a square tile showing its face in the grid, or a card with its 3D
  * bust, name and details in the list. A hovered tile or card shows a favorite star, except on the
  * player's own skin. In the skin menu's delete mode a skin marked for deletion turns red and grey.
+ * A deleted skin is drawn the same way while it falls out of the column, from grey copies taken
+ * before its files and texture went away.
  */
 @Environment(EnvType.CLIENT)
 public class SkinEntry {
@@ -50,6 +52,21 @@ public class SkinEntry {
     private boolean isFavoriteHovered;
     /** Whether the player marked this skin as a favorite; the list is rebuilt when that changes. */
     private final boolean favorite;
+    /** Whether this skin was deleted and is only drawn while it leaves the column. */
+    private boolean departing;
+    /** The grey face a deleted tile shows, taken while its texture was still loaded. */
+    //? if <1.21.11 {
+    private ResourceLocation departingFace;
+    //?} else {
+    private Identifier departingFace;
+    //?}
+    /** The arm width of the bust drawn last, kept for a deleted card whose preferences are gone. */
+    private boolean departingSlim;
+    /** The bust's size in window pixels when it was drawn last, or 0 before. */
+    private int bustPixelWidth;
+    private int bustPixelHeight;
+    /** The size the favorite star is drawn at: 1, except while it pops in on a new favorite. */
+    private float starScale = 1f;
 
     public SkinEntry(SkinListWidget parentList, AssetMetadata metadata) {
         this.parentList = parentList;
@@ -80,6 +97,32 @@ public class SkinEntry {
         return config.enablePlayerOwnSkinSystem && metadata.hash().equals(config.playerOwnSkinHash);
     }
 
+    /**
+     * Takes the grey face and bust this skin shows while it falls out of the column, before its
+     * deletion releases its texture. Call from the render thread.
+     */
+    void prepareDeparture() {
+        if (metadata.isCpmModel()) {
+            return;
+        }
+        if (textureLocation != null) {
+            departingFace = SkinBustTextures.grayFace(metadata.hash(), textureLocation);
+        }
+        departingSlim = isSlim();
+        if (bustPixelWidth > 0) {
+            SkinBustTextures.get(metadata.hash(), departingSlim, bustPixelWidth, bustPixelHeight, true);
+        }
+    }
+
+    /** From now on this skin is drawn as deleted, red and grey, with no star. */
+    void depart() {
+        departing = true;
+    }
+
+    void setStarScale(float scale) {
+        this.starScale = scale;
+    }
+
     /** Draws the tile with its top-left corner at {@code (left, top)}. */
     public void render(
             //? if <26.1 {
@@ -99,9 +142,9 @@ public class SkinEntry {
         ClientConfig config = ClientConfig.getInstance();
         boolean isPlayerOwnSkin = config.enablePlayerOwnSkinSystem && metadata.hash().equals(config.playerOwnSkinHash);
 
-        boolean isFavorite = isFavorite();
+        boolean isFavorite = isFavorite() && !departing;
         boolean deleteMode = parentList.isDeleteMode();
-        boolean marked = deleteMode && parentList.isMarked(this);
+        boolean marked = departing || deleteMode && parentList.isMarked(this);
         graphics.fill(tileLeft, tileTop, tileRight, tileBottom, 0x80000000);
         int borderColor;
         if (marked) {
@@ -129,7 +172,18 @@ public class SkinEntry {
         int faceX = tileLeft + facePadding;
         int faceY = tileTop + facePadding;
 
-        if (textureLocation != null) {
+        if (departing) {
+            // Its texture is gone: only the grey face taken before, when there was one
+            if (departingFace != null) {
+                //? if <1.21.5 {
+                RenderSystem.enableBlend();
+                //?}
+                GuiCompat.blit(graphics, departingFace, faceX, faceY, faceSize, faceSize, 0, 0, 8, 8, 8, 8);
+                //? if <1.21.5 {
+                RenderSystem.disableBlend();
+                //?}
+            }
+        } else if (textureLocation != null) {
             //? if <1.21.5 {
             RenderSystem.enableBlend();
             //?}
@@ -172,7 +226,7 @@ public class SkinEntry {
         // The favorite star in the top-left corner: a button on hover, outside the delete mode, and
         // kept on a favorite
         this.isFavoriteHovered = false;
-        boolean favoriteButton = isHovered && !deleteMode;
+        boolean favoriteButton = isHovered && !deleteMode && !departing;
         if (!isPlayerOwnSkin && (favoriteButton || isFavorite)) {
             int buttonLeft = tileLeft + 2;
             int buttonTop = tileTop + 2;
@@ -182,8 +236,8 @@ public class SkinEntry {
                 graphics.fill(buttonLeft, buttonTop, buttonLeft + CORNER_BUTTON_SIZE, buttonTop + CORNER_BUTTON_SIZE,
                         this.isFavoriteHovered ? 0xF0705418 : 0xD0181820);
             }
-            drawIcon(graphics, ICON_STAR_SMALL, buttonLeft + 2, buttonTop + 2,
-                    isFavorite || this.isFavoriteHovered ? FAVORITE_COLOR : 0xFFE0E0E0, false);
+            drawStar(graphics, ICON_STAR_SMALL, buttonLeft + 2, buttonTop + 2,
+                    isFavorite || this.isFavoriteHovered ? FAVORITE_COLOR : 0xFFE0E0E0);
         }
     }
 
@@ -260,9 +314,9 @@ public class SkinEntry {
         graphics.fill(left, top, right, bottom, CARD_OUTLINE);
         int faceBottom = bottom - 1 - CARD_LIP_HEIGHT;
         graphics.fill(left + 1, faceBottom, right - 1, bottom - 1, CARD_LIP);
-        boolean isFavorite = isFavorite();
+        boolean isFavorite = isFavorite() && !departing;
         boolean deleteMode = parentList.isDeleteMode();
-        boolean marked = deleteMode && parentList.isMarked(this);
+        boolean marked = departing || deleteMode && parentList.isMarked(this);
         int stateColor = marked ? MARKED_COLOR : isPlayerOwnSkin ? OWN_SKIN_COLOR : isFavorite ? FAVORITE_COLOR : SELECTED_COLOR;
         int border = isSelected || marked ? stateColor : isHovered ? CARD_BORDER_HOVER : CARD_BORDER;
         graphics.fill(left + 1, top + 1, right - 1, faceBottom, border);
@@ -288,7 +342,7 @@ public class SkinEntry {
 
         // The favorite button: shown on hover outside the delete mode, and its star kept on a favorite
         this.isFavoriteHovered = false;
-        boolean favoriteButton = isHovered && !deleteMode;
+        boolean favoriteButton = isHovered && !deleteMode && !departing;
         boolean showFavorite = !isPlayerOwnSkin && (favoriteButton || isFavorite);
         int favoriteLeft = right - 3 - ROW_BUTTON_SIZE;
         int favoriteTop = top + 4;
@@ -309,10 +363,10 @@ public class SkinEntry {
                     favoriteBottom - 1 - ROW_BUTTON_LIP, favoriteBorder);
             graphics.fill(favoriteLeft + 2, favoriteTop + 2, favoriteLeft + ROW_BUTTON_SIZE - 2,
                     favoriteBottom - 2 - ROW_BUTTON_LIP, favoriteFace);
-            drawIcon(graphics, ICON_STAR, favoriteLeft + 3, favoriteTop + 2,
-                    isFavorite ? 0xFFFFFFFF : this.isFavoriteHovered ? FAVORITE_COLOR : 0xFFC8C8C8, false);
+            drawStar(graphics, ICON_STAR, favoriteLeft + 3, favoriteTop + 2,
+                    isFavorite ? 0xFFFFFFFF : this.isFavoriteHovered ? FAVORITE_COLOR : 0xFFC8C8C8);
         } else if (showFavorite) {
-            drawIcon(graphics, ICON_STAR, favoriteLeft + 3, favoriteTop + 2, FAVORITE_COLOR, false);
+            drawStar(graphics, ICON_STAR, favoriteLeft + 3, favoriteTop + 2, FAVORITE_COLOR);
         }
 
         // The name, a hairline, then the arm width and the resolution
@@ -335,7 +389,7 @@ public class SkinEntry {
             model = "CPM";
             modelColor = CPM_COLOR;
         } else {
-            boolean slim = isSlim();
+            boolean slim = departing ? departingSlim : isSlim();
             icon = slim ? ICON_SLIM : ICON_WIDE;
             model = net.minecraft.network.chat.Component.translatable(
                     slim ? "quickskin.preview.model.slim" : "quickskin.preview.model.wide").getString();
@@ -361,7 +415,7 @@ public class SkinEntry {
             int x, int y, int width, int height, boolean gray) {
         if (metadata.isCpmModel()) {
             // A CPM model has an icon, not a skin: show it like the grid does, centred
-            if (textureLocation != null) {
+            if (textureLocation != null && !departing) {
                 int size = Math.min(width, height) - 8;
                 //? if <1.21.5 {
                 RenderSystem.enableBlend();
@@ -382,7 +436,10 @@ public class SkinEntry {
         int scale = Math.max(1, (int) Math.round(mc.getWindow().getGuiScale()));
         int pixelWidth = width * scale;
         int pixelHeight = height * scale;
-        var bust = SkinBustTextures.get(metadata.hash(), isSlim(), pixelWidth, pixelHeight, gray);
+        bustPixelWidth = pixelWidth;
+        bustPixelHeight = pixelHeight;
+        boolean slim = departing ? departingSlim : isSlim();
+        var bust = SkinBustTextures.get(metadata.hash(), slim, pixelWidth, pixelHeight, gray);
         if (bust == null) {
             return;
         }
@@ -412,6 +469,24 @@ public class SkinEntry {
         UiText.draw(graphics, mc.font, text, x, y, color);
     }
 
+    /** The favorite star, without a shadow, at {@link #starScale} about its centre. */
+    private void drawStar(
+            //? if <26.1 {
+            GuiGraphics graphics,
+            //?} else {
+            GuiGraphicsExtractor graphics,
+            //?}
+            String[] rows, int x, int y, int color) {
+        if (starScale == 1f) {
+            drawIcon(graphics, rows, x, y, color, false);
+            return;
+        }
+        float centre = rows.length / 2f;
+        GuiTransform.push(graphics, x + centre, y + centre, 0, 0, starScale, 0);
+        drawIcon(graphics, rows, x, y, color, false);
+        GuiTransform.pop(graphics);
+    }
+
     /** A seven-pixel icon from fills, with the same drop shadow as text. */
     private static void drawIcon(
             //? if <26.1 {
@@ -424,7 +499,7 @@ public class SkinEntry {
     }
 
     /** A seven-pixel icon from fills, with or without the drop shadow of text. */
-    private static void drawIcon(
+    static void drawIcon(
             //? if <26.1 {
             GuiGraphics graphics,
             //?} else {
