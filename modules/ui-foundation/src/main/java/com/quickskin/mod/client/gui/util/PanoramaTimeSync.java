@@ -9,7 +9,7 @@ import net.minecraft.util.Util;
 /**
  * The shared clock that turns every panorama together.
  *
- * <p>Quick Skin draws a panorama of its own behind its screens. So that the background does not
+ * <p>Quick Skin draws the title screen's panorama behind its screens. So that the background does not
  * jump when the player moves between the title screen and those screens, every panorama renderer
  * takes its angle from this clock instead of its own per-instance spin; the renderer mixin
  * redirects each read of that spin to {@link #panoramaSpin()}. The angle advances one degree per

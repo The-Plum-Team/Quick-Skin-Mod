@@ -385,6 +385,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Konkrete and Melody JARs beside it; every scenario runs with FancyMenu installed and nothing
   customized, and only the `mod-compatibility` scenario seeds the layouts that hide the title
   preview and move and enlarge the pause preview.
+- Quick Skin's screens over the title screen draw the panorama the title screen last drew
+  (`PanoramaRendererMixin` hands it to `BackgroundRenderer.rememberTitlePanorama`), so a mod
+  that draws its own there, such as Aquamirae, or a resource pack carries over; before the
+  title screen has drawn one, and on NeoForge, which does not load `quickskin.mixins.json`,
+  they draw the vanilla panorama.
 - Compatibility failures must degrade locally; they must not break base mod initialization or
   dedicated-server startup.
 - A release JAR holds only Quick Skin's own packages, so no other mod's copy of a library can
