@@ -1,6 +1,6 @@
 {
   "coverage_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983",
-  "observed_at": "2026-10-25T12:07:44Z",
+  "observed_at": "2026-10-25T12:07:58Z",
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "schema_version": 1,
   "targets": [
@@ -39,7 +39,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -104,7 +104,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -169,7 +169,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -234,7 +234,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -299,7 +299,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -364,7 +364,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -429,7 +429,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -494,7 +494,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -559,7 +559,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -624,7 +624,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -689,7 +689,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -754,7 +754,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -819,7 +819,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -884,7 +884,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -949,7 +949,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -1014,7 +1014,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
@@ -1079,7 +1079,7 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/40191749263/job/121164009760"
           }
         ],
-        "reason": "Required target jobs or shared prerequisites are running.",
+        "reason": "Source reuse has not passed its current-generation gate. Required target jobs or shared prerequisites are running.",
         "reused": false,
         "state": "running",
         "tested_sha": "f5515da5e932a4a6bdc637f83ad1be5984898983"
