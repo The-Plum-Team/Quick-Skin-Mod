@@ -1,8 +1,8 @@
 package com.quickskin.mod.mixin;
 
+import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.client.gui.util.BackgroundRenderer;
 import com.quickskin.mod.client.gui.util.PanoramaTimeSync;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 //? if <26.1 {
 import net.minecraft.client.renderer.PanoramaRenderer;
@@ -47,7 +47,7 @@ public class PanoramaRendererMixin {
         require = 0, expect = 1, allow = 1
     )
     private void quickskin$rememberTitlePanorama(CallbackInfo callback) {
-        if (Minecraft.getInstance().screen instanceof TitleScreen) {
+        if (GuiCompat.currentScreen() instanceof TitleScreen) {
             //? if <26.1 {
             BackgroundRenderer.rememberTitlePanorama((PanoramaRenderer) (Object) this);
             //?} else {
