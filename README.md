@@ -247,7 +247,8 @@ Mojang skins, a CPM model stays the look of whoever wears one, and capes are not
 ### Hidden armour
 
 In a world, the skin menu's and the pause menu's model wear what you wear and hold: armour,
-elytra, a worn head and the items in your hands. Hovering a piece of armour on the skin menu's
+elytra, a worn head, the items in your hands and the accessories of Curios, Trinkets or
+Accessories, such as Artifacts' gloves. Hovering a piece of armour on the skin menu's
 model turns it into a see-through ghost, so you see your skin as hiding it would show it (a hidden
 piece appears as the same ghost), as long as nothing stands in front of it, as your chest does of an
 elytra; click it to hide it from everyone, and click it again to show it. Each piece
