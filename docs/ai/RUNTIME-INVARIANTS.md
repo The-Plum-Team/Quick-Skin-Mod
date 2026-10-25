@@ -436,7 +436,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   skin menu's previews, which show the live local player's armour, elytra, held items and worn head
   as the world does, without the pieces the player hides (`PreviewPlayerData.isEquipmentVisible`,
   never for a cached player of a world that was left). The skin menu's own posed model borrows the
-  equipment layers of the player renderer of its model type (`PreviewEquipment`, ADR 0017). The cape editor's Elytra view
+  equipment layers of the player renderer of its model type (`PreviewEquipment`, ADR 0017), and
+  the layers of accessory mods (Curios, Trinkets, Accessories), named by class only with no
+  dependency or compatibility lane; one that fails is left out for the session. The cape editor's Elytra view
   is no exception: it draws its own model with vanilla's folded wings wearing the edited cape's
   texture (`PreviewPlayerData.isElytraPreview`), never the elytra the player has equipped. The
   one exception is the HUD preview keeping a held TaCZ (Timeless and Classics Zero) gun readable, so TaCZ poses and draws
