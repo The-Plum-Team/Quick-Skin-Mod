@@ -1,6 +1,9 @@
 package com.quickskin.mod.mixin;
 
+import com.quickskin.mod.client.gui.util.BackgroundRenderer;
 import com.quickskin.mod.client.gui.util.PanoramaTimeSync;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.TitleScreen;
 //? if <26.1 {
 import net.minecraft.client.renderer.PanoramaRenderer;
 //?} else {
@@ -9,7 +12,9 @@ import net.minecraft.client.renderer.Panorama;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Turns every panorama renderer with Quick Skin's shared clock, so the background stays continuous
@@ -21,6 +26,9 @@ import org.spongepowered.asm.mixin.injection.Redirect;
  * fields nor a field another mod adds to it can be mistaken for the angle. Every matrix target
  * reads {@code spin} exactly twice there: once to advance it and once for the cube map (render
  * state from 26.1).
+ *
+ * <p>It also remembers the panorama the title screen draws, so Quick Skin's screens show that one
+ * rather than the vanilla pictures: a mod such as Aquamirae draws a panorama of its own there.
  */
 //? if <26.1 {
 @Mixin(PanoramaRenderer.class)
@@ -28,6 +36,25 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 @Mixin(Panorama.class)
 //?}
 public class PanoramaRendererMixin {
+
+    @Inject(
+        //? if <26.1 {
+        method = "render",
+        //?} else {
+        method = "extractRenderState",
+        //?}
+        at = @At("HEAD"),
+        require = 0, expect = 1, allow = 1
+    )
+    private void quickskin$rememberTitlePanorama(CallbackInfo callback) {
+        if (Minecraft.getInstance().screen instanceof TitleScreen) {
+            //? if <26.1 {
+            BackgroundRenderer.rememberTitlePanorama((PanoramaRenderer) (Object) this);
+            //?} else {
+            BackgroundRenderer.rememberTitlePanorama((Panorama) (Object) this);
+            //?}
+        }
+    }
 
 //? if <26.1 {
     @Redirect(
