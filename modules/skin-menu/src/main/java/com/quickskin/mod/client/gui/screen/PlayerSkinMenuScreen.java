@@ -914,9 +914,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         if (!com.quickskin.mod.client.rendering.PreviewEquipment.outline(LocalHiddenArmor.HEAD, false).isEmpty()) {
             // A piece is where it is seen: the traced piece nearest the viewer under the mouse,
             // unless the model itself is nearer there (the chest in front of an elytra)
-            int[] traced = new int[ARMOR_PIECES_BY_PRIORITY.length];
+            int[] pieces = wornPieces();
+            int[] traced = new int[pieces.length];
             int count = 0;
-            for (int candidate : ARMOR_PIECES_BY_PRIORITY) {
+            for (int candidate : pieces) {
                 if (!armorItem(candidate).isEmpty()
                         && com.quickskin.mod.client.rendering.PreviewArmorSilhouette.of(candidate) != null) {
                     traced[count++] = candidate;
@@ -930,8 +931,11 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             boolean onModel = com.quickskin.mod.client.rendering.PreviewArmorSilhouette.bodyCovers(mouseX, mouseY);
             // Beside the model, a piece's outline still counts, and a piece that could not be
             // traced keeps its boxes; the head first and the boots before the leggings
-            for (int candidate : ARMOR_PIECES_BY_PRIORITY) {
-                if (armorItem(candidate).isEmpty()) {
+            for (int candidate : pieces) {
+                // An accessory has no boxes to fall back on
+                if (armorItem(candidate).isEmpty()
+                        || com.quickskin.mod.client.rendering.CuriosPreview.isAccessory(candidate)
+                        && com.quickskin.mod.client.rendering.PreviewArmorSilhouette.of(candidate) == null) {
                     continue;
                 }
                 com.quickskin.mod.client.rendering.PreviewArmorSilhouette silhouette =
@@ -1006,8 +1010,22 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         return false;
     }
 
+    /**
+     * The pieces the model can wear: the four armour slots, then the Curios accessories the
+     * player wears ({@code CuriosPreview}), which hide with Curios' own render toggle.
+     */
+    private int[] wornPieces() {
+        int[] accessories = com.quickskin.mod.client.rendering.CuriosPreview.pieces(this.minecraft == null ? null : this.minecraft.player);
+        int[] pieces = java.util.Arrays.copyOf(ARMOR_PIECES_BY_PRIORITY, ARMOR_PIECES_BY_PRIORITY.length + accessories.length);
+        System.arraycopy(accessories, 0, pieces, ARMOR_PIECES_BY_PRIORITY.length, accessories.length);
+        return pieces;
+    }
+
     /** What the player has on in a piece's slot. */
     private net.minecraft.world.item.ItemStack armorItem(int piece) {
+        if (com.quickskin.mod.client.rendering.CuriosPreview.isAccessory(piece)) {
+            return com.quickskin.mod.client.rendering.CuriosPreview.stack(this.minecraft.player, piece);
+        }
         net.minecraft.world.entity.EquipmentSlot slot = switch (piece) {
             case LocalHiddenArmor.HEAD -> net.minecraft.world.entity.EquipmentSlot.HEAD;
             case LocalHiddenArmor.CHEST -> net.minecraft.world.entity.EquipmentSlot.CHEST;
@@ -1019,6 +1037,11 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     /** Hides a shown piece from everyone, or shows a hidden one, where the server can. */
     private void toggleArmorPiece(int piece) {
+        if (com.quickskin.mod.client.rendering.CuriosPreview.isAccessory(piece)) {
+            // Curios' own render toggle, as the eye of its inventory
+            com.quickskin.mod.client.rendering.CuriosPreview.toggle(this.minecraft == null ? null : this.minecraft.player, piece);
+            return;
+        }
         ClientNetworkActions.ArmorHiding hiding = LocalHiddenArmor.hiding();
         if (hiding == ClientNetworkActions.ArmorHiding.ACTIVE) {
             LocalHiddenArmor.toggle(piece);
@@ -1083,9 +1106,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             return;
         }
         // Only where the ghost is seen: not where the model or another piece drawn on it is nearer
-        int[] drawn = new int[ARMOR_PIECES_BY_PRIORITY.length];
+        int[] candidates = wornPieces();
+        int[] drawn = new int[candidates.length];
         int count = 0;
-        for (int piece : ARMOR_PIECES_BY_PRIORITY) {
+        for (int piece : candidates) {
             if (piece != ghostPiece && restingAlpha(piece) > 0.0f && !armorItem(piece).isEmpty()) {
                 drawn[count++] = piece;
             }
@@ -1106,6 +1130,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     /** How opaque a piece is drawn when no ghost: hidden from everyone, it is not drawn at all. */
     private static float restingAlpha(int piece) {
+        if (com.quickskin.mod.client.rendering.CuriosPreview.isAccessory(piece)) {
+            return com.quickskin.mod.client.rendering.CuriosPreview.shown(net.minecraft.client.Minecraft.getInstance().player, piece) ? 1.0f : 0.0f;
+        }
         return (LocalHiddenArmor.inEffect() & piece) != 0 ? 0.0f : 1.0f;
     }
 

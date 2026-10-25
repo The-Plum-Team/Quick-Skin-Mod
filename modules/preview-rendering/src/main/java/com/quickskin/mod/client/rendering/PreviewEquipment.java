@@ -544,6 +544,11 @@ public final class PreviewEquipment {
                 if (drawsEquipment(layer)) {
                     ((RenderLayer) layer).render(poseStack, buffers, LIGHT, player,
                             0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F);
+                } else if (CuriosPreview.drawsInstead(layer)) {
+                    // Curios' accessories one by one, so the ghost's one is left out
+                    int leftOut = ghostShown() ? ghostPiece : 0;
+                    drawAccessories(layer, poseStack, () -> CuriosPreview.render(player, worn.renderer(), poseStack,
+                            buffers, LIGHT, leftOut));
                 } else if (drawsAccessories(layer)) {
                     drawAccessories(layer, poseStack, () -> ((RenderLayer) layer).render(poseStack, buffers,
                             LIGHT, player, 0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F));
@@ -593,6 +598,10 @@ public final class PreviewEquipment {
         try {
 //? if <1.21.2 {
             AbstractClientPlayer player = (AbstractClientPlayer) worn.subject();
+            if (CuriosPreview.isAccessory(piece)) {
+                CuriosPreview.renderPiece(player, piece, worn.renderer(), poseStack, ghostBuffers, LIGHT);
+                return;
+            }
             PlayerModelRenderer.withOnlyPiece(player, piece, () -> {
                 for (Object layer : layers) {
                     if (drawsWornPiece(layer)) {
