@@ -1826,9 +1826,9 @@
               "id": "catalog_hide_own_skin",
               "assertion_required": true,
               "capture": {
-                "title": "Own skin hidden",
+                "title": "Own skin deleted",
                 "review_tier": "key",
-                "expectation": "After the real delete confirmation on the purple own-skin tile, the skin column no longer lists it and shows only the renamed external skin's tile; no toast is shown. That the own skin's file and catalogue entry are kept, only hidden, is proven by the runtime evidence.",
+                "expectation": "After the real delete confirmation on the purple own-skin tile, the skin column no longer lists it and shows only the renamed external skin's tile; no toast is shown. That the own skin's file and catalogue entry are gone, and that it is remembered as deleted, is proven by the runtime evidence.",
                 "probes": []
               },
               "requires": [
@@ -1850,7 +1850,7 @@
               "capture": {
                 "title": "Last skin deletion refused",
                 "review_tier": "all",
-                "expectation": "An error toast with a red strip and cross icon, saying that the list has to keep at least one skin, is visible over the skin menu while the renamed external skin's tile, the only skin listed, remains in the skin column. That the hidden own skin stays hidden and the external skin's file is kept is proven by the runtime evidence.",
+                "expectation": "An error toast with a red strip and cross icon, saying that the list has to keep at least one skin, is visible over the skin menu while the renamed external skin's tile, the only skin listed, remains in the skin column. That the deleted own skin stays deleted and the external skin's file is kept is proven by the runtime evidence.",
                 "probes": []
               },
               "requires": [
@@ -1872,7 +1872,7 @@
               "capture": {
                 "title": "External skin deleted",
                 "review_tier": "key",
-                "expectation": "After a spare skin was dropped into the skins folder and the real delete confirmation was given, the renamed external skin's tile is gone: the skin column shows exactly one skin tile, the dropped spare skin's, without the purple own-skin frame, with the import zone filling the column below it. The own skin stays hidden, as the runtime evidence proves.",
+                "expectation": "After a spare skin was dropped into the skins folder and the real delete confirmation was given, the renamed external skin's tile is gone: the skin column shows exactly one skin tile, the dropped spare skin's, without the purple own-skin frame, with the import zone filling the column below it. The own skin stays deleted, as the runtime evidence proves.",
                 "probes": []
               },
               "requires": [

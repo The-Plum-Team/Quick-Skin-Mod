@@ -95,7 +95,8 @@ report, even when that selection happens to contain all authored steps.
 closed-state guard, and persisted own-skin selection. It checks the account's Mojang texture on
 every start, recognising the listed own skin by that texture's address, and lists a new one as the
 own skin, which whoever wore the previous one then wears; the previous one stays in the list,
-and the new one is listed even when the player had hidden the previous one. One of Minecraft's
+and the new one is listed even when the player had deleted the previous one. An own skin the
+player deleted is not downloaded again while its texture is unchanged and other skins are listed. One of Minecraft's
 default skins, which Mojang serves an account without a skin of its own, never replaces an own
 skin already listed (`MinecraftDefaultSkins` compares its pixels with the game's own).
 `skin-upload` reports every accepted upload with the active texture of Mojang's reply
