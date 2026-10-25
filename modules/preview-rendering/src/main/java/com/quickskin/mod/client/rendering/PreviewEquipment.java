@@ -1,6 +1,7 @@
 package com.quickskin.mod.client.rendering;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.quickskin.mod.platform.QuickSkinInfo;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -46,7 +47,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -436,6 +439,42 @@ public final class PreviewEquipment {
 //?}
     }
 
+    /**
+     * The layers through which accessory mods draw what the player wears in-world, such as
+     * Artifacts' gloves: Curios (Forge and NeoForge), Trinkets (Fabric) and Accessories. They are
+     * named by class only, so none is a dependency, and one that fails is left out for the rest
+     * of the session.
+     */
+    private static final Set<String> ACCESSORY_LAYERS = Set.of(
+            "top.theillusivec4.curios.client.render.CuriosLayer",
+            "dev.emi.trinkets.TrinketFeatureRenderer",
+            "io.wispforest.accessories.client.AccessoriesRenderLayer");
+    private static final Set<Class<?>> FAILED_ACCESSORY_LAYERS = ConcurrentHashMap.newKeySet();
+
+    /** Whether a layer draws an accessory mod's worn items, and has not failed. */
+    static boolean drawsAccessories(Object layer) {
+        Class<?> type = layer.getClass();
+        return ACCESSORY_LAYERS.contains(type.getName()) && !FAILED_ACCESSORY_LAYERS.contains(type);
+    }
+
+    /**
+     * Draws an accessory mod's layer, which is not Quick Skin's to vouch for: should it fail, the
+     * preview goes on without it.
+     */
+    private static void drawAccessories(Object layer, PoseStack poseStack, Runnable draw) {
+        poseStack.pushPose();
+        try {
+            draw.run();
+        } catch (RuntimeException | LinkageError error) {
+            if (FAILED_ACCESSORY_LAYERS.add(layer.getClass())) {
+                QuickSkinInfo.LOGGER.warn("The preview leaves out {}, which failed to draw",
+                        layer.getClass().getName(), error);
+            }
+        } finally {
+            poseStack.popPose();
+        }
+    }
+
     /** Whether a layer draws equipment: armour, held items, a worn head or the elytra. */
     private static boolean drawsEquipment(Object layer) {
         return layer instanceof HumanoidArmorLayer<?, ?, ?>
@@ -505,6 +544,9 @@ public final class PreviewEquipment {
                 if (drawsEquipment(layer)) {
                     ((RenderLayer) layer).render(poseStack, buffers, LIGHT, player,
                             0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F);
+                } else if (drawsAccessories(layer)) {
+                    drawAccessories(layer, poseStack, () -> ((RenderLayer) layer).render(poseStack, buffers,
+                            LIGHT, player, 0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F));
                 }
             }
         } finally {
@@ -520,6 +562,9 @@ public final class PreviewEquipment {
             if (drawsEquipment(layer)) {
                 ((RenderLayer) layer).render(poseStack, buffers, LIGHT,
                         (net.minecraft.client.renderer.entity.state.EntityRenderState) worn.subject(), 0.0F, 0.0F);
+            } else if (drawsAccessories(layer)) {
+                drawAccessories(layer, poseStack, () -> ((RenderLayer) layer).render(poseStack, buffers, LIGHT,
+                        (net.minecraft.client.renderer.entity.state.EntityRenderState) worn.subject(), 0.0F, 0.0F));
             }
         }
 //?}
@@ -705,6 +750,9 @@ public final class PreviewEquipment {
             if (drawsEquipment(layer)) {
                 ((RenderLayer) layer).submit(poseStack, collector, LIGHT,
                         (net.minecraft.client.renderer.entity.state.EntityRenderState) worn.subject(), 0.0F, 0.0F);
+            } else if (drawsAccessories(layer)) {
+                drawAccessories(layer, poseStack, () -> ((RenderLayer) layer).submit(poseStack, collector, LIGHT,
+                        (net.minecraft.client.renderer.entity.state.EntityRenderState) worn.subject(), 0.0F, 0.0F));
             }
         }
     }
