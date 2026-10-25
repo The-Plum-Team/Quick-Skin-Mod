@@ -113,6 +113,17 @@ public final class PlayerOwnSkinBootstrap {
     }
 
     /**
+     * Whether the own skin the player deleted stays deleted when Mojang serves {@code textureUrl}:
+     * until the account's skin changes, and a default skin never takes its place. Should no other
+     * skin be listed (their files removed outside the game), it is listed again, so the list never
+     * runs empty.
+     */
+    static boolean staysDeleted(boolean deleted, boolean defaultSkin, String textureUrl,
+                                String deletedTexture, boolean otherSkinsListed) {
+        return deleted && otherSkinsListed && (defaultSkin || textureUrl.equals(deletedTexture));
+    }
+
+    /**
      * Handle the fetched player's own skin data
      * Smart mode: checks if skin already exists before saving a duplicate
      *
@@ -139,6 +150,11 @@ public final class PlayerOwnSkinBootstrap {
                     && LocalAssetManager.getInstance().getMetadata(ownConfig.playerOwnSkinHash) != null) {
                 QuickSkinInfo.LOGGER.info("Mojang serves a default skin for '{}'; keeping the own skin already listed",
                         skinData.username);
+                return;
+            }
+            if (replacedSkin == null && staysDeleted(ownConfig.playerOwnSkinHidden, defaultSkin,
+                    skinData.textureUrl, ownConfig.playerOwnSkinTexture,
+                    LocalAssetManager.getInstance().hasSkinsBesidesOwnSkin())) {
                 return;
             }
 
@@ -194,8 +210,9 @@ public final class PlayerOwnSkinBootstrap {
 
             // Now that the skin is guaranteed to be in the asset manager, set its hash in the config.
             // A previous own skin stays in the list as an ordinary skin, and a new own skin is
-            // listed even when the player had hidden the previous one.
-            if (!finalHash.equals(config.playerOwnSkinHash)) {
+            // listed even when the player had deleted the previous one, as is the deleted one
+            // listed again because no other skin is left.
+            if (!finalHash.equals(config.playerOwnSkinHash) || existingMetadata == null) {
                 config.playerOwnSkinHidden = false;
             }
             config.playerOwnSkinHash = finalHash;

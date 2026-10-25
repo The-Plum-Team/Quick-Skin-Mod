@@ -20,6 +20,7 @@ import com.quickskin.mod.e2e.TestAssets;
 import com.quickskin.mod.e2e.VanillaShim;
 import com.quickskin.mod.event.ClientEvents;
 import com.quickskin.mod.client.importing.PlayerOwnSkinBootstrap;
+import com.quickskin.mod.client.gui.util.SkinImporter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -86,6 +87,7 @@ final class CatalogSteps {
     private final AtomicReference<String> activeSkinBeforeOwnSkin = new AtomicReference<>();
     /** Catalog primary of the external skin, captured before its deletion removes the alias. */
     private final AtomicReference<String> externalPrimaryBeforeDelete = new AtomicReference<>();
+    private final AtomicReference<AssetMetadata> ownSkinBeforeDelete = new AtomicReference<>();
     private volatile String restoreMethodUsed;
 
     CatalogSteps(FullScenario owner) {
@@ -418,11 +420,12 @@ final class CatalogSteps {
                             + " entries, importer task idle); entries=" + describeEntries(list));
                 }));
 
-        // 2g. deleting the own skin while another skin is listed hides it --------------------
+        // 2g. deleting the own skin while another skin is listed deletes its file ------------
         steps.add(Step.of("catalog_hide_own_skin")
                 .action(() -> {
                     setupFailure.set(null);
                     protectedDeleteConfirmed.set(false);
+                    ownSkinBeforeDelete.set(null);
                     PlayerSkinMenuScreen screen = openMenu(mc);
                     if (screen == null) {
                         setupFailure.set("skin menu not open before hiding the own skin: "
@@ -439,6 +442,7 @@ final class CatalogSteps {
                                 + "(playerOwnSkinHash=" + ClientConfig.getInstance().playerOwnSkinHash + ")");
                         return;
                     }
+                    ownSkinBeforeDelete.set(own);
                     screen.showDeleteConfirmation(own);
                     E2ELog.info("catalog_hide_own_skin: opened DeletionConfirmScreen for own skin");
                 })
@@ -466,32 +470,39 @@ final class CatalogSteps {
                     }
                     ClientConfig config = ClientConfig.getInstance();
                     if (!config.playerOwnSkinHidden) {
-                        return Step.Result.fail("the own skin is not recorded as hidden");
+                        return Step.Result.fail("the own skin is not recorded as deleted");
+                    }
+                    AssetMetadata own = ownSkinBeforeDelete.get();
+                    if (own == null || own.path() == null) {
+                        return Step.Result.fail("the own skin's entry was not recorded before deleting it");
                     }
                     LocalAssetManager assets = LocalAssetManager.getInstance();
-                    AssetMetadata own = assets.getMetadata(owner.skinHash);
-                    if (own == null) return Step.Result.fail("the hidden own skin was deleted from the catalog");
-                    if (own.path() == null || !Files.exists(own.path())) {
-                        return Step.Result.fail("the hidden own skin's file is gone: " + own.path());
+                    if (assets.getMetadata(own.hash()) != null || assets.getMetadata(owner.skinHash) != null) {
+                        return Step.Result.fail("the deleted own skin " + own.hash() + " is still catalogued");
                     }
-                    if (!isPlayerOwnSkin(own)) {
-                        return Step.Result.fail("the hidden skin is no longer the own skin");
+                    if (Files.exists(own.path())) {
+                        return Step.Result.fail("the deleted own skin's file is still on disk: " + own.path());
+                    }
+                    if (!own.hash().equals(config.playerOwnSkinHash)) {
+                        return Step.Result.fail("the deleted skin is no longer recorded as the own skin: "
+                                + config.playerOwnSkinHash);
                     }
                     SkinListWidget list = listWidget(screen);
                     if (list == null) return Step.Result.fail("skin list widget not built");
-                    if (indexOf(list, owner.skinHash) >= 0) {
-                        return Step.Result.fail("the hidden own skin is still listed: " + describeEntries(list));
+                    if (indexOf(list, own.hash()) >= 0) {
+                        return Step.Result.fail("the deleted own skin is still listed: " + describeEntries(list));
                     }
                     if (indexOf(list, owner.externalSkinHash) < 0) {
                         return Step.Result.fail("the external skin left the list too: " + describeEntries(list));
                     }
                     if (!toasts(screen).isEmpty()) {
-                        return Step.Result.fail("hiding the own skin showed a toast: '"
+                        return Step.Result.fail("deleting the own skin showed a toast: '"
                                 + toastText(toasts(screen).get(0)) + "'");
                     }
-                    return Step.Result.pass("real Delete confirmation on the own skin hid it: "
-                            + own.hash() + " still catalogued at " + own.path().getFileName()
-                            + ", playerOwnSkinHidden=true, not listed; entries=" + describeEntries(list));
+                    return Step.Result.pass("real Delete confirmation on the own skin deleted it: "
+                            + own.hash() + " no longer catalogued, " + own.path().getFileName()
+                            + " gone from disk, recorded as the deleted own skin (playerOwnSkinHidden=true), "
+                            + "not listed; entries=" + describeEntries(list));
                 }));
 
         // 2h. deleting the last listed skin, a custom one, is refused with a toast ---------
@@ -563,13 +574,13 @@ final class CatalogSteps {
                                 + describeEntries(list));
                     }
                     if (!ClientConfig.getInstance().playerOwnSkinHidden || indexOf(list, owner.skinHash) >= 0) {
-                        return Step.Result.fail("the refusal listed the hidden own skin again: "
+                        return Step.Result.fail("the refusal listed the deleted own skin again: "
                                 + describeEntries(list));
                     }
                     return Step.Result.pass("real Delete confirmation on the only listed skin, the custom '"
                             + external.friendlyName() + "' (" + external.hash() + "), was refused: "
                             + toasts.size() + " toast(s), first reads '" + actual + "'; still catalogued at "
-                            + external.path().getFileName() + " and the only entry, own skin still hidden; "
+                            + external.path().getFileName() + " and the only entry, own skin still deleted; "
                             + "entries=" + describeEntries(list));
                 }));
 
@@ -665,12 +676,16 @@ final class CatalogSteps {
                         if (Files.exists(skinsDirectory.resolve(DROPPED_FILE_NAME))) {
                             return Step.Result.fail(DROPPED_FILE_NAME + " reappeared on disk");
                         }
-                        AssetMetadata own = assets.getMetadata(owner.skinHash);
-                        if (own == null || own.path() == null || !Files.exists(own.path())) {
-                            return Step.Result.fail("own skin is missing after deleting the other one");
+                        AssetMetadata own = ownSkinBeforeDelete.get();
+                        if (own == null || own.path() == null) {
+                            return Step.Result.fail("the own skin's entry was not recorded before deleting it");
+                        }
+                        if (assets.getMetadata(own.hash()) != null || Files.exists(own.path())) {
+                            return Step.Result.fail("the deleted own skin came back after deleting another skin: "
+                                    + own.path());
                         }
                         if (!ClientConfig.getInstance().playerOwnSkinHidden) {
-                            return Step.Result.fail("deleting a custom skin listed the hidden own skin again");
+                            return Step.Result.fail("deleting a custom skin forgot that the own skin was deleted");
                         }
                         SkinListWidget list = listWidget(screen);
                         if (list == null) return Step.Result.fail("skin list widget not built");
@@ -697,7 +712,7 @@ final class CatalogSteps {
                                 + "Delete confirmation removed '" + RENAMED_NAME + "' (" + externalPrimary
                                 + ", alias " + owner.externalSkinHash + "): metadata null, no " + RENAMED_NAME
                                 + "* file in uploads/skins; the spare skin is the only entry, the own skin "
-                                + own.hash() + " is still hidden with its file kept, and the import tile is "
+                                + own.hash() + " stays deleted with no file, and the import tile is "
                                 + "below the grid; no toast visible");
                     } finally {
                         // Later steps expect the defaults: no own-skin protection, LATEST_LAST
@@ -708,6 +723,17 @@ final class CatalogSteps {
                         config.enablePlayerOwnSkinSystem = false;
                         config.playerOwnSkinHash = "";
                         config.playerOwnSkinHidden = false;
+                        // Deleting the own skin deleted the plaid skin's file: import it again
+                        if (LocalAssetManager.getInstance().getMetadata(owner.skinHash) == null) {
+                            try {
+                                AssetMetadata restored = SkinImporter.importSkin(TestAssets.makeClassicSkin());
+                                LocalAssetManager.getInstance().discoverLocalAssets();
+                                E2ELog.info("catalog_delete: imported the plaid skin again as "
+                                        + (restored == null ? "<nothing>" : restored.hash()));
+                            } catch (Exception e) {
+                                E2ELog.error("catalog_delete: could not import the plaid skin again", e);
+                            }
+                        }
                         String plaid = primaryOrAlias(owner.skinHash);
                         if (plaid != null) config.activeSkinHash = plaid;
                         config.save();

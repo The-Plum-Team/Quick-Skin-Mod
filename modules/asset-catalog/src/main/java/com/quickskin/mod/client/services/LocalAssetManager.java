@@ -1154,7 +1154,8 @@ public class LocalAssetManager {
 
     /**
      * Get all selectable skin entries, including optional CPM models, as the skin list shows them:
-     * the player's own skin is left out while the player has hidden it and another entry is listed.
+     * the player's own skin is left out while the player has deleted it and another entry is
+     * listed, which matters only for its file kept by older versions, which hid it instead.
      */
     public List<AssetMetadata> getAllSkins() {
         ClientConfig config = ClientConfig.getInstance();

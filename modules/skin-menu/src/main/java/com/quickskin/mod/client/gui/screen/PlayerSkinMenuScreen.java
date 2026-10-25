@@ -2322,7 +2322,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         return config.enablePlayerOwnSkinSystem && metadata.hash().equals(config.playerOwnSkinHash);
     }
 
-    /** Importing or searching the hidden own skin again lists it again: the player asked for it. */
+    /** Importing or searching the deleted own skin again lists it again: the player asked for it. */
     private static void relistOwnSkin(AssetMetadata metadata) {
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
         if (config.playerOwnSkinHidden && isPlayerOwnSkin(metadata)) {
@@ -2339,8 +2339,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     /**
      * Delete skins from local storage, then rescan the catalog once. The list always keeps at
      * least one skin: a deletion that would leave it empty is refused whole. The player's own skin
-     * is never deleted, only hidden from the list. A skin that cannot be deleted shows an error and
-     * the others are still deleted.
+     * is deleted like any other and remembered as deleted, so the next start does not download it
+     * again. A skin that cannot be deleted shows an error and the others are still deleted.
      */
     private void deleteSkins(List<AssetMetadata> skins) {
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
@@ -2356,10 +2356,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             skinListPanel.prepareDeparture(skins.stream().map(AssetMetadata::hash).toList());
         }
         for (AssetMetadata metadata : skins) {
-            if (isPlayerOwnSkin(metadata)) {
-                hideOwnSkin = true;
-                continue;
-            }
+            boolean ownSkin = isPlayerOwnSkin(metadata);
             try {
                 if (!assets.deleteAsset(metadata.hash())) {
                     showError(Component.translatable("quickskin.error.delete_failed", metadata.friendlyName()));
@@ -2371,6 +2368,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 continue;
             }
             deletedAny = true;
+            hideOwnSkin |= ownSkin;
             wasApplied |= metadata.hash().equals(config.activeSkinHash);
             if (metadata.hash().equals(pendingHash)) {
                 pendingHash = null;
@@ -2382,8 +2380,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             if (deletedAny) {
                 assets.discoverLocalAssets();
             }
-            // The own skin stays hidden while another skin is listed; should none be left (its
-            // files removed outside the game), it is listed again for good
+            // The own skin stays deleted while another skin is listed; should none be left (their
+            // files removed outside the game), the next start lists it again
             boolean othersLeft = assets.hasSkinsBesidesOwnSkin();
             boolean hidden = config.playerOwnSkinHidden;
             config.playerOwnSkinHidden = othersLeft && (hidden || hideOwnSkin);
