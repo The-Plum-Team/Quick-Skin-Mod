@@ -115,9 +115,6 @@ public class PlayerModelRenderer {
     private static PlayerModel<?> classicModel;
     private static PlayerModel<?> slimModel;
 
-    // Lighting optimization - only setup lighting once
-    private static boolean lightingSetup = false;
-
     // Grass block caching - cache is built on first use
     private static boolean grassBlockCacheBuilt = false;
 //?} else if <1.21.2 {
@@ -1344,11 +1341,9 @@ public class PlayerModelRenderer {
         // CRITICAL: Position the model at feet (line 84 in LivingEntityRenderer)
         poseStack.translate(0.0F, -1.501F, 0.0F);
 
-        // Only setup lighting if not already set (optimization)
-        if (!lightingSetup) {
-            Lighting.setupForEntityInInventory();
-            lightingSetup = true;
-        }
+        // Every draw sets the inventory lighting, as InventoryScreen does: whatever drew in
+        // between, such as an item, left its own, which lights the model's front darker
+        Lighting.setupForEntityInInventory();
 
         // Get Minecraft instance for tick count
 //?} else if <1.21.6 {
@@ -1593,7 +1588,7 @@ public class PlayerModelRenderer {
 //? if <1.21 {
         poseStack.popPose();
 
-        // Don't restore lighting - let next render set what it needs (optimization)
+        Lighting.setupFor3DItems();
 //?} else if <1.21.6 {
         poseStack.popPose();
 
@@ -3143,14 +3138,6 @@ public class PlayerModelRenderer {
         cachedPlayer = null;
         clearPreviewCapes();
 //? if <1.21 {
-    }
-
-    /**
-     * Reset lighting state
-     * Call this when screen changes to ensure proper lighting setup
-     */
-    public static void resetLightingState() {
-        lightingSetup = false;
     }
 
     /**
