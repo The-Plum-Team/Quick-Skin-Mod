@@ -65,6 +65,12 @@ public class BackgroundRenderer {
     //?} else {
     private static Panorama panoramaRenderer = null;
     //?}
+    // The panorama the title screen last drew, which a mod such as Aquamirae may have replaced
+    //? if <26.1 {
+    private static volatile PanoramaRenderer titlePanorama = null;
+    //?} else {
+    private static volatile Panorama titlePanorama = null;
+    //?}
     //? if <1.21 {
     private static final ResourceLocation PANORAMA_OVERLAY = new ResourceLocation("textures/gui/title/background/panorama_overlay.png");
     private static final CubeMap PANORAMA_CUBE_MAP = new CubeMap(new ResourceLocation("textures/gui/title/background/panorama"));
@@ -255,7 +261,7 @@ public class BackgroundRenderer {
             BlurHandler.blurBehindMenu(graphics);
             graphics.fill(0, 0, screen.width, screen.height, 0x90000000);
         } else {
-            // Title screen: render the panorama background
+            // Title screen: render the panorama background, the one the title screen draws
             if (panoramaRenderer == null) {
                 //? if <26.1 {
                 panoramaRenderer = new PanoramaRenderer(PANORAMA_CUBE_MAP);
@@ -263,22 +269,27 @@ public class BackgroundRenderer {
                 panoramaRenderer = new Panorama();
                 //?}
             }
+            //? if <26.1 {
+            PanoramaRenderer panorama = titlePanorama != null ? titlePanorama : panoramaRenderer;
+            //?} else {
+            Panorama panorama = titlePanorama != null ? titlePanorama : panoramaRenderer;
+            //?}
 
             // The renderer mixin turns this panorama with PanoramaTimeSync's shared clock, the
             // same one the title screen's panorama uses, so switching screens does not jump.
             float panoramaPartialTick = DETERMINISTIC_E2E_RENDER ? 0.0F : partialTick;
 
             //? if <1.21 {
-            GuiCompat.renderPanorama(panoramaRenderer, panoramaPartialTick);
+            GuiCompat.renderPanorama(panorama, panoramaPartialTick);
             //?} else if <1.21.6 {
-            panoramaRenderer.render(graphics, screen.width, screen.height, 1.0F, panoramaPartialTick);
+            panorama.render(graphics, screen.width, screen.height, 1.0F, panoramaPartialTick);
             //?} else if <1.21.11 {
-            panoramaRenderer.render(graphics, screen.width, screen.height, true);
+            panorama.render(graphics, screen.width, screen.height, true);
             //?} else {
                 //? if <26.1 {
-            GuiCompat.renderPanorama(panoramaRenderer, graphics, screen.width, screen.height);
+            GuiCompat.renderPanorama(panorama, graphics, screen.width, screen.height);
                 //?} else {
-            GuiCompat.extractPanorama(panoramaRenderer, graphics, screen.width, screen.height);
+            GuiCompat.extractPanorama(panorama, graphics, screen.width, screen.height);
                 //?}
             //?}
 
@@ -302,6 +313,18 @@ public class BackgroundRenderer {
             // Add additional dark overlay for better UI readability
             graphics.fill(0, 0, screen.width, screen.height, 0x60000000);
         }
+    }
+
+    /**
+     * Remembers the panorama the title screen draws, so Quick Skin's screens show the same one:
+     * a mod may draw its own there, and a resource pack may change its pictures.
+     */
+    //? if <26.1 {
+    public static void rememberTitlePanorama(PanoramaRenderer panorama) {
+    //?} else {
+    public static void rememberTitlePanorama(Panorama panorama) {
+    //?}
+        titlePanorama = panorama;
     }
 
     /**
