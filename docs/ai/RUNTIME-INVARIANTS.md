@@ -438,7 +438,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   never for a cached player of a world that was left). The skin menu's own posed model borrows the
   equipment layers of the player renderer of its model type (`PreviewEquipment`, ADR 0017), and
   the layers of accessory mods (Curios, Trinkets, Accessories), named by class only with no
-  dependency or compatibility lane; one that fails is left out for the session. The cape editor's Elytra view
+  dependency or compatibility lane; one that fails is left out for the session. Before 1.21.2
+  each Curios accessory is a piece the skin menu ghosts and hides like armour, through Curios' own
+  render toggle (`CuriosPreview`, reflection only: the toggle packet of its inventory's eye), so
+  Curios stores and syncs it; should Curios not match, its layer draws as before. The cape editor's Elytra view
   is no exception: it draws its own model with vanilla's folded wings wearing the edited cape's
   texture (`PreviewPlayerData.isElytraPreview`), never the elytra the player has equipped. The
   one exception is the HUD preview keeping a held TaCZ (Timeless and Classics Zero) gun readable, so TaCZ poses and draws

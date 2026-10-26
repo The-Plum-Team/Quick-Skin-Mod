@@ -251,9 +251,10 @@ elytra, a worn head, the items in your hands and the accessories of Curios, Trin
 Accessories, such as Artifacts' gloves. Hovering a piece of armour on the skin menu's
 model turns it into a see-through ghost, so you see your skin as hiding it would show it (a hidden
 piece appears as the same ghost), as long as nothing stands in front of it, as your chest does of an
-elytra; click it to hide it from everyone, and click it again to show it. Each piece
-(helmet, chestplate or elytra, leggings and boots) hides on its own, and the choice is kept per
-account. A hidden piece is still worn and protects as usual: the server leaves it out of the
+elytra; click it to hide it from everyone, and click it again to show it. Each piece (helmet,
+chestplate or elytra, leggings and boots) hides on its own, and the choice is kept per account.
+On Minecraft 1.20.1 and 1.21.1 a Curios accessory works the same way: clicking it flips Curios' own
+visibility toggle, the eye in its inventory. A hidden piece is still worn and protects as usual: the server leaves it out of the
 equipment it sends other players, so nobody sees it, players without Quick Skin included, and you
 no longer see it in third person, in your inventory or in the menus either. This needs Quick Skin
 on the server; a server owner who prefers everyone's armour to show, for example for PvP, sets

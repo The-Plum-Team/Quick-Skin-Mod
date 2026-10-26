@@ -284,6 +284,10 @@ public final class PreviewArmorSilhouette {
         PreviewEquipment.setCapturing(true);
         try {
 //? if <1.21.2 {
+            if (CuriosPreview.isAccessory(piece)) {
+                CuriosPreview.renderPiece(player, piece, renderer, poseStack, (MultiBufferSource) sink::buffer, 15728880);
+                return sink.silhouette();
+            }
             Runnable draw = () -> {
                 for (Object layer : layers.quickskin$previewLayers()) {
                     if (held ? PreviewEquipment.drawsHeldItems(layer) : PreviewEquipment.drawsWornPiece(layer)) {
