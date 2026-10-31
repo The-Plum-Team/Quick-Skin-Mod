@@ -52,11 +52,11 @@ public class SettingsScreen extends Screen {
     // each with an icon, and the tab's settings on the right
     // A dark face for the settings, under a lighter sidebar and the slate header
     private static final int DIALOG_FACE = 0xFF26272A;
-    private static final int SIDEBAR_BG = 0xFF3A3B3E;
+    private static final int SIDEBAR_BG = 0xFF34353A;
     private static final int SIDEBAR_EDGE = 0xFF55565B;
+    /** The line between two tabs, across the sidebar. */
+    private static final int TAB_RULE = 0xFF2A2B2F;
     private static final int SIDEBAR_WIDTH = 112;
-    /** Room around the tabs inside the sidebar. */
-    private static final int INSET = 4;
 
     // Settings rows: the checkboxes become rows with a toggle on the right
     private static final int ROW_PADDING = 3;
@@ -86,9 +86,9 @@ public class SettingsScreen extends Screen {
     private static final int KNOB_DISABLED_BORDER = 0xFF46474A;
     private static final int KNOB_LIP = 0xFF1C1D1F;
 
-    // Tab dimensions
-    private static final int TAB_HEIGHT = 22;
-    private static final int TAB_SPACING = 4;
+    // The tabs fill the sidebar's width, one under another with a line between them
+    private static final int TAB_HEIGHT = 26;
+    private static final int TAB_SPACING = 1;
 
     // Seven-pixel tab icons
     private static final String[] CLIENT_ICON = {"..###..", ".#####.", "..###..", ".......", "#######", "#######", "#######"};
@@ -193,9 +193,9 @@ public class SettingsScreen extends Screen {
         contentX = dialogX + SIDEBAR_WIDTH + 16;
         contentWidth = dialogWidth - SIDEBAR_WIDTH - 32;
         noticeY = DialogFrame.bodyBottom(dialogY, dialogHeight) - 22;
-        int tabX = dialogX + 2 + INSET;
-        int tabWidth = SIDEBAR_WIDTH - 2 * INSET;
-        int tabStartY = DialogFrame.bodyTop(dialogY) + INSET + 2;
+        int tabX = dialogX + 2;
+        int tabWidth = SIDEBAR_WIDTH - 2;
+        int tabStartY = DialogFrame.bodyTop(dialogY);
 
         clientTabButton = (TabButton) ButtonFactory.createTab(
                 tabX, tabStartY,
@@ -236,6 +236,9 @@ public class SettingsScreen extends Screen {
         guiEditTabButton.setIcon(GUI_EDIT_ICON);
         modpackTabButton.setIcon(MODPACK_ICON);
         serverTabButton.setIcon(SERVER_ICON);
+        for (TabButton tab : List.of(clientTabButton, guiEditTabButton, modpackTabButton, serverTabButton)) {
+            tab.setNotchColor(DIALOG_FACE);
+        }
 
         // Create settings for all tabs
         createGuiEditSettings();
@@ -614,6 +617,10 @@ public class SettingsScreen extends Screen {
         int sidebarBottom = DialogFrame.bodyBottom(dialogY, dialogHeight);
         graphics.fill(dialogX + 2, sidebarTop, dialogX + SIDEBAR_WIDTH, sidebarBottom, SIDEBAR_BG);
         graphics.fill(dialogX + SIDEBAR_WIDTH, sidebarTop, dialogX + SIDEBAR_WIDTH + 1, sidebarBottom, SIDEBAR_EDGE);
+        for (int i = 1; i < Tab.values().length; i++) {
+            int ruleY = sidebarTop + i * (TAB_HEIGHT + TAB_SPACING) - TAB_SPACING;
+            graphics.fill(dialogX + 2, ruleY, dialogX + SIDEBAR_WIDTH, ruleY + TAB_SPACING, TAB_RULE);
+        }
 
         // A line under each row that is not a checkbox: the keybind, the cooldown and player skins
         for (AbstractWidget widget : activeTabWidgets()) {
