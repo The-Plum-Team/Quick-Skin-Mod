@@ -1,5 +1,103 @@
 # Changelog
 
+## 4.0.0 (2026-10-31)
+
+### Added
+
+- **A new skin menu built around your player**
+> The skin menu drops its panel: your player stands in the middle on a turntable you can drag to turn, with your skins in a column of face tiles on the left, the player search at the top and the Body (arm width), Skin Websites (Normal or HD), Cape and pose buttons around the model. Clicking a skin wears it at once, and a button beside the sort button switches the column between the compact grid and a list where every skin gets a card with a 3D bust, its arm model and its resolution.
+
+- **Favourites, a delete mode and a right-click menu for skins**
+> Mark skins and CPM models as favourites to keep them right after your own skin in every sort order. Right-click a skin to favourite, rename or delete it, or use the bin beside the view button to pick several skins and delete them together. Added, favourited and deleted skins now animate in the column.
+
+- **Nicknames**
+> Click the name above your player in the skin menu to pick a nickname, kept per launcher account. On a server with Quick Skin everyone sees it in chat, death and advancement messages and the tab list, players without Quick Skin included, and players with Quick Skin also see it above your head; join and leave messages show "Nickname (Account)", operators still see account names in the tab list, and commands keep using account names. Server owners can turn player nicknames off with `allowNicknames` in `config/quickskin-server.json`.
+
+- **Hide pieces of your armour from everyone**
+> The skin menu's and the pause menu's models now wear what you wear and hold. Hover a piece of armour or an elytra on the skin menu's model to see through it, and click it to hide it from every other player, players without Quick Skin included; the piece stays worn and still protects you, and hidden pieces lie on the floor around the turntable, where a click puts them back on. The choice is kept per launcher account, and server owners can turn it off with `allowHiddenArmor` in `config/quickskin-server.json`, for example for PvP.
+
+- **Admin tools for nicknames and skins**
+> Operators can give players nicknames with `/quickskin nickname set`, hand out a different name to each player from `config/quickskin-nicknames.txt` with `random`, and take them back, clear or lock them with `reset`, `clear`, `lock` and `unlock`. They can also give players a skin for now, which other Quick Skin players see over the player's own skin until it is taken back, from the Player skins panel in the Server tab of the settings or with `/quickskin skin set|copy|random|shuffle|reset`; PNG skins put in `config/quickskin-skins/` join the server's skin pool (`/quickskin skin pool list|add|remove|reload`). Made for games where nobody should know who is who.
+
+- **A reworked cape menu**
+> Capes are now cards in sections (Favourites, My Capes, then the built-in capes by where they come from) under a heading that stays pinned while you scroll, with an import tile at the end of My Capes that you can click or drop files on. A large player on the right wears whichever cape is under the mouse, with the worn cape's animation speed under it; a click wears a cape, a right click marks it as a favourite or, for your own capes, edits or deletes it, and the mouse wheel scrolls the list wherever the mouse is.
+
+- **A redesigned cape editor**
+> The cape editor has a new layout with a 3D preview that shows the cape either as a cape or on elytra, Resolution, Position (Center, Snap, Mirror) and Opaque fill controls beside the canvas, and a zoom panel under it. It opens showing only the Front guide; a legend in the canvas corner turns the Cape Back and Elytra guides on and off, and hidden faces are dimmed.
+
+- **Edit animated capes on a timeline**
+> Animated capes now open in the cape editor with a timeline: trim the frames you keep, scrub to any frame, reverse them, play them back and forth and change the speed, and every frame keeps its own delay instead of a fixed 10 frames per second. GIFs too big to load before (up to 4096 pixels per side and 1024 frames) are now shrunk to fit and open in the editor.
+
+- **WebP capes**
+> You can import WebP images as capes (an animated WebP gives its first frame), and the file pickers now list everything the import takes: PNG, WebP and JPG skins and CPM models, and PNG, WebP and GIF capes.
+
+- **Ten more official capes**
+> Aurora, Hero, Twisted, Builder, Crafter, Moonlight Trail, Zombie Horse, Chinese Translator, cheapsh0t's and Blueprint join the built-in capes.
+
+- **A livelier player preview**
+> The preview now loops one of six random idles, and picking another skin plays a short move (a hop, a twirl, a wave and more) and switches to another idle. Walking and Sitting are redone: the player strides in place, or jumps onto the grass block, sits with its legs out and looks around; poses blend into each other, and switching between slim and classic arms springs the arms to their new width instead of snapping.
+
+- **Curios, Trinkets and Accessories on the skin menu's model**
+> Accessories from Curios, Trinkets and Accessories, such as Artifacts' power glove, now show on the skin menu's model. On Minecraft 1.20.1 and 1.21.1 you can click a Curios accessory there to hide it, like armour, which flips Curios' own visibility toggle so it hides in the world too.
+
+- **Cosmetic Armor Reworked support**
+> With Cosmetic Armor Reworked installed, the skin menu's model wears the cosmetic armour the world shows. A slot you hid through Cosmetic Armor lies on the floor around the turntable like any hidden piece, and clicking it switches Cosmetic Armor's own setting.
+
+- **Your own skin follows your account**
+> Quick Skin now checks your Mojang skin on every start, and when it changes it lists the new one as your own skin, keeping the old one as an ordinary skin. After Upload to Mojang it takes the skin as Mojang stored it, since Mojang may retouch an uploaded skin. A default skin (Steve, Alex and the others) that Mojang shows for an account without one never replaces the own skin you already have.
+
+- **Delete your own skin**
+> Your account's own skin can now be deleted like any other, and it is not downloaded again on the next start. It comes back when your account's skin changes, when you import or search it again, or when no other skin is left; the last skin in the list can't be deleted.
+
+- **Players who are offline keep their look**
+> Servers now also share the last appearance of players who are not connected, so mods that draw absent players, such as BlockPops' player figures, show their Quick Skin skins instead of Steve or Alex. Only the server needs this update.
+
+- **Tell players without Quick Skin about it**
+> A server with Quick Skin now tells each player who joins without it, once per world and a minute after they join, that the server uses Quick Skin and where to get it, in their game's language. Server owners can turn it off with `notifyPlayersWithoutQuickSkin` in `config/quickskin-server.json`, or change the text with `playersWithoutQuickSkinMessage` and the link with `playersWithoutQuickSkinLink`; Bedrock players are never told.
+
+- **Quick Skin faces on JourneyMap**
+> JourneyMap's player icons, on the minimap and the fullscreen map, now show the face of the player's Quick Skin skin and update when the skin changes.
+
+### Fixes
+
+- **No more crash in Quick Skin's dialogs with Vulkan (26.2)**
+> On Minecraft 26.2 with the Vulkan renderer, opening the delete dialog, the rename dialog or the settings no longer crashes the game.
+
+- **No more crash at launch with Respawn Recap and similar mods**
+> The game no longer stops at startup when another mod ships the same WebP library Quick Skin used. Quick Skin now uses its own WebP decoder, which also works on Apple Silicon, Linux ARM and Android.
+
+- **Quick Skin no longer changes your GUI Scale**
+> Opening the skin or cape menu no longer changes your GUI Scale option or resizes the window, which could break other mods. Both menus now look the same at any GUI Scale, and every other screen opens at your own.
+
+- **Legacy 64x32 skins get correct hands and feet**
+> When a legacy 64x32 skin is converted, the top and bottom faces of the new left arm and leg (the end of the hand and the sole of the foot) are now copied the way Minecraft does it instead of coming out wrong.
+
+- **Skin searches on a slow day**
+> Searching a player's skin and the start-up check of your own skin now wait longer for Mojang, which sometimes takes several seconds to answer. When Mojang is limiting searches, the menu says so and asks you to wait a minute instead of blaming your connection.
+
+- **Mods' title-screen panoramas behind Quick Skin's menus**
+> On Fabric and Forge, Quick Skin's screens now show the panorama the title screen shows, so a mod such as Aquamirae or a resource pack that changes it carries over instead of the vanilla one.
+
+- **The preview is no longer dark on 1.20.1**
+> On Minecraft 1.20.1 the front of the player preview no longer turns as dark as the side of an item after an item was drawn.
+
+- **No duplicate skins on import**
+> Importing or searching a skin you already have no longer saves a second copy; it selects the one in your list. Deleting the skin you are wearing now wears the first skin in the list.
+
+### Changed
+
+- **New look for buttons, dialogs and toasts**
+> Quick Skin's buttons share one new style, with the main action in green and a new pixel font on the skin menu's buttons, and the Delete, Rename and Upload to Mojang dialogs share one frame with a close button. The Enable Styled Buttons setting is gone, since every Quick Skin button now has the same style.
+
+- **Clearer messages**
+> Every Quick Skin message is now a toast in the menu's corner that says what went wrong and what to do, with the real sizes and limits, in your language. The cape menu's messages are toasts too, and cancelling the cape editor no longer reports that no cape was found.
+
+- **Redesigned settings that apply right away**
+> The settings now have their tabs stacked in a sidebar, the selected one in dark blue, and every setting is a row with its label on the left, its control on the right and a tooltip saying what it does; the texts are clearer and the GUI tab is now called Interface. Every checkbox takes effect as soon as you click it, without waiting for Done.
+
+- **Blurred menu background by default**
+> Quick Skin's menus now blur the world or the title panorama behind them, like Minecraft's own menus, and this is the new default for everyone. The starry background is still available in the settings.
+
 ## 3.1.1 (2026-10-11)
 
 ### Added
