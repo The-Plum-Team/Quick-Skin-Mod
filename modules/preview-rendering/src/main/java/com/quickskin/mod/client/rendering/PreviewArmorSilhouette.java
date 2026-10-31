@@ -304,10 +304,12 @@ public final class PreviewArmorSilhouette {
             if (held) {
                 draw.run();
             } else {
-                PlayerModelRenderer.withOnlyPiece(player, piece, draw);
+                // Cosmetic Armor Reworked's piece where the player wears one, hidden or not
+                CosmeticArmorPreview.wearing(player, piece, () -> PlayerModelRenderer.withOnlyPiece(player, piece, draw));
             }
 //?} else {
-            Object state = ((LivingEntityRenderer) renderer).createRenderState(player, 1.0F);
+            Object state = CosmeticArmorPreview.wearing(player, held ? 0 : piece,
+                    () -> ((LivingEntityRenderer) renderer).createRenderState(player, 1.0F));
             net.minecraft.client.renderer.entity.state.EntityRenderState renderState =
                     (net.minecraft.client.renderer.entity.state.EntityRenderState) state;
             PlayerModelRenderer.blankPieces(renderState, 15 & ~piece);

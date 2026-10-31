@@ -1246,7 +1246,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         return count;
     }
 
-    /** What the player has on in a piece's slot: nothing outside a world, as on the title screen. */
+    /**
+     * What the player has on in a piece's slot, the Cosmetic Armor Reworked piece in it where there
+     * is one ({@code CosmeticArmorPreview.stack}): nothing outside a world, as on the title screen.
+     */
     private net.minecraft.world.item.ItemStack armorItem(int piece) {
         if (this.minecraft == null || this.minecraft.player == null) {
             return net.minecraft.world.item.ItemStack.EMPTY;
@@ -1260,12 +1263,15 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             case LocalHiddenArmor.LEGS -> net.minecraft.world.entity.EquipmentSlot.LEGS;
             default -> net.minecraft.world.entity.EquipmentSlot.FEET;
         };
-        return this.minecraft.player.getItemBySlot(slot);
+        return com.quickskin.mod.client.rendering.CosmeticArmorPreview.stack(
+                this.minecraft.player, piece, this.minecraft.player.getItemBySlot(slot));
     }
 
     /**
      * Hides a shown piece from everyone, or shows a hidden one, where the server can; for a
-     * covered piece, hides the accessory covering it, so it shows.
+     * covered piece, hides the accessory covering it, so it shows. With Cosmetic Armor Reworked an
+     * armour piece the player does not hide here hides and shows through that mod's own toggle,
+     * which hides its cosmetic piece as well.
      */
     private void toggleArmorPiece(int piece) {
         if (covered(piece)) {
@@ -1278,6 +1284,11 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         if (com.quickskin.mod.client.rendering.CuriosPreview.isAccessory(piece)) {
             // Curios' own render toggle, as the eye of its inventory
             com.quickskin.mod.client.rendering.CuriosPreview.toggle(this.minecraft == null ? null : this.minecraft.player, piece);
+            return;
+        }
+        if ((LocalHiddenArmor.inEffect() & piece) == 0
+                && com.quickskin.mod.client.rendering.CosmeticArmorPreview.toggle(
+                        this.minecraft == null ? null : this.minecraft.player, piece)) {
             return;
         }
         ClientNetworkActions.ArmorHiding hiding = LocalHiddenArmor.hiding();
@@ -1435,12 +1446,17 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         graphics.fill(right - 1, bottom - length, right, bottom - 1, color);
     }
 
-    /** How opaque a piece is drawn when not shown for the mouse: hidden from everyone, it is not drawn at all. */
+    /**
+     * How opaque a piece is drawn when not shown for the mouse: hidden from everyone, here or
+     * through Cosmetic Armor Reworked, it is not drawn at all.
+     */
     private static float restingAlpha(int piece) {
+        net.minecraft.world.entity.player.Player player = net.minecraft.client.Minecraft.getInstance().player;
         if (com.quickskin.mod.client.rendering.CuriosPreview.isAccessory(piece)) {
-            return com.quickskin.mod.client.rendering.CuriosPreview.shown(net.minecraft.client.Minecraft.getInstance().player, piece) ? 1.0f : 0.0f;
+            return com.quickskin.mod.client.rendering.CuriosPreview.shown(player, piece) ? 1.0f : 0.0f;
         }
-        return (LocalHiddenArmor.inEffect() & piece) != 0 ? 0.0f : 1.0f;
+        return (LocalHiddenArmor.inEffect() & piece) != 0
+                || com.quickskin.mod.client.rendering.CosmeticArmorPreview.hides(player, piece) ? 0.0f : 1.0f;
     }
 
     /**

@@ -451,7 +451,16 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Curios stores and syncs it; should Curios not match, its layer draws as before. A hidden piece,
   armour or accessory, is never picked on the skin menu's model, where it would cover a piece
   behind it: it lies on the floor round the turntable ring as its item (`PedestalDrops`), and a
-  click there puts it back on. The cape editor's Elytra view
+  click there puts it back on. Cosmetic Armor Reworked's armour shows on that model as it does in the world
+  (`CosmeticArmorPreview`, reflection only through its API, no compatibility lane): for the length
+  of each of the preview's own equipment draws its cosmetic pieces fill the armour slots, a piece
+  hidden for the skin empties its slot, and the worn armour is put back after, as the mod itself
+  does around each draw of the player in the world. The skin menu treats each such slot as one
+  piece, its cosmetic piece where it has one: a slot hidden for the skin lies on the floor and is
+  never covered, and a click on a piece the player does not hide through Quick Skin flips the
+  mod's own hidden-for-the-skin toggle on this client and its server (the packet its slot toggle
+  sends, through the original's network or the fork's platform helper), so the mod stores and
+  syncs it. The cape editor's Elytra view
   is no exception: it draws its own model with vanilla's folded wings wearing the edited cape's
   texture (`PreviewPlayerData.isElytraPreview`), never the elytra the player has equipped. The
   one exception is the HUD preview keeping a held TaCZ (Timeless and Classics Zero) gun readable, so TaCZ poses and draws

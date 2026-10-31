@@ -428,11 +428,13 @@ public final class PreviewEquipment {
         }
 //? if <1.21.2 {
         boolean wings = (com.quickskin.mod.client.services.LocalHiddenArmor.inEffect() & 4) == 0
-                && player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA);
+                && CosmeticArmorPreview.wearing(player, () -> player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA));
         return new Worn(renderer, player, wings);
 //?} else {
+        // The state takes the equipment as it is now, Cosmetic Armor Reworked's included
         @SuppressWarnings({"unchecked", "rawtypes"})
-        Object state = ((LivingEntityRenderer) renderer).createRenderState(player, 1.0F);
+        Object state = CosmeticArmorPreview.wearing(player,
+                () -> ((LivingEntityRenderer) renderer).createRenderState(player, 1.0F));
         return new Worn(renderer, state, wearsWings(state));
 //?}
     }
@@ -627,25 +629,28 @@ public final class PreviewEquipment {
         AbstractClientPlayer player = (AbstractClientPlayer) worn.subject();
         leavingOutGhost = ghostShown();
         try {
-            // As in the world, other mods may change what the player shows while it is drawn
-            net.minecraft.world.item.ItemStack[] before = armour(player);
-            PlayerRenderEvents.around(player, worn.renderer(), new PoseStack(),
-                    (MultiBufferSource) renderType -> new SeeThrough(null, 1.0F), LIGHT, () -> {
-                coveredPieces = emptied(player, before);
-                for (Object layer : layers) {
-                    if (drawsEquipment(layer)) {
-                        alongBody(layer, preview, poseStack, () -> ((RenderLayer) layer).render(poseStack, buffers,
-                                LIGHT, player, 0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F));
-                    } else if (CuriosPreview.drawsInstead(layer)) {
-                        // Curios' accessories one by one, so the ghost's one is left out
-                        int leftOut = ghostShown() ? ghostPiece : 0;
-                        drawAccessories(layer, poseStack, () -> CuriosPreview.render(player, worn.renderer(), poseStack,
-                                buffers, LIGHT, leftOut));
-                    } else if (drawsAccessories(layer)) {
-                        drawAccessories(layer, poseStack, () -> ((RenderLayer) layer).render(poseStack, buffers,
-                                LIGHT, player, 0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F));
+            // As in the world, other mods may change what the player shows while it is drawn; a
+            // piece hidden through Cosmetic Armor Reworked is hidden, not covered
+            CosmeticArmorPreview.wearing(player, () -> {
+                net.minecraft.world.item.ItemStack[] before = armour(player);
+                PlayerRenderEvents.around(player, worn.renderer(), new PoseStack(),
+                        (MultiBufferSource) renderType -> new SeeThrough(null, 1.0F), LIGHT, () -> {
+                    coveredPieces = emptied(player, before);
+                    for (Object layer : layers) {
+                        if (drawsEquipment(layer)) {
+                            alongBody(layer, preview, poseStack, () -> ((RenderLayer) layer).render(poseStack, buffers,
+                                    LIGHT, player, 0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F));
+                        } else if (CuriosPreview.drawsInstead(layer)) {
+                            // Curios' accessories one by one, so the ghost's one is left out
+                            int leftOut = ghostShown() ? ghostPiece : 0;
+                            drawAccessories(layer, poseStack, () -> CuriosPreview.render(player, worn.renderer(), poseStack,
+                                    buffers, LIGHT, leftOut));
+                        } else if (drawsAccessories(layer)) {
+                            drawAccessories(layer, poseStack, () -> ((RenderLayer) layer).render(poseStack, buffers,
+                                    LIGHT, player, 0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F));
+                        }
                     }
-                }
+                });
             });
         } finally {
             leavingOutGhost = false;
@@ -696,16 +701,19 @@ public final class PreviewEquipment {
                 CuriosPreview.renderPiece(player, piece, worn.renderer(), poseStack, ghostBuffers, LIGHT);
                 return;
             }
-            PlayerModelRenderer.withOnlyPiece(player, piece, () -> {
+            // A piece hidden through Cosmetic Armor Reworked as well
+            CosmeticArmorPreview.wearing(player, piece, () -> PlayerModelRenderer.withOnlyPiece(player, piece, () -> {
                 for (Object layer : layers) {
                     if (drawsWornPiece(layer)) {
                         alongBody(layer, preview, poseStack, () -> ((RenderLayer) layer).render(poseStack, ghostBuffers,
                                 LIGHT, player, 0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F));
                     }
                 }
-            });
+            }));
 //?} else {
-            Object state = ((LivingEntityRenderer) worn.renderer()).createRenderState(Minecraft.getInstance().player, 1.0F);
+            AbstractClientPlayer player = Minecraft.getInstance().player;
+            Object state = CosmeticArmorPreview.wearing(player, piece,
+                    () -> ((LivingEntityRenderer) worn.renderer()).createRenderState(player, 1.0F));
             net.minecraft.client.renderer.entity.state.EntityRenderState ghostState =
                     (net.minecraft.client.renderer.entity.state.EntityRenderState) state;
             PlayerModelRenderer.blankPieces(ghostState, 15 & ~piece);
