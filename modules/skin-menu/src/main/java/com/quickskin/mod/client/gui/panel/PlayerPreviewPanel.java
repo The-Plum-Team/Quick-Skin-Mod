@@ -181,7 +181,7 @@ public class PlayerPreviewPanel extends AbstractWidget {
 
     private void selectPose(String pose) {
         if (playerWidget != null) {
-            playerWidget.setAnimation(pose);
+            playerWidget.pickAnimation(pose);
         }
         // Kept for every preview, across screens
         com.quickskin.mod.client.services.PreviewAnimationState.set(pose);

@@ -50,18 +50,43 @@ bundle, when a player comes into view.
   of the player renderer of the previewed model type, poses that renderer's model like the preview
   and draws them over it; from 1.21.9, where armour models pose themselves from the render state
   when the submitted features are drawn, the preview's pose is bound to that state and applied at
-  the end of `HumanoidModel.setupAnim`. The cape menus and the cape editor still hide everything.
-- **Clicks.** Hovering a worn piece on the skin menu's model turns it into a see-through ghost of
-  itself, so the skin beneath shows as hiding it would; a hidden piece appears as the same ghost.
-  The ghost fades in, breathes a little while the mouse stays and fades back when it leaves; a
-  piece just clicked fades to its new state and stays so until the mouse leaves it. The preview's
-  draw leaves the piece out, and once the rest of the preview is drawn, the cape included, the
-  piece's layers draw it alone again, every texture swapped for vanilla's see-through entity draw
-  of the same texture at the ghost's alpha (`PreviewEquipment.renderGhost`; from 1.21.9 a
-  collector passes the layers' submissions on in a later order, with the tint's alpha scaled), so
-  modded armour, trims and dyes keep their look. The glint is left off; a draw that names no
-  texture (a worn item from 1.21.9, a player head) stays opaque. A faint edge and a light tint
-  over the piece's silhouette keep the ghost readable.
+  the end of `HumanoidModel.setupAnim`. The elytra layer draws from the preview's body, as the
+  cape does: vanilla hangs the wings from the player's root, where the body always is in the world,
+  but the preview's walk, sit and idles lean, lower and twist the body. Before 1.21.2 the renderer
+  Minecraft picks for the player takes the preview's pose as well, because accessories pose
+  themselves from it (Curios' `followBodyRotations`, which Relics' necklaces use) and it is the
+  other model type's renderer while the menu shows a skin of the other type. Before 1.21.2 each
+  renderer model the preview poses gets its own pose back once the layers have drawn: the world's
+  next draw poses only part of each model part again, so the sit's offsets stayed on the live
+  player, which the cape menu and the world then drew half seated. The cape menus and the cape
+  editor still hide everything.
+- **Clicks.** Hovering a worn piece on the skin menu's model closes four corner marks in round
+  what is seen of it, as the import zone's corners frame it. A hidden piece is not drawn on the model
+  and is never picked there, where it would cover a piece behind it, such as a second glove on the
+  same hand: it lies on the floor round the turntable ring as its item, turning and bobbing as a
+  dropped item does (`PedestalDrops`). The first two lie on the ring's front beside the feet, the
+  rest beyond the ring, spaced for every piece the player wears. Each keeps its place while it
+  lies there: a piece put back on leaves its place empty and the next one hidden takes the first
+  empty place, so nothing the player is about to click moves. A piece just hidden hops up
+  off the model, falls there and bounces twice, and a click on it puts it back on and it flies up to the model; hovering it
+  holds it still, names it in a tooltip that hangs under the ring below it, clear of the model and of the other pieces, and shows it on the model, where it goes, with marks round both.
+  It fades in there and out when the mouse leaves; a piece just clicked is left unmarked until
+  the mouse leaves it. A piece another mod takes off while the player is drawn, in the world as in
+  the preview, is covered rather than hidden: Relics' boots, shown in Curios' feet slot, take off
+  the armour boots under them. The preview compares the armour before `RenderPlayerEvent.Pre`
+  with what its draw finds, and a covered piece lies on the floor too, darker, with the covering
+  accessory (the one shown in the Curios slot of that body part) as a badge in its corner; hovering
+  it says what covers it and marks that accessory on the model, and a click hides the accessory so
+  the piece shows. Quick Skin cannot tell the covering mod to stand down, so this is the only way
+  to show the piece; when no Curios accessory sits in that slot, the tooltip says another mod's
+  piece covers it and a click does nothing. (Until the floor came, hovering a worn piece made it a see-through ghost,
+  as hiding it would; once hiding moved the piece to the floor, pointing it out read better.) The
+  preview's draw leaves the shown piece out, and once the rest of the preview is drawn, the cape
+  included, the piece's layers draw it alone again, every texture swapped for vanilla's
+  see-through entity draw of the same texture at the fading alpha (`PreviewEquipment.renderGhost`;
+  from 1.21.9 a collector passes the layers' submissions on in a later order, with the tint's
+  alpha scaled), so modded armour, trims and dyes keep their look. The glint is left off; a draw
+  that names no texture (a worn item from 1.21.9, a player head) stays opaque.
   The silhouette (`PreviewArmorSilhouette`) comes from the piece's layers drawing it once more,
   alone and starting from the transform the preview drew its model with this frame, into a sink
   that keeps the quads instead of drawing them (from 1.21.9 a collector, told apart from its

@@ -827,6 +827,9 @@ public class PlayerModelRenderer {
                 : playerData.advanceSkinSwap(System.nanoTime());
         float turnedRotation = yRotation + swap.get(SkinSwapAnimation.Whole.TURN);
 //? if <1.21.6 {
+        // The jump onto the block or off it, drawn where the preview draws its block, and the
+        // blend into the walk or out of it
+        playerData.advancePoseMoves(System.nanoTime());
         // Lift and scale about the feet through the GUI pose, which every draw below inherits.
         // The draw is inline, so the model's pose hook finds the move for exactly this call.
         float swapScale = swap.get(SkinSwapAnimation.Whole.SCALE);
@@ -1007,7 +1010,7 @@ public class PlayerModelRenderer {
                 poseStack.translate(0.0F, -1.501F, 0.0F);
 
 //? if <26.2 {
-                renderGrassBlock(poseStack, bufferSource);
+                renderGrassBlock(poseStack, bufferSource, null);
                 bufferSource.endBatch();
 //?} else {
                 renderGrassBlock(poseStack);
@@ -1388,9 +1391,17 @@ public class PlayerModelRenderer {
 
         // Render grass block if sitting animation is active AND the pose is the preview's own
         // When the live player is drawn, animations are controlled by the game, so don't render it
-        if ("sit".equals(playerData.getCurrentAnimation() != null ? playerData.getCurrentAnimation().toLowerCase(Locale.ROOT) : null)
-                && (mc.level == null || playerData.isOwnPose())) {
-            renderGrassBlock(poseStack, bufferSource);
+        SitJump.Pose sitJump = playerData.getSitJumpPose();
+        boolean sitting = "sit".equals(playerData.getCurrentAnimation() != null ? playerData.getCurrentAnimation().toLowerCase(Locale.ROOT) : null);
+        if ((mc.level == null || playerData.isOwnPose()) && (sitJump != null ? sitJump.blockShown() : sitting)) {
+            renderGrassBlock(poseStack, bufferSource, sitJump);
+        }
+        if (sitJump != null) {
+            // The jump lifts the model and squashes it about its feet, while the block stays on the floor
+            poseStack.translate(0.0f, -sitJump.lift(), 0.0f);
+            poseStack.translate(0.0f, 1.501f, 0.0f);
+            poseStack.scale(sitJump.scaleX(), sitJump.scaleY(), sitJump.scaleX());
+            poseStack.translate(0.0f, -1.501f, 0.0f);
         }
 //?} else {
 //?}
@@ -2343,6 +2354,15 @@ public class PlayerModelRenderer {
 
         String mode = animation.toLowerCase(Locale.ROOT);
         SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
+        // A jump onto the block or off it sits while it is over the block and stands otherwise.
+        // Standing, the model walks as far as it has eased into the walk, from its idle
+        SitJump.Pose sitJump = playerData.getSitJumpPose();
+        float walk = playerData.getWalkAmount();
+        if (sitJump != null && sitJump.sitting()) {
+            mode = "sit";
+        } else if (sitJump != null || "walk".equals(mode) || "idle".equals(mode)) {
+            mode = walk > 0.0f ? "walk" : "idle";
+        }
 
         // Put back the parts a move or a loop shifted, so each pose starts from the baked stance.
         SkinSwapPoser.restore(model);
@@ -2353,7 +2373,7 @@ public class PlayerModelRenderer {
         // Apply animation based on type
         switch (mode) {
             case "walk":
-                setupWalkingPose(model, seconds);
+                setupWalkingPose(model, playerData, seconds, walk);
                 break;
             case "sit":
                 setupSittingPose(model, seconds);
@@ -2367,6 +2387,13 @@ public class PlayerModelRenderer {
         // The skin-change move, on top of the animation's own pose.
         if (!swap.isRest()) {
             SkinSwapPoser.apply(model, swap);
+        }
+        if (sitJump != null) {
+            model.rightArm.xRot += sitJump.armPitch();
+            model.leftArm.xRot += sitJump.armPitch();
+            model.rightLeg.xRot += sitJump.rightLegPitch();
+            model.leftLeg.xRot += sitJump.leftLegPitch();
+            model.head.xRot += sitJump.headPitch();
         }
 
 //? if <1.21.2 {
@@ -2410,18 +2437,26 @@ public class PlayerModelRenderer {
         MinecraftCompat.INSTANCE.setCrouching(model, false);
         MinecraftCompat.INSTANCE.setRiding(model, false);
         MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
-        SkinSwapPoser.loop(model, DETERMINISTIC_E2E_RENDER
-                ? PreviewLoops.idle(PreviewLoops.Idle.CALM, seconds)
-                : playerData.idlePose(seconds));
+        SkinSwapPoser.loop(model, idleLoop(playerData, seconds));
     }
 
-    /** The walk: a stride in place (see {@link PreviewLoops#walk}). */
-    private static void setupWalkingPose(PlayerModel model, double seconds) {
+    private static SkinSwapAnimation.Pose idleLoop(PreviewPlayerData playerData, double seconds) {
+        return DETERMINISTIC_E2E_RENDER
+                ? PreviewLoops.idle(PreviewLoops.Idle.CALM, seconds)
+                : playerData.idlePose(seconds);
+    }
+
+    /**
+     * The walk: a stride in place (see {@link PreviewLoops#walk}), {@code amount} of the way from the
+     * idle, as the model eases into the walk or out of it (see {@link GaitBlend}).
+     */
+    private static void setupWalkingPose(PlayerModel model, PreviewPlayerData playerData, double seconds, float amount) {
         MinecraftCompat.INSTANCE.setYoung(model, false);
         MinecraftCompat.INSTANCE.setCrouching(model, false);
         MinecraftCompat.INSTANCE.setRiding(model, false);
         MinecraftCompat.INSTANCE.setAttackTime(model, 0.0f);
-        SkinSwapPoser.loop(model, PreviewLoops.walk(seconds));
+        SkinSwapAnimation.Pose walk = PreviewLoops.walk(seconds);
+        SkinSwapPoser.loop(model, amount >= 1.0f ? walk : SkinSwapAnimation.Pose.mix(idleLoop(playerData, seconds), walk, amount));
     }
 
     /** The sit: seated on the block with the legs out in front (see {@link PreviewLoops#sit}). */
@@ -2435,10 +2470,10 @@ public class PlayerModelRenderer {
 
     /**
      * Render a grass block underneath the player when sitting
-     * Positioned at the player's feet
+     * Positioned at the player's feet; {@code sitJump}, when not null, pops and squashes it
      */
 //? if <26.2 {
-    private static void renderGrassBlock(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource) {
+    private static void renderGrassBlock(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, SitJump.Pose sitJump) {
 //?} else {
     private static void renderGrassBlock(PoseStack poseStack) {
 //?}
@@ -2464,6 +2499,14 @@ public class PlayerModelRenderer {
 
         // Scale the block
         poseStack.scale((float)scale, (float)scale, (float)scale);
+//? if <26.2 {
+        if (sitJump != null) {
+            // The jump's pop and squash, about the middle of the block's bottom face
+            poseStack.translate(0.5f, 0.0f, 0.5f);
+            poseStack.scale(sitJump.blockScaleX(), sitJump.blockScaleY(), sitJump.blockScaleX());
+            poseStack.translate(-0.5f, 0.0f, -0.5f);
+        }
+//?}
 
 //? if <1.21 {
         // Build cache on first render

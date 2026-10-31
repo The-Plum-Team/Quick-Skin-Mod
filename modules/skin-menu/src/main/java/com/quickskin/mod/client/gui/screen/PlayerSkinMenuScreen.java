@@ -152,17 +152,26 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     // Dragging the model turns it (from 1.21; before, the model widget turns itself)
     private boolean rotatingModel;
+    /** The model eases back to face the viewer once a drag lets go of it. */
+    private boolean modelReturningToFront;
     /** The armour piece a left click pressed on the model, which a release in place toggles. */
     private int armorPressPiece;
     private double armorPressX;
     private double armorPressY;
-    /** The piece drawn see-through on the model, its alpha, and when the mouse came onto it. */
+    /** A hidden piece shown on the model while its item on the floor is under the mouse, and its alpha. */
     private int ghostPiece;
     private float ghostAlpha = 1.0f;
-    private long ghostSinceNanos;
     private long ghostFrameNanos;
-    /** A piece just clicked, shown as it now is until the mouse leaves it. */
+    /** A piece just clicked, left unmarked until the mouse leaves it. */
     private int ghostSettledPiece;
+    /** The piece the corner marks close in round, and when they started closing. */
+    private int markedPiece;
+    private long markedSinceNanos;
+    /** The pieces nobody sees, lying on the floor round the turntable ring. */
+    private final PedestalDrops pedestalDrops = new PedestalDrops();
+    /** How big a lying piece is drawn, and how far from the ring's centre lying pieces may reach. */
+    private float pedestalItemSize = 16.0f;
+    private float pedestalReach = 120.0f;
     private double rotationDragStartX;
     private float rotationDragStartYaw;
     private static final float ROTATION_DRAG_SENSITIVITY = 0.8f;
@@ -514,6 +523,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         // The ring's appearing animation plays when the menu opens, not on resizes or returns
         playerPreviewPanel.initControls(this, centerX, feetY - 3, ringRadiusX, !ringIntroPlayed);
         ringIntroPlayed = true;
+        // Hidden pieces lie round the ring, as big as the model suits, between the side columns
+        pedestalItemSize = Math.max(16.0f, Math.min(36.0f, modelScale * PEDESTAL_ITEM_SIZE_PER_SCALE));
+        pedestalReach = Math.min(centerX - sideStart, sideEnd - centerX) - pedestalItemSize / 2;
 
         // Floating buttons, left and right of the model at shoulder and waist height
         int halfBody = (int) (modelScale * HALF_WIDTH_PER_SCALE);
@@ -600,14 +612,34 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     /** Height of the drawn player per unit of model scale: a player is 1.8 blocks, plus the hat and a margin. */
     private static final float MODEL_HEIGHT_PER_SCALE = 2.0f;
-    /** How opaque a ghost is under the mouse, how far it breathes either way, and in how long. */
-    private static final float GHOST_ALPHA = 0.45f;
-    private static final float GHOST_BREATH = 0.10f;
-    private static final float GHOST_BREATH_SECONDS = 1.0f;
-    /** How quickly a ghost fades in and out, as the time constant of an exponential approach. */
+    /** How quickly a hidden piece fades in on the model and out again, as the time constant of an exponential approach. */
     private static final float GHOST_EASE_SECONDS = 0.05f;
+    /** How long the corner marks take to close in round a piece, and from how far out they start. */
+    private static final float MARK_CLOSE_SECONDS = 0.18f;
+    private static final float MARK_GROW = 6.0f;
+    /** How far from the piece the marks rest, and how long their arms are at most. */
+    private static final int MARK_PAD = 2;
+    private static final int MARK_LENGTH = 6;
+    /** The marks' colour and that of the shadow a pixel below and to the right of them; their alpha is set where drawn. */
+    private static final int MARK_COLOR = 0xFFFFFFFF;
+    private static final int MARK_SHADOW = 0xFF140A1E;
+    private static final float MARK_SHADOW_ALPHA = 0.55f;
     private static final int[] ARMOR_PIECES_BY_PRIORITY = {
             LocalHiddenArmor.HEAD, LocalHiddenArmor.CHEST, LocalHiddenArmor.FEET, LocalHiddenArmor.LEGS};
+    /** The order hidden armour lies in on the floor, before the accessories: head to feet. */
+    private static final int[] ARMOR_PIECES_ON_FLOOR = {
+            LocalHiddenArmor.HEAD, LocalHiddenArmor.CHEST, LocalHiddenArmor.LEGS, LocalHiddenArmor.FEET};
+    /** A lying piece is drawn this much bigger per unit of model scale, within a vanilla icon and 2.25 of them. */
+    private static final float PEDESTAL_ITEM_SIZE_PER_SCALE = 16.0f / 52.0f;
+    /** How much bigger the lying piece under the mouse is drawn. */
+    private static final float PEDESTAL_HOVER_SCALE = 1.15f;
+    /** How bright a covered piece lies on the floor until the mouse is on it, and its badge's size per item size. */
+    private static final float COVERED_BRIGHTNESS = 0.5f;
+    private static final float COVERED_BADGE = 0.55f;
+    /** How far a tooltip's border reaches beyond its text. */
+    private static final int TOOLTIP_BORDER = 4;
+    /** Lying pieces hold still in deterministic E2E frames. */
+    private static final boolean DETERMINISTIC_E2E_RENDER = Boolean.getBoolean("quickskin.e2e.enabled");
     /** Half the drawn player's width per unit of model scale, arms included. */
     private static final float HALF_WIDTH_PER_SCALE = 0.55f;
     /**
@@ -719,6 +751,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             com.quickskin.mod.client.gui.widget.PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
             if (widget != null) {
                 widget.setRotationState(savedBodyYaw, savedTargetRotation);
+                // Unlike the title and pause menus, whose model rests turned aside, it faces the viewer
+                widget.setRestingYRotation(0.0f);
             }
         }
     }
@@ -823,6 +857,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         // Render the animated background
         this.renderBackgroundEffects(graphics, partialTick);
 
+        returnModelToFront();
+
         // The turntable ring goes behind the model, which stands inside it
         if (playerPreviewPanel != null && playerPreviewPanel.getRotationArc() != null) {
             playerPreviewPanel.getRotationArc().setHighlighted(rotatingModel);
@@ -876,6 +912,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?} else {
         graphics.nextStratum();
 //?}
+        // Hidden pieces lie in front of the model, which stands inside the ring
+        renderPedestalDrops(graphics, mouseX, mouseY);
         for (AbstractWidget control : foregroundControls) {
             int controlMouseX = control == skinContextMenu ? menuMouseX : mouseX;
             int controlMouseY = control == skinContextMenu ? menuMouseY : mouseY;
@@ -889,7 +927,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         if (actionButtonsPanel != null) {
             actionButtonsPanel.renderLeftTooltips(graphics, this.font, mouseX, mouseY);
         }
-        renderArmorGhost(graphics, mouseX, mouseY);
+        renderArmorHover(graphics, mouseX, mouseY);
+        renderPedestalTooltip(graphics, mouseX, mouseY);
 
         // Render error toasts (on top of everything)
         renderErrorToasts(graphics);
@@ -901,7 +940,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     /**
      * The armour piece the model wears under the mouse, as a {@link LocalHiddenArmor} bit, or 0:
      * the model's height splits into the helmet, the chestplate, the leggings and the boots, each
-     * about as wide as the part it covers. Only a piece the player has on counts, shown or hidden.
+     * about as wide as the part it covers. Only a piece drawn on the model counts: a hidden or
+     * covered one lies on the floor ({@link #pedestalPieceAt}), so it never covers the piece
+     * behind it.
      */
     private int armorPieceAt(double mouseX, double mouseY) {
         if (this.minecraft == null || this.minecraft.player == null || playerPreviewPanel == null) {
@@ -918,7 +959,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             int[] traced = new int[pieces.length];
             int count = 0;
             for (int candidate : pieces) {
-                if (!armorItem(candidate).isEmpty()
+                if (!armorItem(candidate).isEmpty() && onModel(candidate)
                         && com.quickskin.mod.client.rendering.PreviewArmorSilhouette.of(candidate) != null) {
                     traced[count++] = candidate;
                 }
@@ -933,7 +974,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             // traced keeps its boxes; the head first and the boots before the leggings
             for (int candidate : pieces) {
                 // An accessory has no boxes to fall back on
-                if (armorItem(candidate).isEmpty()
+                if (armorItem(candidate).isEmpty() || !onModel(candidate)
                         || com.quickskin.mod.client.rendering.CuriosPreview.isAccessory(candidate)
                         && com.quickskin.mod.client.rendering.PreviewArmorSilhouette.of(candidate) == null) {
                     continue;
@@ -970,7 +1011,180 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             piece = LocalHiddenArmor.FEET;
             halfWidth = 0.15;
         }
-        return sideways <= halfWidth && !armorItem(piece).isEmpty() ? piece : 0;
+        return sideways <= halfWidth && !armorItem(piece).isEmpty() && onModel(piece) ? piece : 0;
+    }
+
+    /** The piece under the mouse: one lying on the floor, or else one the model wears. */
+    private int pieceUnderMouse(double mouseX, double mouseY) {
+        int lying = pedestalPieceAt(mouseX, mouseY);
+        return lying != 0 ? lying : armorPieceAt(mouseX, mouseY);
+    }
+
+    /** The hidden piece lying on the floor under the mouse, or 0. */
+    private int pedestalPieceAt(double mouseX, double mouseY) {
+        return pedestalDrops.pieceAt(mouseX, mouseY, pedestalItemSize);
+    }
+
+    /**
+     * The worn pieces nobody sees, which lie on the floor round the turntable ring: the armour
+     * from head to feet, hidden or covered ({@link #covered}), then the accessories.
+     */
+    private int[] pedestalPieces() {
+        if (this.minecraft == null || this.minecraft.player == null || playerPreviewPanel == null
+                || playerPreviewPanel.getRotationArc() == null) {
+            return new int[0];
+        }
+        int[] accessories = com.quickskin.mod.client.rendering.CuriosPreview.pieces(this.minecraft.player);
+        int[] lying = new int[ARMOR_PIECES_ON_FLOOR.length + accessories.length];
+        int count = 0;
+        for (int piece : ARMOR_PIECES_ON_FLOOR) {
+            if (!onModel(piece) && !armorItem(piece).isEmpty()) {
+                lying[count++] = piece;
+            }
+        }
+        for (int piece : accessories) {
+            if (restingAlpha(piece) <= 0.0f && !armorItem(piece).isEmpty()) {
+                lying[count++] = piece;
+            }
+        }
+        return java.util.Arrays.copyOf(lying, count);
+    }
+
+    /**
+     * Where a piece's item drops from or flies to on the model, as a place on the floor would be
+     * given: the item is drawn over the middle of the piece's outline (or of the model). Null
+     * without a model.
+     */
+    @Nullable
+    private float[] wornPoint(int piece) {
+        float lift = pedestalItemSize * PedestalDrops.LIFT;
+        com.quickskin.mod.client.rendering.PreviewArmorSilhouette silhouette =
+                com.quickskin.mod.client.rendering.PreviewArmorSilhouette.of(piece);
+        if (silhouette != null) {
+            float[] center = silhouette.center();
+            return new float[]{center[0], center[1] + lift};
+        }
+        com.quickskin.mod.client.gui.widget.PlayerWidget widget =
+                playerPreviewPanel == null ? null : playerPreviewPanel.getPlayerWidget();
+        if (widget == null || !widget.visible) {
+            return null;
+        }
+        return new float[]{widget.getLayoutCenterX(),
+                widget.getLayoutFeetY() - widget.getEffectiveScale() * MODEL_HEIGHT_PER_SCALE / 2 + lift};
+    }
+
+    /**
+     * Draws the pieces nobody sees lying on the floor round the turntable ring, turning and bobbing
+     * as Minecraft draws dropped items, and those just put back on flying up to the model. The one
+     * under the mouse faces the player, holds still and grows a little. A covered piece is drawn
+     * darker, with the piece covering it as a badge in its corner.
+     */
+//? if <26.1 {
+    private void renderPedestalDrops(GuiGraphics graphics, int mouseX, int mouseY) {
+//?} else {
+    private void renderPedestalDrops(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+//?}
+        long now = Util.getMillis();
+        int[] pieces = pedestalPieces();
+        if (playerPreviewPanel != null && playerPreviewPanel.getRotationArc() != null) {
+            float[] band = playerPreviewPanel.getRotationArc().band();
+            // Spaced for every piece the player wears, so a piece arriving or leaving moves no other
+            int room = Math.max(pieces.length, wornPieceCount());
+            pedestalDrops.update(pieces, slot -> PedestalDrops.place(slot, Math.max(room, slot + 1),
+                    band[0], band[1], band[2], band[3], pedestalItemSize, pedestalReach),
+                    pedestalItemSize, this::wornPoint, now);
+        }
+        int hovered = pedestalPieceAt(mouseX, mouseY);
+        float size = pedestalItemSize;
+        for (PedestalDrops.Item item : pedestalDrops.items()) {
+            net.minecraft.world.item.ItemStack stack = armorItem(item.piece);
+            if (stack.isEmpty()) {
+                continue;
+            }
+            boolean still = DETERMINISTIC_E2E_RENDER || item.piece == hovered || item.dropping();
+            float bob = still ? 0.0f : PedestalDrops.bob(now, item.piece);
+            float width = still ? 1.0f : PedestalDrops.width(now, item.piece);
+            float scale = size / 16.0f * (item.piece == hovered ? PEDESTAL_HOVER_SCALE : 1.0f);
+            if (!item.inAir()) {
+                // A soft shadow under it, on the floor
+                int half = Math.round(size * 0.36f);
+                int x = Math.round(item.x);
+                int y = Math.round(item.y);
+                graphics.fill(x - half, y - 1, x + half, y + 1, 0x38000000);
+                graphics.fill(x - half / 2, y - 2, x + half / 2, y + 2, 0x30000000);
+            }
+            float middle = item.y - size * PedestalDrops.LIFT - bob;
+            if (!covered(item.piece)) {
+                GuiCompat.item(graphics, stack, item.x, middle, scale * width, scale);
+                continue;
+            }
+            GuiCompat.item(graphics, stack, item.x, middle, scale * width, scale,
+                    item.piece == hovered ? 1.0f : COVERED_BRIGHTNESS);
+            int covering = coverer(item.piece);
+            net.minecraft.world.item.ItemStack badge = covering == 0 ? net.minecraft.world.item.ItemStack.EMPTY : armorItem(covering);
+            if (!badge.isEmpty() && !item.dropping()) {
+                float badgeSize = size * COVERED_BADGE;
+                GuiCompat.badge(graphics, badge, item.x + size * 0.45f, middle + size * 0.4f, badgeSize);
+            }
+        }
+        for (PedestalDrops.Rise rise : pedestalDrops.rises()) {
+            net.minecraft.world.item.ItemStack stack = armorItem(rise.piece());
+            if (!stack.isEmpty()) {
+                float[] at = rise.at(now);
+                float scale = size / 16.0f * rise.scale(now);
+                GuiCompat.item(graphics, stack, at[0], at[1] - size * PedestalDrops.LIFT, scale, scale);
+            }
+        }
+    }
+
+    /**
+     * Names the lying piece under the mouse and says a click puts it back on, or, for a covered
+     * one, what covers it and that a click hides that. It hangs under the ring, below the piece,
+     * so it covers neither the model nor the other pieces lying round it.
+     */
+//? if <26.1 {
+    private void renderPedestalTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
+//?} else {
+    private void renderPedestalTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+//?}
+        int piece = pedestalPieceAt(mouseX, mouseY);
+        if (piece == 0 || this.minecraft == null || this.minecraft.player == null) {
+            return;
+        }
+        net.minecraft.world.item.ItemStack stack = armorItem(piece);
+        if (stack.isEmpty()) {
+            return;
+        }
+        List<Component> lines;
+        if (!covered(piece)) {
+            lines = List.of(stack.getHoverName(),
+                    Component.translatable("quickskin.armor.put_back").withStyle(net.minecraft.ChatFormatting.GRAY));
+        } else {
+            int covering = coverer(piece);
+            net.minecraft.world.item.ItemStack cover = covering == 0 ? net.minecraft.world.item.ItemStack.EMPTY : armorItem(covering);
+            lines = cover.isEmpty()
+                    ? List.of(stack.getHoverName(),
+                            Component.translatable("quickskin.armor.covered").withStyle(net.minecraft.ChatFormatting.YELLOW))
+                    : List.of(stack.getHoverName(),
+                            Component.translatable("quickskin.armor.covered_by", cover.getHoverName())
+                                    .withStyle(net.minecraft.ChatFormatting.YELLOW),
+                            Component.translatable("quickskin.armor.uncover", cover.getHoverName())
+                                    .withStyle(net.minecraft.ChatFormatting.GRAY));
+        }
+        PedestalDrops.Item lying = pedestalDrops.item(piece);
+        if (lying == null || playerPreviewPanel == null || playerPreviewPanel.getRotationArc() == null) {
+            GuiCompat.tooltip(graphics, this.font, lines, mouseX, mouseY);
+            return;
+        }
+        int width = 0;
+        for (Component line : lines) {
+            width = Math.max(width, this.font.width(line));
+        }
+        // Centred under the piece, within the screen; Minecraft draws a tooltip 12 right of and 12
+        // above the point it is given, its border 4 beyond its text
+        int left = Math.max(TOOLTIP_BORDER, Math.min(this.width - width - TOOLTIP_BORDER, Math.round(lying.x - width / 2.0f)));
+        int top = (int) Math.ceil(playerPreviewPanel.getRotationArc().bottom()) + TOOLTIP_BORDER + 1;
+        GuiCompat.tooltip(graphics, this.font, lines, left - 12, top + 12);
     }
 
     /** The outline of a worn piece on the model, one convex polygon per box it covers. */
@@ -1021,8 +1235,22 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         return pieces;
     }
 
-    /** What the player has on in a piece's slot. */
+    /** How many pieces the player has on, shown or not. */
+    private int wornPieceCount() {
+        int count = 0;
+        for (int piece : wornPieces()) {
+            if (!armorItem(piece).isEmpty()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /** What the player has on in a piece's slot: nothing outside a world, as on the title screen. */
     private net.minecraft.world.item.ItemStack armorItem(int piece) {
+        if (this.minecraft == null || this.minecraft.player == null) {
+            return net.minecraft.world.item.ItemStack.EMPTY;
+        }
         if (com.quickskin.mod.client.rendering.CuriosPreview.isAccessory(piece)) {
             return com.quickskin.mod.client.rendering.CuriosPreview.stack(this.minecraft.player, piece);
         }
@@ -1035,8 +1263,18 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         return this.minecraft.player.getItemBySlot(slot);
     }
 
-    /** Hides a shown piece from everyone, or shows a hidden one, where the server can. */
+    /**
+     * Hides a shown piece from everyone, or shows a hidden one, where the server can; for a
+     * covered piece, hides the accessory covering it, so it shows.
+     */
     private void toggleArmorPiece(int piece) {
+        if (covered(piece)) {
+            int covering = coverer(piece);
+            if (covering != 0) {
+                toggleArmorPiece(covering);
+            }
+            return;
+        }
         if (com.quickskin.mod.client.rendering.CuriosPreview.isAccessory(piece)) {
             // Curios' own render toggle, as the eye of its inventory
             com.quickskin.mod.client.rendering.CuriosPreview.toggle(this.minecraft == null ? null : this.minecraft.player, piece);
@@ -1053,87 +1291,179 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     /**
-     * Turns the armour piece under the mouse into a see-through ghost of itself on the model, so
-     * the skin beneath shows, as hiding it would; a hidden piece appears as the same ghost. It fades
-     * in, breathes a little while the mouse stays, and fades back to how the piece is drawn when the
-     * mouse leaves; a piece just clicked fades to its new state and stays so until the mouse leaves
-     * it. A faint edge and a light tint over the piece's own silhouette keep the ghost readable.
-     * The model draws the ghost from the next frame on ({@code PreviewEquipment.setGhost}).
+     * Points out the piece under the mouse: four corner marks close in round it on the model, and a
+     * hidden piece whose item on the floor is under the mouse appears on the model, where it goes
+     * back on, with marks round both. It fades in there and back out when the mouse leaves; the
+     * model draws it from the next frame on ({@code PreviewEquipment.setGhost}). A piece just
+     * clicked is left unmarked until the mouse leaves it.
      */
 //? if <26.1 {
-    private void renderArmorGhost(GuiGraphics graphics, int mouseX, int mouseY) {
+    private void renderArmorHover(GuiGraphics graphics, int mouseX, int mouseY) {
 //?} else {
-    private void renderArmorGhost(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+    private void renderArmorHover(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
 //?}
         boolean onMenu = !rotatingModel && this.minecraft != null && GuiCompat.currentScreen() == this;
-        int hovered = onMenu ? armorPieceAt(mouseX, mouseY) : 0;
+        int hovered = onMenu ? pieceUnderMouse(mouseX, mouseY) : 0;
         long now = System.nanoTime();
         float elapsed = ghostFrameNanos == 0 ? 0.0f : Math.min(0.1f, (now - ghostFrameNanos) / 1.0e9f);
         ghostFrameNanos = now;
         if (hovered != ghostSettledPiece) {
             ghostSettledPiece = 0;
         }
-        boolean ghosting = hovered != 0 && hovered != ghostSettledPiece;
-        if (ghosting && hovered != ghostPiece) {
-            // A new piece starts from how it is drawn now
-            ghostPiece = hovered;
-            ghostAlpha = restingAlpha(hovered);
-            ghostSinceNanos = now;
+        int pointed = hovered != ghostSettledPiece ? hovered : 0;
+
+        if (pointed != 0 && pointed != ghostPiece && restingAlpha(pointed) <= 0.0f) {
+            ghostPiece = pointed;
+            ghostAlpha = 0.0f;
         }
-        if (ghostPiece == 0) {
-            com.quickskin.mod.client.rendering.PreviewEquipment.setGhost(0, 1.0f);
-            return;
-        }
-        boolean held = ghosting && hovered == ghostPiece;
-        float target = held
-                ? GHOST_ALPHA + GHOST_BREATH * (float) Math.sin(2.0 * Math.PI * ((now - ghostSinceNanos) / 1.0e9f) / GHOST_BREATH_SECONDS)
-                : restingAlpha(ghostPiece);
-        ghostAlpha += (target - ghostAlpha) * (1.0f - (float) Math.exp(-elapsed / GHOST_EASE_SECONDS));
-        if (!held && Math.abs(ghostAlpha - target) < 0.01f) {
-            ghostPiece = 0;
-            ghostAlpha = 1.0f;
-            com.quickskin.mod.client.rendering.PreviewEquipment.setGhost(0, 1.0f);
-            return;
+        if (ghostPiece != 0) {
+            float target = ghostPiece == pointed ? 1.0f : restingAlpha(ghostPiece);
+            ghostAlpha += (target - ghostAlpha) * (1.0f - (float) Math.exp(-elapsed / GHOST_EASE_SECONDS));
+            if (ghostPiece != pointed && Math.abs(ghostAlpha - target) < 0.01f) {
+                ghostPiece = 0;
+                ghostAlpha = 1.0f;
+            }
         }
         com.quickskin.mod.client.rendering.PreviewEquipment.setGhost(ghostPiece, ghostAlpha);
 
-        // How far the piece is from how it rests, 0 to 1
-        float rest = restingAlpha(ghostPiece);
-        float ghostliness = Math.min(1.0f, Math.abs(rest - ghostAlpha) / Math.abs(rest - GHOST_ALPHA));
-        com.quickskin.mod.client.rendering.PreviewArmorSilhouette silhouette =
-                com.quickskin.mod.client.rendering.PreviewArmorSilhouette.of(ghostPiece);
-        if (silhouette == null || ghostliness <= 0.01f || this.minecraft == null || this.minecraft.player == null) {
+        if (pointed != markedPiece) {
+            markedPiece = pointed;
+            markedSinceNanos = now;
+        }
+        if (markedPiece == 0 || this.minecraft == null || this.minecraft.player == null) {
             return;
         }
-        // Only where the ghost is seen: not where the model or another piece drawn on it is nearer
-        int[] candidates = wornPieces();
-        int[] drawn = new int[candidates.length];
-        int count = 0;
-        for (int piece : candidates) {
-            if (piece != ghostPiece && restingAlpha(piece) > 0.0f && !armorItem(piece).isEmpty()) {
-                drawn[count++] = piece;
-            }
+        float progress = Math.min(1.0f, (now - markedSinceNanos) / 1.0e9f / MARK_CLOSE_SECONDS);
+        float grow = MARK_GROW * (1.0f - backOut(progress));
+        float alpha = Math.min(1.0f, progress * 2.0f);
+        // A covered piece is not seen on the model: the piece covering it is marked there
+        int covering = covered(markedPiece) ? coverer(markedPiece) : 0;
+        int[] onModel = covered(markedPiece) ? covering == 0 ? null : seenBox(covering) : seenBox(markedPiece);
+        if (onModel != null) {
+            drawMarks(graphics, onModel, grow, alpha);
         }
-        com.quickskin.mod.client.rendering.PreviewArmorSilhouette.Seen seen =
-                silhouette.seen(java.util.Arrays.copyOf(drawn, count));
-        int tint = Math.round(0.12f * ghostliness * 255) << 24 | 0xD2F0FF;
-        int[] spans = seen.spans();
-        for (int i = 0; i < spans.length; i += 3) {
-            graphics.fill(spans[i], spans[i + 2], spans[i + 1], spans[i + 2] + 1, tint);
-        }
-        int edge = Math.round(0.30f * ghostliness * 255) << 24 | 0xE1F5FF;
-        int[] ring = seen.ring();
-        for (int i = 0; i < ring.length; i += 2) {
-            graphics.fill(ring[i], ring[i + 1], ring[i] + 1, ring[i + 1] + 1, edge);
+        PedestalDrops.Item lying = pedestalDrops.item(markedPiece);
+        if (lying != null && !lying.dropping()) {
+            float half = pedestalItemSize * PEDESTAL_HOVER_SCALE / 2.0f;
+            float middle = lying.y - pedestalItemSize * PedestalDrops.LIFT;
+            drawMarks(graphics, new int[]{(int) Math.floor(lying.x - half), (int) Math.floor(middle - half),
+                    (int) Math.ceil(lying.x + half), (int) Math.ceil(middle + half)}, grow, alpha);
         }
     }
 
-    /** How opaque a piece is drawn when no ghost: hidden from everyone, it is not drawn at all. */
+    /**
+     * The box round what the viewer sees of a piece on the model, {left, top, right, bottom} in GUI
+     * coordinates (right and bottom exclusive), or null when it is not drawn there.
+     */
+    @Nullable
+    private int[] seenBox(int piece) {
+        com.quickskin.mod.client.rendering.PreviewArmorSilhouette silhouette =
+                com.quickskin.mod.client.rendering.PreviewArmorSilhouette.of(piece);
+        if (silhouette == null) {
+            return null;
+        }
+        // Not where the model or another piece drawn on it is nearer
+        int[] candidates = wornPieces();
+        int[] drawn = new int[candidates.length];
+        int count = 0;
+        for (int other : candidates) {
+            if (other != piece && onModel(other) && !armorItem(other).isEmpty()) {
+                drawn[count++] = other;
+            }
+        }
+        int[] spans = silhouette.seen(java.util.Arrays.copyOf(drawn, count)).spans();
+        int[] box = {Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
+        for (int i = 0; i < spans.length; i += 3) {
+            box[0] = Math.min(box[0], spans[i]);
+            box[2] = Math.max(box[2], spans[i + 1]);
+            box[1] = Math.min(box[1], spans[i + 2]);
+            box[3] = Math.max(box[3], spans[i + 2] + 1);
+        }
+        // Wholly covered: the whole piece, as the mouse can only be on its edge
+        int[] ring = silhouette.ring();
+        for (int i = 0; spans.length == 0 && i < ring.length; i += 2) {
+            box[0] = Math.min(box[0], ring[i]);
+            box[2] = Math.max(box[2], ring[i] + 1);
+            box[1] = Math.min(box[1], ring[i + 1]);
+            box[3] = Math.max(box[3], ring[i + 1] + 1);
+        }
+        return box[0] < box[2] ? box : null;
+    }
+
+    /** An ease that overshoots a little before it settles at 1, for {@code progress} from 0 to 1. */
+    private static float backOut(float progress) {
+        float p = progress - 1.0f;
+        return 1.0f + 2.7f * p * p * p + 1.7f * p * p;
+    }
+
+    /**
+     * Four corner marks round a box, {@code grow} further out than where they rest, at
+     * {@code alpha}, each over its shadow.
+     */
+//? if <26.1 {
+    private static void drawMarks(GuiGraphics graphics, int[] box, float grow, float alpha) {
+//?} else {
+    private static void drawMarks(GuiGraphicsExtractor graphics, int[] box, float grow, float alpha) {
+//?}
+        int out = MARK_PAD + Math.round(grow);
+        int left = box[0] - out;
+        int top = box[1] - out;
+        int right = box[2] + out;
+        int bottom = box[3] + out;
+        int length = Math.max(2, Math.min(MARK_LENGTH, Math.min(right - left, bottom - top) / 3));
+        cornerMarks(graphics, left + 1, top + 1, right + 1, bottom + 1, length,
+                Math.round(MARK_SHADOW_ALPHA * alpha * 255) << 24 | (MARK_SHADOW & 0x00FFFFFF));
+        cornerMarks(graphics, left, top, right, bottom, length, Math.round(alpha * 255) << 24 | (MARK_COLOR & 0x00FFFFFF));
+    }
+
+    /**
+     * An L-shaped mark in each corner, one pixel thick. The vertical arm stops short of the corner
+     * pixel, which the horizontal arm draws, so a translucent colour is not drawn twice there.
+     */
+//? if <26.1 {
+    private static void cornerMarks(GuiGraphics graphics, int left, int top, int right, int bottom, int length, int color) {
+//?} else {
+    private static void cornerMarks(GuiGraphicsExtractor graphics, int left, int top, int right, int bottom, int length, int color) {
+//?}
+        graphics.fill(left, top, left + length, top + 1, color);
+        graphics.fill(left, top + 1, left + 1, top + length, color);
+        graphics.fill(right - length, top, right, top + 1, color);
+        graphics.fill(right - 1, top + 1, right, top + length, color);
+        graphics.fill(left, bottom - 1, left + length, bottom, color);
+        graphics.fill(left, bottom - length, left + 1, bottom - 1, color);
+        graphics.fill(right - length, bottom - 1, right, bottom, color);
+        graphics.fill(right - 1, bottom - length, right, bottom - 1, color);
+    }
+
+    /** How opaque a piece is drawn when not shown for the mouse: hidden from everyone, it is not drawn at all. */
     private static float restingAlpha(int piece) {
         if (com.quickskin.mod.client.rendering.CuriosPreview.isAccessory(piece)) {
             return com.quickskin.mod.client.rendering.CuriosPreview.shown(net.minecraft.client.Minecraft.getInstance().player, piece) ? 1.0f : 0.0f;
         }
         return (LocalHiddenArmor.inEffect() & piece) != 0 ? 0.0f : 1.0f;
+    }
+
+    /**
+     * Whether an armour piece the player shows is covered: another mod takes it off while the
+     * player is drawn, in the world as in the preview, as Relics does with the boots under its
+     * own ({@code PreviewEquipment.coveredPieces}). It lies on the floor until what covers it is
+     * hidden.
+     */
+    private static boolean covered(int piece) {
+        return !com.quickskin.mod.client.rendering.CuriosPreview.isAccessory(piece)
+                && (com.quickskin.mod.client.rendering.PreviewEquipment.coveredPieces() & piece) != 0
+                && restingAlpha(piece) > 0.0f;
+    }
+
+    /** The accessory most likely covering a covered piece ({@code CuriosPreview.covering}), or 0. */
+    private int coverer(int piece) {
+        return com.quickskin.mod.client.rendering.CuriosPreview.covering(
+                this.minecraft == null ? null : this.minecraft.player, piece);
+    }
+
+    /** Whether a piece is drawn on the model: neither hidden nor covered. */
+    private static boolean onModel(int piece) {
+        return restingAlpha(piece) > 0.0f && !covered(piece);
     }
 
     /**
@@ -1466,8 +1796,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         if (playerPreviewPanel != null) {
             playerPreviewPanel.closePoseListUnlessOver(mouseX, mouseY);
         }
-        // A click on a piece of armour the model wears hides or shows it once released in place
-        armorPressPiece = button == InputConstants.MOUSE_BUTTON_LEFT ? armorPieceAt(mouseX, mouseY) : 0;
+        // A click on a piece the model wears hides it once released in place, and a click on a
+        // hidden one lying on the floor puts it back on
+        armorPressPiece = button == InputConstants.MOUSE_BUTTON_LEFT ? pieceUnderMouse(mouseX, mouseY) : 0;
         armorPressX = mouseX;
         armorPressY = mouseY;
         // Handle debug positioning mode
@@ -1508,9 +1839,30 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             return false;
         }
         rotatingModel = true;
+        modelReturningToFront = false;
         rotationDragStartX = mouseX;
         rotationDragStartYaw = widget.getTargetYRotation();
         return true;
+    }
+
+    /**
+     * Eases a model the player let go of back to face the viewer, by the shortest way, as the model
+     * widget eases back to its resting yaw when a drag of the model itself lets go before 1.21.
+     */
+    private void returnModelToFront() {
+        if (!modelReturningToFront || rotatingModel || playerPreviewPanel == null
+                || playerPreviewPanel.getPlayerWidget() == null) {
+            return;
+        }
+        com.quickskin.mod.client.gui.widget.PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
+        float target = widget.getTargetYRotation();
+        float front = 360.0f * Math.round(target / 360.0f);
+        if (Math.abs(front - target) > 0.1f) {
+            widget.setTargetYRotation(target + (front - target) * 0.08f);
+        } else {
+            widget.setTargetYRotation(front);
+            modelReturningToFront = false;
+        }
     }
 
     /**
@@ -1597,6 +1949,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         }
         if (rotatingModel && button == InputConstants.MOUSE_BUTTON_LEFT) {
             rotatingModel = false;
+            modelReturningToFront = true;
             return true;
         }
 //? if <1.21 {

@@ -438,10 +438,20 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   never for a cached player of a world that was left). The skin menu's own posed model borrows the
   equipment layers of the player renderer of its model type (`PreviewEquipment`, ADR 0017), and
   the layers of accessory mods (Curios, Trinkets, Accessories), named by class only with no
-  dependency or compatibility lane; one that fails is left out for the session. Before 1.21.2
-  each Curios accessory is a piece the skin menu ghosts and hides like armour, through Curios' own
+  dependency or compatibility lane; one that fails is left out for the session. Before 1.21.2 on
+  Forge and NeoForge that draw sits between `RenderPlayerEvent.Pre` and `Post`, as a player in the
+  world does (`PlayerRenderEvents`, reflection only, with a pose stack and buffers that draw
+  nowhere), so mods that change what a player shows only while it is drawn, such as Relics hiding
+  the boots under its own, do so on the preview too. An armour piece such a mod takes off for the
+  draw is covered (`PreviewEquipment.coveredPieces`): never picked on the model, it lies darkened
+  on the floor with the accessory shown in its body part's Curios slot (`CuriosPreview.covering`)
+  as a badge, and a click on it hides that accessory. Before 1.21.2
+  each Curios accessory is a piece the skin menu points out and hides like armour, through Curios' own
   render toggle (`CuriosPreview`, reflection only: the toggle packet of its inventory's eye), so
-  Curios stores and syncs it; should Curios not match, its layer draws as before. The cape editor's Elytra view
+  Curios stores and syncs it; should Curios not match, its layer draws as before. A hidden piece,
+  armour or accessory, is never picked on the skin menu's model, where it would cover a piece
+  behind it: it lies on the floor round the turntable ring as its item (`PedestalDrops`), and a
+  click there puts it back on. The cape editor's Elytra view
   is no exception: it draws its own model with vanilla's folded wings wearing the edited cape's
   texture (`PreviewPlayerData.isElytraPreview`), never the elytra the player has equipped. The
   one exception is the HUD preview keeping a held TaCZ (Timeless and Classics Zero) gun readable, so TaCZ poses and draws

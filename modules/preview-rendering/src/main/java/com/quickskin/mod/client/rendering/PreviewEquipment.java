@@ -71,10 +71,11 @@ import java.util.regex.Pattern;
  * pieces the player hides, and from 1.21.2 they read a render state extracted from it, from which
  * the extraction already left the hidden pieces out.
  *
- * <p>The piece under the skin menu's mouse is drawn see-through, a ghost of itself that shows the
- * skin beneath ({@link #setGhost}): the draw leaves it out, and once the rest of the preview is
- * drawn, the cape included, its layers draw it alone again, every texture swapped for a
- * see-through draw of the same texture at the ghost's alpha. A hidden piece is drawn so too.
+ * <p>The skin menu can draw one piece see-through, a ghost of itself ({@link #setGhost}): a hidden
+ * piece whose item on the floor is under the mouse, fading in where it goes back on. The draw
+ * leaves it out, and once the rest of the preview is drawn, the cape included, its layers draw it
+ * alone again, every texture swapped for a see-through draw of the same texture at the ghost's
+ * alpha.
  */
 @Environment(EnvType.CLIENT)
 public final class PreviewEquipment {
@@ -115,6 +116,8 @@ public final class PreviewEquipment {
     private static float ghostAlpha = 1.0F;
     /** True while a preview's own draw runs, which then leaves the ghost's piece out (before 1.21.2). */
     private static boolean leavingOutGhost;
+    /** What {@link #coveredPieces} answers. */
+    private static int coveredPieces;
 
     /** Poses bound to the render states of preview draws from 1.21.9, until they are collected. */
     private static final Map<Object, PartPose[]> BOUND_POSES = new WeakHashMap<>();
@@ -169,6 +172,7 @@ public final class PreviewEquipment {
         outlineFrame++;
         ghostPiece = 0;
         ghostAlpha = 1.0F;
+        coveredPieces = 0;
         PreviewArmorSilhouette.clearTextures();
     }
 
@@ -191,6 +195,36 @@ public final class PreviewEquipment {
                 : slot == net.minecraft.world.entity.EquipmentSlot.CHEST ? piece == 4
                 : slot == net.minecraft.world.entity.EquipmentSlot.LEGS ? piece == 2
                 : slot == net.minecraft.world.entity.EquipmentSlot.FEET && piece == 1;
+    }
+
+    /**
+     * The armour pieces ({@code HiddenArmor} bits) another mod took off the player for the last
+     * preview draw, as Relics takes off the boots under its own: worn, but not drawn. Before
+     * 1.21.2 only; 0 after.
+     */
+    public static int coveredPieces() {
+        return coveredPieces;
+    }
+
+    /** The player's armour from head to feet, as {@link #emptied} compares it. */
+    private static net.minecraft.world.item.ItemStack[] armour(net.minecraft.world.entity.LivingEntity player) {
+        return new net.minecraft.world.item.ItemStack[]{
+                player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD),
+                player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST),
+                player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.LEGS),
+                player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET)};
+    }
+
+    /** The pieces ({@code HiddenArmor} bits) that held an item {@code before} and are empty now. */
+    private static int emptied(net.minecraft.world.entity.LivingEntity player, net.minecraft.world.item.ItemStack[] before) {
+        net.minecraft.world.item.ItemStack[] now = armour(player);
+        int emptied = 0;
+        for (int i = 0; i < now.length; i++) {
+            if (!before[i].isEmpty() && now[i].isEmpty()) {
+                emptied |= 8 >> i;
+            }
+        }
+        return emptied;
     }
 
     /** Whether a ghost is to be drawn now. */
@@ -267,9 +301,12 @@ public final class PreviewEquipment {
         return playerRenderer(minecraft, slim);
     }
 
-    /** Poses that renderer's model like the preview's, as a draw of the equipment does first. */
-    static void poseRenderer(HumanoidModel<?> preview, Object renderer) {
-        copyPose(preview, renderer);
+    /**
+     * Poses that renderer's model like the preview's, as a draw of the equipment does first; the
+     * returned action puts back the pose it had once the layers have drawn.
+     */
+    static Runnable poseRenderer(HumanoidModel<?> preview, Object renderer) {
+        return copyPose(preview, renderer);
     }
 
     /** Whether a layer draws something worn in an armour slot: armour, an elytra or a worn head. */
@@ -475,6 +512,30 @@ public final class PreviewEquipment {
         }
     }
 
+    /**
+     * Runs a layer's draw, the elytra's from the preview's body. Vanilla hangs the wings from the
+     * player's root, where the body always is in the world, but the preview's poses lean, lower and
+     * twist the body, and the cape already follows it.
+     */
+    static void alongBody(Object layer, HumanoidModel<?> preview, PoseStack poseStack, Runnable draw) {
+//? if <1.21.2 {
+        boolean wings = layer instanceof ElytraLayer<?, ?>;
+//?} else {
+        boolean wings = layer instanceof WingsLayer<?, ?>;
+//?}
+        if (!wings) {
+            draw.run();
+            return;
+        }
+        poseStack.pushPose();
+        try {
+            preview.body.translateAndRotate(poseStack);
+            draw.run();
+        } finally {
+            poseStack.popPose();
+        }
+    }
+
     /** Whether a layer draws equipment: armour, held items, a worn head or the elytra. */
     private static boolean drawsEquipment(Object layer) {
         return layer instanceof HumanoidArmorLayer<?, ?, ?>
@@ -492,16 +553,42 @@ public final class PreviewEquipment {
      * 1.21.2 the layers also take the model's state (child, riding, crouching, arm poses), which
      * the last draw through that renderer left, so all of it comes from the preview's model:
      * a renderer left in its child state drew the armour at a child's size, the helmet at the belly.
+     * The returned action puts back the pose those models had, once the layers have drawn: before
+     * 1.21.2 the world's next draw poses only some of each part again (not the offsets the loops
+     * move), so the cape menu and the world showed the live player half seated after the sit.
+     * From 1.21.2 every draw starts from the baked pose and the action does nothing.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static void copyPose(HumanoidModel<?> preview, Object renderer) {
+    private static Runnable copyPose(HumanoidModel<?> preview, Object renderer) {
         if (!(((LivingEntityRenderer) renderer).getModel() instanceof HumanoidModel<?> target)) {
-            return;
+            return () -> { };
         }
+        PartPose[] pose = storePose(preview);
 //? if <1.21.2 {
+        PartPose[] targetOwn = storePose(target);
         ((HumanoidModel) preview).copyPropertiesTo((HumanoidModel) target);
 //?}
-        loadPose(target, storePose(preview));
+        loadPose(target, pose);
+//? if <1.21.2 {
+        // Accessories pose themselves from the renderer Minecraft picks for the player (Curios'
+        // followBodyRotations), which is the other model type's while the preview shows a skin
+        // of the other type: it takes the pose too, and the world poses it again before its next draw
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player != null
+                && minecraft.getEntityRenderDispatcher().getRenderer(minecraft.player) instanceof LivingEntityRenderer<?, ?> own
+                && own != renderer && own.getModel() instanceof HumanoidModel<?> ownModel) {
+            PartPose[] ownPose = storePose(ownModel);
+            ((HumanoidModel) preview).copyPropertiesTo((HumanoidModel) ownModel);
+            loadPose(ownModel, pose);
+            return () -> {
+                loadPose(target, targetOwn);
+                loadPose(ownModel, ownPose);
+            };
+        }
+        return () -> loadPose(target, targetOwn);
+//?} else {
+        return () -> { };
+//?}
     }
 
     private static ModelPart[] parts(HumanoidModel<?> model) {
@@ -532,7 +619,7 @@ public final class PreviewEquipment {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static void render(Worn worn, HumanoidModel<?> preview, PoseStack poseStack, MultiBufferSource buffers) {
-        copyPose(preview, worn.renderer());
+        Runnable giveBack = copyPose(preview, worn.renderer());
         List<?> layers = ((RendererLayers) worn.renderer()).quickskin$previewLayers();
 //? if <1.21.2 {
         // The layers skip the pieces the player hides themselves (LocalArmorLayerMixin), and the
@@ -540,22 +627,29 @@ public final class PreviewEquipment {
         AbstractClientPlayer player = (AbstractClientPlayer) worn.subject();
         leavingOutGhost = ghostShown();
         try {
-            for (Object layer : layers) {
-                if (drawsEquipment(layer)) {
-                    ((RenderLayer) layer).render(poseStack, buffers, LIGHT, player,
-                            0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F);
-                } else if (CuriosPreview.drawsInstead(layer)) {
-                    // Curios' accessories one by one, so the ghost's one is left out
-                    int leftOut = ghostShown() ? ghostPiece : 0;
-                    drawAccessories(layer, poseStack, () -> CuriosPreview.render(player, worn.renderer(), poseStack,
-                            buffers, LIGHT, leftOut));
-                } else if (drawsAccessories(layer)) {
-                    drawAccessories(layer, poseStack, () -> ((RenderLayer) layer).render(poseStack, buffers,
-                            LIGHT, player, 0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F));
+            // As in the world, other mods may change what the player shows while it is drawn
+            net.minecraft.world.item.ItemStack[] before = armour(player);
+            PlayerRenderEvents.around(player, worn.renderer(), new PoseStack(),
+                    (MultiBufferSource) renderType -> new SeeThrough(null, 1.0F), LIGHT, () -> {
+                coveredPieces = emptied(player, before);
+                for (Object layer : layers) {
+                    if (drawsEquipment(layer)) {
+                        alongBody(layer, preview, poseStack, () -> ((RenderLayer) layer).render(poseStack, buffers,
+                                LIGHT, player, 0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F));
+                    } else if (CuriosPreview.drawsInstead(layer)) {
+                        // Curios' accessories one by one, so the ghost's one is left out
+                        int leftOut = ghostShown() ? ghostPiece : 0;
+                        drawAccessories(layer, poseStack, () -> CuriosPreview.render(player, worn.renderer(), poseStack,
+                                buffers, LIGHT, leftOut));
+                    } else if (drawsAccessories(layer)) {
+                        drawAccessories(layer, poseStack, () -> ((RenderLayer) layer).render(poseStack, buffers,
+                                LIGHT, player, 0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F));
+                    }
                 }
-            }
+            });
         } finally {
             leavingOutGhost = false;
+            giveBack.run();
         }
 //?} else {
         if (ghostShown()) {
@@ -565,8 +659,8 @@ public final class PreviewEquipment {
         }
         for (Object layer : layers) {
             if (drawsEquipment(layer)) {
-                ((RenderLayer) layer).render(poseStack, buffers, LIGHT,
-                        (net.minecraft.client.renderer.entity.state.EntityRenderState) worn.subject(), 0.0F, 0.0F);
+                alongBody(layer, preview, poseStack, () -> ((RenderLayer) layer).render(poseStack, buffers, LIGHT,
+                        (net.minecraft.client.renderer.entity.state.EntityRenderState) worn.subject(), 0.0F, 0.0F));
             } else if (drawsAccessories(layer)) {
                 drawAccessories(layer, poseStack, () -> ((RenderLayer) layer).render(poseStack, buffers, LIGHT,
                         (net.minecraft.client.renderer.entity.state.EntityRenderState) worn.subject(), 0.0F, 0.0F));
@@ -591,7 +685,7 @@ public final class PreviewEquipment {
             Object ghost = ghostType(renderType);
             return new SeeThrough(ghost == null ? null : buffers.getBuffer((RenderType) ghost), alpha);
         };
-        copyPose(preview, worn.renderer());
+        Runnable giveBack = copyPose(preview, worn.renderer());
         List<?> layers = ((RendererLayers) worn.renderer()).quickskin$previewLayers();
         // A hidden piece is drawn as well
         capturing = true;
@@ -605,8 +699,8 @@ public final class PreviewEquipment {
             PlayerModelRenderer.withOnlyPiece(player, piece, () -> {
                 for (Object layer : layers) {
                     if (drawsWornPiece(layer)) {
-                        ((RenderLayer) layer).render(poseStack, ghostBuffers, LIGHT, player,
-                                0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F);
+                        alongBody(layer, preview, poseStack, () -> ((RenderLayer) layer).render(poseStack, ghostBuffers,
+                                LIGHT, player, 0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F));
                     }
                 }
             });
@@ -617,12 +711,14 @@ public final class PreviewEquipment {
             PlayerModelRenderer.blankPieces(ghostState, 15 & ~piece);
             for (Object layer : layers) {
                 if (drawsWornPiece(layer)) {
-                    ((RenderLayer) layer).render(poseStack, ghostBuffers, LIGHT, ghostState, 0.0F, 0.0F);
+                    alongBody(layer, preview, poseStack,
+                            () -> ((RenderLayer) layer).render(poseStack, ghostBuffers, LIGHT, ghostState, 0.0F, 0.0F));
                 }
             }
 //?}
         } finally {
             capturing = false;
+            giveBack.run();
         }
     }
 
@@ -757,8 +853,8 @@ public final class PreviewEquipment {
         }
         for (Object layer : ((RendererLayers) worn.renderer()).quickskin$previewLayers()) {
             if (drawsEquipment(layer)) {
-                ((RenderLayer) layer).submit(poseStack, collector, LIGHT,
-                        (net.minecraft.client.renderer.entity.state.EntityRenderState) worn.subject(), 0.0F, 0.0F);
+                alongBody(layer, preview, poseStack, () -> ((RenderLayer) layer).submit(poseStack, collector, LIGHT,
+                        (net.minecraft.client.renderer.entity.state.EntityRenderState) worn.subject(), 0.0F, 0.0F));
             } else if (drawsAccessories(layer)) {
                 drawAccessories(layer, poseStack, () -> ((RenderLayer) layer).submit(poseStack, collector, LIGHT,
                         (net.minecraft.client.renderer.entity.state.EntityRenderState) worn.subject(), 0.0F, 0.0F));
@@ -796,7 +892,8 @@ public final class PreviewEquipment {
         SubmitNodeCollector ghost = ghostCollector(collector, GHOST_ORDER, ghostAlpha);
         for (Object layer : ((RendererLayers) worn.renderer()).quickskin$previewLayers()) {
             if (drawsWornPiece(layer)) {
-                ((RenderLayer) layer).submit(poseStack, ghost, LIGHT, ghostState, 0.0F, 0.0F);
+                alongBody(layer, preview, poseStack,
+                        () -> ((RenderLayer) layer).submit(poseStack, ghost, LIGHT, ghostState, 0.0F, 0.0F));
             }
         }
         return true;

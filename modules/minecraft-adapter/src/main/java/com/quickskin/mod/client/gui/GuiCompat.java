@@ -24,6 +24,7 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 //?}
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
 //? if <1.21.11 {
 import net.minecraft.resources.ResourceLocation;
 //?} else {
@@ -265,6 +266,84 @@ public final class GuiCompat {
         graphics.tooltip(font, components, mouseX, mouseY, DefaultTooltipPositioner.INSTANCE, null, false);
             //?}
         //?}
+    //?}
+    }
+
+    /**
+     * Draws an item's icon centred on {@code (x, y)}, {@code scaleX} and {@code scaleY} times its
+     * 16 pixels: a narrower one looks turned, as a dropped item turning on the ground.
+     */
+    //? if <1.21.6 {
+    public static void item(GuiGraphics graphics, ItemStack stack, float x, float y, float scaleX, float scaleY) {
+        graphics.pose().pushPose();
+        graphics.pose().translate(x, y, 0.0F);
+        graphics.pose().scale(scaleX, scaleY, 1.0F);
+        graphics.renderItem(stack, -8, -8);
+        graphics.pose().popPose();
+    //?} else if <26.1 {
+    public static void item(GuiGraphics graphics, ItemStack stack, float x, float y, float scaleX, float scaleY) {
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(x, y);
+        graphics.pose().scale(scaleX, scaleY);
+        graphics.renderItem(stack, -8, -8);
+        graphics.pose().popMatrix();
+    //?} else {
+    public static void item(GuiGraphicsExtractor graphics, ItemStack stack, float x, float y, float scaleX, float scaleY) {
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(x, y);
+        graphics.pose().scale(scaleX, scaleY);
+        graphics.item(stack, -8, -8);
+        graphics.pose().popMatrix();
+    //?}
+    }
+
+    /**
+     * Draws {@link #item} darkened to {@code brightness}, from 0 (black) to 1. Before 1.21.6 only,
+     * where the GUI draws an item at once; from 1.21.6 the item is drawn as it is.
+     */
+    //? if <1.21.6 {
+    public static void item(GuiGraphics graphics, ItemStack stack, float x, float y, float scaleX, float scaleY,
+                            float brightness) {
+        com.mojang.blaze3d.systems.RenderSystem.setShaderColor(brightness, brightness, brightness, 1.0F);
+        try {
+            item(graphics, stack, x, y, scaleX, scaleY);
+        } finally {
+            com.mojang.blaze3d.systems.RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+        }
+    //?} else if <26.1 {
+    public static void item(GuiGraphics graphics, ItemStack stack, float x, float y, float scaleX, float scaleY,
+                            float brightness) {
+        item(graphics, stack, x, y, scaleX, scaleY);
+    //?} else {
+    public static void item(GuiGraphicsExtractor graphics, ItemStack stack, float x, float y, float scaleX, float scaleY,
+                            float brightness) {
+        item(graphics, stack, x, y, scaleX, scaleY);
+    //?}
+    }
+
+    /**
+     * Draws a small item icon {@code size} pixels wide centred on {@code (x, y)}, on a dark square,
+     * over any item drawn there before.
+     */
+    //? if <1.21.6 {
+    public static void badge(GuiGraphics graphics, ItemStack stack, float x, float y, float size) {
+        graphics.pose().pushPose();
+        // Items reach about 160 forward of where they are drawn
+        graphics.pose().translate(0.0F, 0.0F, 200.0F);
+    //?} else if <26.1 {
+    public static void badge(GuiGraphics graphics, ItemStack stack, float x, float y, float size) {
+    //?} else {
+    public static void badge(GuiGraphicsExtractor graphics, ItemStack stack, float x, float y, float size) {
+    //?}
+        int half = Math.round(size / 2.0F) + 1;
+        int left = Math.round(x) - half;
+        int top = Math.round(y) - half;
+        graphics.fill(left, top, left + half * 2, top + half * 2, 0xC8140A19);
+        graphics.fill(left + 1, top - 1, left + half * 2 - 1, top, 0xC8140A19);
+        graphics.fill(left + 1, top + half * 2, left + half * 2 - 1, top + half * 2 + 1, 0xC8140A19);
+        item(graphics, stack, x, y, size / 16.0F, size / 16.0F);
+    //? if <1.21.6 {
+        graphics.pose().popPose();
     //?}
     }
 }

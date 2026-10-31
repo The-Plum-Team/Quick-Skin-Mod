@@ -40,7 +40,7 @@ import net.minecraft.util.Util;
  * settles. At rest the glow holds still. While the mouse is on the ring or the model turns, the
  * glow eases into a slow, brighter breath, and when the mouse leaves it eases back to rest; the
  * glow blends between the two states rather than adding them. The skin menu turns the model when
- * a drag starts on the ring.
+ * a drag starts on the ring, and eases it back to face the viewer when the drag lets go.
  */
 @Environment(EnvType.CLIENT)
 public class RotationArcWidget extends AbstractWidget {
@@ -117,6 +117,16 @@ public class RotationArcWidget extends AbstractWidget {
     /** Lights the ring up while the model is being turned. */
     public void setHighlighted(boolean highlighted) {
         this.highlighted = highlighted;
+    }
+
+    /** The ring's centre and the radii of its band's middle line, in GUI pixels: {x, y, radiusX, radiusY}. */
+    public float[] band() {
+        return new float[]{centerX, centerY, (RADIUS_X - BAND / 2) * scale, (RADIUS_Y - BAND / 2) * scale};
+    }
+
+    /** The lowest point the ring is drawn at, the bottom of its front rim, in GUI pixels. */
+    public float bottom() {
+        return centerY + (RADIUS_Y + RIM) * scale;
     }
 
     /** Whether a point is on the ring's band, front or back. */

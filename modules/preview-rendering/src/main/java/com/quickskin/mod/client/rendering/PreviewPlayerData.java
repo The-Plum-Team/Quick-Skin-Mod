@@ -47,7 +47,14 @@ public class PreviewPlayerData {
     private SkinSwapAnimation.Variant skinSwapVariant;
     private long skinSwapStartNanos;
     private SkinSwapAnimation.Pose skinSwapPose = SkinSwapAnimation.Pose.REST;
-    private final IdleShuffle idles = new IdleShuffle();
+    private IdleShuffle idles = new IdleShuffle();
+    // The jump onto the block when the Sitting pose is picked, or off it when it is left
+    private SitJump.Move sitJump;
+    private long sitJumpStartNanos;
+    private SitJump.Pose sitJumpPose;
+    // How far the model is walking as it eases into the walk or out of it
+    private final GaitBlend gait = new GaitBlend();
+    private float walkAmount;
 
     public PreviewPlayerData() {
         this.modelType = "classic";
@@ -135,6 +142,67 @@ public class PreviewPlayerData {
             skinSwapPose = SkinSwapAnimation.sample(skinSwapVariant, seconds);
         }
         return skinSwapPose;
+    }
+
+    /**
+     * Switches to an animation the player picked, with the move that leads into it, which the skin
+     * menu plays: picking Sitting from another pose jumps onto the block and picking another pose
+     * from Sitting jumps off it ({@link SitJump}); otherwise the model eases into the walk or out
+     * of it ({@link GaitBlend}). The jump onto the block plays only while the pose stays Sitting,
+     * the jump off it only while it stays another.
+     */
+    public void pickAnimation(String animation, long nowNanos) {
+        boolean wasSitting = "sit".equalsIgnoreCase(currentAnimation);
+        boolean sitting = "sit".equalsIgnoreCase(animation);
+        boolean walking = "walk".equalsIgnoreCase(animation);
+        currentAnimation = animation;
+        if (wasSitting != sitting) {
+            sitJump = sitting ? SitJump.Move.ONTO : SitJump.Move.OFF;
+            sitJumpStartNanos = nowNanos;
+        }
+        if (wasSitting) {
+            // The jump off the block eases into the picked pose itself
+            gait.set(walking);
+        } else {
+            // Into the walk, out of it, or out of it on the way onto the block
+            gait.ease(walking, nowNanos);
+        }
+    }
+
+    /**
+     * Samples the jump onto the block or off it and the walk blend for the draw starting at
+     * {@code nowNanos}, which then reads them through {@link #getSitJumpPose()} and
+     * {@link #getWalkAmount()}.
+     */
+    public void advancePoseMoves(long nowNanos) {
+        float seconds = (nowNanos - sitJumpStartNanos) / 1.0e9f;
+        if (sitJump != null && ((sitJump == SitJump.Move.ONTO) != "sit".equalsIgnoreCase(currentAnimation)
+                || seconds >= SitJump.duration(sitJump))) {
+            sitJump = null;
+        }
+        sitJumpPose = sitJump != null ? SitJump.sample(sitJump, seconds) : null;
+        walkAmount = gait.amount(nowNanos);
+        if (sitJump == SitJump.Move.OFF) {
+            walkAmount *= sitJumpPose.settled();
+        }
+    }
+
+    /** The jump onto the block or off it in the current draw, or null when none plays. */
+    public SitJump.Pose getSitJumpPose() {
+        return sitJumpPose;
+    }
+
+    /** How far the model is walking in the current draw, from its idle (0) to the full stride (1). */
+    public float getWalkAmount() {
+        return walkAmount;
+    }
+
+    /**
+     * Has this preview play {@code shared}'s idle, which a menu keeps for every preview it builds,
+     * so the idle the player was watching carries on when the window is resized or a dialog closes.
+     */
+    public void shareIdles(IdleShuffle shared) {
+        this.idles = shared;
     }
 
     /** The preview's idle {@code seconds} on the preview clock: one of several, changing with the skin. */
@@ -303,6 +371,9 @@ public class PreviewPlayerData {
 
     public void setCurrentAnimation(String currentAnimation) {
         this.currentAnimation = currentAnimation;
+        boolean walking = "walk".equalsIgnoreCase(currentAnimation);
+        gait.set(walking);
+        walkAmount = walking ? 1.0f : 0.0f;
     }
 
     public float getAnimationProgress() {

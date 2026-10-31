@@ -147,6 +147,11 @@ public final class PreviewArmorSilhouette {
         return false;
     }
 
+    /** The middle of the box round the piece, {x, y} in GUI coordinates. */
+    public float[] center() {
+        return new float[]{x0 + width / 2.0F, y0 + height / 2.0F};
+    }
+
     /** The outline's pixels, {x, y} pairs in GUI coordinates, in the order a walk round it meets them. */
     public int[] ring() {
         return ring;
@@ -279,7 +284,7 @@ public final class PreviewArmorSilhouette {
 //?}
             return sink.silhouette();
         }
-        PreviewEquipment.poseRenderer(placement.model(), renderer);
+        Runnable giveBack = PreviewEquipment.poseRenderer(placement.model(), renderer);
         boolean held = piece == HELD;
         PreviewEquipment.setCapturing(true);
         try {
@@ -291,8 +296,8 @@ public final class PreviewArmorSilhouette {
             Runnable draw = () -> {
                 for (Object layer : layers.quickskin$previewLayers()) {
                     if (held ? PreviewEquipment.drawsHeldItems(layer) : PreviewEquipment.drawsWornPiece(layer)) {
-                        ((RenderLayer) layer).render(poseStack, sink::buffer, 15728880, player,
-                                0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F);
+                        PreviewEquipment.alongBody(layer, placement.model(), poseStack, () -> ((RenderLayer) layer).render(
+                                poseStack, sink::buffer, 15728880, player, 0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F));
                     }
                 }
             };
@@ -309,7 +314,8 @@ public final class PreviewArmorSilhouette {
 //? if <1.21.9 {
             for (Object layer : layers.quickskin$previewLayers()) {
                 if (held ? PreviewEquipment.drawsHeldItems(layer) : PreviewEquipment.drawsWornPiece(layer)) {
-                    ((RenderLayer) layer).render(poseStack, sink::buffer, 15728880, renderState, 0.0F, 0.0F);
+                    PreviewEquipment.alongBody(layer, placement.model(), poseStack,
+                            () -> ((RenderLayer) layer).render(poseStack, sink::buffer, 15728880, renderState, 0.0F, 0.0F));
                 }
             }
 //?} else {
@@ -317,13 +323,15 @@ public final class PreviewArmorSilhouette {
             SubmitNodeCollector collector = sink.collector();
             for (Object layer : layers.quickskin$previewLayers()) {
                 if (held ? PreviewEquipment.drawsHeldItems(layer) : PreviewEquipment.drawsWornPiece(layer)) {
-                    ((RenderLayer) layer).submit(poseStack, collector, 15728880, renderState, 0.0F, 0.0F);
+                    PreviewEquipment.alongBody(layer, placement.model(), poseStack,
+                            () -> ((RenderLayer) layer).submit(poseStack, collector, 15728880, renderState, 0.0F, 0.0F));
                 }
             }
 //?}
 //?}
         } finally {
             PreviewEquipment.setCapturing(false);
+            giveBack.run();
         }
         return sink.silhouette();
     }
