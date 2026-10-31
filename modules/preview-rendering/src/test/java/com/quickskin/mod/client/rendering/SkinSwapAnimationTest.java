@@ -34,6 +34,8 @@ class SkinSwapAnimationTest {
         WHOLE_RANGES.put(Whole.TURN, new float[] {-30, 375});
         WHOLE_RANGES.put(Whole.LIFT, new float[] {-0.05f, 0.15f});
         WHOLE_RANGES.put(Whole.SCALE, new float[] {0.97f, 1.03f});
+        // No move changes the arms' width; only ArmWidthMorph does
+        WHOLE_RANGES.put(Whole.ARM_WIDTH, new float[] {1.0f, 1.0f});
         // Rotations X, Y, Z, then offsets X, Y, Z.
         BONE_RANGES.put(Bone.ROOT, new float[][] {{-10, 10}, {-10, 10}, {-10, 10}, {0, 0}, {0, 0}, {0, 0}});
         BONE_RANGES.put(Bone.WAIST, new float[][] {{-15, 20}, {-25, 25}, {-10, 10}, {-2, 2}, {-1, 4}, {-2, 2}});

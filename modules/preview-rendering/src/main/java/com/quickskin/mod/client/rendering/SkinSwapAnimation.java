@@ -72,9 +72,13 @@ public final class SkinSwapAnimation {
         ROT_X, ROT_Y, ROT_Z, POS_X, POS_Y, POS_Z
     }
 
-    /** What a whole-model channel moves: degrees for the turn, blocks for the lift, a factor for the scale. */
+    /**
+     * What a whole-model channel moves: degrees for the turn, blocks for the lift, a factor for the
+     * scale, and a factor for the arms' width over the width of the model's own arms, which no move
+     * keys: it carries {@link ArmWidthMorph} to the model through the same draws as the moves.
+     */
     public enum Whole {
-        TURN, LIFT, SCALE
+        TURN, LIFT, SCALE, ARM_WIDTH
     }
 
     private static final int WHOLE_CHANNELS = Whole.values().length;
@@ -97,7 +101,7 @@ public final class SkinSwapAnimation {
     }
 
     private static float rest(int channel) {
-        return channel == index(Whole.SCALE) ? 1.0f : 0.0f;
+        return channel == index(Whole.SCALE) || channel == index(Whole.ARM_WIDTH) ? 1.0f : 0.0f;
     }
 
     private static float settleDelay(int channel) {
@@ -130,6 +134,16 @@ public final class SkinSwapAnimation {
 
         public float get(Bone bone, Axis axis) {
             return values[index(bone, axis)];
+        }
+
+        /** This pose with the arms drawn {@code factor} times as wide as the model's own. */
+        public Pose withArmWidth(float factor) {
+            if (factor == get(Whole.ARM_WIDTH)) {
+                return this;
+            }
+            float[] changed = values.clone();
+            changed[index(Whole.ARM_WIDTH)] = factor;
+            return new Pose(changed);
         }
 
         public boolean isRest() {

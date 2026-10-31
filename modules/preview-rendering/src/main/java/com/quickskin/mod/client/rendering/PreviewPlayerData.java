@@ -55,6 +55,10 @@ public class PreviewPlayerData {
     // How far the model is walking as it eases into the walk or out of it
     private final GaitBlend gait = new GaitBlend();
     private float walkAmount;
+    // The arms changing width when the other arm width is picked
+    private boolean armWidthMorphing;
+    private float armWidthFrom;
+    private long armWidthStartNanos;
 
     public PreviewPlayerData() {
         this.modelType = "classic";
@@ -132,14 +136,24 @@ public class PreviewPlayerData {
         drawn = true;
         if (skinSwapVariant == null) {
             skinSwapPose = SkinSwapAnimation.Pose.REST;
-            return skinSwapPose;
-        }
-        float seconds = (nowNanos - skinSwapStartNanos) / 1.0e9f;
-        if (seconds >= SkinSwapAnimation.duration(skinSwapVariant)) {
-            skinSwapVariant = null;
-            skinSwapPose = SkinSwapAnimation.Pose.REST;
         } else {
-            skinSwapPose = SkinSwapAnimation.sample(skinSwapVariant, seconds);
+            float seconds = (nowNanos - skinSwapStartNanos) / 1.0e9f;
+            if (seconds >= SkinSwapAnimation.duration(skinSwapVariant)) {
+                skinSwapVariant = null;
+                skinSwapPose = SkinSwapAnimation.Pose.REST;
+            } else {
+                skinSwapPose = SkinSwapAnimation.sample(skinSwapVariant, seconds);
+            }
+        }
+        // The model drawn has the new arms already, so their width is given over its own
+        if (armWidthMorphing) {
+            float seconds = (nowNanos - armWidthStartNanos) / 1.0e9f;
+            if (seconds >= ArmWidthMorph.DURATION) {
+                armWidthMorphing = false;
+            } else {
+                float to = armWidth(modelType);
+                skinSwapPose = skinSwapPose.withArmWidth(ArmWidthMorph.width(armWidthFrom, to, seconds) / to);
+            }
         }
         return skinSwapPose;
     }
@@ -292,8 +306,25 @@ public class PreviewPlayerData {
         return modelType;
     }
 
+    /**
+     * Changes the arm width. On the skin menu's model, once drawn, the arms then change width
+     * with {@link ArmWidthMorph}, from wherever a change still playing has them.
+     */
     public void setModelType(String modelType) {
+        if (showcaseIdle && drawn && armWidth(modelType) != armWidth(this.modelType)) {
+            long now = System.nanoTime();
+            armWidthFrom = armWidthMorphing
+                    ? ArmWidthMorph.width(armWidthFrom, armWidth(this.modelType), (now - armWidthStartNanos) / 1.0e9f)
+                    : armWidth(this.modelType);
+            armWidthStartNanos = now;
+            armWidthMorphing = true;
+        }
         this.modelType = modelType;
+    }
+
+    /** The width of a model's arms in model pixels: 3 for the slim model, 4 for the classic one. */
+    private static float armWidth(String modelType) {
+        return "slim".equalsIgnoreCase(modelType) ? 3.0f : 4.0f;
     }
 
     public SkinResolution getResolution() {
