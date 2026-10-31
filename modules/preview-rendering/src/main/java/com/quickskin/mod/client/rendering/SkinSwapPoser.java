@@ -115,6 +115,10 @@ public final class SkinSwapPoser {
         restore(model.leftArm);
         restore(model.rightLeg);
         restore(model.leftLeg);
+//? if <1.21.2 {
+        model.rightSleeve.xScale = 1.0f;
+        model.leftSleeve.xScale = 1.0f;
+//?}
     }
 
     /** Puts back the pose the move took a single part from, if it moved it. */
@@ -122,6 +126,7 @@ public final class SkinSwapPoser {
         PartPose pose = unmoved.remove(part);
         if (pose != null) {
             write(pose, part);
+            part.xScale = 1.0f;
         }
     }
 
@@ -176,14 +181,25 @@ public final class SkinSwapPoser {
         for (int i = 0; i < parts.length; i++) {
             write(poses[i], parts[i]);
         }
+        // The arms changing width: each is scaled about its pivot and moved so its inner side,
+        // one pixel from the pivot in both widths, stays against the body
+        float armWidth = pose.get(SkinSwapAnimation.Whole.ARM_WIDTH);
+        if (armWidth != 1.0f) {
+            model.rightArm.xScale = armWidth;
+            model.rightArm.x += 1.0f - armWidth;
+            model.leftArm.xScale = armWidth;
+            model.leftArm.x -= 1.0f - armWidth;
+        }
 //? if <1.21.2 {
-        // The outer layers are separate parts that copy their base part's pose.
+        // The outer layers are separate parts that copy their base part's pose, though not its scale.
         model.hat.copyFrom(model.head);
         model.jacket.copyFrom(model.body);
         model.rightSleeve.copyFrom(model.rightArm);
         model.leftSleeve.copyFrom(model.leftArm);
         model.rightPants.copyFrom(model.rightLeg);
         model.leftPants.copyFrom(model.leftLeg);
+        model.rightSleeve.xScale = model.rightArm.xScale;
+        model.leftSleeve.xScale = model.leftArm.xScale;
 //?}
     }
 

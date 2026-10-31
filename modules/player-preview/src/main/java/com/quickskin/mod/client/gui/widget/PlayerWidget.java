@@ -97,6 +97,11 @@ public class PlayerWidget extends AbstractWidget {
     }
     private WidgetContext context = WidgetContext.OTHER;
 
+    // Each menu's idle, which outlives its previews: a screen builds a new one at every resize
+    // and when a dialog over it closes, and the idle would otherwise be picked again each time
+    private static final java.util.Map<WidgetContext, com.quickskin.mod.client.rendering.IdleShuffle> IDLES =
+            new java.util.EnumMap<>(WidgetContext.class);
+
     /**
      * How the running Minecraft version decides which GUI draw ends up on top.
      *
@@ -382,6 +387,17 @@ public class PlayerWidget extends AbstractWidget {
         return !isMouseOutsideModelArea(mouseX, mouseY, cachedModelCenterX, cachedModelCenterY, cachedScale);
     }
 
+    /**
+     * Sets the yaw the model eases back to when a drag of the model itself lets go of it, which
+     * happens only before 1.21, where the model turns itself.
+     */
+    public void setRestingYRotation(float yaw) {
+//? if <1.21 {
+        this.originalYRotation = yaw;
+        this.shouldReturnToOriginal = false;
+//?}
+    }
+
     /** Turns the model toward a yaw; the drawn rotation eases toward it like {@link #toggleRotation}. */
     public void setTargetYRotation(float targetYRotation) {
         this.targetYRotation = targetYRotation;
@@ -459,6 +475,10 @@ public class PlayerWidget extends AbstractWidget {
      */
     public void setContext(WidgetContext context) {
         this.context = context;
+        if (context != WidgetContext.OTHER) {
+            this.previewData.shareIdles(
+                    IDLES.computeIfAbsent(context, ignored -> new com.quickskin.mod.client.rendering.IdleShuffle()));
+        }
         // The skin menu presents the whole skin: a squarely facing stance for its idle.
         this.previewData.setShowcaseIdle(context == WidgetContext.SKIN_MENU);
         // The pause menu and the skin menu show the player as the world does, with what they wear
@@ -956,6 +976,23 @@ public class PlayerWidget extends AbstractWidget {
     }
 
     /**
+     * Switches to an animation the player picked, with the move that leads into it: a jump onto the
+     * block or off it, or easing into the walk or out of it
+     * ({@link PreviewPlayerData#pickAnimation}), except in packaged E2E, whose captures pin every
+     * pose; restoring a pose with {@link #setAnimation} switches at once.
+     */
+    public void pickAnimation(String animation) {
+        if (animation == null || animation.isEmpty()) {
+            return;
+        }
+        if (Boolean.getBoolean("quickskin.e2e.enabled")) {
+            setAnimationState(animation);
+        } else {
+            previewData.pickAnimation(animation, System.nanoTime());
+        }
+    }
+
+    /**
      * Draws the widget's own model in its chosen pose even in a world, instead of the live player
      * (see {@link PreviewPlayerData#isOwnPose}).
      */
@@ -1137,6 +1174,8 @@ public class PlayerWidget extends AbstractWidget {
         // Handle rotation dragging release (left-click in normal mode, or right-click in any mode)
         if (isRotating && (button == InputConstants.MOUSE_BUTTON_LEFT || button == InputConstants.MOUSE_BUTTON_RIGHT)) {
             isRotating = false;
+            // Back to the resting yaw by the shortest way, not by unwinding every turn the drag made
+            originalYRotation += 360.0f * Math.round((targetYRotation - originalYRotation) / 360.0f);
             shouldReturnToOriginal = true; // Start smooth return to original rotation
             if (activeInteractionWidget == this) {
                 activeInteractionWidget = null; // Clear active widget

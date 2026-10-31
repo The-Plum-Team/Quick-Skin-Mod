@@ -96,6 +96,38 @@ public final class CuriosPreview {
     }
 
     /**
+     * The shown accessory piece in the Curios slot of the body part an armour piece covers
+     * ({@code HiddenArmor} bit), or 0: the one most likely to hide that armour while it shows, as
+     * Relics' boots in the feet slot hide the boots worn under them.
+     */
+    public static int covering(@Nullable LivingEntity player, int armorPiece) {
+        String slot = switch (armorPiece) {
+            case 8 -> "head";
+            case 4 -> "body";
+            case 2 -> "legs";
+            case 1 -> "feet";
+            default -> null;
+        };
+        if (!ERA || player == null || slot == null) {
+            return 0;
+        }
+        int piece = FIRST_PIECE;
+        for (Accessory accessory : accessories(player)) {
+            if (accessory.cosmetic()) {
+                continue;
+            }
+            if (piece >= FIRST_PIECE + MAX_PIECES) {
+                break;
+            }
+            if (accessory.shown() && accessory.slot().equals(slot)) {
+                return piece;
+            }
+            piece++;
+        }
+        return 0;
+    }
+
+    /**
      * Flips an accessory piece's render toggle, as the eye of Curios' inventory does: Curios'
      * server flips it and syncs it back.
      */

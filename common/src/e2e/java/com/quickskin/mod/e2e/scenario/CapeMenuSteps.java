@@ -58,9 +58,6 @@ final class CapeMenuSteps {
     private static final double DEFAULT_SPEED = 1.0;
     /** Tight tolerance for config/live-state agreement after accounting for click quantization. */
     private static final double SPEED_TOLERANCE = 5.0e-3;
-    /** Mirrors the screen's private delete-button geometry (ACTION_BUTTON_SIZE, margin). */
-    private static final int ACTION_BUTTON_SIZE = 11;
-    private static final int ACTION_BUTTON_MARGIN = 2;
     /** A corner no tile, widget or tooltip trigger occupies. */
     private static final int NEUTRAL_MOUSE_X = 2;
     private static final int NEUTRAL_MOUSE_Y = 2;
@@ -489,11 +486,14 @@ final class CapeMenuSteps {
                         deleteFailure.set("no grid position for " + contrastId);
                         return;
                     }
-                    int size = intField(screen, "capeDisplaySize");
-                    int buttonX = pos[0] + size - ACTION_BUTTON_SIZE - ACTION_BUTTON_MARGIN;
-                    int buttonY = pos[1] + ACTION_BUTTON_MARGIN;
-                    int clickX = buttonX + ACTION_BUTTON_SIZE / 2;
-                    int clickY = buttonY + ACTION_BUTTON_SIZE / 2;
+                    Object bounds = invokePrivate(screen, "deleteButtonBounds",
+                            new Class<?>[] {CapeEntry.class}, contrast);
+                    if (!(bounds instanceof int[] b) || b.length != 4) {
+                        deleteFailure.set("no delete tag for " + contrastId);
+                        return;
+                    }
+                    int clickX = b[0] + b[2] / 2;
+                    int clickY = b[1] + b[3] / 2;
                     CapeEntry under = capeAt(screen, clickX, clickY);
                     if (under == null || !sameCape(under.getCapeId(), owner.previewCapeHashB)) {
                         deleteFailure.set("delete button (" + clickX + "," + clickY + ") is not over "

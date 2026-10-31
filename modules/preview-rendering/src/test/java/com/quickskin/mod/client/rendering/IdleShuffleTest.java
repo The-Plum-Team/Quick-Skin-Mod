@@ -75,6 +75,28 @@ class IdleShuffleTest {
     }
 
     @Test
+    void aRebuiltPreviewCarriesOnWithItsMenusIdle() {
+        IdleShuffle menu = new IdleShuffle();
+        PreviewPlayerData before = new PreviewPlayerData();
+        before.shareIdles(menu);
+        before.idlePose(100.0);
+        Idle playing = menu.current();
+        // The window is resized: the menu builds a new preview
+        PreviewPlayerData after = new PreviewPlayerData();
+        after.shareIdles(menu);
+        for (double t = 100.0 + FRAME; t < 100.0 + 60.0; t += FRAME) {
+            Pose pose = after.idlePose(t);
+            assertEquals(playing, menu.current(), "picked another idle at " + t);
+            Pose expected = PreviewLoops.idle(playing, t);
+            for (Bone bone : Bone.values()) {
+                for (Axis axis : Axis.values()) {
+                    assertEquals(expected.get(bone, axis), pose.get(bone, axis), 1.0e-6f, bone + "." + axis + " at " + t);
+                }
+            }
+        }
+    }
+
+    @Test
     void theNextIdleIsNeverTheSame() {
         for (Idle previous : Idle.values()) {
             for (int roll = 0; roll < Idle.values().length - 1; roll++) {

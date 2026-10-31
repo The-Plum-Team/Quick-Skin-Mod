@@ -556,6 +556,14 @@ public final class FullScenario implements Scenario {
                 .assertion(() -> {
                     if (!(VanillaShim.currentScreen(mc) instanceof CapeAdjustScreen s))
                         return Step.Result.fail("cape adjust not open: " + screenName(mc));
+                    // The editor opens with the Front guide alone
+                    try {
+                        if (adjustScreenField("showBackGuide").getBoolean(s)
+                                || adjustScreenField("showElytraGuide").getBoolean(s))
+                            return Step.Result.fail("the editor opened with the Cape Back or Elytra guide shown");
+                    } catch (Exception e) {
+                        return Step.Result.fail("could not read the guide switches: " + e);
+                    }
                     // Trigger the (private) apply path so our owned onApply consumer receives the result.
                     try {
                         Method m = CapeAdjustScreen.class.getDeclaredMethod("applyAndClose");
@@ -569,7 +577,8 @@ public final class FullScenario implements Scenario {
                     int w = out.getWidth(), h = out.getHeight();
                     if (w <= 0 || h <= 0) return Step.Result.fail("composed cape has bad dims " + w + "x" + h);
                     if (w != h * 2) return Step.Result.fail("composed cape not 2:1: " + w + "x" + h);
-                    return Step.Result.pass("CapeAdjust onApply received " + w + "x" + h + " cape");
+                    return Step.Result.pass("CapeAdjust opened with only the Front guide and onApply received "
+                            + w + "x" + h + " cape");
                 }));
 
         // 5b. cape preview follows the SELECTION, not the worn cape -------------------------------
@@ -1042,6 +1051,7 @@ public final class FullScenario implements Scenario {
                 .minTicks(5)
                 .ready(() -> {
                     if (bmoSetupFailure.get() != null) return true;
+                    if (!showGuidesThroughLegend(mc)) return false;
                     double target = bmoTargetZoomPosition();
                     return setZoomOnAdjustScreen(mc, target)
                             && bmoAdjustHold.incrementAndGet() >= PREVIEW_HOLD_TICKS;
@@ -1062,6 +1072,13 @@ public final class FullScenario implements Scenario {
 
                     String padding = validatePaddedBmoSource(prepared.atlas(), expected);
                     if (padding != null) return Step.Result.fail(padding);
+                    try {
+                        if (!adjustScreenField("showBackGuide").getBoolean(screen)
+                                || !adjustScreenField("showElytraGuide").getBoolean(screen))
+                            return Step.Result.fail("the guide legend did not show the Cape Back and Elytra guides");
+                    } catch (Exception e) {
+                        return Step.Result.fail("could not read the guide switches: " + e);
+                    }
                     double target = bmoTargetZoomPosition();
                     String desync = checkZoomSliderAgrees(mc, target);
                     if (desync != null) return Step.Result.fail(desync);
@@ -1121,7 +1138,8 @@ public final class FullScenario implements Scenario {
                                 + metadata);
                     }
                     return Step.Result.pass("128x64 black-padded BMO aligned at scale 1.0 / offset "
-                            + "(-32,-16); preview, applied and bundled 64x32 atlases are identical");
+                            + "(-32,-16) with the Cape Back and Elytra guides shown through the legend; "
+                            + "preview, applied and bundled 64x32 atlases are identical");
                 }));
 
         steps.add(Step.of("adjusted_bmo_cape")
@@ -2233,6 +2251,22 @@ public final class FullScenario implements Scenario {
 
     static int adjustScreenInt(CapeAdjustScreen screen, String name) throws Exception {
         return adjustScreenField(name).getInt(screen);
+    }
+
+    /**
+     * Shows the editor's Cape Back and Elytra guides through the real entries of its guide legend,
+     * which the editor opens with off; true once both are shown.
+     */
+    static boolean showGuidesThroughLegend(Minecraft mc) {
+        if (!(VanillaShim.currentScreen(mc) instanceof CapeAdjustScreen screen)) return false;
+        try {
+            if (!adjustScreenField("showBackGuide").getBoolean(screen)) pressActiveButton(mc, "Cape Back guide");
+            if (!adjustScreenField("showElytraGuide").getBoolean(screen)) pressActiveButton(mc, "Elytra guide");
+            return adjustScreenField("showBackGuide").getBoolean(screen)
+                    && adjustScreenField("showElytraGuide").getBoolean(screen);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     static double adjustScreenDouble(CapeAdjustScreen screen, String name) throws Exception {

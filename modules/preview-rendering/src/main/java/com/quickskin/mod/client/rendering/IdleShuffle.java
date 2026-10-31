@@ -8,7 +8,8 @@ import java.util.function.IntUnaryOperator;
 /**
  * A preview's idle: one picked at random, looping until {@link #shuffle()} asks for another,
  * which the skin menu does with every skin change. The next is never the same as the last, and it
- * crossfades in over a second and a half so the change is never a jump. Each preview has its own.
+ * crossfades in over a second and a half so the change is never a jump. Each menu has its own,
+ * kept while it rebuilds its preview (see {@link PreviewPlayerData#shareIdles}).
  */
 public final class IdleShuffle {
 
