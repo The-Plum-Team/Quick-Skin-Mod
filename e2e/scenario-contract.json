@@ -2151,31 +2151,31 @@
               "capture": {
                 "title": "Cape menu",
                 "review_tier": "all",
-                "expectation": "The Quick Skin cape menu is open with readable My Capes and Quick Skin Exclusives section headings (more built-in sections, such as New, may follow below them), the import zone beside the My Capes tiles (corner marks and a tray icon beside Drop cape files here / or click to import), the grid of built-in cape tiles, a rear 3D player preview and the Import Cape, Remove Cape and Done buttons. A hover tooltip for the built-in tile under the resting mouse (such as BMO Cape) may be shown.",
+                "expectation": "The Quick Skin cape menu is open: on the left a grid of capes on dark bevelled cards under readable My Capes and Quick Skin Exclusives headings (the My Capes heading pinned at the top), with the None card blue as the worn one and an import tile (corner marks, a tray icon and Import / or drop) stretching across the rest of the My Capes row; on the right one large rear 3D player centred in the space beside the grid, with no heading over it; and the Import Cape, Remove Cape and Done buttons along the bottom. A hover tooltip for the cape under the resting mouse (such as BMO Cape) may be shown, and the player then wears that cape.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
                     "label": "cape menu title",
                     "box": [
-                      505,
-                      35,
-                      650,
-                      75
+                      55,
+                      25,
+                      190,
+                      55
                     ],
                     "minimum_luma_exclusive": 159,
-                    "minimum_pixels": 300
+                    "minimum_pixels": 400
                   },
                   {
                     "kind": "required-gui-text",
                     "label": "cape drop-zone instructions",
                     "box": [
-                      585,
-                      140,
-                      880,
-                      200
+                      575,
+                      150,
+                      695,
+                      215
                     ],
                     "minimum_luma_exclusive": 159,
-                    "minimum_pixels": 650
+                    "minimum_pixels": 250
                   }
                 ]
               },
@@ -2457,7 +2457,7 @@
               "capture": {
                 "title": "Cape imported through the menu",
                 "review_tier": "key",
-                "expectation": "The cape menu shows a green-striped Imported cape toast in its top-right corner and a new My Capes tile for a teal-and-yellow cape imported through the real import workflow.",
+                "expectation": "The cape menu shows a green-striped Imported cape toast in its top-right corner and a new card in My Capes holding a teal-and-yellow cape imported through the real import workflow.",
                 "probes": []
               },
               "requires": [
@@ -2887,7 +2887,7 @@
               "capture": {
                 "title": "Cape menu with local capes",
                 "review_tier": "key",
-                "expectation": "The cape menu's My Capes section lists the imported local capes, each with a small blue-violet marker square in its lower-right corner: the animated GIF tile carries a cyan GIF badge and the yellow selection outline after being clicked, the magenta-and-yellow HD cape tile sits beside it, the Animation Speed slider is visible below the buttons, and a scrollbar thumb at the right edge of the list shows that the built-in cape sections overflow. The teal imported tile's own yellow border is cape art, not a selection outline, and a hover tooltip for the GIF tile may be shown.",
+                "expectation": "The cape menu's My Capes grid holds the imported local capes on cards, each with a small blue-violet mark in the cape's bottom-right corner: after being clicked, the animated GIF cape sits on a blue card (worn) with a cyan GIF badge in its top-left corner, and the large player wears it; the magenta-and-yellow HD cape carries a green HD badge; the animation speed control is visible under the player (a dark plate with a double-chevron icon, a thin slider track lit up to its knob, and the percentage); and a scrollbar thumb at the right edge of the grid shows that the built-in sections overflow. The teal imported cape's own yellow border is cape art, and a hover tooltip for the GIF cape may be shown.",
                 "probes": []
               },
               "requires": [
@@ -2907,7 +2907,7 @@
               "capture": {
                 "title": "Cape animation speed",
                 "review_tier": "all",
-                "expectation": "The cape menu's Animation Speed slider reads 200% while the animated GIF tile keeps its yellow selection outline; a hover tooltip describing the slider may be shown beside it.",
+                "expectation": "The cape menu's animation speed control under the player, a dark plate with a double-chevron icon and a thin slider track lit up to its knob, reads 200% while the animated GIF cape keeps its blue worn card; no tooltip is shown over it.",
                 "probes": []
               },
               "requires": [
@@ -2929,16 +2929,16 @@
               "capture": {
                 "title": "Cape tile tooltip",
                 "review_tier": "all",
-                "expectation": "A tooltip over the HD cape tile lists the cape name, Static cape, Resolution: CAPE_256 and Click to preview.",
+                "expectation": "A tooltip over the HD cape's card lists the cape name, Static cape, Resolution: CAPE_256 and Click to preview, and the large player wears that magenta-and-yellow HD cape while the mouse is over it.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
                     "label": "cape tile tooltip copy",
                     "box": [
-                      600,
-                      125,
-                      875,
-                      290
+                      655,
+                      95,
+                      950,
+                      270
                     ],
                     "minimum_luma_exclusive": 159,
                     "minimum_pixels": 2500
@@ -2976,7 +2976,7 @@
               "capture": {
                 "title": "Local cape deleted",
                 "review_tier": "key",
-                "expectation": "The cape menu shows a green-striped Deleted cape toast in its top-right corner, and My Capes no longer contains a red-and-black striped contrast cape tile: the real delete confirmation removed it, as the runtime evidence proves. The animated GIF tile keeps its yellow selection outline.",
+                "expectation": "The cape menu shows a green-striped Deleted cape toast in its top-right corner, and My Capes no longer holds a red-and-black striped contrast cape: the real delete confirmation removed it, as the runtime evidence proves. The animated GIF cape keeps its blue worn card.",
                 "probes": []
               },
               "requires": [
@@ -2996,7 +2996,7 @@
               "capture": {
                 "title": "None tile selected",
                 "review_tier": "all",
-                "expectation": "The cape menu's None tile carries the yellow selection outline after being clicked, the rear 3D preview wears no cape, and the Animation Speed slider is hidden. The teal imported tile's own yellow border is cape art, not a selection outline, and a hover tooltip for the None tile may be shown.",
+                "expectation": "After being clicked, the cape menu's None card is the worn one: a blue card with a dashed empty outline. The player wears no cape and the animation speed control is hidden. The teal imported cape's own yellow border is cape art, and a hover tooltip for None may be shown.",
                 "probes": []
               },
               "requires": [
@@ -3039,7 +3039,7 @@
               "capture": {
                 "title": "Built-in capes hidden",
                 "review_tier": "all",
-                "expectation": "With Hide Built-in Capes enabled, the cape menu shows only the My Capes section with the None tile and the local capes; no built-in cape section and no scrollbar is visible.",
+                "expectation": "With Hide Built-in Capes enabled, the cape menu shows only My Capes: its grid holds the None card, the local capes and the import tile; no built-in cape section and no scrollbar is visible.",
                 "probes": []
               },
               "requires": [
@@ -4697,7 +4697,7 @@
               "capture": {
                 "title": "Cape menu rebuilt after changing settings",
                 "review_tier": "key",
-                "expectation": "Closing settings after hiding the official Minecraft capes returns to a new cape menu that lists no built-in capes, with its grey Import and Remove buttons, its green Done button and its player preview.",
+                "expectation": "Closing settings after hiding the official Minecraft capes returns to a new cape menu that lists no built-in capes, with its grey Import and Remove buttons, its green Done button and its large player.",
                 "probes": []
               }
             }

@@ -161,7 +161,6 @@
   "quickskin.tooltip.resolution": "해상도: %s",
   "quickskin.tooltip.click_preview": "클릭하여 미리보기",
   "quickskin.cape.animation_speed": "애니메이션 속도: %s%%",
-  "quickskin.cape.animation_speed_tooltip": "이 망토의 애니메이션 속도를 제어합니다 (10%% - 300%%)",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
   "quickskin.cape.adjust_title": "망토 이미지 조정",

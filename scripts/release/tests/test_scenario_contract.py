@@ -1023,16 +1023,16 @@ class ScenarioContractTest(unittest.TestCase):
                 (
                     "cape_menu_screen",
                     "cape menu title",
-                    (505, 35, 650, 75),
+                    (55, 25, 190, 55),
                     159,
-                    300,
+                    400,
                 ),
                 (
                     "cape_menu_screen",
                     "cape drop-zone instructions",
-                    (585, 140, 880, 200),
+                    (575, 150, 695, 215),
                     159,
-                    650,
+                    250,
                 ),
                 (
                     "cape_adjust_screen",
@@ -1072,7 +1072,7 @@ class ScenarioContractTest(unittest.TestCase):
                 (
                     "cape_tile_tooltip",
                     "cape tile tooltip copy",
-                    (600, 125, 875, 290),
+                    (655, 95, 950, 270),
                     159,
                     2500,
                 ),

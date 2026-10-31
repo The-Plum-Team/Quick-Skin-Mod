@@ -161,7 +161,6 @@
   "quickskin.tooltip.resolution": "解像度: %s",
   "quickskin.tooltip.click_preview": "クリックでプレビュー",
   "quickskin.cape.animation_speed": "アニメーション速度: %s%%",
-  "quickskin.cape.animation_speed_tooltip": "このマントのアニメーション速度を制御します(10%% - 300%%)",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
   "quickskin.cape.adjust_title": "マント画像を調整",

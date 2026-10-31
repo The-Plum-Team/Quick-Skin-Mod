@@ -161,7 +161,6 @@
   "quickskin.tooltip.resolution": "Risoluzione: %s",
   "quickskin.tooltip.click_preview": "Clicca per anteprima",
   "quickskin.cape.animation_speed": "Velocità animazione: %s%%",
-  "quickskin.cape.animation_speed_tooltip": "Controlla la velocità di animazione di questo mantello (10%% - 300%%)",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
   "quickskin.cape.adjust_title": "Regola immagine mantello",

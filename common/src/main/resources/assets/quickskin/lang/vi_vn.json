@@ -161,7 +161,6 @@
   "quickskin.tooltip.resolution": "Độ phân giải: %s",
   "quickskin.tooltip.click_preview": "Nhấp để xem trước",
   "quickskin.cape.animation_speed": "Tốc độ hoạt hình: %s%%",
-  "quickskin.cape.animation_speed_tooltip": "Điều khiển tốc độ hoạt hình cho áo choàng này (10%% - 300%%)",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
   "quickskin.cape.adjust_title": "Điều chỉnh ảnh áo choàng",

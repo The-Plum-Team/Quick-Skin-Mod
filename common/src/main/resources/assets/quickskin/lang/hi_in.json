@@ -161,7 +161,6 @@
   "quickskin.tooltip.resolution": "रेज़ोल्यूशन: %s",
   "quickskin.tooltip.click_preview": "पूर्वावलोकन के लिए क्लिक करें",
   "quickskin.cape.animation_speed": "एनिमेशन गति: %s%%",
-  "quickskin.cape.animation_speed_tooltip": "इस केप के लिए एनिमेशन गति को नियंत्रित करता है (10%% - 300%%)",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
   "quickskin.cape.adjust_title": "केप इमेज एडजस्ट करें",

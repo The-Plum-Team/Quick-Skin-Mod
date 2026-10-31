@@ -43,6 +43,11 @@ public class CapeEntry {
         return isLocal;
     }
 
+    /** The "None" entry, which wears no cape. */
+    public boolean isNone() {
+        return isKnown() && getKnownCape() != null && getKnownCape().isNoCape();
+    }
+
     public boolean isKnown() {
         return !isLocal;
     }

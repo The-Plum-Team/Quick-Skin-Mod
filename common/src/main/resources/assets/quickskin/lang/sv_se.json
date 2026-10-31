@@ -161,7 +161,6 @@
   "quickskin.tooltip.resolution": "Upplösning: %s",
   "quickskin.tooltip.click_preview": "Klicka för att förhandsgranska",
   "quickskin.cape.animation_speed": "Animationshastighet: %s%%",
-  "quickskin.cape.animation_speed_tooltip": "Styr animationshastigheten för denna mantel (10%% - 300%%)",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
   "quickskin.cape.adjust_title": "Justera mantelbild",

@@ -32,12 +32,13 @@ TEXT_CANARY = {
         ("skin column counter", (16, 96, 120, 156), 175, 200),
         ("player name tag", (600, 116, 1000, 162), 175, 100),
     ),
-    # The cape menu draws at its own scale: "My Capes" heads the frame and the drop zone sits
-    # below it. Every anchor lane keeps about 495 title and 1,087 drop-zone glyph pixels above
+    # The cape menu draws at its own scale: "My Capes" heads the grid at its top-left corner and
+    # the import tile stretches across the rest of the My Capes row under it, its words centred.
+    # The Fabric 1.20.1 anchor keeps about 506 title and 346 import-tile glyph pixels above
     # luma 159 after the 1600x900 resize.
     ("full", "client_a", "cape_menu_screen"): (
-        ("cape menu title", (505, 35, 650, 75), 159, 300),
-        ("cape drop-zone instructions", (585, 140, 880, 200), 159, 650),
+        ("cape menu title", (55, 25, 190, 55), 159, 400),
+        ("cape drop-zone instructions", (575, 150, 695, 215), 159, 250),
     ),
     # The title and the hint share the editor's header strip, the title from its left edge and
     # the hint against its right edge. At GUI scale 3 the title spans x=20..252, y=17..37 on a
@@ -53,10 +54,10 @@ TEXT_CANARY = {
     ("full", "client_a", "cape_fill_color_picker"): (
         ("fill colour hex value", (79, 543, 220, 576), 175, 380),
     ),
-    # Every anchor lane retains about 3,570 bright tooltip pixels in this box, and only the
-    # drop-zone copy's 1,087 without the tooltip.
+    # The Fabric 1.20.1 anchor retains about 3,880 bright pixels in this box with the tooltip
+    # beside the HD cape's card, and about 1,370 from the cards and import tile without it.
     ("full", "client_a", "cape_tile_tooltip"): (
-        ("cape tile tooltip copy", (600, 125, 875, 290), 159, 2500),
+        ("cape tile tooltip copy", (655, 95, 950, 270), 159, 2500),
     ),
     # The source size ends the Zoom panel's heading row under the canvas and the output size sits
     # under the right panel's resolution buttons. The boxes are the union of the 1920x1080 and

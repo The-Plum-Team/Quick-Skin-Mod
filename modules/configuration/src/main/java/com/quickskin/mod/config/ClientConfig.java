@@ -15,8 +15,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -26,6 +29,7 @@ import java.util.Map;
 public class ClientConfig {
     private static final int MAX_CONFIG_BYTES = 1024 * 1024;
     private static final int MAX_CAPE_SPEED_ENTRIES = 4096;
+    private static final int MAX_FAVORITE_CAPES = 4096;
     private static volatile ClientConfig instance;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     /**
@@ -72,6 +76,8 @@ public class ClientConfig {
     public float animationSpeed = 1.0f; // Default animation speed (deprecated, use per-cape speeds)
     public boolean enableSmoothRotation = true;
     public Map<String, Float> capeAnimationSpeeds = new HashMap<>(); // Per-cape animation speeds (capeId -> speed)
+    /** The speed a built-in cape plays at until the player picks one: the Rickroll GIF is too quick at its own timing. */
+    static final Map<String, Float> DEFAULT_CAPE_ANIMATION_SPEEDS = Map.of("known:rickroll", 0.4f);
 
     // Performance Settings
     public int maxCachedTextures = 100;
@@ -84,6 +90,7 @@ public class ClientConfig {
 
     // Cape Settings
     public boolean hideBuiltInCapes = false; // Hide built-in Minecraft capes from cape menu
+    public List<String> favoriteCapes = new ArrayList<>(); // Cape ids marked as favourites in the cape menu, in marking order
 
     // Sorting Settings
     public String skinSortMode = "LATEST_LAST"; // Skin list sorting mode
@@ -271,7 +278,7 @@ public class ClientConfig {
     /**
      * Get animation speed for a specific cape
      * @param capeId The cape ID (e.g., "local_cape:hash" or "known:cape_name")
-     * @return Clamped animation speed (0.01 to 10.0), defaults to 1.0 if not set
+     * @return Clamped animation speed (0.01 to 10.0); if not set, the cape's own default, else 1.0
      */
     public float getCapeAnimationSpeed(String capeId) {
         if (capeId == null || capeId.isEmpty()) {
@@ -285,7 +292,7 @@ public class ClientConfig {
 
         Float speed = capeAnimationSpeeds.get(capeId);
         if (speed == null) {
-            return 1.0f; // Default speed
+            return DEFAULT_CAPE_ANIMATION_SPEEDS.getOrDefault(capeId, 1.0f);
         }
 
         // Clamp to prevent invalid values
@@ -314,6 +321,41 @@ public class ClientConfig {
             capeAnimationSpeeds.remove(capeAnimationSpeeds.keySet().iterator().next());
         }
         capeAnimationSpeeds.put(capeId, clampedSpeed);
+    }
+
+    /** Whether the cape menu lists this cape among the favourites. */
+    public boolean isFavoriteCape(String capeId) {
+        return capeId != null && favoriteCapes != null && favoriteCapes.contains(capeId);
+    }
+
+    /** Marks or unmarks a cape as a favourite; a new favourite goes last. */
+    public void setFavoriteCape(String capeId, boolean favorite) {
+        if (capeId == null || capeId.isEmpty() || capeId.length() > 256) {
+            return;
+        }
+        if (favoriteCapes == null) {
+            favoriteCapes = new ArrayList<>();
+        }
+        favoriteCapes.remove(capeId);
+        if (favorite && favoriteCapes.size() < MAX_FAVORITE_CAPES) {
+            favoriteCapes.add(capeId);
+        }
+    }
+
+    /** Moves a favourite to the cape's new id in place, as an edit replaces a cape's content. */
+    public void renameFavoriteCape(String oldId, String newId) {
+        if (favoriteCapes == null || oldId == null || newId == null || oldId.equals(newId)) {
+            return;
+        }
+        int index = favoriteCapes.indexOf(oldId);
+        if (index < 0) {
+            return;
+        }
+        if (favoriteCapes.contains(newId)) {
+            favoriteCapes.remove(index);
+        } else {
+            favoriteCapes.set(index, newId);
+        }
     }
 
     /**
@@ -354,6 +396,20 @@ public class ClientConfig {
         save();
     }
 
+    /** Drops blank, overlong and repeated ids, keeping the first of each, up to the cap. */
+    static List<String> normalizeFavoriteCapes(List<String> favorites) {
+        List<String> out = new ArrayList<>();
+        if (favorites == null) {
+            return out;
+        }
+        for (String id : new LinkedHashSet<>(favorites)) {
+            if (id != null && !id.isEmpty() && id.length() <= 256 && out.size() < MAX_FAVORITE_CAPES) {
+                out.add(id);
+            }
+        }
+        return out;
+    }
+
     private void normalize() {
         if (overlayPosition == null) overlayPosition = "BOTTOM_RIGHT";
         previewScale = Math.max(1, Math.min(previewScale, 200));
@@ -370,6 +426,7 @@ public class ClientConfig {
         while (capeAnimationSpeeds.size() > MAX_CAPE_SPEED_ENTRIES) {
             capeAnimationSpeeds.remove(capeAnimationSpeeds.keySet().iterator().next());
         }
+        favoriteCapes = normalizeFavoriteCapes(favoriteCapes);
         if (skinSortMode == null) skinSortMode = "LATEST_LAST";
         if (menuBackgroundStyle == null) menuBackgroundStyle = BackgroundStyle.VANILLA_BLUR.getId();
         activeSkinHash = validHashOrEmpty(activeSkinHash);

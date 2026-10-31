@@ -161,7 +161,6 @@
   "quickskin.tooltip.resolution": "Çözünürlük: %s",
   "quickskin.tooltip.click_preview": "Önizlemek için tıkla",
   "quickskin.cape.animation_speed": "Animasyon Hızı: %s%%",
-  "quickskin.cape.animation_speed_tooltip": "Bu pelerinin animasyon hızını kontrol eder (10%% - 300%%)",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
   "quickskin.cape.adjust_title": "Pelerin Görselini Ayarla",

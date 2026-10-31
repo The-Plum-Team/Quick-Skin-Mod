@@ -161,7 +161,6 @@
   "quickskin.tooltip.resolution": "Rozdzielczość: %s",
   "quickskin.tooltip.click_preview": "Kliknij, aby zobaczyć podgląd",
   "quickskin.cape.animation_speed": "Prędkość animacji: %s%%",
-  "quickskin.cape.animation_speed_tooltip": "Kontroluje prędkość animacji tej peleryny (10%% - 300%%)",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
   "quickskin.cape.adjust_title": "Dostosuj obraz peleryny",

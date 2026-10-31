@@ -46,6 +46,7 @@
   "quickskin.context.rename": "Rename",
   "quickskin.context.delete": "Delete",
   "quickskin.context.delete_confirm": "Sure? Delete",
+  "quickskin.context.edit_cape": "Edit",
   "quickskin.screen.delete_many.title": "Delete Skins?",
   "quickskin.dialog.confirm_delete_many": "Are you sure you want to delete %s skins?",
 
@@ -60,6 +61,8 @@
   "quickskin.dropzone.skins.click": "or click to import",
   "quickskin.dropzone.capes.main": "Drop cape files here",
   "quickskin.dropzone.capes.click": "or click to import",
+  "quickskin.dropzone.capes.short_main": "Import",
+  "quickskin.dropzone.capes.short_click": "or drop",
 
   "_comment_dialogs": "=== Dialog Messages ===",
   "quickskin.dialog.confirm_delete": "Are you sure you want to delete \"%s\"?",
@@ -151,6 +154,7 @@
   "quickskin.cape.section.in_person": "MINECON and In-Person Events",
   "quickskin.cape.section.mojang": "Mojang and Contributors",
   "quickskin.cape.section.personal": "Personal and One-of-a-Kind",
+  "quickskin.cape.section.favorites": "Favourites",
   "quickskin.cape.option.none": "None",
   "quickskin.cape.loading": "Loading",
   "quickskin.cape.animated_badge": "GIF",
@@ -161,7 +165,6 @@
   "quickskin.tooltip.resolution": "Resolution: %s",
   "quickskin.tooltip.click_preview": "Click to preview",
   "quickskin.cape.animation_speed": "Animation Speed: %s%%",
-  "quickskin.cape.animation_speed_tooltip": "Controls animation speed for this cape (10%% - 300%%)",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
   "quickskin.cape.adjust_title": "Adjust Cape Image",

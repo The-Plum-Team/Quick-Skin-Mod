@@ -2,6 +2,7 @@ package com.quickskin.mod.client.services;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,6 +22,16 @@ class LocalContentIdMigrationTest {
                         "local_cape:" + LEGACY, aliases));
         assertEquals("known:unchanged",
                 LocalContentIdMigration.migrateCapeReference("known:unchanged", aliases));
+    }
+
+    @Test
+    void favouriteCapesFollowTheirMigratedIdsInOrderWithoutDuplicates() {
+        Map<String, String> aliases = Map.of(LEGACY, STRONG);
+
+        assertEquals(List.of("known:fox", "local_cape:" + STRONG),
+                LocalContentIdMigration.migrateCapeFavorites(
+                        List.of("known:fox", "local_cape:" + LEGACY, "local_cape:" + STRONG), aliases));
+        assertEquals(List.of(), LocalContentIdMigration.migrateCapeFavorites(null, aliases));
     }
 
     @Test

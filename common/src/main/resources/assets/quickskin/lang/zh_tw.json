@@ -161,7 +161,6 @@
   "quickskin.tooltip.resolution": "解析度：%s",
   "quickskin.tooltip.click_preview": "點選以預覽",
   "quickskin.cape.animation_speed": "動畫速度：%s%%",
-  "quickskin.cape.animation_speed_tooltip": "調整披風動畫播放速度 (10%% - 300%%)",
 
   "_comment_cape_adjust": "=== 披風調整畫面 ===",
   "quickskin.cape.adjust_title": "調整披風圖片",

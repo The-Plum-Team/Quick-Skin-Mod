@@ -161,7 +161,6 @@
   "quickskin.tooltip.resolution": "Resolutie: %s",
   "quickskin.tooltip.click_preview": "Klik om te bekijken",
   "quickskin.cape.animation_speed": "Animatiesnelheid: %s%%",
-  "quickskin.cape.animation_speed_tooltip": "Regelt de animatiesnelheid voor deze cape (10%% - 300%%)",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
   "quickskin.cape.adjust_title": "Capeafbeelding aanpassen",

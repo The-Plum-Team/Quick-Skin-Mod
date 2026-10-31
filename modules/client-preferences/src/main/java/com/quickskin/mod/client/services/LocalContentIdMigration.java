@@ -52,18 +52,22 @@ public final class LocalContentIdMigration {
         String oldOwnSkin = config.playerOwnSkinHash;
         Map<String, Float> oldSpeeds = config.capeAnimationSpeeds == null
                 ? null : new HashMap<>(config.capeAnimationSpeeds);
+        java.util.List<String> oldFavorites = config.favoriteCapes == null
+                ? null : new java.util.ArrayList<>(config.favoriteCapes);
 
         config.activeSkinHash = migrateBareId(oldActiveSkin, skinAliases);
         config.activeCpmModelHash = migrateBareId(oldActiveCpm, cpmAliases);
         config.activeCapeHash = migrateCapeReference(oldActiveCape, capeAliases);
         config.playerOwnSkinHash = migrateBareId(oldOwnSkin, skinAliases);
         config.capeAnimationSpeeds = migrateCapeSpeeds(oldSpeeds, capeAliases);
+        config.favoriteCapes = migrateCapeFavorites(oldFavorites, capeAliases);
 
         boolean changed = !config.activeSkinHash.equals(oldActiveSkin)
                 || !config.activeCpmModelHash.equals(oldActiveCpm)
                 || !config.activeCapeHash.equals(oldActiveCape)
                 || !config.playerOwnSkinHash.equals(oldOwnSkin)
-                || !java.util.Objects.equals(config.capeAnimationSpeeds, oldSpeeds);
+                || !java.util.Objects.equals(config.capeAnimationSpeeds, oldSpeeds)
+                || !java.util.Objects.equals(config.favoriteCapes, oldFavorites);
         if (changed && !config.save()) {
             // The verified replacement did not commit: retain the same runtime view as the old
             // on-disk document so a later scan can retry the migration coherently.
@@ -72,6 +76,7 @@ public final class LocalContentIdMigration {
             config.activeCapeHash = oldActiveCape;
             config.playerOwnSkinHash = oldOwnSkin;
             config.capeAnimationSpeeds = oldSpeeds;
+            config.favoriteCapes = oldFavorites;
         }
     }
 
@@ -88,6 +93,17 @@ public final class LocalContentIdMigration {
         if (!value.startsWith(LOCAL_CAPE_PREFIX)) return value;
         String migrated = aliases.get(value.substring(LOCAL_CAPE_PREFIX.length()));
         return migrated == null ? value : LOCAL_CAPE_PREFIX + migrated;
+    }
+
+    static java.util.List<String> migrateCapeFavorites(java.util.List<String> favorites, Map<String, String> aliases) {
+        if (favorites == null || favorites.isEmpty()) {
+            return favorites == null ? new java.util.ArrayList<>() : favorites;
+        }
+        java.util.LinkedHashSet<String> migrated = new java.util.LinkedHashSet<>();
+        for (String id : favorites) {
+            migrated.add(migrateCapeReference(id, aliases));
+        }
+        return new java.util.ArrayList<>(migrated);
     }
 
     private static Map<String, Float> migrateCapeSpeeds(

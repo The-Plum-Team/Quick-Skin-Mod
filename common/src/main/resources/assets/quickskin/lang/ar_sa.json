@@ -161,7 +161,6 @@
   "quickskin.tooltip.resolution": "الدقة: %s",
   "quickskin.tooltip.click_preview": "انقر للمعاينة",
   "quickskin.cape.animation_speed": "سرعة الرسوم المتحركة: %s%%",
-  "quickskin.cape.animation_speed_tooltip": "يتحكم في سرعة الرسوم المتحركة لهذه العباءة (10%% - 300%%)",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
   "quickskin.cape.adjust_title": "ضبط صورة العباءة",

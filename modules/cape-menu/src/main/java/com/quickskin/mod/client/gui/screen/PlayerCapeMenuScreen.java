@@ -25,7 +25,6 @@ import com.quickskin.mod.client.gui.util.BackgroundRenderer;
 //?}
 import com.quickskin.mod.client.gui.util.FileDialogHelper;
 import com.quickskin.mod.client.gui.util.MenuGuiScale;
-import com.quickskin.mod.client.gui.util.GuiScalingUtils;
 import com.quickskin.mod.config.ClientConfig;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
 import com.quickskin.mod.client.rendering.LocalLookPreview;
@@ -50,6 +49,8 @@ import com.quickskin.mod.common.util.SafeImageReader;
 import com.quickskin.mod.common.util.UserFacingIOException;
 import com.quickskin.mod.client.gui.widget.ErrorToast;
 import com.quickskin.mod.client.gui.widget.ImportZone;
+import com.quickskin.mod.client.gui.widget.CapeEditorStyle;
+import com.quickskin.mod.client.gui.util.UiText;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -60,7 +61,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 //?}
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 //? if <1.21.6 {
 //?} else if <26.1 {
@@ -115,42 +115,95 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     private static final Identifier VIGNETTE_LOCATION = Identifier.withDefaultNamespace("textures/misc/vignette.png");
 //?}
 
+    /** The edit and delete buttons on a cape of the player's own, square. */
     private static final int ACTION_BUTTON_SIZE = 11;
-    private static final int HEADER_HEIGHT = 20;
+    /** How far the buttons on a card, and a favourite's star, sit from its top and right edges. */
+    private static final int ACTION_BUTTON_INSET = 4;
 
-    // Layout, in GUI units of the menu's own scale (see MenuGuiScale)
+    // Layout, in GUI units of the menu's own scale (see MenuGuiScale): the capes on the left, the
+    // player wearing one of them on the right
     private static final int MARGIN = 8;
     private static final int CONTROL_HEIGHT = 20;
-    private static final int BUTTON_SPACING = 8;
-    private static final int MAX_BUTTON_WIDTH = 150;
-    /** Room right of the grid for its scrollbar. */
+    private static final int BUTTON_SPACING = 6;
+    /** Room right of the list for its scrollbar. */
     private static final int SCROLLBAR_ROOM = 12;
-    /** A cape tile is this share of the canvas height, within the bounds below. */
+    /** A cape is this share of the canvas height tall, within the bounds below. */
     private static final float CAPE_SIZE_SHARE = 0.15f;
     private static final int MIN_CAPE_SIZE = 32;
     private static final int MAX_CAPE_SIZE = 64;
-    /** The player preview's column is this share of the canvas width, within the bounds below. */
-    private static final float PREVIEW_WIDTH_SHARE = 0.26f;
-    private static final int MIN_PREVIEW_WIDTH = 80;
-    private static final int MAX_PREVIEW_WIDTH = 170;
+    /** Above and below each cape, the edge of the card it sits on. */
+    private static final int CARD_PADDING = 6;
+    /** Beside each cape: wider than above and below, so the badges fit. */
+    private static final int CARD_PADDING_X = 13;
+    /** Between two cards, across and down. */
+    private static final int CARD_GAP = 6;
+    /** The preview's share of the canvas width, within the bounds below. */
+    private static final float PREVIEW_WIDTH_SHARE = 0.40f;
+    private static final int MIN_PREVIEW_WIDTH = 150;
+    private static final int MAX_PREVIEW_WIDTH = 320;
+    private static final int SPEED_SLIDER_WIDTH = 160;
+    /** Left of the speed slider's track, on its plate: the speed icon. */
+    private static final int SPEED_ICON_ROOM = 18;
+    /** Two chevrons: the speed slider's icon. */
+    private static final String[] ICON_SPEED = {"#..#...", ".#..#..", "..#..#.", "...#..#", "..#..#.", ".#..#..", "#..#..."};
+    /** The heading that stays at the top of the list while it scrolls. */
+    private static final int STICKY_HEIGHT = 15;
+    /** A section's heading and the space under it: the sticky heading's band and a gap, so that band never covers the first row. */
+    private static final int SHELF_HEADER_HEIGHT = STICKY_HEIGHT + 6;
+    private static final int SHELF_SECTION_GAP = 6;
     /** Height of the drawn player per unit of model scale: a player is 1.8 blocks, plus the hat and a margin. */
     private static final float MODEL_HEIGHT_PER_SCALE = 2.0f;
     /** The drawn player's width per unit of model scale, arms included. */
     private static final float MODEL_WIDTH_PER_SCALE = 1.2f;
     /** The largest model scale, so the model stays in proportion with the tiles and buttons. */
-    private static final float MAX_MODEL_SCALE = 120.0f;
+    private static final float MAX_MODEL_SCALE = 130.0f;
+
+    private static final int GOLD = 0xFFFFD24A;
+    private static final int SECTION_TEXT = 0xFFB0B0B0;
+    private static final int MUTED_TEXT = 0xFF8A8A8A;
+    private static final int RULE = 0xFF46474A;
+    /** The worn cape's card: a blue edge round a dark blue face. */
+    private static final int WORN_EDGE = 0xFF4080FF;
+    private static final int WORN_FACE = 0xFF263652;
+    private static final int CARD_EDGE = 0xFF55565A;
+    private static final int CARD_EDGE_HOVER = 0xFF8D8E93;
+    private static final int CARD_FACE = 0xFF2E2F32;
+    private static final int CARD_FACE_HOVER = 0xFF404145;
+    private static final int GIF_TAG = 0xFF138FC4;
+    private static final int HD_TAG = 0xFF2E9A45;
+    /** Quick Skin's own capes keep their blue-violet corner mark. */
+    private static final int QUICK_SKIN_MARK = 0xFF5555FF;
+    private static final int EDIT_TAG = 0xFF2F8F8A;
+    private static final int DELETE_TAG = 0xFFC03030;
+    private static final int FAVORITE_TAG = 0xFFB07C14;
+
+    private static final String[] ICON_FOLDER = {"###....", "#######", "#.....#", "#.....#", "#.....#", "#.....#", "#######"};
+    private static final String[] ICON_QUICK_SKIN = {".......", ".#####.", ".#####.", ".#####.", ".#####.", ".#####.", "......."};
+    private static final String[] ICON_SPARKLE = {"...#...", "...#...", "..###..", "#######", "..###..", "...#...", "...#..."};
+    private static final String[] ICON_GLOBE = {"..###..", ".#.#.#.", "#######", "#..#..#", "#######", ".#.#.#.", "..###.."};
+    private static final String[] ICON_GIFT = {".#...#.", "..#.#..", "#######", "#..#..#", "#######", "#..#..#", "#######"};
+    private static final String[] ICON_CREEPER = {"#######", "#..#..#", "#..#..#", "###.###", "##...##", "##.#.##", "#######"};
+    private static final String[] ICON_MOJANG = {"#.....#", "##...##", "#.#.#.#", "#..#..#", "#.....#", "#.....#", "#.....#"};
+    private static final String[] ICON_CROWN = {".......", "#..#..#", "##.#.##", "#######", "#######", ".......", "#######"};
+    private static final String[] ICON_PEN = {".....##", "....###", "...###.", "..###..", ".###...", "###....", "##....."};
+    private static final String[] ICON_CROSS = {"#.....#", ".#...#.", "..#.#..", "...#...", "..#.#..", ".#...#.", "#.....#"};
 
     // Adaptive dimensions
+    /** The height of a cape on its card; it is ten sixteenths of that wide. */
     private int capeDisplaySize;
-    private int capePadding;
-    private int capesPerRow;
+    private int capeWidth;
+    private int cardWidth;
+    private int cardHeight;
     private int scrollSpeed;
+    private int stageX, stageWidth;
 
     @Nullable
     private final Screen parent;
 
+    /** The player, wearing the cape under the mouse, or the worn one. */
     private PlayerWidget playerWidget;
     private SpeedSlider animationSpeedSlider;
+    private CapeContextMenu contextMenu;
 
     // Picks up capes copied into the uploads folder from outside the game
     private final LocalAssetFolderWatch localAssetWatch = new LocalAssetFolderWatch();
@@ -162,12 +215,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     private double scrollbarClickOffset = 0.0;
     private int totalContentHeight = 0;
     private int gridX, gridY, gridWidth, gridHeight;
-    /** Where the last frame drew the My Capes import zone; a click there opens the file dialog. */
-    private boolean importZoneShown;
-    private int importZoneX, importZoneY, importZoneWidth, importZoneHeight;
     private int bottomButtonY;
-    private static final int STATUS_BAND_FRAME = 5;
-    private static final int STATUS_BAND_MARGIN = 2;
 
     // Player widget rotation state (preserved across resizes)
     private float savedBodyYaw = 20.0f;
@@ -175,6 +223,9 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
     @Nullable
     private CapeEntry selectedCape;
+    /** The cape under the mouse, which the model shows; null shows the worn one. */
+    @Nullable
+    private CapeEntry previewCape;
 
     // Sectioned cape lists
     private final List<CapeEntry> localCapes = new ArrayList<>(); // Contains "None" and local capes
@@ -182,10 +233,16 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     private final List<CapeEntry> knownCapes = new ArrayList<>();
     /** The built-in capes by where they come from, each section under its own heading. */
     private final List<CapeSection> builtInSections = new ArrayList<>();
-    /** Space above each built-in section's heading. */
-    private static final int SECTION_GAP = 20;
+    /** Every section the list shows, in order: Favourites (when there are any), My Capes, the built-in ones. */
+    private final List<ShelfSection> shelfSections = new ArrayList<>();
+    private CapeGridLayout shelf = new CapeGridLayout(1, 1, 1, 0, 0, new int[0], new boolean[0], new int[0]);
 
     private record CapeSection(String titleKey, List<CapeEntry> capes) {
+    }
+
+    /** One section of the list under its heading. */
+    private record ShelfSection(String titleKey, String[] icon, int iconColor, List<CapeEntry> capes,
+                                boolean importSlot) {
     }
 
     /** What the menu has to say (imports, edits, deletions, failures), as toasts in the top-right corner. */
@@ -224,72 +281,73 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         super.init();
 
         // The layout is sized from the canvas, which the menu's own scale keeps between about 300
-        // and 450 units tall: Import, Remove and Done along the bottom with the animation speed
-        // slider under them, the player on the right standing above the buttons, and the cape
-        // grid filling the rest
-        int sliderY = this.height - MARGIN - CONTROL_HEIGHT;
-        int bottomY = sliderY - CONTROL_HEIGHT - 4;
+        // and 450 units tall: the capes on the left with Import, Remove and Done under them, the
+        // player on the right with the worn cape's animation speed under it
+        int bottomY = this.height - MARGIN - CONTROL_HEIGHT;
         this.bottomButtonY = bottomY;
 
-        int previewWidth = Mth.clamp(Math.round(this.width * PREVIEW_WIDTH_SHARE), MIN_PREVIEW_WIDTH, MAX_PREVIEW_WIDTH);
-        int previewX = this.width - MARGIN - previewWidth;
+        this.stageWidth = Mth.clamp(Math.round(this.width * PREVIEW_WIDTH_SHARE), MIN_PREVIEW_WIDTH, MAX_PREVIEW_WIDTH);
+        this.stageX = this.width - MARGIN - this.stageWidth;
 
         this.capeDisplaySize = Mth.clamp(Math.round(this.height * CAPE_SIZE_SHARE), MIN_CAPE_SIZE, MAX_CAPE_SIZE);
-        this.capePadding = Math.max(4, this.capeDisplaySize / 8);
-        this.scrollSpeed = Math.max(10, this.capeDisplaySize / 3);
+        this.capeWidth = Math.round(this.capeDisplaySize * 10 / 16f);
+        // Wide enough for the import tile's words too, with ImportZone's margins, in every language
+        int importText = Math.max(
+                this.font.width(Component.translatable("quickskin.dropzone.capes.short_main")),
+                this.font.width(Component.translatable("quickskin.dropzone.capes.short_click")));
+        this.cardWidth = Math.max(this.capeWidth + 2 * CARD_PADDING_X, importText + 18);
+        this.cardHeight = this.capeDisplaySize + 2 * CARD_PADDING;
+        this.scrollSpeed = Math.max(10, (this.cardHeight + CARD_GAP) / 3);
 
-        // The grid takes whole tiles out of the room left of the preview and is centred in it.
-        // Keep a band between the grid's frame (5 px below the grid) and the buttons.
-        int gridAreaWidth = previewX - SCROLLBAR_ROOM - MARGIN;
-        this.gridWidth = gridAreaWidth;
-        refineCapesPerRowForGridWidth();
-        this.gridWidth = Math.min(gridAreaWidth,
-                this.capesPerRow * (this.capeDisplaySize + this.capePadding) + this.capePadding);
-        this.gridX = MARGIN + (gridAreaWidth - this.gridWidth) / 2;
-        this.gridY = MARGIN + 4;
-        int statusBand = STATUS_BAND_FRAME + this.font.lineHeight + STATUS_BAND_MARGIN * 2;
-        this.gridHeight = Math.max(HEADER_HEIGHT + this.capeDisplaySize + this.capePadding * 2,
-                bottomY - statusBand - this.gridY);
-
-        int buttonWidth = Math.min(MAX_BUTTON_WIDTH, (this.width - 2 * MARGIN - BUTTON_SPACING * 2) / 3);
-        int buttonStartX = (this.width - (buttonWidth * 3 + BUTTON_SPACING * 2)) / 2;
+        this.gridX = MARGIN + 6;
+        this.gridY = MARGIN;
+        this.gridWidth = Math.max(this.cardWidth, this.stageX - SCROLLBAR_ROOM - 8 - this.gridX);
+        this.gridHeight = bottomY - 6 - this.gridY;
 
         // Load capes
         refreshCapeList();
         updateGridDimensions();
 
-        // Create buttons
-        Button importButton = this.addRenderableWidget(com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
-                buttonStartX, bottomY, buttonWidth, CONTROL_HEIGHT,
+        // Import, Remove and Done under the list
+        int buttonsRight = this.gridX + this.gridWidth + SCROLLBAR_ROOM;
+        int buttonWidth = (buttonsRight - MARGIN - BUTTON_SPACING * 2) / 3;
+        this.addRenderableWidget(com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
+                MARGIN, bottomY, buttonWidth, CONTROL_HEIGHT,
                 Component.translatable("quickskin.button.import_cape"),
                 button -> importCape()
         ));
-
-        Button removeButton = this.addRenderableWidget(com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
-                buttonStartX + buttonWidth + BUTTON_SPACING, bottomY, buttonWidth, CONTROL_HEIGHT,
+        this.addRenderableWidget(com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
+                MARGIN + buttonWidth + BUTTON_SPACING, bottomY, buttonWidth, CONTROL_HEIGHT,
                 Component.translatable("quickskin.button.remove_cape"),
                 button -> removeCape()
         ));
-
-        Button closeButton = this.addRenderableWidget(com.quickskin.mod.client.gui.util.ButtonFactory.createPrimary(
-                buttonStartX + (buttonWidth + BUTTON_SPACING) * 2, bottomY, buttonWidth, CONTROL_HEIGHT,
+        this.addRenderableWidget(com.quickskin.mod.client.gui.util.ButtonFactory.createPrimary(
+                MARGIN + (buttonWidth + BUTTON_SPACING) * 2, bottomY,
+                buttonsRight - MARGIN - (buttonWidth + BUTTON_SPACING) * 2, CONTROL_HEIGHT,
                 Component.translatable("quickskin.button.done"),
                 button -> this.onClose()
         ));
 
-        // Create animation speed slider (centered, below buttons)
-        int sliderWidth = Math.min(200, this.width - 2 * MARGIN);
-        int sliderX = (this.width - sliderWidth) / 2;
-        this.animationSpeedSlider = this.addRenderableWidget(new SpeedSlider(sliderX, sliderY, sliderWidth, CONTROL_HEIGHT));
-        // Initially hidden - will be shown when an animated cape is selected
+        // The worn cape's animation speed, centred under the player while an animated cape is
+        // worn: a plate with the speed icon, the slider's track and the percentage. The widget is
+        // the track alone, so vanilla's mapping of a click puts the knob under the mouse
+        int plateWidth = Math.min(this.stageWidth, SPEED_SLIDER_WIDTH);
+        int plateX = this.stageX + (this.stageWidth - plateWidth) / 2;
+        int trackX = plateX + SPEED_ICON_ROOM;
+        int trackWidth = plateWidth - SPEED_ICON_ROOM - speedPercentRoom();
+        this.animationSpeedSlider = this.addRenderableWidget(new SpeedSlider(
+                trackX, bottomY + 3, trackWidth, CONTROL_HEIGHT - 6));
         this.animationSpeedSlider.visible = false;
         this.animationSpeedSlider.active = false;
 
-        // The player stands in its column above the buttons, as large as the column allows
-        int feetY = bottomY - 6;
-        int previewTop = MARGIN + 4;
+        // The player, as large as the space right of the list allows, centred in it
+        int stageTop = MARGIN;
+        int stageBottom = bottomY - 6;
         float modelScale = Math.min(MAX_MODEL_SCALE, Math.min(
-                (feetY - previewTop) / MODEL_HEIGHT_PER_SCALE, previewWidth / MODEL_WIDTH_PER_SCALE));
+                (stageBottom - stageTop) / MODEL_HEIGHT_PER_SCALE, this.stageWidth / MODEL_WIDTH_PER_SCALE));
+        int modelHeight = Math.round(modelScale * MODEL_HEIGHT_PER_SCALE);
+        int feetY = stageTop + (stageBottom - stageTop + modelHeight) / 2;
+        int centerX = this.stageX + this.stageWidth / 2;
 
         LocalPlayer player = Minecraft.getInstance().player;
 //? if <1.21.11 {
@@ -394,12 +452,29 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         }
 
         this.playerWidget = addRenderableWidget(new PlayerWidget(
-                previewX, previewTop, previewWidth, feetY - previewTop,
+                this.stageX, stageTop, this.stageWidth, stageBottom - stageTop,
                 skinLocation, null, null, modelType));
         this.playerWidget.setContext(com.quickskin.mod.client.gui.widget.PlayerWidget.WidgetContext.CAPE_MENU);
-        // Feet at the bottom centre of the column, no larger than the column allows
-        this.playerWidget.setCustomReferencePoint(previewX + previewWidth / 2, feetY);
+        this.playerWidget.setCustomReferencePoint(centerX, feetY);
         this.playerWidget.setScaleCap(modelScale);
+
+        // The right-click menu, drawn over everything else
+        this.contextMenu = new CapeContextMenu(new CapeContextMenu.Actions() {
+            @Override
+            public void toggleFavorite(CapeEntry cape) {
+                PlayerCapeMenuScreen.this.toggleFavorite(cape);
+            }
+
+            @Override
+            public void edit(CapeEntry cape) {
+                startCapeEdit(cape);
+            }
+
+            @Override
+            public void delete(CapeEntry cape) {
+                showDeleteConfirmation(cape);
+            }
+        });
 
         // Initialize selected cape based on config/currently equipped cape (AFTER widget is created)
         initializeSelectedCape();
@@ -409,17 +484,6 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
         // Restore saved rotation state
         this.playerWidget.setRotationState(this.savedBodyYaw, this.savedTargetRotation);
-    }
-
-    private void refineCapesPerRowForGridWidth() {
-        int capeWithPadding = capeDisplaySize + capePadding;
-        int availableWidth = this.gridWidth - (capePadding * 2);
-        int maxPerRow = Math.max(2, availableWidth / capeWithPadding);
-        this.capesPerRow = Mth.clamp(maxPerRow, 2, 10);
-    }
-
-    private int scaleValue(int baseValue) {
-        return GuiScalingUtils.scaleValue(baseValue, this.width, this.height);
     }
 
     /**
@@ -462,7 +526,111 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             }
         }
 
+        buildShelf();
+        // The entries are new: keep showing the same cape on the model, if it is still listed
+        if (this.previewCape != null) {
+            this.previewCape = findCape(this.previewCape.getCapeId());
+            updateStage();
+        }
         // Animations are registered lazily when capes become visible in the grid
+    }
+
+    /** Lays out the list's sections: Favourites first when there are any, then My Capes and the built-in ones. */
+    private void buildShelf() {
+        this.shelfSections.clear();
+        List<CapeEntry> favorites = favoriteCapes();
+        if (!favorites.isEmpty()) {
+            this.shelfSections.add(new ShelfSection("quickskin.cape.section.favorites",
+                    CapeContextMenu.ICON_STAR, GOLD, favorites, false));
+        }
+        this.shelfSections.add(new ShelfSection("quickskin.cape.section.my_capes",
+                ICON_FOLDER, 0xFFE8E8E8, this.localCapes, true));
+        for (CapeSection section : this.builtInSections) {
+            this.shelfSections.add(new ShelfSection(section.titleKey(),
+                    sectionIcon(section.titleKey()), sectionColor(section.titleKey()), section.capes(), false));
+        }
+        int[] counts = new int[this.shelfSections.size()];
+        boolean[] importSlots = new boolean[counts.length];
+        int[] spareRows = new int[counts.length];
+        for (int i = 0; i < counts.length; i++) {
+            counts[i] = this.shelfSections.get(i).capes().size();
+            importSlots[i] = this.shelfSections.get(i).importSlot();
+            // A row of air under My Capes, so the menu opens on the player's own capes with the
+            // built-in ones further down rather than on a wall of capes
+            spareRows[i] = importSlots[i] ? 1 : 0;
+        }
+        // Each cell is a card and the gap after it; the list is one gap wider, so the last card
+        // of a row ends at its right edge
+        this.shelf = new CapeGridLayout(Math.max(1, this.gridWidth + CARD_GAP), Math.max(1, this.cardWidth + CARD_GAP),
+                Math.max(1, this.cardHeight + CARD_GAP), SHELF_HEADER_HEIGHT, SHELF_SECTION_GAP, counts, importSlots, spareRows);
+    }
+
+    /** The favourite capes still listed, in the order they were marked. */
+    private List<CapeEntry> favoriteCapes() {
+        List<CapeEntry> favorites = new ArrayList<>();
+        ClientConfig config = ClientConfig.getInstance();
+        if (config.favoriteCapes == null) {
+            return favorites;
+        }
+        for (String id : config.favoriteCapes) {
+            CapeEntry cape = findCape(id);
+            if (cape != null && !cape.isNone()) {
+                favorites.add(cape);
+            }
+        }
+        return favorites;
+    }
+
+    @Nullable
+    private CapeEntry findCape(String capeId) {
+        for (CapeEntry cape : this.localCapes) {
+            if (cape.getCapeId().equals(capeId)) {
+                return cape;
+            }
+        }
+        for (CapeEntry cape : this.knownCapes) {
+            if (cape.getCapeId().equals(capeId)) {
+                return cape;
+            }
+        }
+        return null;
+    }
+
+    private static String[] sectionIcon(String titleKey) {
+        return switch (titleKey) {
+            case "quickskin.cape.section.quick_skin" -> ICON_QUICK_SKIN;
+            case "quickskin.cape.section.new" -> ICON_SPARKLE;
+            case "quickskin.cape.section.everyone" -> ICON_GLOBE;
+            case "quickskin.cape.section.events" -> ICON_GIFT;
+            case "quickskin.cape.section.in_person" -> ICON_CREEPER;
+            case "quickskin.cape.section.mojang" -> ICON_MOJANG;
+            default -> ICON_CROWN;
+        };
+    }
+
+    private static int sectionColor(String titleKey) {
+        return switch (titleKey) {
+            case "quickskin.cape.section.quick_skin" -> 0xFF6A6AFF;
+            case "quickskin.cape.section.new" -> 0xFFFFE05A;
+            case "quickskin.cape.section.everyone" -> 0xFF6FD0FF;
+            case "quickskin.cape.section.events" -> 0xFFFF8FC8;
+            case "quickskin.cape.section.in_person" -> 0xFF6FDB5A;
+            case "quickskin.cape.section.mojang" -> 0xFFFF6A5A;
+            default -> 0xFFE8B84A;
+        };
+    }
+
+    /** Marks or unmarks a favourite, and lays the list out again with the Favourites section changed. */
+    private void toggleFavorite(CapeEntry cape) {
+        ClientConfig config = ClientConfig.getInstance();
+        config.setFavoriteCape(cape.getCapeId(), !config.isFavoriteCape(cape.getCapeId()));
+        config.save();
+        double before = this.shelf.contentHeight();
+        buildShelf();
+        updateGridDimensions();
+        // Keep the capes on screen where they were: the Favourites section above them grew or shrank
+        this.targetScrollOffset = Mth.clamp(this.targetScrollOffset + this.shelf.contentHeight() - before, 0, this.maxScroll);
+        this.scrollOffset = this.targetScrollOffset;
     }
 
     /**
@@ -503,6 +671,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
      * Initialize the selected cape based on the saved config or player's currently equipped cape
      */
     private void initializeSelectedCape() {
+        this.selectedCape = null;
         String activeCapeId = null;
 
         // First priority: Check config (works on title screen)
@@ -522,53 +691,49 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             }
         }
 
-        // No active cape found
-        if (activeCapeId == null || activeCapeId.isEmpty()) {
-            this.selectedCape = null;
+        if (activeCapeId != null && !activeCapeId.isEmpty()) {
+            // Every local cape is a catalogue asset addressed by its SHA-256 primary, while the
+            // saved reference may still be a SHA-1 alias whose migration has not run yet. Compare
+            // the two in the catalogue's own vocabulary so the active cape is marked, previewed and
+            // retimed instead of silently reading as "no cape selected".
+            activeCapeId = com.quickskin.mod.client.services.CapeAnimationIds.canonicalCapeId(
+                    activeCapeId, this::catalogPrimaryOf);
+            this.selectedCape = findCape(activeCapeId);
+        }
+        updateStage();
+    }
+
+    /** Dresses the model in the cape under the mouse, or else the worn one. */
+    private void updateStage() {
+        if (this.playerWidget != null) {
+            dress(this.playerWidget, this.previewCape != null ? this.previewCape : this.selectedCape);
+        }
+    }
+
+    private static void dress(PlayerWidget widget, @Nullable CapeEntry cape) {
+        if (cape == null || cape.isNone()) {
+            widget.setCape(null, null);
             return;
         }
-
-        // Every local tile below is a catalogue asset addressed by its SHA-256 primary, while the
-        // saved reference may still be a SHA-1 alias whose migration has not run yet. Compare the
-        // two in the catalogue's own vocabulary so the active cape is highlighted, previewed and
-        // retimed instead of silently reading as "no cape selected".
-        activeCapeId = com.quickskin.mod.client.services.CapeAnimationIds.canonicalCapeId(
-                activeCapeId, this::catalogPrimaryOf);
-
-        // Find the matching cape in both lists and update preview
-        for (CapeEntry cape : this.localCapes) {
-            if (cape.getCapeId().equals(activeCapeId)) {
-                this.selectedCape = cape;
-                // Update the preview widget with the saved cape
 //? if <1.21.11 {
-                ResourceLocation capeLocation = cape.getTextureLocation();
+        ResourceLocation location = com.quickskin.mod.client.services.CapeService.getInstance()
 //?} else {
-                Identifier capeLocation = cape.getTextureLocation();
+        Identifier location = com.quickskin.mod.client.services.CapeService.getInstance()
 //?}
-                if (capeLocation != null && playerWidget != null) {
-                    playerWidget.setCape(capeLocation, cape.getCapeId());
-                }
-                return;
-            }
+                .getCapeLocation(null, cape.getCapeId());
+        if (location == null) {
+            location = cape.getTextureLocation();
         }
+        widget.setCape(location, cape.getCapeId());
+    }
 
-        for (CapeEntry cape : this.knownCapes) {
-            if (cape.getCapeId().equals(activeCapeId)) {
-                this.selectedCape = cape;
-                // Update the preview widget with the saved cape
-//? if <1.21.11 {
-                ResourceLocation capeLocation = cape.getTextureLocation();
-//?} else {
-                Identifier capeLocation = cape.getTextureLocation();
-//?}
-                if (capeLocation != null && playerWidget != null) {
-                    playerWidget.setCape(capeLocation, cape.getCapeId());
-                }
-                return;
-            }
+    /** Shows the cape under the mouse on the model, and the worn one again once the mouse leaves it. */
+    private void preview(@Nullable CapeEntry cape) {
+        if (cape == this.previewCape) {
+            return;
         }
-
-        this.selectedCape = null;
+        this.previewCape = cape;
+        updateStage();
     }
 
     /**
@@ -589,23 +754,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     private void updateGridDimensions() {
-        int totalHeight = 0;
-
-        // "My Capes" section height
-        if (!this.localCapes.isEmpty()) {
-            totalHeight += HEADER_HEIGHT;
-            int localRows = (int) Math.ceil((double) this.localCapes.size() / capesPerRow);
-            totalHeight += localRows * (capeDisplaySize + capePadding);
-        }
-
-        // The built-in sections, each with space above its heading
-        for (CapeSection section : this.builtInSections) {
-            totalHeight += SECTION_GAP + HEADER_HEIGHT;
-            int rows = (int) Math.ceil((double) section.capes().size() / capesPerRow);
-            totalHeight += rows * (capeDisplaySize + capePadding);
-        }
-
-        this.totalContentHeight = totalHeight + capePadding;
+        this.totalContentHeight = this.shelf.contentHeight() + 8;
         this.maxScroll = Math.max(0, this.totalContentHeight - this.gridHeight);
     }
 
@@ -831,6 +980,12 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             if (speed != null) {
                 config.setCapeAnimationSpeed(updated.getCapeId(), speed);
             }
+            if (config.isFavoriteCape(previousId)) {
+                config.renameFavoriteCape(previousId, updated.getCapeId());
+                config.save();
+                buildShelf();
+                updateGridDimensions();
+            }
             if (stillActive) {
                 this.selectedCape = updated;
                 applyCape(updated);
@@ -867,8 +1022,8 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
     private void removeCape() {
         // Always update preview widget (works both in-game and on title screen)
-        playerWidget.setCape(null, null);
         this.selectedCape = null;
+        updateStage();
 
         // Update speed slider visibility (hide it since no cape is selected)
         updateSpeedSliderVisibility();
@@ -966,6 +1121,11 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             Files.deleteIfExists(capePath);
             LocalAssetManager.getInstance().discoverLocalAssets();
             releaseEditorSource(capeEntry.getLocalCape().hash());
+            ClientConfig config = ClientConfig.getInstance();
+            if (config.isFavoriteCape(capeEntry.getCapeId())) {
+                config.setFavoriteCape(capeEntry.getCapeId(), false);
+                config.save();
+            }
             refreshCapeList();
             updateGridDimensions();
 
@@ -1061,8 +1221,6 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         this.renderBackgroundEffects(graphics, partialTick);
 
 //? if <1.21 {
-        // Title
-        graphics.drawCenteredString(this.font, this.title, this.width / 2, scaleValue(15), 0xFFFFFFFF);
 //?} else if <1.21.6 {
         // Flush and ensure clean render state
         graphics.flush();
@@ -1075,43 +1233,37 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
 
 //? if <1.21 {
-        // Grid background (darker semi-transparent for better visibility)
-        graphics.fill(this.gridX - 5, this.gridY - 5,
-                this.gridX + this.gridWidth + 5, this.gridY + this.gridHeight + 5,
-                0xB0000000);
 //?} else if <1.21.6 {
-        // Title
-        graphics.drawCenteredString(this.font, this.title, this.width / 2, scaleValue(15), 0xFFFFFFFF);
-
         super.render(graphics, mouseX, mouseY, partialTick);
 
         // Push pose and translate forward in Z to render on top
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 100);
 //?} else if <26.1 {
-        // Title
-        graphics.drawCenteredString(this.font, this.title, this.width / 2, scaleValue(15), 0xFFFFFFFF);
-
         super.render(graphics, mouseX, mouseY, partialTick);
 
         // Push pose (1.21.11: Matrix3x2fStack uses pushMatrix/popMatrix, no Z translate in 2D)
         graphics.pose().pushMatrix();
 //?} else {
-        // Title
-        graphics.centeredText(this.font, this.title, this.width / 2, scaleValue(15), 0xFFFFFFFF);
-
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
 
         // Push pose (1.21.11: Matrix3x2fStack uses pushMatrix/popMatrix, no Z translate in 2D)
         graphics.pose().pushMatrix();
 //?}
 
-        // Enable scissor for grid content
-        graphics.enableScissor(this.gridX, this.gridY,
-                this.gridX + this.gridWidth, this.gridY + this.gridHeight);
+        // The list's panel, then the capes clipped to it
+        graphics.fill(this.gridX - 6, this.gridY - 2, this.gridX + this.gridWidth + 6,
+                this.gridY + this.gridHeight + 2, 0x9C0C0C0E);
+        graphics.fill(this.gridX - 6, this.gridY - 2, this.gridX + this.gridWidth + 6, this.gridY - 1, 0x40FFFFFF);
+        boolean menuOpen = this.contextMenu.isOpen();
+        int hoverX = menuOpen ? -1 : mouseX;
+        int hoverY = menuOpen ? -1 : mouseY;
+        graphics.enableScissor(this.gridX - 6, this.gridY + STICKY_HEIGHT, this.gridX + this.gridWidth + 6,
+                this.gridY + this.gridHeight);
         this.scrollOffset += (this.targetScrollOffset - this.scrollOffset) * 0.5;
-        renderCapeGrid(graphics, mouseX, mouseY);
+        renderCapeGrid(graphics, hoverX, hoverY);
         graphics.disableScissor();
+        renderStickyHeading(graphics);
 
         this.renderScrollbar(graphics);
 //? if <1.21 {
@@ -1128,24 +1280,29 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
         renderToasts(graphics);
 
+        if (this.contextMenu.isOpen()) {
+            this.contextMenu.drawOnTop(graphics, mouseX, mouseY);
+            return;
+        }
+
         // Tooltip logic
         if (isMouseOverGrid(mouseX, mouseY)) {
-            CapeEntry hoveredCape = getCapeAt(mouseX, mouseY);
+            CapeGridLayout.Hit hoveredHit = shelfHit(mouseX, mouseY);
+            CapeEntry hoveredCape = hoveredHit == null || hoveredHit.importSlot() ? null
+                    : this.shelfSections.get(hoveredHit.section()).capes().get(hoveredHit.index());
             if (hoveredCape != null) {
                 Component actionTooltip = null;
-                int[] pos = getCapePosition(hoveredCape);
-                if (pos != null && hoveredCape.isLocal()) {
-                    int x = pos[0];
-                    int y = pos[1];
-                    int margin = 2;
-
-                    int deleteButtonX = x + capeDisplaySize - ACTION_BUTTON_SIZE - margin;
-                    int deleteButtonY = y + margin;
-                    int editButtonY = deleteButtonY + ACTION_BUTTON_SIZE + 2;
-                    if (isMouseOver(mouseX, mouseY, deleteButtonX, deleteButtonY, ACTION_BUTTON_SIZE, ACTION_BUTTON_SIZE)) {
+                int[] card = cardOrigin(hoveredHit);
+                int[] favorite = favoriteButtonBounds(hoveredCape, card[0], card[1]);
+                int[] delete = deleteButtonBounds(hoveredCape, card[0], card[1]);
+                int[] edit = editButtonBounds(hoveredCape, card[0], card[1]);
+                if (favorite != null) {
+                    if (isMouseOver(mouseX, mouseY, favorite[0], favorite[1], favorite[2], favorite[3])) {
+                        actionTooltip = Component.translatable(ClientConfig.getInstance().isFavoriteCape(hoveredCape.getCapeId())
+                                ? "quickskin.context.unfavorite" : "quickskin.context.favorite");
+                    } else if (delete != null && isMouseOver(mouseX, mouseY, delete[0], delete[1], delete[2], delete[3])) {
                         actionTooltip = Component.translatable("quickskin.tooltip.delete_cape");
-                    } else if (hoveredCape.isEditable()
-                            && isMouseOver(mouseX, mouseY, deleteButtonX, editButtonY, ACTION_BUTTON_SIZE, ACTION_BUTTON_SIZE)) {
+                    } else if (edit != null && isMouseOver(mouseX, mouseY, edit[0], edit[1], edit[2], edit[3])) {
                         actionTooltip = Component.translatable("quickskin.tooltip.edit_cape");
                     }
                     if (actionTooltip != null) {
@@ -1224,198 +1381,198 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 //?} else {
     private void renderCapeGrid(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
 //?}
-        int currentY = gridY - (int) scrollOffset;
-        importZoneShown = false;
-
-        // --- SECTION 1: MY CAPES ---
-        if (!localCapes.isEmpty()) {
-            currentY = renderSection(graphics, "quickskin.cape.section.my_capes", localCapes, currentY, mouseX, mouseY, true);
+        int top = this.gridY - (int) this.scrollOffset;
+        boolean inView = mouseY >= this.gridY + STICKY_HEIGHT && mouseY < this.gridY + this.gridHeight;
+        CapeEntry hovered = null;
+        for (int i = 0; i < this.shelfSections.size(); i++) {
+            ShelfSection section = this.shelfSections.get(i);
+            CapeGridLayout.Section place = this.shelf.sections().get(i);
+            int headingY = top + place.top() + 3;
+            if (headingY > this.gridY - 12 && headingY < this.gridY + this.gridHeight) {
+                renderHeading(graphics, section, headingY);
+            }
+            for (int slot = 0; slot < place.slots(); slot++) {
+                int x = this.gridX + this.shelf.slotX(slot);
+                int y = top + this.shelf.cellY(i, slot);
+                if (y + this.cardHeight < this.gridY || y > this.gridY + this.gridHeight) {
+                    continue;
+                }
+                if (slot == section.capes().size()) {
+                    // The import tile stretches to the end of its row, up to the list's right edge
+                    int w = this.shelf.importWidth(slot) - CARD_GAP;
+                    renderImportTile(graphics, x, y, w,
+                            inView && isMouseOver(mouseX, mouseY, x, y, w, this.cardHeight));
+                    continue;
+                }
+                boolean over = inView && isMouseOver(mouseX, mouseY, x, y, this.cardWidth, this.cardHeight);
+                CapeEntry cape = section.capes().get(slot);
+                if (over) {
+                    hovered = cape;
+                }
+                renderCapeTile(graphics, cape, x, y, over, mouseX, mouseY);
+            }
         }
+        preview(hovered);
+    }
 
-        // --- THE BUILT-IN SECTIONS ---
-        for (CapeSection section : builtInSections) {
-            currentY = renderSection(graphics, section.titleKey(), section.capes(), currentY + SECTION_GAP,
-                    mouseX, mouseY, false);
+    /** A section's heading: its icon, its name, a rule and how many capes it holds. */
+//? if <26.1 {
+    private void renderHeading(GuiGraphics graphics, ShelfSection section, int y) {
+//?} else {
+    private void renderHeading(GuiGraphicsExtractor graphics, ShelfSection section, int y) {
+//?}
+        CapeEditorStyle.icon(graphics, section.icon(), this.gridX + 2, y, section.iconColor());
+        Component title = Component.translatable(section.titleKey());
+        int textX = this.gridX + 12;
+        UiText.draw(graphics, this.font, title, textX, y, SECTION_TEXT);
+        String count = String.valueOf(capeCount(section));
+        int right = this.gridX + this.gridWidth - 2;
+        UiText.draw(graphics, this.font, count, right - this.font.width(count), y, MUTED_TEXT);
+        int ruleStart = textX + this.font.width(title) + 6;
+        int ruleEnd = right - this.font.width(count) - 6;
+        if (ruleEnd - ruleStart > 8) {
+            graphics.fill(ruleStart, y + 4, ruleEnd, y + 5, RULE);
         }
     }
 
+    /** The heading of the section at the top of the list, which stays there while the list scrolls. */
 //? if <26.1 {
-    private int renderSection(GuiGraphics graphics, String titleKey, List<CapeEntry> capes, int startY, int mouseX, int mouseY, boolean isLocalSection) {
+    private void renderStickyHeading(GuiGraphics graphics) {
 //?} else {
-    private int renderSection(GuiGraphicsExtractor graphics, String titleKey, List<CapeEntry> capes, int startY, int mouseX, int mouseY, boolean isLocalSection) {
+    private void renderStickyHeading(GuiGraphicsExtractor graphics) {
 //?}
-        // Render Header (centered within the grid)
-        int headerY = startY + HEADER_HEIGHT / 2 - 4;
-        if (headerY > gridY - 8 && headerY < gridY + gridHeight + 8) {
-            int gridCenterX = this.gridX + (this.gridWidth / 2);
-//? if <1.21.9 {
-            graphics.drawCenteredString(this.font, Component.translatable(titleKey), gridCenterX, headerY, 0xFFFFFFFF);
-//?} else if <26.1 {
-            graphics.drawCenteredString(this.font, Component.translatable(titleKey), gridCenterX, headerY, 0xFFFFFFFF);
-//?} else {
-            graphics.centeredText(this.font, Component.translatable(titleKey), gridCenterX, headerY, 0xFFFFFFFF);
-//?}
-        }
-        int currentY = startY + HEADER_HEIGHT;
-
-        // Render Grid Items
-        for (int i = 0; i < capes.size(); i++) {
-            CapeEntry cape = capes.get(i);
-            int row = i / capesPerRow;
-            int col = i % capesPerRow;
-
-            int x = gridX + capePadding + col * (capeDisplaySize + capePadding);
-            int y = currentY + capePadding + row * (capeDisplaySize + capePadding);
-
-            if (y + capeDisplaySize < gridY || y > gridY + gridHeight) {
-                continue; // Cull capes outside the visible area
-            }
-
-            renderCapeEntry(graphics, cape, x, y, mouseX, mouseY);
-        }
-
-        // For "My Capes", if the first row isn't full, the rest of it is the import zone
-        if (isLocalSection && capes.size() < capesPerRow) {
-            int col = capes.size() % capesPerRow;
-            int dropZoneX = gridX + capePadding + col * (capeDisplaySize + capePadding);
-            int dropZoneY = currentY + capePadding; // Y position of the first row
-            int dropZoneWidth = (gridX + gridWidth) - dropZoneX - capePadding;
-            int dropZoneHeight = capeDisplaySize;
-
-            if (dropZoneWidth > capePadding) {
-                renderDropZone(graphics, dropZoneX, dropZoneY, dropZoneWidth, dropZoneHeight, mouseX, mouseY);
-                importZoneShown = true;
-                importZoneX = dropZoneX;
-                importZoneY = dropZoneY;
-                importZoneWidth = dropZoneWidth;
-                importZoneHeight = dropZoneHeight;
-            }
-        }
-
-        int rows = (int) Math.ceil((double) capes.size() / capesPerRow);
-        return currentY + rows * (capeDisplaySize + capePadding);
-    }
-
-    /** The import zone, drawn as the skin menu's: it lightens under the mouse inside the grid. */
-//? if <26.1 {
-    private void renderDropZone(GuiGraphics graphics, int x, int y, int width, int height, int mouseX, int mouseY) {
-//?} else {
-    private void renderDropZone(GuiGraphicsExtractor graphics, int x, int y, int width, int height, int mouseX, int mouseY) {
-//?}
-        boolean isHovering = isMouseOver(mouseX, mouseY, x, y, width, height) &&
-                mouseY >= gridY && mouseY < gridY + gridHeight;
-        ImportZone.draw(graphics, this.font, x, y, width, height,
-                Component.translatable("quickskin.dropzone.capes.main"),
-                Component.translatable("quickskin.dropzone.capes.click"), isHovering);
-    }
-
-//? if <26.1 {
-    private void renderCapeEntry(GuiGraphics graphics, CapeEntry cape, int x, int y, int mouseX, int mouseY) {
-//?} else {
-    private void renderCapeEntry(GuiGraphicsExtractor graphics, CapeEntry cape, int x, int y, int mouseX, int mouseY) {
-//?}
-        boolean hovered = isMouseOver(mouseX, mouseY, x, y, capeDisplaySize, capeDisplaySize);
-
-        // Special handling for "None" option
-        if (cape.isKnown() && cape.getKnownCape() != null && cape.getKnownCape().isNoCape()) {
-            // Render black background
-            graphics.fill(x, y, x + capeDisplaySize, y + capeDisplaySize, 0x90000000);
-
-            // Render "None" text centered
-//? if <1.21.9 {
-            graphics.drawCenteredString(this.font, Component.translatable("quickskin.cape.option.none"), x + capeDisplaySize / 2,
-                    y + capeDisplaySize / 2 - 4, 0xFFFFFFFF);
-//?} else if <26.1 {
-            graphics.drawCenteredString(this.font, Component.translatable("quickskin.cape.option.none"), x + capeDisplaySize / 2,
-                    y + capeDisplaySize / 2 - 4, 0xFFFFFFFF);
-//?} else {
-            graphics.centeredText(this.font, Component.translatable("quickskin.cape.option.none"), x + capeDisplaySize / 2,
-                    y + capeDisplaySize / 2 - 4, 0xFFFFFFFF);
-//?}
-
-            // Highlight if selected or hovered
-            if (isSelected(cape)) {
-//? if <1.21.9 {
-                graphics.renderOutline(x - 2, y - 2, capeDisplaySize + 4, capeDisplaySize + 4, 0xFFFFFF00);
-//?} else {
-                drawOutline(graphics,x - 2, y - 2, capeDisplaySize + 4, capeDisplaySize + 4, 0xFFFFFF00);
-//?}
-            } else if (hovered) {
-                graphics.fill(x, y, x + capeDisplaySize, y + capeDisplaySize, 0x33FFFFFF);
-            }
+        int active = this.shelf.sectionAt(this.scrollOffset, this.gridHeight);
+        if (active < 0) {
             return;
         }
+        int x0 = this.gridX - 6;
+        int x1 = this.gridX + this.gridWidth + 6;
+        graphics.fill(x0, this.gridY - 2, x1, this.gridY + STICKY_HEIGHT, 0xF0141518);
+        graphics.fill(x0, this.gridY + STICKY_HEIGHT, x1, this.gridY + STICKY_HEIGHT + 1, 0xFF2C3440);
+        renderHeading(graphics, this.shelfSections.get(active), this.gridY + 4);
+    }
 
-        // Regular cape rendering
-//? if <1.21.11 {
-        ResourceLocation texture = cape.getTextureLocation();
+    /**
+     * One cape on its card: the worn one on a blue card, its kind on badges (GIF and HD in the top
+     * corner, Quick Skin's own capes with a mark in the bottom one), a favourite with a gold star,
+     * and, while the mouse is over it, the favourite button and, on a cape of the player's own, the
+     * delete and edit buttons under it.
+     */
+//? if <26.1 {
+    private void renderCapeTile(GuiGraphics graphics, CapeEntry cape, int x, int y, boolean hovered, int mouseX, int mouseY) {
 //?} else {
-        Identifier texture = cape.getTextureLocation();
+    private void renderCapeTile(GuiGraphicsExtractor graphics, CapeEntry cape, int x, int y, boolean hovered, int mouseX, int mouseY) {
 //?}
-
-        // If animated, ensure registration (lazy) and get the current frame texture
-        if (texture != null && cape.isAnimated()) {
-            ensureAnimationRegistered(cape);
-            texture = com.quickskin.mod.client.services.AnimatedTextureManager.getInstance()
-                .getAnimationFrame(texture)
-                .orElse(texture);
+        boolean worn = isSelected(cape);
+        CapeTileArt.card(graphics, x, y, this.cardWidth, this.cardHeight,
+                worn ? WORN_EDGE : hovered ? CARD_EDGE_HOVER : CARD_EDGE,
+                worn ? WORN_FACE : hovered ? CARD_FACE_HOVER : CARD_FACE);
+        if (worn) {
+            // A second line of the edge, so the worn card stands out from a hovered one
+            CapeTileArt.card(graphics, x + 1, y + 1, this.cardWidth - 2, this.cardHeight - 2, WORN_EDGE, WORN_FACE);
         }
-
-        // Render cape texture
-        if (texture != null) {
-            renderCapeTexture(graphics, texture, cape, x, y);
+        int cx = x + this.cardWidth / 2;
+        int capeLeft = x + CARD_PADDING_X;
+        int capeTop = y + CARD_PADDING;
+        int capeRight = capeLeft + this.capeWidth;
+        if (cape.isNone()) {
+            CapeTileArt.dashedOutline(graphics, capeLeft, capeTop, this.capeWidth, this.capeDisplaySize, 0x60FFFFFF);
+            UiText.drawCentered(graphics, this.font, Component.translatable("quickskin.cape.option.none"), cx,
+                    capeTop + this.capeDisplaySize / 2 - 4, 0xFFE6E6E6);
         } else {
-            renderLoadingTexture(graphics, x, y);
-        }
-
-        // Render custom indicator
-        if (cape.isCustom()) {
-            renderCustomIndicator(graphics, x, y);
-        }
-
-        // Render animated indicator if applicable
-        if (cape.isAnimated()) {
-            renderAnimatedIndicator(graphics, x, y);
-        }
-
-        // Highlight if selected or hovered
-        if (isSelected(cape)) {
-//? if <1.21.9 {
-            graphics.renderOutline(x - 2, y - 2, capeDisplaySize + 4, capeDisplaySize + 4, 0xFFFFFF00);
+//? if <1.21.11 {
+            ResourceLocation texture = cape.getTextureLocation();
 //?} else {
-            drawOutline(graphics,x - 2, y - 2, capeDisplaySize + 4, capeDisplaySize + 4, 0xFFFFFF00);
+            Identifier texture = cape.getTextureLocation();
 //?}
-        } else if (hovered) {
-            graphics.fill(x, y, x + capeDisplaySize, y + capeDisplaySize, 0x33FFFFFF);
-        }
-
-        // Render delete button on hover (only for local capes, not "None")
-        if (hovered && cape.isLocal() && !cape.isKnown()) {
-            int margin = 2;
-            int deleteButtonX = x + capeDisplaySize - ACTION_BUTTON_SIZE - margin;
-            int deleteButtonY = y + margin;
-            boolean deleteHovered = isMouseOver(mouseX, mouseY, deleteButtonX, deleteButtonY, ACTION_BUTTON_SIZE, ACTION_BUTTON_SIZE);
-            int deleteBgColor = deleteHovered ? 0xA0E04040 : 0x80C00000;
-            graphics.fill(deleteButtonX, deleteButtonY, deleteButtonX + ACTION_BUTTON_SIZE, deleteButtonY + ACTION_BUTTON_SIZE, deleteBgColor);
-//? if <26.1 {
-            graphics.drawString(this.font, "x", deleteButtonX + 3, deleteButtonY + 1, 0xFFFFFFFF);
-//?} else {
-            graphics.text(this.font, "x", deleteButtonX + 3, deleteButtonY + 1, 0xFFFFFFFF);
-//?}
-
-            // Render edit button below delete button (only for capes that kept their editor source)
-            if (cape.isEditable()) {
-                int editButtonY = deleteButtonY + ACTION_BUTTON_SIZE + 2;
-                boolean editHovered = isMouseOver(mouseX, mouseY, deleteButtonX, editButtonY, ACTION_BUTTON_SIZE, ACTION_BUTTON_SIZE);
-                int editBgColor = editHovered ? 0xA040C0C0 : 0x80408080;
-                graphics.fill(deleteButtonX, editButtonY, deleteButtonX + ACTION_BUTTON_SIZE, editButtonY + ACTION_BUTTON_SIZE, editBgColor);
-//? if <26.1 {
-                graphics.drawString(this.font, "\u270E", deleteButtonX + 2, editButtonY + 1, 0xFFFFFFFF);
-//?} else {
-                graphics.text(this.font, "\u270E", deleteButtonX + 2, editButtonY + 1, 0xFFFFFFFF);
-//?}
+            if (texture != null && cape.isAnimated()) {
+                ensureAnimationRegistered(cape);
+                texture = com.quickskin.mod.client.services.AnimatedTextureManager.getInstance()
+                        .getAnimationFrame(texture)
+                        .orElse(texture);
+            }
+            if (texture != null) {
+                renderCapeTexture(graphics, texture, cape, cx - this.capeDisplaySize / 2, capeTop);
+            } else {
+                renderLoadingTexture(graphics, capeLeft, capeTop);
+            }
+            int badgeY = y + 2;
+            if (cape.isAnimated()) {
+                CapeTileArt.badge(graphics, this.font, x + 2, badgeY,
+                        Component.translatable("quickskin.cape.animated_badge"), GIF_TAG);
+                badgeY += this.font.lineHeight + 3;
+            }
+            if (isHd(cape)) {
+                CapeTileArt.badge(graphics, this.font, x + 2, badgeY, Component.literal("HD"), HD_TAG);
+            }
+            if (cape.isCustom()) {
+                int mark = 5;
+                graphics.fill(capeRight - mark, capeTop + this.capeDisplaySize - mark,
+                        capeRight + 1, capeTop + this.capeDisplaySize + 1, CapeTileArt.OUTLINE);
+                graphics.fill(capeRight - mark + 1, capeTop + this.capeDisplaySize - mark + 1,
+                        capeRight, capeTop + this.capeDisplaySize, QUICK_SKIN_MARK);
             }
         }
+
+        int[] favorite = favoriteButtonBounds(cape, x, y);
+        if (favorite == null) {
+            return;
+        }
+        boolean isFavorite = ClientConfig.getInstance().isFavoriteCape(cape.getCapeId());
+        if (hovered) {
+            renderActionButton(graphics, favorite, CapeContextMenu.ICON_STAR,
+                    isFavorite ? FAVORITE_TAG : CARD_FACE, isFavorite ? 0xFFFFFFFF : GOLD, mouseX, mouseY);
+            int[] delete = deleteButtonBounds(cape, x, y);
+            if (delete != null) {
+                renderActionButton(graphics, delete, ICON_CROSS, DELETE_TAG, 0xFFFFFFFF, mouseX, mouseY);
+            }
+            int[] edit = editButtonBounds(cape, x, y);
+            if (edit != null) {
+                renderActionButton(graphics, edit, ICON_PEN, EDIT_TAG, 0xFFFFFFFF, mouseX, mouseY);
+            }
+        } else if (isFavorite) {
+            // On the button's gold plate, like the GIF and HD badges, so it reads over any cape
+            renderActionButton(graphics, favorite, CapeContextMenu.ICON_STAR, FAVORITE_TAG, 0xFFFFFFFF, -1, -1);
+        }
+    }
+
+//? if <26.1 {
+    private void renderActionButton(GuiGraphics graphics, int[] bounds, String[] icon, int face, int iconColor, int mouseX, int mouseY) {
+//?} else {
+    private void renderActionButton(GuiGraphicsExtractor graphics, int[] bounds, String[] icon, int face, int iconColor, int mouseX, int mouseY) {
+//?}
+        boolean over = isMouseOver(mouseX, mouseY, bounds[0], bounds[1], bounds[2], bounds[3]);
+        graphics.fill(bounds[0], bounds[1], bounds[0] + bounds[2], bounds[1] + bounds[3], CapeTileArt.OUTLINE);
+        graphics.fill(bounds[0] + 1, bounds[1] + 1, bounds[0] + bounds[2] - 1, bounds[1] + bounds[3] - 1,
+                over ? CapeTileArt.lighter(face) : face);
+        CapeEditorStyle.icon(graphics, icon, bounds[0] + 2, bounds[1] + 2, iconColor);
+    }
+
+    /** The last tile of My Capes: the import zone, {@code width} wide. */
+//? if <26.1 {
+    private void renderImportTile(GuiGraphics graphics, int x, int y, int width, boolean hovered) {
+//?} else {
+    private void renderImportTile(GuiGraphicsExtractor graphics, int x, int y, int width, boolean hovered) {
+//?}
+        ImportZone.draw(graphics, this.font, x, y, width, this.cardHeight,
+                Component.translatable("quickskin.dropzone.capes.short_main"),
+                Component.translatable("quickskin.dropzone.capes.short_click"), hovered);
+    }
+
+    private static boolean isHd(CapeEntry cape) {
+        return cape.isLocal() && cape.getLocalCape() != null && cape.getLocalCape().resolution() != null
+                && cape.getLocalCape().resolution().isHD();
+    }
+
+    /** The capes a section holds, None not counted. */
+    private static int capeCount(ShelfSection section) {
+        int count = 0;
+        for (CapeEntry cape : section.capes()) {
+            if (!cape.isNone()) {
+                count++;
+            }
+        }
+        return count;
     }
 
 //? if <1.21.6 {
@@ -1497,62 +1654,12 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 //?} else {
     private void renderLoadingTexture(GuiGraphicsExtractor graphics, int x, int y) {
 //?}
-        graphics.fill(x, y, x + capeDisplaySize, y + capeDisplaySize, 0xFF222222);
-//? if <1.21.9 {
-        graphics.drawCenteredString(this.font, Component.translatable("quickskin.cape.loading"),
-                x + capeDisplaySize / 2, y + capeDisplaySize / 2 - 4, 0xFF888888);
-//?} else if <26.1 {
-        graphics.drawCenteredString(this.font, Component.translatable("quickskin.cape.loading"),
-                x + capeDisplaySize / 2, y + capeDisplaySize / 2 - 4, 0xFF888888);
-//?} else {
-        graphics.centeredText(this.font, Component.translatable("quickskin.cape.loading"),
-                x + capeDisplaySize / 2, y + capeDisplaySize / 2 - 4, 0xFF888888);
-//?}
-    }
-
-//? if <26.1 {
-    private void renderCustomIndicator(GuiGraphics graphics, int x, int y) {
-//?} else {
-    private void renderCustomIndicator(GuiGraphicsExtractor graphics, int x, int y) {
-//?}
-        int indicatorSize = Math.max(4, capeDisplaySize / 16);
-        int rarityColor = 0xFF5555FF; // Purple for custom
-        graphics.fill(x + capeDisplaySize - indicatorSize * 2,
-                y + capeDisplaySize - indicatorSize * 2,
-                x + capeDisplaySize - indicatorSize / 2,
-                y + capeDisplaySize - indicatorSize / 2,
-                rarityColor);
-    }
-
-//? if <26.1 {
-    private void renderAnimatedIndicator(GuiGraphics graphics, int x, int y) {
-//?} else {
-    private void renderAnimatedIndicator(GuiGraphicsExtractor graphics, int x, int y) {
-//?}
-        String badgeText = Component.translatable("quickskin.cape.animated_badge").getString();
-        int textWidth = this.font.width(badgeText);
-        int badgeWidth = textWidth + 4;
-        int badgeHeight = this.font.lineHeight + 2;
-        int margin = 2;
-
-        int badgeX = x + margin;
-        int badgeY = y + margin;
-
-        int bgColor = 0xD000CCFF;
-        graphics.fill(badgeX, badgeY, badgeX + badgeWidth, badgeY + badgeHeight, bgColor);
-
-        int borderColor = 0xFF00AADD;
-//? if <1.21.9 {
-        graphics.renderOutline(badgeX, badgeY, badgeWidth, badgeHeight, borderColor);
-//?} else {
-        drawOutline(graphics,badgeX, badgeY, badgeWidth, badgeHeight, borderColor);
-//?}
-
-//? if <26.1 {
-        graphics.drawString(this.font, badgeText, badgeX + 2, badgeY + 1, 0xFFFFFFFF);
-//?} else {
-        graphics.text(this.font, badgeText, badgeX + 2, badgeY + 1, 0xFFFFFFFF);
-//?}
+        CapeTileArt.dashedOutline(graphics, x, y, this.capeWidth, this.capeDisplaySize, 0xFF6E6F73);
+        for (int i = 0; i < 3; i++) {
+            int dot = x + this.capeWidth / 2 - 6 + i * 5;
+            graphics.fill(dot, y + this.capeDisplaySize / 2, dot + 2, y + this.capeDisplaySize / 2 + 2,
+                    i == 0 ? 0xFFE0E0E0 : i == 1 ? 0xFF909090 : 0xFF5A5B60);
+        }
     }
 
     private boolean isSelected(CapeEntry cape) {
@@ -1595,36 +1702,38 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     @Override
 //? if <1.21.9 {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (this.contextMenu.isOpen() && (this.contextMenu.click(mouseX, mouseY, button) || this.contextMenu.isOpen())) {
+            return true;
+        }
         if (super.mouseClicked(mouseX, mouseY, button)) return true;
 //?} else if <26.1 {
     public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean focused) {
-        if (super.mouseClicked(event, focused)) return true;
         double mouseX = event.x();
         double mouseY = event.y();
         int button = event.buttonInfo().button();
+        if (this.contextMenu.isOpen() && (this.contextMenu.click(mouseX, mouseY, button) || this.contextMenu.isOpen())) {
+            return true;
+        }
+        if (super.mouseClicked(event, focused)) return true;
 //?} else {
     public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean focused) {
-        if (super.mouseClicked(event, focused)) return true;
         double mouseX = GuiCompat.mouseX(event);
         double mouseY = GuiCompat.mouseY(event);
         int button = GuiCompat.mouseButton(event);
+        if (this.contextMenu.isOpen() && (this.contextMenu.click(mouseX, mouseY, button) || this.contextMenu.isOpen())) {
+            return true;
+        }
+        if (super.mouseClicked(event, focused)) return true;
 //?}
 
         // Handle scrollbar dragging
         if (button == InputConstants.MOUSE_BUTTON_LEFT && this.maxScroll > 0) {
-            int scrollbarWidth = scaleValue(6);
-            int scrollbarX = this.gridX + this.gridWidth + 3;
-            int scrollbarTrackHeight = this.gridHeight;
-
-            if (mouseX >= scrollbarX && mouseX < scrollbarX + scrollbarWidth &&
-                    mouseY >= this.gridY && mouseY < this.gridY + scrollbarTrackHeight) {
-
+            int scrollbarX = scrollbarX();
+            if (mouseX >= scrollbarX && mouseX < scrollbarX + scrollbarWidth()
+                    && mouseY >= this.gridY && mouseY < this.gridY + this.gridHeight) {
                 this.isDraggingScrollbar = true;
-
-                int thumbHeight = Mth.clamp((int) ((float) (scrollbarTrackHeight * scrollbarTrackHeight) / (float) this.totalContentHeight),
-                        scaleValue(32), scrollbarTrackHeight - 8);
-                int thumbY = this.gridY + (int) (this.scrollOffset * (double) (scrollbarTrackHeight - thumbHeight) / (double) this.maxScroll);
-
+                int thumbHeight = scrollbarThumbHeight();
+                int thumbY = this.gridY + (int) (this.scrollOffset * (double) (this.gridHeight - thumbHeight) / (double) this.maxScroll);
                 if (mouseY >= thumbY && mouseY < thumbY + thumbHeight) {
                     this.scrollbarClickOffset = mouseY - thumbY;
                 } else {
@@ -1635,66 +1744,73 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             }
         }
 
-        // The import zone opens the file dialog, as the Import Cape button does
-        if (button == InputConstants.MOUSE_BUTTON_LEFT && importZoneShown
-                && isMouseOverGrid((int) mouseX, (int) mouseY)
-                && isMouseOver((int) mouseX, (int) mouseY, importZoneX, importZoneY, importZoneWidth, importZoneHeight)) {
-            if (minecraft != null && minecraft.getSoundManager() != null) {
-                minecraft.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-                    net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.value(), 1.0f
-                ));
+        if (!isMouseOverGrid((int) mouseX, (int) mouseY)) {
+            return false;
+        }
+        CapeGridLayout.Hit hit = shelfHit((int) mouseX, (int) mouseY);
+        if (hit == null) {
+            return false;
+        }
+
+        // The import tile opens the file dialog, as the Import Cape button does
+        if (hit.importSlot()) {
+            if (button == InputConstants.MOUSE_BUTTON_LEFT) {
+                playClick(1.0f);
+                importCape();
+                return true;
             }
-            importCape();
+            return false;
+        }
+
+        CapeEntry clickedCape = this.shelfSections.get(hit.section()).capes().get(hit.index());
+        if (button == InputConstants.MOUSE_BUTTON_RIGHT) {
+            if (!clickedCape.isNone()) {
+                this.contextMenu.open(clickedCape, ClientConfig.getInstance().isFavoriteCape(clickedCape.getCapeId()),
+                        (int) mouseX, (int) mouseY, this.width, this.height);
+            }
+            return true;
+        }
+        if (button != InputConstants.MOUSE_BUTTON_LEFT) {
+            return false;
+        }
+
+        // The favourite button, and the edit and delete buttons of a cape of the player's own
+        int[] card = cardOrigin(hit);
+        int[] favorite = favoriteButtonBounds(clickedCape, card[0], card[1]);
+        if (favorite != null && isMouseOver((int) mouseX, (int) mouseY, favorite[0], favorite[1], favorite[2], favorite[3])) {
+            playClick(1.0f);
+            toggleFavorite(clickedCape);
+            return true;
+        }
+        int[] delete = deleteButtonBounds(clickedCape, card[0], card[1]);
+        if (delete != null && isMouseOver((int) mouseX, (int) mouseY, delete[0], delete[1], delete[2], delete[3])) {
+            showDeleteConfirmation(clickedCape);
+            return true;
+        }
+        int[] edit = editButtonBounds(clickedCape, card[0], card[1]);
+        if (edit != null && isMouseOver((int) mouseX, (int) mouseY, edit[0], edit[1], edit[2], edit[3])) {
+            startCapeEdit(clickedCape);
             return true;
         }
 
-        // Handle cape selection
-        if (button == InputConstants.MOUSE_BUTTON_LEFT && isMouseOverGrid((int) mouseX, (int) mouseY)) {
-            CapeEntry clickedCape = getCapeAt((int) mouseX, (int) mouseY);
-            if (clickedCape != null) {
-                // Check for delete button click (only for local capes, not "None")
-                if (clickedCape.isLocal() && !clickedCape.isKnown()) {
-                    int[] pos = getCapePosition(clickedCape);
-                    if (pos != null) {
-                        int x = pos[0];
-                        int y = pos[1];
-                        int margin = 2;
-
-                        int deleteButtonX = x + capeDisplaySize - ACTION_BUTTON_SIZE - margin;
-                        int deleteButtonY = y + margin;
-                        if (isMouseOver((int) mouseX, (int) mouseY, deleteButtonX, deleteButtonY, ACTION_BUTTON_SIZE, ACTION_BUTTON_SIZE)) {
-                            showDeleteConfirmation(clickedCape);
-                            return true;
-                        }
-
-                        int editButtonY = deleteButtonY + ACTION_BUTTON_SIZE + 2;
-                        if (clickedCape.isEditable()
-                                && isMouseOver((int) mouseX, (int) mouseY, deleteButtonX, editButtonY, ACTION_BUTTON_SIZE, ACTION_BUTTON_SIZE)) {
-                            startCapeEdit(clickedCape);
-                            return true;
-                        }
-                    }
-                }
-
-                // Play selection sound
-                if (minecraft != null && minecraft.getSoundManager() != null) {
-                    minecraft.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-                        net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.value(), 1.0f, 0.25f
-                    ));
-                }
-
-                // Select cape (includes "None" option)
-                this.selectedCape = clickedCape;
-                if (clickedCape.isKnown() && clickedCape.getKnownCape() != null && clickedCape.getKnownCape().isNoCape()) {
-                    removeCape();
-                } else {
-                    applyCape(clickedCape);
-                }
-                return true;
-            }
+        // Wear it at once (None takes the cape off)
+        playClick(0.25f);
+        this.selectedCape = clickedCape;
+        this.previewCape = clickedCape;
+        if (clickedCape.isNone()) {
+            removeCape();
+        } else {
+            applyCape(clickedCape);
         }
+        return true;
+    }
 
-        return false;
+    private void playClick(float volume) {
+        if (minecraft != null && minecraft.getSoundManager() != null) {
+            minecraft.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                    net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.value(), 1.0f, volume
+            ));
+        }
     }
 
     private void applyCape(CapeEntry cape) {
@@ -1724,8 +1840,8 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             capeLocation = cape.getTextureLocation();
         }
 
-        // Always update preview widget (works both in-game and on title screen)
-        playerWidget.setCape(capeLocation, capeId);
+        // Dress the model (works both in-game and on title screen)
+        updateStage();
 
         // Save to config for persistence
         config.activeCapeHash = capeId;
@@ -1766,15 +1882,29 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     private void updateScrollFromMouse(double mouseY) {
-        int scrollbarTrackHeight = this.gridHeight;
-        int thumbHeight = Mth.clamp((int) ((float) (scrollbarTrackHeight * scrollbarTrackHeight) / (float) this.totalContentHeight),
-                scaleValue(32), scrollbarTrackHeight - 8);
-
-        double scrollableTrackHeight = scrollbarTrackHeight - thumbHeight;
+        double scrollableTrackHeight = this.gridHeight - scrollbarThumbHeight();
         if (scrollableTrackHeight > 0) {
             double scrollRatio = (mouseY - this.gridY - this.scrollbarClickOffset) / scrollableTrackHeight;
             this.targetScrollOffset = Mth.clamp(scrollRatio * this.maxScroll, 0, this.maxScroll);
         }
+    }
+
+    private int scrollbarX() {
+        return this.gridX + this.gridWidth + 8;
+    }
+
+    /** Right of the speed slider's track, on its plate: room for the widest percentage. */
+    private int speedPercentRoom() {
+        return this.font.width("300%") + 14;
+    }
+
+    private static int scrollbarWidth() {
+        return 4;
+    }
+
+    private int scrollbarThumbHeight() {
+        return Mth.clamp((int) ((float) (this.gridHeight * this.gridHeight) / (float) this.totalContentHeight),
+                24, this.gridHeight - 8);
     }
 
     @Override
@@ -1824,19 +1954,21 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 //?} else {
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
 //?}
-        if (isMouseOverGrid((int) mouseX, (int) mouseY)) {
+        this.contextMenu.close();
+        // The wheel scrolls the list wherever the mouse is, unless something under it, such as the
+        // player preview's zoom, takes the notch
 //? if <1.21 {
-            this.targetScrollOffset = Mth.clamp(this.targetScrollOffset - delta * scrollSpeed, 0.0D, this.maxScroll);
-//?} else {
-            this.targetScrollOffset = Mth.clamp(this.targetScrollOffset - deltaY * scrollSpeed, 0.0D, this.maxScroll);
-//?}
+        if (!isMouseOverGrid((int) mouseX, (int) mouseY) && super.mouseScrolled(mouseX, mouseY, delta)) {
             return true;
         }
-//? if <1.21 {
-        return super.mouseScrolled(mouseX, mouseY, delta);
+        this.targetScrollOffset = Mth.clamp(this.targetScrollOffset - delta * scrollSpeed, 0.0D, this.maxScroll);
 //?} else {
-        return super.mouseScrolled(mouseX, mouseY, deltaX, deltaY);
+        if (!isMouseOverGrid((int) mouseX, (int) mouseY) && super.mouseScrolled(mouseX, mouseY, deltaX, deltaY)) {
+            return true;
+        }
+        this.targetScrollOffset = Mth.clamp(this.targetScrollOffset - deltaY * scrollSpeed, 0.0D, this.maxScroll);
 //?}
+        return true;
     }
 
 //? if <26.1 {
@@ -1846,112 +1978,103 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
         if (this.maxScroll <= 0) return;
 
-        int scrollbarWidth = scaleValue(6);
-        int scrollbarX = this.gridX + this.gridWidth + 3;
-        int scrollbarTrackEnd = this.gridY + this.gridHeight;
-
-        graphics.fill(scrollbarX, this.gridY, scrollbarX + scrollbarWidth, scrollbarTrackEnd, 0x80000000);
-
-        int thumbHeight = Mth.clamp((int) ((float) (this.gridHeight * this.gridHeight) / (float) this.totalContentHeight),
-                scaleValue(32), this.gridHeight - 8);
+        int x = scrollbarX();
+        int w = scrollbarWidth();
+        graphics.fill(x, this.gridY, x + w, this.gridY + this.gridHeight, 0x80000000);
+        int thumbHeight = scrollbarThumbHeight();
         int thumbY = this.gridY + (int) (this.scrollOffset * (double) (this.gridHeight - thumbHeight) / (double) this.maxScroll);
+        graphics.fill(x, thumbY, x + w, thumbY + thumbHeight, 0xFF808080);
+        graphics.fill(x, thumbY, x + w - 1, thumbY + thumbHeight - 1, 0xFFC0C0C0);
+    }
 
-        graphics.fill(scrollbarX, thumbY, scrollbarX + scrollbarWidth, thumbY + thumbHeight, -8355712);
-        graphics.fill(scrollbarX + 1, thumbY + 1, scrollbarX + scrollbarWidth - 1, thumbY + thumbHeight - 1, -4144960);
+    /** What lies under the mouse in the list, below its sticky heading; null for nothing. */
+    @Nullable
+    private CapeGridLayout.Hit shelfHit(int mouseX, int mouseY) {
+        if (!isMouseOverGrid(mouseX, mouseY) || mouseY < this.gridY + STICKY_HEIGHT) {
+            return null;
+        }
+        int x = mouseX - this.gridX;
+        int y = mouseY - this.gridY + (int) this.scrollOffset;
+        CapeGridLayout.Hit hit = this.shelf.hitTest(x, y);
+        // A cell ends with the gap after its card, which holds nothing; the import tile reaches
+        // the end of its row
+        int width = hit == null ? 0 : hit.importSlot() ? this.shelf.importWidth(hit.index()) - CARD_GAP : this.cardWidth;
+        if (hit == null || x - this.shelf.slotX(hit.index()) >= width
+                || y - this.shelf.cellY(hit.section(), hit.index()) >= this.cardHeight) {
+            return null;
+        }
+        return hit;
     }
 
     @Nullable
     private CapeEntry getCapeAt(int mouseX, int mouseY) {
-        if (!isMouseOverGrid(mouseX, mouseY)) return null;
-
-        int absoluteMouseY = mouseY + (int) scrollOffset;
-        int currentY = gridY;
-
-        // --- Check "My Capes" section ---
-        if (!localCapes.isEmpty()) {
-            currentY += HEADER_HEIGHT;
-            int rows = (int) Math.ceil((double) localCapes.size() / capesPerRow);
-            int sectionHeight = rows * (capeDisplaySize + capePadding) + capePadding;
-
-            if (absoluteMouseY >= currentY && absoluteMouseY < currentY + sectionHeight) {
-                CapeEntry cape = findCapeInGrid(mouseX, mouseY, absoluteMouseY, currentY, localCapes);
-                if (cape != null) return cape;
-            }
-            // The next section starts where renderSection ends, without the trailing padding
-            currentY += sectionHeight - capePadding;
+        CapeGridLayout.Hit hit = shelfHit(mouseX, mouseY);
+        if (hit == null || hit.importSlot()) {
+            return null;
         }
-
-        // --- Check the built-in sections, spaced as renderCapeGrid draws them ---
-        for (CapeSection section : builtInSections) {
-            currentY += SECTION_GAP + HEADER_HEIGHT;
-            int rows = (int) Math.ceil((double) section.capes().size() / capesPerRow);
-            int gridHeight = rows * (capeDisplaySize + capePadding);
-            if (absoluteMouseY >= currentY && absoluteMouseY < currentY + gridHeight + capePadding) {
-                CapeEntry cape = findCapeInGrid(mouseX, mouseY, absoluteMouseY, currentY, section.capes());
-                if (cape != null) return cape;
-            }
-            currentY += gridHeight;
-        }
-
-        return null;
+        return this.shelfSections.get(hit.section()).capes().get(hit.index());
     }
 
-    private CapeEntry findCapeInGrid(int mouseX, int mouseY, int absoluteMouseY, int sectionTopY, List<CapeEntry> capes) {
-        int relX = mouseX - this.gridX - capePadding;
-        int relY = absoluteMouseY - sectionTopY - capePadding;
-
-        int col = relX / (capeDisplaySize + capePadding);
-        int row = relY / (capeDisplaySize + capePadding);
-
-        if (col < 0 || col >= capesPerRow) return null;
-
-        int index = row * capesPerRow + col;
-
-        if (index >= 0 && index < capes.size()) {
-            int capeX = this.gridX + capePadding + col * (capeDisplaySize + capePadding);
-            // We need the on-screen Y to check bounds, not the absolute Y
-            int capeY = sectionTopY + capePadding + row * (capeDisplaySize + capePadding) - (int) this.scrollOffset;
-            if (isMouseOver(mouseX, mouseY, capeX, capeY, capeDisplaySize, capeDisplaySize)) {
-                return capes.get(index);
-            }
-        }
-        return null;
-    }
-
+    /**
+     * Where a cape is on screen: the top-left corner of a square of {@link #capeDisplaySize}
+     * centred on the cape, whose middle is the middle of the cape. The first place it is listed: a
+     * favourite is found in Favourites.
+     */
     @Nullable
     private int[] getCapePosition(CapeEntry cape) {
-        int currentY = gridY - (int) scrollOffset;
-
-        // Check "My Capes" section
-        if (!localCapes.isEmpty()) {
-            currentY += HEADER_HEIGHT;
-            int index = localCapes.indexOf(cape);
-            if (index != -1) {
-                int row = index / capesPerRow;
-                int col = index % capesPerRow;
-                int x = gridX + capePadding + col * (capeDisplaySize + capePadding);
-                int y = currentY + capePadding + row * (capeDisplaySize + capePadding);
-                return new int[]{x, y};
+        for (int i = 0; i < this.shelfSections.size(); i++) {
+            int slot = this.shelfSections.get(i).capes().indexOf(cape);
+            if (slot >= 0) {
+                int cx = this.gridX + this.shelf.slotX(slot) + this.cardWidth / 2;
+                int capeTop = this.gridY - (int) this.scrollOffset + this.shelf.cellY(i, slot) + CARD_PADDING;
+                return new int[]{cx - this.capeDisplaySize / 2, capeTop};
             }
-            int rows = (int) Math.ceil((double) localCapes.size() / capesPerRow);
-            currentY += rows * (capeDisplaySize + capePadding);
-        }
-
-        // Check the built-in sections
-        for (CapeSection section : builtInSections) {
-            currentY += SECTION_GAP + HEADER_HEIGHT;
-            int index = section.capes().indexOf(cape);
-            if (index != -1) {
-                int row = index / capesPerRow;
-                int col = index % capesPerRow;
-                int x = gridX + capePadding + col * (capeDisplaySize + capePadding);
-                int y = currentY + capePadding + row * (capeDisplaySize + capePadding);
-                return new int[]{x, y};
-            }
-            int rows = (int) Math.ceil((double) section.capes().size() / capesPerRow);
-            currentY += rows * (capeDisplaySize + capePadding);
         }
         return null;
+    }
+
+    /** The top-left corner of the card a hit landed on. */
+    private int[] cardOrigin(CapeGridLayout.Hit hit) {
+        return new int[]{this.gridX + this.shelf.slotX(hit.index()),
+                this.gridY - (int) this.scrollOffset + this.shelf.cellY(hit.section(), hit.index())};
+    }
+
+    /**
+     * The {@code row}th button down the top-right corner of the card at cardX, cardY, as
+     * {x, y, width, height}. A cape listed twice (a favourite) has buttons on both cards.
+     */
+    private int[] cardButton(int cardX, int cardY, int row) {
+        return new int[]{cardX + this.cardWidth - ACTION_BUTTON_SIZE - ACTION_BUTTON_INSET,
+                cardY + ACTION_BUTTON_INSET + row * (ACTION_BUTTON_SIZE + 2), ACTION_BUTTON_SIZE, ACTION_BUTTON_SIZE};
+    }
+
+    /** The favourite button at the top of a card, or null for None. A favourite keeps its gold star there. */
+    @Nullable
+    private int[] favoriteButtonBounds(CapeEntry cape, int cardX, int cardY) {
+        return cape.isNone() ? null : cardButton(cardX, cardY, 0);
+    }
+
+    /** The delete button under the favourite button of a cape of the player's own; null for others. */
+    @Nullable
+    private int[] deleteButtonBounds(CapeEntry cape, int cardX, int cardY) {
+        return !cape.isLocal() || cape.isKnown() ? null : cardButton(cardX, cardY, 1);
+    }
+
+    /** The delete button on the first card a cape is listed on. */
+    @Nullable
+    private int[] deleteButtonBounds(CapeEntry cape) {
+        int[] pos = getCapePosition(cape);
+        if (pos == null) {
+            return null;
+        }
+        int cardX = pos[0] + this.capeDisplaySize / 2 - this.cardWidth / 2;
+        return deleteButtonBounds(cape, cardX, pos[1] - CARD_PADDING);
+    }
+
+    /** The edit button under the delete button, for a cape whose editor source was kept; null otherwise. */
+    @Nullable
+    private int[] editButtonBounds(CapeEntry cape, int cardX, int cardY) {
+        return deleteButtonBounds(cape, cardX, cardY) == null || !cape.isEditable() ? null : cardButton(cardX, cardY, 2);
     }
 
     private boolean isMouseOverGrid(int mouseX, int mouseY) {
@@ -2112,8 +2235,6 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
         public SpeedSlider(int x, int y, int width, int height) {
             super(x, y, width, height, Component.empty(), 0);
-
-            this.setTooltip(Tooltip.create(Component.translatable("quickskin.cape.animation_speed_tooltip")));
             loadSpeedForCurrentCape();
         }
 
@@ -2143,8 +2264,35 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         @Override
         protected void updateMessage() {
             // Display percentage (10% to 300%)
-            int percentage = (int) Math.round(10 + this.value * this.value * 290);
-            setMessage(Component.translatable("quickskin.cape.animation_speed", percentage));
+            setMessage(Component.translatable("quickskin.cape.animation_speed", percentage()));
+        }
+
+        private int percentage() {
+            return (int) Math.round(10 + this.value * this.value * 290);
+        }
+
+        /**
+         * The plate round the track, as the menu's cards are drawn, with the speed icon on its
+         * left and the percentage on its right, then the track in the cape editor's slider style.
+         */
+        @Override
+        //? if <26.1 {
+        public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        //?} else {
+        public void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        //?}
+            boolean lit = this.isHovered() || this.isFocused();
+            int plateX = getX() - SPEED_ICON_ROOM;
+            int plateY = getY() - 3;
+            int plateRight = getX() + getWidth() + speedPercentRoom();
+            CapeTileArt.card(graphics, plateX, plateY, plateRight - plateX, CONTROL_HEIGHT,
+                    lit ? CARD_EDGE_HOVER : CARD_EDGE, CARD_FACE);
+            CapeEditorStyle.icon(graphics, ICON_SPEED, plateX + 6, plateY + (CONTROL_HEIGHT - 7) / 2,
+                    lit ? 0xFFFFFFFF : 0xFFC6C7CC);
+            CapeEditorStyle.slider(graphics, getX(), getY(), getWidth(), getHeight(), this.value, lit, this.active);
+            String percent = percentage() + "%";
+            UiText.draw(graphics, font, percent, plateRight - 6 - font.width(percent),
+                    plateY + (CONTROL_HEIGHT - 8) / 2, 0xFFFFFFFF);
         }
 
         @Override
