@@ -10,6 +10,7 @@ import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.client.gui.util.BackgroundRenderer;
 import com.quickskin.mod.client.gui.util.UiText;
 import com.quickskin.mod.client.gui.widget.CapeEditorStyle;
+import com.quickskin.mod.client.gui.widget.CapeGuideChip;
 import com.quickskin.mod.client.gui.widget.CapeSwatchButton;
 import com.quickskin.mod.client.gui.widget.CapeToggleSwitch;
 import com.quickskin.mod.client.gui.widget.CapeToolButton;
@@ -39,6 +40,7 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -120,6 +122,18 @@ public class CapeAdjustScreen extends Screen {
 
     // Mirror: copy cape back region to front
     private boolean mirrorFrontBack = false;
+
+    // The canvas opens with the Front guide alone; the legend shows or hides the other two
+    private boolean showBackGuide = false;
+    private boolean showElytraGuide = false;
+    private static final int FRONT_GUIDE = 0xFF5599FF;
+    private static final int BACK_GUIDE = 0xFF55FF55;
+    private static final int ELYTRA_GUIDE = 0xFFFFAA00;
+    private static final int LEGEND_PAD = 4;
+    private static final int LEGEND_GAP = 2;
+    /** Where the legend's Front entry is drawn, and whether the entries name their guides. */
+    private int legendX, legendY, legendFrontW;
+    private boolean legendLabels;
 
     // Opaque cape: flatten the cape's transparency onto a solid colour.
     // Off by default; off is exactly the behaviour this screen had before the toggle existed.
@@ -325,6 +339,7 @@ public class CapeAdjustScreen extends Screen {
         initPositionControls();
         initOpaqueControls();
         initZoomControls();
+        initGuideLegend();
         initFooter();
         initTimelineControls();
         initPlayerPreview();
@@ -539,6 +554,45 @@ public class CapeAdjustScreen extends Screen {
         mirrorButton.setMessage(mirrorMessage());
         mirrorButton.setTooltip(Tooltip.create(mirrorMessage().copy().append("\n")
                 .append(Component.translatable("quickskin.cape.adjust_mirror_tip"))));
+    }
+
+    /**
+     * The guide legend in the canvas's bottom-left corner, over the strip of the cape the game never
+     * shows: Front, always shown, then Cape Back and Elytra, which a click shows or hides. On a canvas
+     * too narrow for their names the entries keep their colour squares, and their tooltips name them.
+     */
+    private void initGuideLegend() {
+        String front = Component.translatable("quickskin.cape.adjust_front").getString();
+        Component backName = Component.translatable("quickskin.cape.adjust_back");
+        Component elytraName = Component.translatable("quickskin.cape.adjust_elytra");
+        int named = CapeGuideChip.width(this.font, front) + CapeGuideChip.width(this.font, backName.getString())
+                + CapeGuideChip.width(this.font, elytraName.getString()) + 2 * LEGEND_GAP;
+        legendLabels = named <= gridW - 2 * LEGEND_PAD;
+        legendX = gridX + LEGEND_PAD;
+        legendY = gridY + gridH - LEGEND_PAD - CapeGuideChip.HEIGHT;
+        legendFrontW = CapeGuideChip.width(this.font, legendLabels ? front : "");
+        int x = legendX + legendFrontW + LEGEND_GAP;
+        CapeGuideChip back = guideChip(x, backName, BACK_GUIDE, showBackGuide, chip -> {
+            showBackGuide = !showBackGuide;
+            chip.setShown(showBackGuide);
+        });
+        x += back.getWidth() + LEGEND_GAP;
+        guideChip(x, elytraName, ELYTRA_GUIDE, showElytraGuide, chip -> {
+            showElytraGuide = !showElytraGuide;
+            chip.setShown(showElytraGuide);
+        });
+    }
+
+    private CapeGuideChip guideChip(int x, Component name, int color, boolean shown,
+                                    java.util.function.Consumer<CapeGuideChip> toggle) {
+        String label = legendLabels ? name.getString() : "";
+        Component message = Component.translatable("quickskin.cape.adjust_guide", name);
+        CapeGuideChip chip = new CapeGuideChip(x, legendY, CapeGuideChip.width(this.font, label), label, color,
+                message, b -> toggle.accept((CapeGuideChip) b));
+        chip.setShown(shown);
+        chip.setTooltip(Tooltip.create(message.copy().append("\n")
+                .append(Component.translatable("quickskin.cape.adjust_guide_tip"))));
+        return this.addRenderableWidget(chip);
     }
 
     /** Zoom out, the zoom slider and its percentage, and zoom in, in the panel under the canvas. */
@@ -1571,6 +1625,7 @@ public class CapeAdjustScreen extends Screen {
         // Render cape grid overlay
         renderCapeGridOverlay(graphics);
         renderSourceBoundary(graphics);
+        renderGuideLegend(graphics);
 
         renderZoomPanel(graphics);
         renderTimelinePanel(graphics);
@@ -1586,6 +1641,24 @@ public class CapeAdjustScreen extends Screen {
         //?} else {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
         //?}
+    }
+
+    /** The guide legend's backing and its Front entry; the other two entries are buttons over it. */
+    //? if <26.1 {
+    private void renderGuideLegend(GuiGraphics graphics) {
+    //?} else {
+    private void renderGuideLegend(GuiGraphicsExtractor graphics) {
+    //?}
+        int right = legendX + legendFrontW;
+        for (GuiEventListener child : this.children()) {
+            if (child instanceof CapeGuideChip chip) {
+                right = Math.max(right, chip.getX() + chip.getWidth());
+            }
+        }
+        graphics.fill(legendX - 2, legendY - 2, right + 2, legendY + CapeGuideChip.HEIGHT + 2, 0xC0101012);
+        CapeGuideChip.draw(graphics, this.font, legendX, legendY, legendFrontW, CapeGuideChip.HEIGHT,
+                legendLabels ? Component.translatable("quickskin.cape.adjust_front").getString() : "",
+                FRONT_GUIDE, true, false);
     }
 
     /** The strip across the top: the title on the left, how to use the canvas on the right. */
@@ -1913,25 +1986,27 @@ public class CapeAdjustScreen extends Screen {
 
         // --- Cape outlines ---
         //? if <1.21.9 {
-        graphics.renderOutline(backX, backY, backW, backH, 0xFF5599FF);
+        graphics.renderOutline(backX, backY, backW, backH, FRONT_GUIDE);
         //?} else {
-        drawOutline(graphics, backX, backY, backW, backH, 0xFF5599FF);
+        drawOutline(graphics, backX, backY, backW, backH, FRONT_GUIDE);
         //?}
-        if (!mirrorFrontBack) {
+        // A face whose guide is hidden is dimmed like the unused areas, so only shown guides stand out
+        if (showBackGuide && !mirrorFrontBack) {
             //? if <1.21.9 {
-            graphics.renderOutline(frontX, backY, frontW, backH, 0xFF55FF55);
+            graphics.renderOutline(frontX, backY, frontW, backH, BACK_GUIDE);
             //?} else {
-            drawOutline(graphics, frontX, backY, frontW, backH, 0xFF55FF55);
+            drawOutline(graphics, frontX, backY, frontW, backH, BACK_GUIDE);
             //?}
         } else {
             graphics.fill(frontX, backY, frontX + frontW, backY + backH, 0x88000000);
         }
 
-        // Dim all elytra faces except the back/outer wing (barely visible in-game)
+        // Dim all elytra faces except the back/outer wing (barely visible in-game), and that one too
+        // while the Elytra guide is hidden
         // Top + bottom faces: (24,0)->(44,2)
         graphics.fill(eTopX, gridY, eBotX + eBotW, elytraTopStripBottom, 0x88000000);
-        // Left side + front/inner + right side: (22,2)->(36,22)
-        graphics.fill(eLX, eLY, eBackX, eLY + eLH, 0x88000000);
+        // Left side + front/inner + right side: (22,2)->(36,22), up to (46,22) without the guide
+        graphics.fill(eLX, eLY, showElytraGuide ? eBackX : elytraRightX, eLY + eLH, 0x88000000);
 
         // --- Back/outer wing: wing silhouette outline + corner dimming ---
         // Wing shape from elytra default texture (MinecraftCapes convention)
@@ -1940,9 +2015,9 @@ public class CapeAdjustScreen extends Screen {
         int eBackFaceY = eLY; // same Y as other elytra body faces
         double colW = eBackW / 10.0;
         double rowH = eLH / 20.0;
-        int wingColor = 0xFFFFAA00;
+        int wingColor = ELYTRA_GUIDE;
 
-        for (int row = 0; row < 20; row++) {
+        for (int row = 0; showElytraGuide && row < 20; row++) {
             int left = CapeElytraSilhouette.wingStartColumn(row);
             int right = CapeElytraSilhouette.wingEndColumn(row);
             int sLeft = eBackX + (int) (left * colW);
@@ -2001,29 +2076,29 @@ public class CapeAdjustScreen extends Screen {
             //?} else {
             graphics.text(this.font, label,
             //?}
-                    backX + (backW - labelW) / 2, backY + backH / 2 - 4, 0xFF5599FF);
+                    backX + (backW - labelW) / 2, backY + backH / 2 - 4, FRONT_GUIDE);
         }
         // Cape back (outer side, visible from behind) — hidden when mirroring from front
         String frontLabel = Component.translatable("quickskin.cape.adjust_back").getString();
         int frontLabelW = this.font.width(frontLabel);
-        if (!mirrorFrontBack && frontLabelW <= labelRoom) {
+        if (showBackGuide && !mirrorFrontBack && frontLabelW <= labelRoom) {
             //? if <26.1 {
             graphics.drawString(this.font, frontLabel,
             //?} else {
             graphics.text(this.font, frontLabel,
             //?}
-                    frontX + (frontW - frontLabelW) / 2, backY + backH / 2 - 4, 0xFF55FF55);
+                    frontX + (frontW - frontLabelW) / 2, backY + backH / 2 - 4, BACK_GUIDE);
         }
         // Elytra back/outer (centered in wing shape)
         String eOuterLabel = Component.translatable("quickskin.cape.adjust_elytra").getString();
         int eOuterLabelW = this.font.width(eOuterLabel);
-        if (eBackW > eOuterLabelW + 4) {
+        if (showElytraGuide && eBackW > eOuterLabelW + 4) {
             //? if <26.1 {
             graphics.drawString(this.font, eOuterLabel,
             //?} else {
             graphics.text(this.font, eOuterLabel,
             //?}
-                    eBackX + (eBackW - eOuterLabelW) / 2, eLY + eLH / 2 - 4, 0xFFFFAA00);
+                    eBackX + (eBackW - eOuterLabelW) / 2, eLY + eLH / 2 - 4, ELYTRA_GUIDE);
         }
     }
 

@@ -2219,7 +2219,7 @@
               "capture": {
                 "title": "Cape editor",
                 "review_tier": "all",
-                "expectation": "The Quick Skin cape-adjustment editor is open: a slate header strip carries the readable Adjust Cape Image title on the left and the Drag to move · Scroll to zoom instructions on the right. Its framed canvas shows the 64x32 test cape: a flat navy base with an orange, green-striped Front panel and labelled Front, Cape Back and Elytra region outlines; there are no grid lines. Under the canvas a Zoom panel holds the source size, a zoom-out button, the zoom slider with its percentage and a zoom-in button. A panel on the right opens with Cape and Elytra view buttons, Cape selected in blue, above a 3D player wearing the cape from behind, then the Resolution buttons 1x to 16x with the output size under them, the Position buttons Center, Snap and Mirror, and the Opaque fill switch with its colour swatch. Cancel and a green Apply Cape button sit at the bottom right.",
+                "expectation": "The Quick Skin cape-adjustment editor is open: a slate header strip carries the readable Adjust Cape Image title on the left and the Drag to move · Scroll to zoom instructions on the right. Its framed canvas shows the 64x32 test cape: a flat navy base with an orange, green-striped Front panel and the labelled Front region outline alone, since the editor opens with the Cape Back and Elytra outlines hidden, their faces dimmed like the canvas's unused areas; there are no grid lines. In the canvas's bottom-left corner a small guide legend lists Front lit with a filled blue square, then Cape Back and Elytra unlit with hollow grey squares. Under the canvas a Zoom panel holds the source size, a zoom-out button, the zoom slider with its percentage and a zoom-in button. A panel on the right opens with Cape and Elytra view buttons, Cape selected in blue, above a 3D player wearing the cape from behind, then the Resolution buttons 1x to 16x with the output size under them, the Position buttons Center, Snap and Mirror, and the Opaque fill switch with its colour swatch. Cancel and a green Apply Cape button sit at the bottom right.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
@@ -2643,7 +2643,7 @@
               "capture": {
                 "title": "Black-padded BMO aligned",
                 "review_tier": "key",
-                "expectation": "At 200% zoom, the complete 64x32 BMO atlas fills the crop: the Front, Cape Back and tapered Elytra art align with their coloured guides and the 3D player preview wears the aligned cape. Narrow teal strips between or beside those three highlighted faces are expected auxiliary side, top and bottom UV faces from the same BMO atlas, not leaked padding.",
+                "expectation": "At 200% zoom, the complete 64x32 BMO atlas fills the crop: the Front, Cape Back and tapered Elytra art align with their coloured guides, which the guide legend in the canvas's bottom-left corner shows all lit (blue Front, green Cape Back, orange Elytra), and the 3D player preview wears the aligned cape. Narrow teal strips between or beside those three highlighted faces are expected auxiliary side, top and bottom UV faces from the same BMO atlas, not leaked padding.",
                 "probes": []
               },
               "requires": [

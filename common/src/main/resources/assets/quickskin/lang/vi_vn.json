@@ -195,6 +195,8 @@
   "quickskin.cape.adjust_mirror_on": "Đối xứng: BẬT",
   "quickskin.cape.adjust_mirror_off": "Đối xứng: TẮT",
   "quickskin.cape.adjust_mirror_tip": "Mặt sau áo choàng sao chép mặt trước",
+  "quickskin.cape.adjust_guide": "Đường dẫn %s",
+  "quickskin.cape.adjust_guide_tip": "Nhấn để hiện hoặc ẩn đường viền trên khung vẽ",
   "quickskin.cape.adjust_zoom_in": "Phóng to",
   "quickskin.cape.adjust_zoom_out": "Thu nhỏ",
   "quickskin.cape.adjust_view_cape": "Áo choàng",

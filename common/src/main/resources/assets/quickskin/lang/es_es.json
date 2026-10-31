@@ -199,6 +199,8 @@
   "quickskin.cape.adjust_mirror_on": "Espejo: SÍ",
   "quickskin.cape.adjust_mirror_off": "Espejo: NO",
   "quickskin.cape.adjust_mirror_tip": "La trasera copia la delantera",
+  "quickskin.cape.adjust_guide": "Guía: %s",
+  "quickskin.cape.adjust_guide_tip": "Clic para mostrar u ocultar su contorno en el lienzo",
   "quickskin.cape.adjust_zoom_in": "Acercar",
   "quickskin.cape.adjust_zoom_out": "Alejar",
   "quickskin.cape.adjust_view_cape": "Capa",
