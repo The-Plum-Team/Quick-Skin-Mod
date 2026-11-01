@@ -119,6 +119,55 @@ class PublicationReconciliationTest(unittest.TestCase):
         self.assertEqual(requested[0][1], expected.bytes)
         self.assertTrue(requested[0][0].startswith(f"{reconciliation.CURSEFORGE_CDN}/0/42/"))
 
+    def test_curseforge_finds_a_file_under_the_name_curseforge_gave_it(self) -> None:
+        payload = b"quick-skin-published-bytes"
+        expected = self.expected_for(payload)
+        renamed = self.approved(expected)
+        renamed["fileName"] = "Quick-Skin-Fabric-1.20.1-3.0.0.jar"
+        requested: list[str] = []
+
+        def fetch(url: str, limit: int) -> bytes:
+            requested.append(url)
+            return payload
+
+        result = reconciliation.classify_curseforge([renamed], expected, 1323980, fetch)
+        self.assertFalse(result.publish)
+        self.assertEqual(result.remote_id, "42")
+        # The CDN answers 403 for the original name, so the bytes come from the stored one.
+        self.assertEqual(
+            requested,
+            [f"{reconciliation.CURSEFORGE_CDN}/0/42/Quick-Skin-Fabric-1.20.1-3.0.0.jar"],
+        )
+
+    def test_curseforge_renamed_file_still_needs_the_staged_bytes(self) -> None:
+        payload = b"quick-skin-published-bytes"
+        expected = self.expected_for(payload)
+        renamed = self.approved(expected)
+        renamed["fileName"] = reconciliation.curseforge_file_name(expected.filename)
+        with self.assertRaises(reconciliation.ReconciliationError):
+            reconciliation.classify_curseforge(
+                [renamed], expected, 1323980, lambda url, limit: b"x" * len(payload)
+            )
+
+    def test_curseforge_refuses_both_names_listed_at_once(self) -> None:
+        payload = b"quick-skin-published-bytes"
+        expected = self.expected_for(payload)
+        original = self.approved(expected)
+        renamed = dict(original, id=43, fileName=reconciliation.curseforge_file_name(expected.filename))
+        with self.assertRaises(reconciliation.ReconciliationError):
+            reconciliation.classify_curseforge(
+                [original, renamed], expected, 1323980, self.refuse_download
+            )
+
+    def test_curseforge_file_name_joins_spaced_separators_into_one_hyphen(self) -> None:
+        for original, stored in (
+            ("Quick Skin - Fabric - 1.20.1-4.0.0.jar", "Quick-Skin-Fabric-1.20.1-4.0.0.jar"),
+            ("Quick Skin - NeoForge - 26.3-4.0.0.jar", "Quick-Skin-NeoForge-26.3-4.0.0.jar"),
+            ("block-pops-2.0.0.jar", "block-pops-2.0.0.jar"),
+        ):
+            with self.subTest(original=original):
+                self.assertEqual(reconciliation.curseforge_file_name(original), stored)
+
     def test_curseforge_fails_closed_when_published_bytes_differ(self) -> None:
         payload = b"quick-skin-published-bytes"
         expected = self.expected_for(payload)
