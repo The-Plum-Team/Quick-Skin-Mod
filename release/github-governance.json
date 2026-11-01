@@ -58,39 +58,18 @@
       ]
     },
     "release_source": {
-      ".github/workflows/release.yml": [
-        "environment: release",
-        "github_release.py stage",
-        "github_release.py publish",
-        "--event-target",
-        "--target \"$RELEASE_TARGET\"",
-        "release-target: ${{ needs.build.outputs.target }}",
-        "queue: max",
-        "rehearse_publication.py",
-        "publication_state.py register",
-        "publication_state.py begin"
-      ],
       ".github/workflows/sync-version-branches.yml": [
         "scripts/release/release_sources.py --kind mode",
         "version-branch porting is retired"
       ],
-      ".github/workflows/release-recovery.yml": [
-        "environment: release",
-        "scripts/release/recover_sbom_release.py prepare",
-        "scripts/release/recover_sbom_release.py verify",
-        "needs.prepare.outputs.source_sha"
-      ],
-      ".github/workflows/release-verify.yml": [
-        "environment: release",
-        "contents: read",
-        "actions: read",
-        "verify_pending_publications.py",
-        "--finalize",
-        "group: release-publish",
-        "queue: max"
+      ".github/workflows/mod-base-release.yml": [
+        "workflow_dispatch:",
+        "environment: ${{ needs.plan.outputs.environment }}",
+        "release admit",
+        "--environment \"$RELEASE_ENVIRONMENT\""
       ]
     }
   },
   "source_matrix": "release/release-matrix.json",
-  "sbom_recovery_workflow": ".github/workflows/release-recovery.yml"
+  "shared_release_workflow": ".github/workflows/mod-base-release.yml"
 }

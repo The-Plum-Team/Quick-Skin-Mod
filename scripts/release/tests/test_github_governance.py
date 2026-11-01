@@ -128,16 +128,16 @@ class GitHubGovernanceTest(unittest.TestCase):
             {("mc*-v*", "tag"), ("master", "branch")},
         )
 
-    def test_recovery_branch_requires_explicit_workflow_and_complete_readiness(self) -> None:
+    def test_the_default_branch_requires_the_declared_shared_release_and_complete_readiness(self) -> None:
         mutations = []
         undeclared = copy.deepcopy(self.config)
-        undeclared.pop("sbom_recovery_workflow")
+        undeclared.pop("shared_release_workflow")
         mutations.append(undeclared)
         foreign = copy.deepcopy(self.config)
-        foreign["sbom_recovery_workflow"] = ".github/workflows/untrusted.yml"
+        foreign["shared_release_workflow"] = ".github/workflows/untrusted.yml"
         mutations.append(foreign)
         incomplete = copy.deepcopy(self.config)
-        incomplete["readiness"]["release_source"][self.config["sbom_recovery_workflow"]] = []
+        incomplete["readiness"]["release_source"][self.config["shared_release_workflow"]] = []
         mutations.append(incomplete)
         broad = copy.deepcopy(self.config)
         broad["release_environment"]["deployment_policies"][-1]["name"] = "*"
@@ -150,7 +150,7 @@ class GitHubGovernanceTest(unittest.TestCase):
                     github_governance.load_config(path)
 
         original = copy.deepcopy(self.config)
-        original.pop("sbom_recovery_workflow")
+        original.pop("shared_release_workflow")
         original["release_environment"]["deployment_policies"].pop()
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "governance.json"

@@ -173,11 +173,11 @@ it must not reuse the full-suite baseline and inherit unrelated image-comparison
 Source-inspection policies resolve Java classes through `scripts/architecture/source_inventory.py`
 and the module registry, including explicitly selected legacy replacements.
 
-Shared-source release tags select exactly one matrix target. `release_identity.py --event-target`
-resolves canonical tag pushes or requires an explicit manual target on the source branch. The
-release workflow carries that target through both builds, staged verification, runtime rows and
-publication. Complete build bundles remain non-publishable; target views retain the authoritative
-full matrix hash. See `docs/architecture/RELEASING-FROM-SHARED-SOURCE.md`.
+Each shared-source release tag `mc<minecraft>-v<mod_version>` names exactly one matrix target.
+mod-base's shared release (`mod-base-release.yml`) publishes every target's tag from one tested
+generation of `master`'s head, each GitHub Release holding only its target's lanes; the tag is
+created when its release is published. Complete build bundles remain non-publishable; target views
+retain the authoritative full matrix hash. See `docs/architecture/RELEASING-FROM-SHARED-SOURCE.md`.
 
 Module ownership is transitional while the rework proceeds: the remaining `common` tree is one
 mixed runtime module, and loader/build/policy paths outside this graph have unknown ownership.
@@ -576,8 +576,7 @@ Quick Skin's sources below own the scenarios, the adapter and the review semanti
   rate-limit, transport, and server failures with bounded run-skewed backoff; provenance and exact
   identity checks remain in each caller.
 - `scripts/ci/gradle_cache_policy.py` is the fail-closed writer policy for Gradle state. It permits
-  writes only from protected `master`; release branches, packaged E2E, and release jobs remain
-  read-only.
+  writes only from protected `master`; release branches and packaged E2E remain read-only.
 - `scripts/ci/prune_actions_caches.py` owns bounded cache hygiene. It discovers branches, active
   runs, exact successful Build jobs, and caches from paginated GitHub APIs. It revalidates each
   immutable cache before deleting by exact ID. Absent-branch caches are disposable; on a live

@@ -145,7 +145,7 @@ deltas.
   free `GET /rate_limit` of the job's own token, logs only the numeric counters, and below 40% of
   the core limit (`GITHUB_API_BACKGROUND_RESERVE_PERCENT`) the job settles successfully while its
   durable capsule or pending source stays queued; unreadable counters admit. Never call it from
-  Build, Packaged E2E, mod-base gate status, release workflows or a path without a durable queue:
+  Build, Packaged E2E, mod-base gate status, the release caller or a path without a durable queue:
   the compatibility publication (a completed source is never queued for publication again and only
   a successful producer run's handoff is selectable) and the optional-mod wave request (emitted
   once, after its capsule is retired). A sweep that finds a backlog while no other run of its
@@ -158,8 +158,8 @@ deltas.
   completed; an already-reviewed, blocked, cooling or superseded capsule is selected once
   ([visual-review pipeline](../ci/VISUAL-REVIEW-PIPELINE.md#wake-storm-of-2026-10-15)). QS-owned sweeps keep distinct
   minutes (drain `:21/:51`, compatibility review `:26/:56`, feature coverage `:34`, wake recovery
-  `:41`, target status `:11`), away from the managed gate-status `:17` and Pages `:43` schedules
-  and the `:03`-step release verifier.
+  `:41`, target status `:11`), away from the managed gate-status `:17`, Pages `:43` and release
+  `:29` schedules.
 - Only a job that builds and runs exclusively protected-`master` code may write an Actions cache
   ([dependency security](../../DEPENDENCY-SECURITY.md#actions-cache-writers)). A job that launches
   a pull request's JARs, a candidate checkout or another run's artifact restores read-only under
@@ -397,31 +397,16 @@ it as the `quick-skin.runtime_source` extension with delegated reuse, which the 
 policy base. These references never chain. Explicit full recovery requests bypass runtime reuse
 and may rebuild if no current source bundle is available.
 
-Release automation always rebuilds `scripts/release/build_matrix.py` with `--rerun-tasks` and
-requires every production and harness SHA-256 to equal the first build. When determinism is in
-scope locally, use `scripts/release/verify_reproducibility.py` against the first staged manifest.
+Publication never rebuilds: mod-base's shared release publishes the exact bytes the shared Build
+built and the shared packaged E2E ran for the live `master` head. When determinism is in scope
+locally, rebuild with `scripts/release/build_matrix.py --rerun-tasks` and compare with
+`scripts/release/verify_reproducibility.py` against the first staged manifest.
 
-Release preparation is bounded to four isolated build runners and four runtime slots per loader
-family (Fabric or Forge/NeoForge); every checkout still runs Gradle serially. Preserve pending
-entries with `queue: max` and `cancel-in-progress: false`. Only remote publication writers share
-the short `release-publish` lock. Never hold it while polling marketplace moderation.
-
-Before tagging, require the manual target rehearsal on the exact protected source. The offline
-publication simulation also runs in policy tests and on the real staged bundle before attestation.
-Preserve the durable draft-body ledger: save `uploading` before the upload, `pending` after accepted
-submission, and `verified` only after identity/hash reconciliation. Missing public listings never
-reset upload intent. The secretless scheduled verifier reads original source inputs as inert data,
-authenticates the original release evidence, and requests protected-environment finalization only
-after every row is verified. Its discovery job holds `contents: write` without an approval only
-because GitHub lists drafts to no other token; it reads release metadata and never an artifact,
-and the probe that downloads artifact bytes stays read-only. An upload workflow can succeed with
-pending moderation; report that state explicitly and retain the original tag, version, bundle and
-publication identities.
-
-The separate SBOM recovery workflow may retain a canonical tag's already tested JARs only after
-authenticating its full release rehearsal and original tag-push provenance. Its bounded metadata
-repair preserves the original source SHA and requires the protected release environment's human
-review. See `RELEASING.md`; ordinary release dispatches remain validation-only.
+The shared release keeps its durable state in each draft release's ledger: `uploading` is saved
+before a file is sent, `pending` after an accepted submission and `verified` only after the file is
+reconciled by content. Missing public listings never reset upload intent. Its publish job holds the
+only approval; the hourly finish job holds no secret and publishes only drafts whose rows all
+verify. A publish run can succeed with pending moderation; report that state explicitly.
 
 Shared-source feature selection must use the protected complete-baseline consumer, including
 current availability of every retained public baseline. Keep every matrix runtime job required;
@@ -435,24 +420,19 @@ Public frames keep their original tested commit/run/JAR when unaffected dependen
 [`RELEASING.md`](../../RELEASING.md) owns the procedure. These rules come from releases that failed
 and must not fail the same way again:
 
-- Land the version bump and its dated changelog section through a ready PR. The whole
-  `CHANGELOG.md` is uploaded as the Modrinth and CurseForge changelog. Tests derive the expected
-  release identities from the checked-in version and must never hardcode it.
-- Freeze `master` from that merge until every target's tag run has passed `Validate requested
-  release identity`. Rehearsals and tag runs require the exact branch head, and a queued tag run
-  may validate an hour after its push. Coordinate with every other session or automation that
-  can merge: one merge in that window fails every run that has not validated yet.
-- Before creating any tag, rehearse every matrix target with a validation-only `release.yml`
-  dispatch on that exact head and require `Build and verify` and `Packaged E2E gate` on it.
-- Push exactly one release tag per `git push`. GitHub creates no push event when more than three
-  tags are pushed together, which leaves tags without runs. Recheck the `master` head before each
-  push and confirm that its `Release` run started before pushing the next tag.
-- Release tags are immutable by ruleset, so get them right the first time. A tag whose run staged
-  nothing is retried only as `RELEASING.md` describes, never by moving or reusing a tag silently.
-- Each tag run waits for the `release` environment before it stages and publishes, and
-  `release-verify.yml` asks again to finalize once both marketplaces verify every file. A release
-  is finished only when every target's GitHub release is published and every ledger row is
-  `verified`.
+- Land the version bump and its dated changelog section through a ready PR. The first `## `
+  heading of `CHANGELOG.md` must be `## <version> (<YYYY-MM-DD>)`, and that section alone is the
+  release notes on GitHub, Modrinth and CurseForge. Tests derive the expected release identities
+  from the checked-in version and must never hardcode it.
+- Release only a `master` head whose shared `Build and verify` and `Packaged E2E gate` passed, and
+  rehearse first with `mod-base-release.yml` and `publish=false`.
+- Nothing may merge to `master` between the `publish=true` dispatch and its `release` approval:
+  admission refuses a moved head. Coordinate with every other session or automation that can merge.
+- Release tags are immutable by ruleset and are created only when their release is published, so a
+  failed release leaves drafts, never tags. Resume by dispatching `publish=true` again; never delete
+  a published release or reuse a version.
+- A release is finished only when every target's GitHub release is published and every ledger row
+  is `verified`; the hourly schedule finishes what moderation holds back.
 
 ## Documentation maintenance
 

@@ -154,20 +154,22 @@ def load_config(path: Path) -> dict[str, Any]:
         if "release_source" not in data["readiness"]:
             raise GovernanceError("shared governance requires release-source readiness")
         expected = [{"type": "tag", "name": data["release_tag_pattern"]}]
-        recovery = data.get("sbom_recovery_workflow")
-        if recovery is not None:
-            if recovery != ".github/workflows/release-recovery.yml":
-                raise GovernanceError("unknown SBOM recovery workflow")
-            tokens = data["readiness"]["release_source"].get(recovery, [])
-            required_recovery_tokens = {
-                "environment: release", "scripts/release/recover_sbom_release.py prepare",
-                "scripts/release/recover_sbom_release.py verify", "needs.prepare.outputs.source_sha",
+        # The kit's shared release publishes from a dispatch of the default branch, so only a
+        # declared shared release caller, proven by its readiness tokens, admits ``master``.
+        release = data.get("shared_release_workflow")
+        if release is not None:
+            if release != ".github/workflows/mod-base-release.yml":
+                raise GovernanceError("unknown shared release workflow")
+            tokens = data["readiness"]["release_source"].get(release, [])
+            required_release_tokens = {
+                "workflow_dispatch:", "environment: ${{ needs.plan.outputs.environment }}",
+                "release admit", '--environment "$RELEASE_ENVIRONMENT"',
             }
-            if not isinstance(tokens, list) or not required_recovery_tokens <= set(tokens):
-                raise GovernanceError("SBOM recovery requires complete protected-source readiness")
+            if not isinstance(tokens, list) or not required_release_tokens <= set(tokens):
+                raise GovernanceError("the shared release requires complete protected-source readiness")
             expected.append({"type": "branch", "name": "master"})
         if data["release_environment"]["deployment_policies"] != expected:
-            raise GovernanceError("publication requires canonical tags and only declared protected recovery")
+            raise GovernanceError("publication requires canonical tags and only the declared shared release")
         retired = data["release_environment"].get("retired_deployment_policies", [])
         if retired != [{"type": "branch", "name": "*-and-*-*"}]:
             raise GovernanceError("only the historical release-branch deployment policy may be retired")

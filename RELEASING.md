@@ -1,266 +1,115 @@
 # Releasing Quick Skin
 
-The shared-source rework uses release-matrix schema 3. The complete artifact bundle has the
-non-publishable identity `build-v<mod_version>`. Passing `--target <minecraft>` to
-`scripts/release/release_identity.py` derives an independent `mc<minecraft>-v<mod_version>`
-publication identity from the same `master` source revision. The target set comes from the matrix's
-artifact rows. Selecting a target never rewrites that authoritative matrix.
+Quick Skin publishes through mod-base's shared release (kit v1.8.0 and later): the managed caller
+`.github/workflows/mod-base-release.yml`, with Quick Skin's data in
+`scripts/ci/mod-base-release.json`. The kit's [release
+protocol](https://github.com/The-Plum-Team/mod-base/blob/main/docs/RELEASE-PROTOCOL.md) is the
+reference for its jobs, documents and recovery. A release publishes every production JAR of the
+tested generation of `master`'s head to GitHub Releases, Modrinth and CurseForge after one approval,
+and compiles nothing: the bytes are those the protected shared Build built and the shared packaged
+E2E ran.
 
-The target-specific release workflow and declared governance now use shared source. See
+Release-matrix schema 3 keeps one immutable identity per target. The complete artifact bundle has
+the non-publishable identity `build-v<mod_version>`; each matrix target is published as
+`mc<minecraft>-v<mod_version>` (`scripts/release/release_identity.py --target <minecraft>` derives
+it), one GitHub Release per target holding that target's Fabric and Forge or NeoForge JARs and its
+SBOM. One dispatch publishes every target of the version. Modrinth version numbers are
+`<tag>-<loader>` (`mc1.21.10-v4.0.1-neoforge`), within Modrinth's 32 characters. See
 [the shared-source command guide](docs/architecture/RELEASING-FROM-SHARED-SOURCE.md) for local
-build/stage/rebuild examples. Protected selective review and Pages use the shared contracts;
-live rollout and final GitHub image acceptance are tracked in the
-[migration plan](docs/architecture/MODULAR-REWORK.md). The identity
-validator rejects attempts to publish the aggregate bundle.
+build and stage commands.
 
 ## Preconditions
 
-Before creating a release tag:
-
-1. land the version, matrix, source, and workflow changes through reviewed PRs, and replace the
-   current changelog heading's `unreleased` marker with its ISO release date;
-2. let both required checks, `Build and verify` and `Packaged E2E gate`, pass on the exact release
-   source branch (`master`) head;
-3. confirm the working tree is clean and the branch head has not moved;
-4. run the release workflow manually from `master` for each intended `minecraft_target` and
-   require a successful validation-only rehearsal, including the offline publication/recovery
-   simulation against its staged bundle; a manual run of `release.yml` never publishes;
-5. derive and inspect the only accepted identity:
+1. Land the version bump (`mod_version` in `gradle.properties`) and its changelog section through a
+   ready PR. The first `## ` heading of `CHANGELOG.md` must read `## <version> (<YYYY-MM-DD>)`; that
+   section alone becomes the marketplace and GitHub Release notes. Tests derive the expected
+   identities from the checked-in version and never hardcode it.
+2. Wait until the shared `Build and verify` and `Packaged E2E gate` of that exact `master` head have
+   passed (a post-merge reuse of the PR's generation counts). The release needs that head's tested
+   generation within the seven days of its Build bundle.
+3. Rehearse:
 
    ```bash
-   python scripts/release/release_identity.py --target 1.20.1
+   gh workflow run mod-base-release.yml --ref master -f publish=false
    ```
 
-The release workflow rejects a stale checkout, a tag with another name, a commit that is not the
-exact configured release-branch head, and a manual run from another branch.
+   The plan job authenticates the head's tested generation, derives every tag, file name and
+   marketplace text, and seals the exact files. It holds no credential and publishes nothing.
 
 ## Publish
 
-Create the derived target tag at the already-tested `master` head and push only that new tag. Do not
-move, reuse, or delete a release tag.
-
-Keep `master` frozen from the merge of the release commit until every target's tag run has passed
-`Validate requested release identity`. Rehearsals and tag runs both require the exact branch head,
-and a tag run waits for one of the four build slots, so it may validate an hour after its push.
-Any merge in that window, a CI-only one included, fails every rehearsal or tag run that has not
-validated yet.
-
-Push each tag on its own. GitHub creates no `push` event, and therefore no `Release` run, when one
-`git push` carries more than three tags; those tags then exist without a run and cannot simply be
-pushed again. Recheck the `master` head before every push and confirm that the tag's `Release` run
-exists before pushing the next tag.
-
 ```bash
-git fetch origin --tags
-git switch master
-git pull --ff-only origin master
-python scripts/release/release_identity.py --target 1.20.1
-git tag --sign mc1.20.1-v3.0.0
-git push origin refs/tags/mc1.20.1-v3.0.0
-gh run list --workflow release.yml --event push --branch mc1.20.1-v3.0.0
+gh workflow run mod-base-release.yml --ref master -f publish=true
 ```
 
-Replace the example Minecraft target and identity with the exact values derived from the matrix. The
-protected `release` environment requires a human approval before publication jobs receive their
-credentials.
+Approve the `release` environment once when GitHub asks. Nothing may merge to `master` between the
+dispatch and the approval: `release admit` refuses a moved head, and the dispatch is simply
+repeated from the new head once its gates pass.
 
-The workflow then performs this fixed sequence:
+The publish job then:
 
-1. build the selected target's production and packaged-E2E JARs twice from the tagged commit and require identical
-   SHA-256 bytes for every production and harness JAR;
-2. record source identity plus SHA-1, SHA-256, and SHA-512 for every production artifact, then
-   generate a deterministic CycloneDX SBOM from those records, the matrix, each lane's strict
-   `shadowBundle` lock, and the matching SHA-256 entries in Gradle verification metadata.
-   The `serialNumber` required by the attestation action is derived from the document content, so
-   identical inputs retain identical SBOM bytes;
-3. rehearse the publication protocol offline with those exact staged bytes: validate the SBOM
-   attestation contract, recover an interrupted GitHub asset upload with normalized filenames,
-   fence an accepted but unindexed marketplace upload after a simulated restart, and finalize
-   only after every simulated file is approved and verified;
-4. attest the production JARs twice with the same pinned GitHub action: once for build provenance
-   and once with the exact staged CycloneDX document as the SBOM predicate;
-5. run all release-profile scenarios for that target's matrix-declared runtimes against the staged bytes;
-6. create or reconcile an exact draft GitHub Release without overwriting assets and persist its
-   publication ledger in a hidden comment at the end of the release notes;
-7. publish every artifact independently to Modrinth and CurseForge, reconciling the remote
-   publication ID, filename, size, and bytes before and after each upload. Modrinth is reconciled
-   by SHA-512 through its own API. CurseForge publishes no hash on any endpoint its author token
-   can reach, so reconciliation locates the file through the unauthenticated first-party listing
-   and then proves byte equality by downloading the published copy and hashing it locally against
-   the staged SHA-1 and SHA-256. Persist upload intent before sending the file, then persist
-   acceptance before checking visibility once. An accepted or unapproved file remains pending
-   and never authorizes another upload;
-8. publish the GitHub Release only after every marketplace row is verified. Otherwise finish
-   the upload workflow with an explicit pending summary and leave the release as a draft.
+1. admits the sealed plan of its own run, its environment and the protected release config;
+2. creates one draft GitHub Release per target with its files and the sealed plan
+   (`mod-base-release-plan.json`), and a publication ledger in a hidden block at the end of the
+   draft's notes;
+3. uploads every lane to Modrinth and to CurseForge, four at a time, each step holding only its own
+   token; upload intent is saved in the ledger before a file is sent;
+4. verifies every file by content: Modrinth by its hashes, CurseForge through its public listing
+   and a download of the published copy;
+5. publishes each GitHub Release whose rows are all `verified` and only then creates its tag
+   `mc<minecraft>-v<mod_version>` at the released commit. The highest Minecraft target becomes the
+   latest release unless a newer one already is.
 
-Preparation uses four matrix-derived build slots on isolated hosted runners, plus at most four
-Fabric and four Forge/NeoForge runtime jobs. Gradle remains serial inside each checkout.
-Different targets can prepare concurrently. Only the short jobs that stage assets, write the
-publication ledger, upload marketplace files or finalize GitHub share `release-publish`.
-Workflow and job queues use `queue: max` with cancellation disabled; GitHub retains up to 100
-pending entries per group. This is a bounded queue, not an unlimited capacity guarantee.
+CurseForge moderation can keep files pending after the job ends; the caller's hourly schedule
+(minute 29) finishes those drafts without any secret and publishes them once every row verifies.
+A release is finished only when every target's GitHub Release is published.
 
-The GitHub Release contains the production JARs, `artifacts.json`, `quick-skin.cdx.json`, and
-deterministic `SHA256SUMS`. The artifact manifest binds the SBOM's path, size, and SHA-256;
-`--target <minecraft> --verify-staged` regenerates it and requires byte-for-byte equality before any publication step.
-Published releases are immutable at the repository level.
+GitHub replaces spaces in asset names with periods, and since late October 2026 CurseForge turns
+every run of spaces and hyphens that holds a space into one hyphen
+(`Quick Skin - Fabric - 1.20.1-4.0.0.jar` is stored as `Quick-Skin-Fabric-1.20.1-4.0.0.jar`, and its
+CDN answers 403 for the original name). The kit reconciles both and still checks every byte.
 
-GitHub replaces spaces in uploaded asset filenames with periods. GitHub reconciliation maps
-those remote names to the original manifest records and still downloads and verifies every
-asset's SHA-256. The manifest and `SHA256SUMS` retain the original filenames used by the staged
-bundle and marketplaces; restore those names when checking GitHub downloads with `SHA256SUMS`.
-Names that collide after GitHub's normalization are rejected before creating or uploading assets.
+## Recovery
 
-CurseForge renames uploads too: since late October 2026 it turns every run of spaces and hyphens
-that holds a space into one hyphen, so `Quick Skin - Fabric - 1.20.1-4.0.0.jar` is listed and served
-as `Quick-Skin-Fabric-1.20.1-4.0.0.jar`. Reconciliation finds a file under either name, downloads it
-from the CDN under the stored one (the original name answers 403) and still checks its size, SHA-1
-and SHA-256 against the staged bytes; both names listed at once fail closed.
+Publication is retryable, not rollback-based. To finish a partial release, dispatch with
+`publish=true` again while `master` is still at the released commit: files already published are
+recognized by content and never sent twice, and the drafts' ledgers say which rows are left. A
+re-dispatch from a new generation of the same commit changes the plan's digest and is refused by
+the existing drafts. No tag exists until its release is published, so a release abandoned before
+then leaves only drafts.
 
-## Recovery and verification
+The ledger row states are `unstarted`, `uploading`, `pending` and `verified`. A row left
+`uploading` by a lost response stays fenced: check the provider's author dashboard before any
+operator reset, because absence from a public listing cannot prove rejection. Never delete a tag or
+a published release, or invent a second version to hide a partial one; a genuine byte conflict needs
+a new version.
 
-Publication is retryable, not rollback-based. If a marketplace or GitHub API fails, rerun the
-failed jobs from GitHub Actions. Exact existing uploads are accepted; unstarted uploads resume;
-an identity or byte conflict fails closed. Never delete the tag or release, use an asset-clobber
-flag, or invent a second version ID to hide a partial release. A genuine byte conflict requires a
-new logical version and therefore a new immutable identity.
+Published tags `mc*-v*` are immutable by the `Quick Skin immutable release tags` ruleset.
 
-`Verify pending releases` wakes after a release/recovery run and on a five-minute schedule
-(GitHub may delay scheduled runs). GitHub lists draft releases only to a token with push access,
-so a small discovery job holds `contents: write`, reads release metadata only and hands the
-recorded ledgers to the probe. The read-only probe checks each pending draft once using
-public marketplace APIs, without upload secrets or a publication lock. It authenticates the
-original producer, protected source history, immutable tag, successful preparation and release
-E2E jobs, archive ID/digest, manifest and every staged file. Old source metadata is read as inert
-data by the current protected implementation. A failed upload job does not invalidate already
-successful preparation; reused jobs from failed-jobs-only reruns retain their exact run identity.
+## History
 
-When every file is verified, final publication still requires the protected `release` environment's
-human approval. The final job repeats authentication and byte checks under `release-publish`.
-One active verifier avoids duplicate approval requests; a human approval can hold that verifier's
-queue, while pending moderation itself ends the probe without waiting. The original bundle must
-remain available within its 90-day retention window. An expired or conflicting bundle fails closed.
+Until kit v1.8.0, Quick Skin released through its own `release.yml` (one tag push per target, which
+rebuilt and re-ran the release E2E), `release-verify.yml` (the pending-release verifier) and
+`release-recovery.yml` (SBOM and ledger recovery). Quick Skin 4.0.0 (17 targets, 31 October 2026)
+took about five hours that way, 105 minutes of them in 102 serial `release` approvals. Those
+workflows and their scripts were retired; releases up to 4.0.0 keep their published assets,
+`SHA256SUMS`, attestations (`gh attestation verify <jar> --repo The-Plum-Team/Quick-Skin-Mod`) and
+ledgers. Their history is in Git.
 
-The durable row states are `unstarted`, `uploading`, `pending`, and `verified`. A green upload
-workflow with pending rows means the upload phase finished, not that the release is public.
-Both that workflow and the verifier write the individual states to their job summaries. The
-final immutable release retains the ledger, including each verified marketplace file ID.
+## Actions storage
 
-If a runner loses the upload response, `uploading` deliberately remains fenced even if the
-public API lists no file. Check the provider's author dashboard and original upload logs before
-any operator recovery; absence from the public listing cannot prove rejection. Only after
-confirming that the provider never accepted the file may an operator restore that single row
-to `unstarted`, under the publication lock. Never erase the ledger or reset accepted rows.
-Ordinary pending approval needs no rerun or reset. A manual probe is available with:
-
-```bash
-gh workflow run release-verify.yml --ref master -f release_tag=mc<TARGET>-v<MOD_VERSION>
-```
-
-The offline rehearsal runs in the release-policy tests before tagging and on each actual staged
-target bundle before attestation. It checks our publication contracts and recovery behavior;
-it cannot predict live provider outages or moderation time. Re-run it locally on an existing
-verified bundle with `python3 scripts/release/rehearse_publication.py --stage build/release`.
-
-### Retry a tag whose run staged nothing
-
-A tag whose `Release` run never started, because it was pushed together with more than three tags,
-or that stopped at `Validate requested release identity`, because `master` had moved, staged
-nothing: no draft release, no publication ledger and no marketplace file. Retrying needs the same
-tag name, and the `Quick Skin immutable release tags` ruleset forbids deleting it. First confirm
-that no GitHub release or draft and no Modrinth or CurseForge version exists for the tag. Only
-with the maintainer's explicit authorization, an administrator then saves the ruleset, sets its
-enforcement to `disabled`, deletes exactly those tags, restores `active` at once and compares the
-ruleset with the saved copy. Rehearse and tag again from the current `master` head, which needs a
-new release commit if the version itself must change. A tag that staged anything is never
-deleted; publish a new version instead. 3.0.1 needed this once, on 2026-09-27.
-
-### Recover an unpublished release with a missing SBOM serial number
-
-When tag publication failed because its CycloneDX SBOM omitted `serialNumber`, retain the tag,
-mod version and exact production/harness bytes. Merge the generator repair through the required
-PR gates. The separate `release-recovery.yml` workflow accepts an existing canonical tag plus the
-numeric run and artifact IDs of its successful validation-only release rehearsal:
-
-```bash
-gh workflow run release-recovery.yml --ref master \
-  -f release_tag=mc26.1-v3.0.0 \
-  -f source_run_id=34712044977 \
-  -f source_artifact_id=10303697152
-```
-
-The recovery authenticates the exact protected implementation and immutable tag, the tagged source's
-required gates, every rehearsal release-runtime job, and the archive's owner, size and digest.
-It verifies the original tag-push provenance for each production JAR. Every tracked input outside
-the explicit metadata-repair allowlist must still equal the tagged source. It accepts only the
-addition of the deterministic `serialNumber`; changes to dependency records, JARs, harnesses,
-version, matrix, game code or build inputs fail closed. No tagged code executes in this recovery.
-
-The corrected bundle retains the original source SHA and receives a new SBOM attestation; the
-original production provenance and packaged E2E evidence remain authoritative for its unchanged
-JARs. Publication jobs independently reauthenticate the tag and protected implementation, require
-the exact prepared manifest hash, and reverify every staged artifact before the ordinary immutable
-GitHub/marketplace reconciliation. Recovery uses the same durable publication ledger and short
-`release-publish` write lock; pending approval is verified by `release-verify.yml`.
-
-The declared `release` environment permits protected `master` for this explicit recovery and for
-`release-verify.yml` finalization, as well as canonical tag runs, with the same required human
-reviewer. Apply the reviewed governance change
-before dispatching recovery. Ordinary `release.yml` dispatches remain validation-only. Recovery
-cannot move a tag, create another version identity, replace an existing conflicting asset, or
-claim that its current orchestration commit produced the original JARs. An advancing `master`,
-unavailable source archive, changed non-repair input or byte conflict stops recovery.
-
-This path recovered `mc26.1-v3.0.0` once, in run `34722137405`. Its admission requires a
-`generate_sbom.py` or `publication_state.py` repair between the tag and protected `master` and
-no other change outside its allowlist, so it cannot admit any tag once `master` carries unrelated
-changes. Keep `master` at the repair until every recovery run it serves has finished.
-
-### Recover an unpublished release after a publication-ledger repair
-
-The first tag runs of the durable ledger (`mc1.20.1-v3.0.0` through `mc1.21.11-v3.0.0` and
-`mc26.3-v3.0.0`, tagged at `fd8e7dbf`) could not publish: they located the draft through
-GitHub's tag lookup, which never returns a draft, so every ledger read failed before any
-marketplace upload. The offline rehearsal had simulated that lookup returning the draft.
-`publication_state.py` now finds the single release with the exact tag in the bounded release
-listing and rereads it by its immutable ID, and the rehearsal models GitHub's draft visibility.
-The first recovery then showed that a draft edited without `tag_name` loses its tag and becomes
-`untagged-…`, so the ledger's confirming read failed after its first write. Every ledger write now
-restates the exact tag, and the rehearsal detaches a draft edited without it.
-
-Such a tag keeps its version, tag and bytes. Dispatch the same `release-recovery.yml` with the
-target's successful validation-only rehearsal on the tagged commit. When that bundle's SBOM is
-already complete, recovery adds no repair: it authenticates the same evidence as above and
-publishes every staged byte, the manifest included, unchanged, so it also matches draft assets
-that the failed tag run had already uploaded. A failed tag run's pending `release` approvals
-must be rejected rather than approved, because its tagged implementation still has the defect.
-Pending drafts created before the fix may lack a ledger; recovery registers one under the lock.
-
-Modrinth rejects a `version_number` longer than 32 characters. The NeoForge 1.21.10 and 1.21.11
-publication identities (`mc1.21.10-v3.0.0-neoforge-1.21.10`) were 33, so those two uploads failed
-with HTTP 400 and were never accepted. `matrix.py` now shortens only a schema-3 identity that
-would exceed the limit, dropping the target already named by its release identity
-(`mc1.21.10-v3.0.0-neoforge`), and fails closed if that is still too long. Every identity that
-fits is unchanged, so already published files keep reconciling. Recovery admits this
-`matrix.py` repair; the matrix data itself stays outside the allowlist.
-
-A row left `uploading` by a provider error stays fenced. An operator may restore it to
-`unstarted` under the publication lock only with evidence that the provider never accepted the
-file: a synchronous validation rejection, or a complete first-party listing in which later
-uploads of the same wave appear while that file does not.
-
-Actions storage follows the same recovery boundary. Ordinary build, diagnostics, packaged-E2E,
-review, publication-receipt, synchronization, and Pages handoff artifacts are transient and expire
-after one day. The pinned mod-base kit owns the Pages artifacts (ADR 0010): source PNGs exist only
-in the one-day `mb-handoff--<key>--a<attempt>` handoff, which protected Pages code validates and
-replaces with WebP derivatives before fan-in, plus the lossless `mb-anchor--mc1.20.1--…` visual
-anchor. Each matrix key keeps one compact `mb-cache--<key>--<coverage_sha>` for 90 days, and the
-separately locked rotation deletes the previous generation only after a successful publication. The
-immutable `release-<release-id>` bundle, or `release-recovery-<release-id>` for an SBOM recovery, is
-the other 90-day exception so the same verified bytes survive protected-environment approvals,
-resume an interrupted GitHub Release or marketplace publication, and let `Verify pending releases`
-finalize after moderation. Release, Packaged E2E, and every release-branch Build restore Gradle state read-only;
-only a trusted Build gate push or manual run on protected `master` may publish a Gradle cache.
+Ordinary build, diagnostics, packaged-E2E, review, synchronization, and Pages handoff artifacts are
+transient and expire after one day. The pinned mod-base kit owns the Pages artifacts (ADR 0010):
+source PNGs exist only in the one-day `mb-handoff--<key>--a<attempt>` handoff, which protected Pages
+code validates and replaces with WebP derivatives before fan-in, plus the lossless
+`mb-anchor--mc1.20.1--…` visual anchor. Each matrix key keeps one compact
+`mb-cache--<key>--<coverage_sha>` for 90 days, and the separately locked rotation deletes the
+previous generation only after a successful publication. A shared release keeps no bundle of its
+own: its seven-day `mb-rel-plan--<run>--a<attempt>` artifact holds the sealed plan and files of one
+dispatch, and the plan published with each release records every file's digest. Older
+`release-<release-id>` and `release-recovery-<release-id>` bundles expire under their own 90-day
+retention. Packaged E2E and every release-branch Build restore Gradle state read-only; only a
+trusted Build gate push or manual run on protected `master` may publish a Gradle cache.
 Existing branch-scoped release caches remain useful read-only fallbacks. A protected daily cleanup
 discovers live branches directly. It deletes absent-branch caches and superseded, unambiguously
 SHA-bound Gradle-home generations by exact cache ID, while retaining the newest generation per
@@ -301,19 +150,6 @@ The automatic cache-pruning boundary is deliberately mechanical:
 - The protected workflow applies at most 75 IDs and 10 GiB per invocation, serially, with one second
   between deletes. The script remains dry-run unless `--apply` is explicit.
 
-Downloaders can verify checksums with `SHA256SUMS` after restoring the original filenames of GitHub
-downloads (see above). Maintainers can additionally verify GitHub's provenance for a downloaded JAR
-under either filename:
-
-```bash
-gh attestation verify "Quick Skin - Fabric - 1.20.1-3.0.0.jar" \
-  --repo The-Plum-Team/Quick-Skin-Mod
-```
-
-Publication receipts and packaged-runtime diagnostics remain attached to the workflow run for one
-day. Durable audit comes from the immutable GitHub Release assets and its release-notes publication
-ledger, checksums, attestations, and the marketplaces themselves; transient Actions output is not the system of record.
-
 ## Repository governance rollout
 
 The intended rulesets and protected release environment live in
@@ -325,9 +161,8 @@ python scripts/release/github_governance.py readiness
 ```
 
 `readiness` pins the current default-branch commit, validates its complete schema-3 release matrix,
-and checks the shared build, runtime, release, SBOM-recovery, pending-release verification and
-retirement workflows at that same commit. It
-requires no historical version branches. Once those changes are present on protected source, an
+and checks the shared build, runtime, shared release and retirement workflows at that same commit.
+It requires no historical version branches. Once those changes are present on protected source, an
 administrator can converge the declared state explicitly:
 
 ```bash
@@ -337,15 +172,15 @@ python scripts/release/github_governance.py apply \
 
 The helper enables immutable releases, creates no-bypass branch and tag rulesets, requires PRs and
 strict stable checks, blocks deletion and force-pushes, and configures the human-reviewed `release`
-environment. Shared publication deploys from canonical release tags; the declared `master` branch
-policy exists for the protected SBOM-recovery and pending-release finalization workflows, whose jobs
-wait for the same human reviewer. The schema-2 governance
+environment. The shared release's publish job deploys from `master`, which the declared
+`shared_release_workflow` admits, and waits for that human reviewer; the canonical tag policy
+`mc*-v*` stays declared, though no workflow deploys from a tag any more. The schema-2 governance
 configuration explicitly retires the old `*-and-*-*` environment deployment policy; the helper
 shows that deletion in its plan and addresses only its independently read numeric policy ID.
 Unknown or ambiguous policies stop the apply operation. Historical release-branch rulesets are
-left untouched, and no branch or tag is removed. The declared state, including the `master`
-recovery/finalization policy and the retired `*-and-*-*` policy, has been applied remotely; rerun
-`audit` before any further `apply`.
+left untouched, and no branch or tag is removed. The declared state, including the `master` policy
+and the retired `*-and-*-*` policy, has been applied remotely; rerun `audit` before any further
+`apply`.
 
 ## GitHub Pages activation
 

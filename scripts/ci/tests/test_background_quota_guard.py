@@ -43,7 +43,7 @@ GUARDED = {
         "compatibility review wake", 'payload="$RUNNER_TEMP/mod-compatibility-review-request.json"'),
 }
 # Owned by the mod-base kit (byte-identical managed callers); their minutes are fixed here.
-MANAGED_SCHEDULES = {"mod-base-gate-status.yml": {17}, "pages.yml": {43}}
+MANAGED_SCHEDULES = {"mod-base-gate-status.yml": {17}, "pages.yml": {43}, "mod-base-release.yml": {29}}
 SWEEPS = {
     "visual-review-drain.yml": {21, 51},
     "mod-compatibility-review.yml": {26, 56},
@@ -74,9 +74,6 @@ class ScheduleSpreadTest(unittest.TestCase):
             for minute in minutes:
                 self.assertNotIn(minute, owners, f"{workflow} shares minute {minute} with {owners.get(minute)}")
                 owners[minute] = workflow
-        # release-verify.yml polls every five minutes from :03; no QS-owned sweep starts on its beat.
-        self.assertIn('cron: "3-58/5 * * * *"', (WORKFLOWS / "release-verify.yml").read_text(encoding="utf-8"))
-        self.assertTrue(all(minute % 5 != 3 for minutes in SWEEPS.values() for minute in minutes))
 
 
 class GuardPlacementTest(unittest.TestCase):

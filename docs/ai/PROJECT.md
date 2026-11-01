@@ -65,8 +65,9 @@ loader change starts in the release matrix and must pass its validation and muta
 The matrix names `master` as the shared source branch. `scripts/release/release_identity.py`
 derives a non-publishable `build-v<mod_version>` identity for the complete schema-3 bundle;
 `--target <minecraft>` derives that target's independent `mc<minecraft>-v<mod_version>` identity.
-A publishing run must still bind the exact source head, pass its manual target rehearsal and
-receive protected `release` environment approval; see `RELEASING.md`. Historical
+mod-base's shared release (`mod-base-release.yml`, data in `scripts/ci/mod-base-release.json`)
+publishes every target's identity at once from the tested generation of the live `master` head,
+after one protected `release` environment approval; see `RELEASING.md`. Historical
 schema-2 snapshots retain their original branch/tag validation contract.
 
 ## Shared validation and feature evidence
@@ -124,16 +125,16 @@ the repository.
   Named 90-day artifact classes include the semantic certificate, the evidence caches
   `mb-cache--<key>--<coverage_sha>`, the lossless anchor
   `mb-anchor--mc1.20.1--<commit>--<run_id>--a<attempt>` of the matrix's unit-test target, the
-  family caches `mb-family-cache--mod-compatibility--<key>--<coverage_sha>`, the
-  immutable `release-<release-id>` bundle, and its SBOM-recovery counterpart
-  `release-recovery-<release-id>`. Shared-source feature coverage additionally retains its
+  family caches `mb-family-cache--mod-compatibility--<key>--<coverage_sha>`, and the
+  `release-<release-id>` and `release-recovery-<release-id>` bundles of releases up to 4.0.0,
+  which expire unread. Shared-source feature coverage additionally retains its
   complete healthy certificate and the exact complete compact baselines
   `mb-baseline--<key>--<commit>--<tested_run_id>` for at most 90 days. Only a successfully
   deployed complete generation may create those public baselines; partial generations reuse them
   without extending their lifetime. Missing or expired baseline
-  artifacts restore complete runtime coverage. The release bundle
-  spans protected environment approvals, provides bounded recovery for an interrupted publication,
-  and is the only source from which the pending-release verifier finalizes. After the owning Pages
+  artifacts restore complete runtime coverage. A shared release's sealed plan
+  `mb-rel-plan--<run>--a<attempt>` keeps the kit's seven days; each published release carries its
+  plan, and its draft-body ledger resumes an interrupted publication. After the owning Pages
   run is authenticated `completed/success`, the kit's separately locked rotation deletes by exact
   artifact ID only the `mb-*` generations it superseded and that run's own `github-pages`
   artifact; it keeps the newest anchor of each key and never deletes a baseline archive or any
@@ -161,13 +162,14 @@ the repository.
   branches directly and must never infer a supported-version inventory.
 - Build gate owns Gradle cache writes, and only a trusted push or manual Build run on protected
   `master` may write. Release branches restore their last known branch cache read-only; pull
-  requests, ephemeral branches, Packaged E2E, and Release are also read-only. This bounds immutable
-  generations without making the release-branch inventory another cache-policy input.
+  requests, ephemeral branches and Packaged E2E are also read-only, and the shared release builds
+  nothing. This bounds immutable generations without making the release-branch inventory another
+  cache-policy input.
 - Only a job that builds and runs exclusively protected-`master` code may write an Actions cache
   ([dependency security](../../DEPENDENCY-SECURITY.md#actions-cache-writers)).
 - Packaged runtime owns the second cache family, the installed Forge/NeoForge server, keyed by its
-  exact recipe digest rather than a commit. Only a declared writer job (Packaged E2E and the
-  release rehearsal, which launch a bundle their own `master` run built) in a `workflow_dispatch`
+  exact recipe digest rather than a commit. Only a declared writer job (Packaged E2E, which
+  launches a bundle its own `master` run built) in a `workflow_dispatch`
   on protected `master` may publish an entry; every other context, the optional-mod wave included,
   restores read-only, with no prefix fallback, and a restore that fails the store's own validation
   is a cache miss and a fresh install. Retention is the platform's

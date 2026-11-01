@@ -88,13 +88,14 @@ away from them.
   a `push` or `workflow_dispatch` on protected `master`. Those jobs check out `github.sha`, compile
   it from source and launch nothing downloaded. Every other context restores read-only: pull
   requests (whose writes GitHub would scope to the pull request's own ref anyway), release
-  branches, Packaged E2E's own compile, which does not pass `cache-writer`, and Release.
+  branches and Packaged E2E's own compile, which does not pass `cache-writer`. The shared release
+  compiles nothing.
 - The installed Forge/NeoForge server (`runtime-store-v1|…`) is the other written family. The
   packaged-runtime action saves it only when its job passes `runtime-store-writer: "true"` and
   `scripts/ci/runtime_store_cache_policy.py` approves the run: a `workflow_dispatch` on protected
-  `master`. Packaged E2E and the release rehearsal are the declared writers; both launch a bundle
-  their own run built from `master` (a `master` dispatch of Packaged E2E takes the push Build of the
-  same SHA, never a pull request's). The optional-mod wave is a `repository_dispatch` that launches
+  `master`. Packaged E2E is the declared writer; it launches a bundle its own run built from
+  `master` (a `master` dispatch of Packaged E2E takes the push Build of the same SHA, never a pull
+  request's). The optional-mod wave is a `repository_dispatch` that launches
   the original pull request's JARs whenever the merge reused that pull request, so it restores
   read-only.
 - `scripts/ci/tests/test_workflow_security.py` holds every workflow to this rule: the set of jobs
@@ -145,7 +146,7 @@ project-processed Forge/NeoForge game JAR, for example
 `.gradle/loom-cache/minecraftMaven` file repository (`LoomLocalMinecraft`) when it applies the
 project's `META-INF/accesstransformer.cfg`. The NeoForge 26.1 and 26.1.1 overlay ships that file
 into generated resources, so a clean first build still resolves the shared merged JAR while the
-release workflow's `--rerun-tasks` rebuild of the same checkout resolves the processed one. It is
+`--rerun-tasks` rebuild of the same checkout resolves the processed one. It is
 the same suffix shape the Fabric `minecraft-merged-<hash>` alternative already accepts, and the
 `-beta` loader versions were already covered by the version part of the rule.
 
