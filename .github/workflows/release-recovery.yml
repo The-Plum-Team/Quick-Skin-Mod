@@ -53,7 +53,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
 
@@ -114,7 +114,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
 
@@ -180,7 +180,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
 
@@ -213,7 +213,7 @@ jobs:
 
       - name: Publish exact verified artifact to Modrinth
         if: ${{ matrix.marketplace == 'modrinth' && steps.reconcile.outputs.publish == 'true' }}
-        uses: Kira-NT/mc-publish@52307b03863581dec6b652b83e597aec02ebb075 # v3.3.1
+        uses: Kira-NT/mc-publish@c23376546a97f5ba7984e94445da359459b14419 # v3.3.2
         with:
           modrinth-id: ${{ matrix.modrinth_id }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
@@ -233,7 +233,7 @@ jobs:
 
       - name: Publish exact verified artifact to CurseForge
         if: ${{ matrix.marketplace == 'curseforge' && steps.reconcile.outputs.publish == 'true' }}
-        uses: Kira-NT/mc-publish@52307b03863581dec6b652b83e597aec02ebb075 # v3.3.1
+        uses: Kira-NT/mc-publish@c23376546a97f5ba7984e94445da359459b14419 # v3.3.2
         with:
           curseforge-id: ${{ matrix.curseforge_id }}
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
@@ -300,7 +300,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
 
