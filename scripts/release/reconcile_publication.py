@@ -8,6 +8,7 @@ import hashlib
 import http.client
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -140,15 +141,26 @@ def curseforge_download_url(file_id: int, filename: str) -> str:
     )
 
 
+def curseforge_file_name(filename: str) -> str:
+    """The name CurseForge stores an upload under.
+
+    Since late October 2026 CurseForge turns every run of spaces and hyphens that holds a space
+    into one hyphen, so ``Quick Skin - Fabric - 1.20.1-4.0.0.jar`` is listed and served as
+    ``Quick-Skin-Fabric-1.20.1-4.0.0.jar``; files uploaded earlier kept their original name.
+    """
+    return re.sub(r"[ -]* [ -]*", "-", filename)
+
+
 def classify_curseforge(
     files: list[dict[str, Any]],
     expected: ExpectedArtifact,
     project_id: int,
     fetch_bytes: Callable[[str, int], bytes],
 ) -> Reconciliation:
+    names = {expected.filename, curseforge_file_name(expected.filename)}
     named = [
         row for row in files
-        if row.get("fileName") == expected.filename and row.get("projectId") == project_id
+        if row.get("fileName") in names and row.get("projectId") == project_id
     ]
     if not named:
         return Reconciliation(True, None)
@@ -174,7 +186,8 @@ def classify_curseforge(
     # The public listing carries no hash of any algorithm, so byte identity is proven from the
     # published bytes themselves. That is strictly stronger than trusting a marketplace-asserted
     # digest, and it lets the strong SHA-256 participate instead of SHA-1 alone.
-    payload = fetch_bytes(curseforge_download_url(file_id, expected.filename), expected.bytes)
+    # The CDN serves the file only under the name CurseForge stored it under.
+    payload = fetch_bytes(curseforge_download_url(file_id, remote["fileName"]), expected.bytes)
     if (
         len(payload) != expected.bytes
         or hashlib.sha1(payload).hexdigest() != expected.sha1.lower()

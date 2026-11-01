@@ -111,6 +111,12 @@ asset's SHA-256. The manifest and `SHA256SUMS` retain the original filenames use
 bundle and marketplaces; restore those names when checking GitHub downloads with `SHA256SUMS`.
 Names that collide after GitHub's normalization are rejected before creating or uploading assets.
 
+CurseForge renames uploads too: since late October 2026 it turns every run of spaces and hyphens
+that holds a space into one hyphen, so `Quick Skin - Fabric - 1.20.1-4.0.0.jar` is listed and served
+as `Quick-Skin-Fabric-1.20.1-4.0.0.jar`. Reconciliation finds a file under either name, downloads it
+from the CDN under the stored one (the original name answers 403) and still checks its size, SHA-1
+and SHA-256 against the staged bytes; both names listed at once fail closed.
+
 ## Recovery and verification
 
 Publication is retryable, not rollback-based. If a marketplace or GitHub API fails, rerun the
