@@ -72,14 +72,15 @@ PIN_REFERENCES = {
     ".github/workflows/on-demand-e2e.yml": 2,
     ".github/workflows/pages.yml": 3,
 }
-#: The shared Build/E2E callers the activation mode manages. The kit renders each whole and
-#: `template check` holds it to the pinned template byte for byte, so its pin lines are the kit's
-#: to count; they still carry the single pin.
+#: The shared Build/E2E and release callers the activation mode manages. The kit renders each
+#: whole and `template check` holds it to the pinned template byte for byte, so its pin lines are
+#: the kit's to count; they still carry the single pin.
 SHARED_CALLERS = (
     ".github/workflows/mod-base-guard.yml",
     ".github/workflows/mod-base-build.yml",
     ".github/workflows/mod-base-packaged-e2e.yml",
     ".github/workflows/mod-base-gate-status.yml",
+    ".github/workflows/mod-base-release.yml",
 )
 
 
