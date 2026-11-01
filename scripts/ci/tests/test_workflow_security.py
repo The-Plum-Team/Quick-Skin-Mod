@@ -104,16 +104,13 @@ TRUSTED_CACHE_WRITERS = {
     ("on-demand-e2e.yml", "e2e"): (
         "a master dispatch launches the bundle of this exact SHA's push Build or of its own compile"
     ),
-    ("release.yml", "runtime-behavior"): (
-        "a master rehearsal launches the release bundle its own build job made from github.sha"
-    ),
     ("build-gate.yml", "compile"): (
         "build-matrix.yml:target compiles github.sha from source; gradle_cache_policy.py lets only a"
         " push or workflow_dispatch on protected master save Gradle home"
     ),
 }
 # The runtime-store writers among them: each launches a packaged bundle, its own run's.
-RUNTIME_STORE_WRITERS = (("on-demand-e2e.yml", "e2e"), ("release.yml", "runtime-behavior"))
+RUNTIME_STORE_WRITERS = (("on-demand-e2e.yml", "e2e"),)
 CACHE_SAVING_ACTIONS = ("actions/cache@", "actions/cache/save@")
 PROTECTED_CHECKOUT_REFS = frozenset({"${{ github.sha }}", "master"})
 
@@ -333,18 +330,11 @@ class WorkflowSecurityTest(unittest.TestCase):
             COMPOSITE_ACTIONS / "run-packaged-e2e" / "action.yml"
         ).read_text(encoding="utf-8")
         on_demand = job_block("on-demand-e2e.yml", "e2e")
-        release = job_block("release.yml", "runtime-behavior")
 
         self.assertIn("uses: ./.github/actions/run-packaged-e2e", on_demand)
         self.assertIn("bundle-name: e2e-input-bundle", on_demand)
         self.assertIn("source-sha: ${{ github.sha }}", on_demand)
         self.assertIn("evidence-name: packaged-e2e-${{ matrix.id }}", on_demand)
-        self.assertIn("uses: ./.github/actions/run-packaged-e2e", release)
-        self.assertIn(
-            "bundle-name: release-${{ needs.build.outputs.release_id }}", release
-        )
-        self.assertIn("source-sha: ${{ github.sha }}", release)
-        self.assertIn("evidence-name: release-behavior-${{ matrix.id }}", release)
         self.assertIn("source-sha:\n", action)
         self.assertIn("required: true", action)
         self.assertIn("EXPECTED_SOURCE_SHA: ${{ inputs.source-sha }}", action)
@@ -430,16 +420,6 @@ class WorkflowSecurityTest(unittest.TestCase):
                 "feature-coverage.yml",
                 "Publish the complete feature baseline",
                 "${{ steps.baseline.outputs.artifact_name }}",
-            ): "90",
-            (
-                "release.yml",
-                "Upload immutable release bundle",
-                "release-${{ steps.release.outputs.release_id }}",
-            ): "90",
-            (
-                "release-recovery.yml",
-                "Upload the exact recovered release bundle",
-                "release-recovery-${{ steps.recovery.outputs.release_id }}",
             ): "90",
             (
                 "visual-review.yml",
@@ -593,10 +573,6 @@ class WorkflowSecurityTest(unittest.TestCase):
                 self.assertIn("workflow_dispatch", workflow_triggers(text))
         self.assertIn("bundle-name: e2e-input-bundle", job_block("on-demand-e2e.yml", "e2e"))
         self.assertIn("name: e2e-input-bundle", job_block("on-demand-e2e.yml", "build"))
-        self.assertIn(
-            "bundle-name: release-${{ needs.build.outputs.release_id }}",
-            job_block("release.yml", "runtime-behavior"),
-        )
         # A master dispatch takes its bundle only from the push Build of the same SHA on master
         # (or compiles it in the same run), never from a pull request's Build.
         source = staged_build_bundle.source_from_environment(
@@ -707,7 +683,6 @@ class WorkflowSecurityTest(unittest.TestCase):
     def test_gradle_cache_writes_are_limited_to_protected_master_builds(self) -> None:
         build = job_block("build-matrix.yml", "target")
         e2e = job_block("on-demand-e2e.yml", "compile")
-        release = job_block("release.yml", "build")
         policy = (ROOT / "scripts" / "ci" / "gradle_cache_policy.py").read_text(
             encoding="utf-8"
         )
@@ -716,7 +691,7 @@ class WorkflowSecurityTest(unittest.TestCase):
             workflow.read_text(encoding="utf-8").count("gradle/actions/setup-gradle@")
             for workflow in WORKFLOWS.glob("*.yml")
         )
-        self.assertEqual(setup_count, 2)
+        self.assertEqual(setup_count, 1)
         self.assertIn("scripts/ci/gradle_cache_policy.py", build)
         self.assertIn("--matrix release/release-matrix.json", build)
         self.assertIn('--event-name "$GITHUB_EVENT_NAME"', build)
@@ -735,9 +710,6 @@ class WorkflowSecurityTest(unittest.TestCase):
         self.assertIn("default: false", compiler)
         self.assertIn('if [[ "$CACHE_WRITER" == true ]]', build)
         self.assertIn("cache-writer: true", job_block("build-gate.yml", "compile"))
-        self.assertEqual(release.count("gradle/actions/setup-gradle@"), 1)
-        self.assertEqual(release.count("cache-read-only: true"), 1)
-        self.assertNotIn("gradle_cache_policy.py", release)
 
         self.assertIn('WRITER_EVENTS = frozenset({"push", "workflow_dispatch"})', policy)
         self.assertIn("event_name not in WRITER_EVENTS", policy)
@@ -3247,128 +3219,6 @@ class WorkflowSecurityTest(unittest.TestCase):
             "node node_modules/@anthropic-ai/claude-code/install.cjs", capacity
         )
         self.assertIn("node_modules/.bin/claude --version", capacity)
-
-    def test_marketplace_jobs_receive_only_the_selected_secret(self) -> None:
-        for filename in ("release.yml", "release-recovery.yml"):
-            with self.subTest(workflow=filename):
-                workflow = (WORKFLOWS / filename).read_text(encoding="utf-8")
-                self.assertEqual(
-                    workflow.count(
-                        "MODRINTH_TOKEN: ${{ matrix.marketplace == 'modrinth' "
-                        "&& secrets.MODRINTH_TOKEN || '' }}"
-                    ),
-                    2,
-                )
-                # Only the upload action needs the CurseForge credential.
-                self.assertNotIn("CURSEFORGE_TOKEN: ", workflow)
-                self.assertEqual(
-                    workflow.count("curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}"), 1
-                )
-
-    def test_release_queues_preserve_pending_work_and_only_writers_share_the_lock(self) -> None:
-        release = (WORKFLOWS / "release.yml").read_text(encoding="utf-8")
-        for filename in ("release.yml", "release-recovery.yml", "release-verify.yml"):
-            text = (WORKFLOWS / filename).read_text(encoding="utf-8")
-            self.assertEqual(text.count("concurrency:"), text.count("queue: max"))
-            self.assertEqual(text.count("concurrency:"), text.count("cancel-in-progress: false"))
-        for job in ("build", "runtime-behavior"):
-            block = job_block("release.yml", job)
-            self.assertNotIn("group: release-publish", block)
-            self.assertIn("runs-on: ubuntu-24.04", block)
-        self.assertIn("release_schedule.py", release)
-        self.assertIn("release-build-${{ needs.admit.outputs.slot }}", release)
-        self.assertIn("release-runtime-${{ needs.build.outputs.preparation_slot }}", release)
-        for filename in ("release.yml", "release-recovery.yml"):
-            for job in ("stage-github-release", "publish-marketplace", "publish-github-release"):
-                block = job_block(filename, job)
-                self.assertIn("group: release-publish", block)
-                self.assertIn("environment: release", block)
-
-    def test_upload_intent_precedes_external_write_and_moderation_has_no_poll_loop(self) -> None:
-        for filename in ("release.yml", "release-recovery.yml"):
-            workflow = (WORKFLOWS / filename).read_text(encoding="utf-8")
-            block = job_block(filename, "publish-marketplace")
-            self.assertLess(block.index("publication_state.py begin"), block.index("uses: Kira-NT/mc-publish@"))
-            self.assertGreater(block.index("publication_state.py accept"), block.index("uses: Kira-NT/mc-publish@"))
-            self.assertNotIn("--attempts", block)
-            self.assertNotIn("--delay-seconds", block)
-            self.assertIn("publication_state.py register", job_block(filename, "stage-github-release"))
-            final = job_block(filename, "publish-github-release")
-            self.assertIn("publication_state.py check", final)
-            self.assertIn("if: ${{ steps.settled.outputs.ready == 'true' }}", final)
-            self.assertIn("Rehearse publication and interrupted recovery", workflow)
-            self.assertLess(workflow.index("rehearse_publication.py"), workflow.index("uses: actions/attest@"))
-
-    def test_pending_verification_is_secretless_and_finalization_remains_protected(self) -> None:
-        workflow = (WORKFLOWS / "release-verify.yml").read_text(encoding="utf-8")
-        discovery = job_block("release-verify.yml", "discover")
-        probe = job_block("release-verify.yml", "verify")
-        final = job_block("release-verify.yml", "finalize")
-        self.assertIn("workflow_run:", workflow)
-        self.assertIn("schedule:", workflow)
-        self.assertNotIn("secrets.", workflow)
-        self.assertNotIn("mc-publish", workflow)
-        # GitHub shows drafts only to a token with push access. Discovery holds one without an
-        # approval, so it reads release metadata only; the job that downloads bytes stays read-only.
-        self.assertIn("contents: write", discovery)
-        self.assertNotIn("actions:", discovery)
-        self.assertNotIn("environment:", discovery)
-        self.assertIn("--discover", discovery)
-        self.assertNotIn("--finalize", discovery)
-        self.assertNotIn("-artifact@", discovery)
-        self.assertIn("needs: discover", probe)
-        self.assertIn("PENDING_DRAFTS: ${{ needs.discover.outputs.pending }}", probe)
-        self.assertNotIn("release_tag", probe)
-        self.assertNotIn("--discover", probe)
-        self.assertNotIn("contents: write", probe)
-        self.assertNotIn("environment:", probe)
-        self.assertNotIn("--finalize", probe)
-        self.assertIn("environment: release", final)
-        self.assertIn("group: release-publish", final)
-        self.assertIn("--finalize", final)
-        for block in (discovery, probe, final):
-            self.assertIn("ref: ${{ github.sha }}", block)
-            self.assertIn("persist-credentials: false", block)
-            self.assertIn("verify_pending_publications.py", block)
-
-    def test_curseforge_upload_is_never_retried_inside_the_action(self) -> None:
-        for filename in ("release.yml", "release-recovery.yml"):
-            with self.subTest(workflow=filename):
-                workflow = (WORKFLOWS / filename).read_text(encoding="utf-8")
-
-                def publish_step(marketplace: str) -> str:
-                    tail = workflow.split(
-                        f"Publish exact verified artifact to {marketplace}", 1
-                    )[1]
-                    return tail.split("- name: ", 1)[0]
-
-                # CurseForge approves asynchronously; only the reconciler may retry.
-                self.assertIn("retry-attempts: 1", publish_step("CurseForge"))
-                # Modrinth rejects duplicates synchronously.
-                self.assertIn("retry-attempts: 3", publish_step("Modrinth"))
-
-    def test_sbom_recovery_preserves_source_identity_and_publication_boundaries(self) -> None:
-        workflow = (WORKFLOWS / "release-recovery.yml").read_text(encoding="utf-8")
-        prepare = job_block("release-recovery.yml", "prepare")
-        self.assertIn("workflow_dispatch:", workflow)
-        self.assertIn("group: release", workflow)
-        self.assertIn("cancel-in-progress: false", workflow)
-        self.assertIn("recover_sbom_release.py prepare", prepare)
-        self.assertIn("SOURCE_RUN_ID: ${{ inputs.source_run_id }}", prepare)
-        self.assertIn("SOURCE_ARTIFACT_ID: ${{ inputs.source_artifact_id }}", prepare)
-        self.assertNotIn("secrets.", prepare)
-        self.assertIn("sbom-path: build/release/sbom/quick-skin.cdx.json", prepare)
-        for name in ("stage-github-release", "publish-marketplace", "publish-github-release"):
-            block = job_block("release-recovery.yml", name)
-            self.assertIn("environment: release", block)
-            self.assertIn("recover_sbom_release.py verify", block)
-            self.assertIn("MANIFEST_SHA256: ${{ needs.prepare.outputs.manifest_sha256 }}", block)
-            self.assertIn("fetch-tags: true", block)
-            self.assertIn("persist-credentials: false", block)
-        for name in ("stage-github-release", "publish-github-release"):
-            block = job_block("release-recovery.yml", name)
-            self.assertIn('--commit "${{ needs.prepare.outputs.source_sha }}"', block)
-            self.assertNotIn('--commit "$GITHUB_SHA"', block)
 
 
 if __name__ == "__main__":

@@ -167,38 +167,19 @@ class RepositoryGuidanceTest(unittest.TestCase):
         self.assertIn("including a fix for one Minecraft version or loader", contributing)
         self.assertRegex(contributing, r"separate ephemeral\s+worktree")
 
-    def test_release_publication_is_recoverable_and_non_destructive(self) -> None:
-        workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
-            encoding="utf-8"
-        )
-        release_helper = (
-            ROOT / "scripts" / "release" / "github_release.py"
-        ).read_text(encoding="utf-8")
-        release_identity = (
-            ROOT / "scripts" / "release" / "release_identity.py"
-        ).read_text(encoding="utf-8")
-
-        self.assertIn('tags:\n      - "mc*-v*"', workflow)
-        self.assertIn("--kind publications", workflow)
-        self.assertIn("fail-fast: false", workflow)
-        self.assertIn("github_release.py stage", workflow)
-        self.assertIn("github_release.py publish", workflow)
-        state = (ROOT / "scripts" / "release" / "publication_state.py").read_text(encoding="utf-8")
-        self.assertIn("publication_state.py begin", workflow)
-        self.assertIn("publication_state.py accept", workflow)
-        self.assertIn("publication_state.py check", workflow)
-        self.assertIn("from reconcile_publication import", state)
-        self.assertIn("rehearse_publication.py", workflow)
-        self.assertIn("verify_reproducibility.py", workflow)
-        self.assertIn("--rerun-tasks", workflow)
-        self.assertIn("validate_changelog", release_identity)
-        attest_pin = "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6"
-        self.assertEqual(workflow.count(attest_pin), 2)
-        self.assertIn("sbom-path: build/release/sbom/quick-skin.cdx.json", workflow)
-        combined = workflow + release_helper + state
-        self.assertNotIn("gh release delete", combined)
-        self.assertNotIn("git push --delete", combined)
-        self.assertNotIn("gh release upload --clobber", combined)
+    def test_releases_publish_only_through_the_shared_release(self) -> None:
+        workflows = ROOT / ".github" / "workflows"
+        for retired in ("release.yml", "release-verify.yml", "release-recovery.yml"):
+            with self.subTest(retired=retired):
+                self.assertFalse((workflows / retired).exists())
+        for path in sorted(workflows.glob("*.y*ml")):
+            with self.subTest(workflow=path.name):
+                self.assertNotIn("mc-publish", path.read_text(encoding="utf-8"))
+        caller = (workflows / "mod-base-release.yml").read_text(encoding="utf-8")
+        self.assertIn("environment: ${{ needs.plan.outputs.environment }}", caller)
+        releasing = (ROOT / "RELEASING.md").read_text(encoding="utf-8")
+        self.assertIn("gh workflow run mod-base-release.yml --ref master -f publish=false", releasing)
+        self.assertIn("gh workflow run mod-base-release.yml --ref master -f publish=true", releasing)
 
     def test_github_governance_is_declarative_and_fail_closed(self) -> None:
         config = (
