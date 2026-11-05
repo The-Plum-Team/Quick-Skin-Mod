@@ -1921,10 +1921,12 @@ public class LocalAssetManager {
             registered = true;
 
             // Cache transparency info for the first-person arm rendering mixin
-            // DynamicTextures aren't accessible via resource manager, so we check here
+            // DynamicTextures aren't accessible via resource manager, so we check here. Every
+            // texel is read (stopping at the first translucent one): a sampled grid misses
+            // translucent texels between its points and records the texture as opaque.
             boolean hasAlpha = false;
-            for (int y = 0; y < nativeImage.getHeight() && !hasAlpha; y += Math.max(1, nativeImage.getHeight() / 32)) {
-                for (int x = 0; x < nativeImage.getWidth() && !hasAlpha; x += Math.max(1, nativeImage.getWidth() / 32)) {
+            for (int y = 0; y < nativeImage.getHeight() && !hasAlpha; y++) {
+                for (int x = 0; x < nativeImage.getWidth() && !hasAlpha; x++) {
 //? if <1.21 {
                     int pixel = MinecraftCompat.INSTANCE.getPixel(nativeImage, x, y);
 //?} else if <1.21.11 {

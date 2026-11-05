@@ -185,15 +185,13 @@ public class TextureAlphaDetector {
         int width = image.getWidth();
         int height = image.getHeight();
 
-        // Sample pixels to check for transparency for performance
-        int sampleRate = Math.max(1, Math.min(width, height) / 32); // Sample every Nth pixel
-
-        for (int y = 0; y < height; y += sampleRate) {
-            for (int x = 0; x < width; x += sampleRate) {
-                int pixel = image.getRGB(x, y);
-                int alpha = (pixel >> 24) & 0xFF;
-
-                if (alpha < 255) {
+        // Every pixel is read, row by row, stopping at the first translucent one: a sampled
+        // grid misses translucent pixels between its points and reports the image as opaque.
+        int[] row = new int[width];
+        for (int y = 0; y < height; y++) {
+            image.getRGB(0, y, width, 1, row, 0, width);
+            for (int pixel : row) {
+                if ((pixel >>> 24) < 255) {
                     return true;
                 }
             }
