@@ -36,6 +36,8 @@ class VisualReviewGuardTest(unittest.TestCase):
             "responses = json.loads((root / 'responses.json').read_text())\n"
             "if route not in responses: raise SystemExit('Unexpected API route: ' + route)\n"
             "value = responses[route]\n"
+            "if isinstance(value, dict) and '__error' in value:\n"
+            "    sys.stderr.write(value['__error'] + '\\n'); raise SystemExit(1)\n"
             "if isinstance(value, dict) and '__archive' in value:\n"
             "    sys.stdout.buffer.write((root / value['__archive']).read_bytes())\n"
             "else: print(json.dumps(value))\n"
@@ -62,7 +64,7 @@ class VisualReviewGuardTest(unittest.TestCase):
 
     def guard(self, bundle="mc1.20.1", *, legacy=False, overrides=None, marker=None, marker_key=None,
               wave_block=None, archive_path="visual-review-wave-block.json", fresh_workspace=False,
-              marker_owner=("completed", "failure")):
+              marker_owner=("completed", "failure"), owner_response=None):
         review_key = "55" + (f"--{bundle}" if bundle else "")
         name = "visual-review-input-55"
         if not legacy:
@@ -112,6 +114,8 @@ class VisualReviewGuardTest(unittest.TestCase):
                 "path": ".github/workflows/visual-review-drain.yml",
             }
             responses[prefix + "artifacts/99/zip"] = {"__archive": archive.name}
+        if owner_response is not None:
+            responses[prefix + "runs/99"] = owner_response
         (self.folder / "responses.json").write_text(json.dumps(responses))
         output = Path(env["GITHUB_OUTPUT"])
         output.write_text("")
@@ -313,6 +317,52 @@ class VisualReviewGuardTest(unittest.TestCase):
         result, output, _ = self.guard(marker="visual-review", marker_owner=("pending", "failure"))
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertNotIn("already_reviewed=true", output)
+
+    def test_a_deleted_marker_owner_is_skipped_only_on_a_definite_404(self) -> None:
+        missing = {"__error": "gh: Not Found (HTTP 404)"}
+        for marker in ("visual-review", "visual-review-attempt"):
+            with self.subTest(marker=marker):
+                result, output, requests = self.guard(marker=marker, owner_response=missing)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertNotIn("reviewable=false", output)
+                self.assertIn("/artifacts/77", requests)
+                self.assertFalse((self.folder / "github-api-unavailable-guard").exists())
+        result, output, requests = self.guard(wave_block=self.block(), owner_response=missing)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertNotIn("wave_blocked=true", output)
+        self.assertIn("/artifacts/77", requests)
+
+    def test_an_unreadable_marker_owner_fails_the_guard_instead_of_admitting_review(self) -> None:
+        # Retries must not wait in a unit test.
+        sleep = self.tools / "sleep"
+        sleep.write_text("#!/bin/sh\nexit 0\n")
+        sleep.chmod(0o755)
+        for error in ("gh: Server Error (HTTP 503)", "gh: Forbidden (HTTP 403)"):
+            for marker, kind in (("visual-review", "marker"),
+                                 ("visual-review-attempt", "marker"), (None, "block")):
+                with self.subTest(error=error, marker=marker or kind):
+                    owner = {"__error": error}
+                    if kind == "block":
+                        result, output, requests = self.guard(
+                            wave_block=self.block(), owner_response=owner)
+                    else:
+                        result, output, requests = self.guard(
+                            marker=marker, owner_response=owner)
+                    self.assertNotEqual(0, result.returncode)
+                    self.assertNotIn("/artifacts/77", requests)
+                    self.assertNotIn("reviewable=false", output)
+
+    def test_an_exhausted_owner_lookup_keeps_the_transient_signal(self) -> None:
+        sleep = self.tools / "sleep"
+        sleep.write_text("#!/bin/sh\nexit 0\n")
+        sleep.chmod(0o755)
+        signal = self.folder / "github-api-unavailable-guard"
+        result, _, requests = self.guard(
+            marker="visual-review", owner_response={"__error": "gh: Server Error (HTTP 503)"},
+            overrides={"GITHUB_API_RETRY_UNAVAILABLE_SIGNAL": str(signal)})
+        self.assertNotEqual(0, result.returncode)
+        self.assertNotIn("/artifacts/77", requests)
+        self.assertTrue(signal.exists())
 
 
 if __name__ == "__main__":
