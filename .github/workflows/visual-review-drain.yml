@@ -1028,6 +1028,25 @@ jobs:
               (( delay <= 60 )) || delay=60
             done
           }
+          # A marker's owner run is authenticated, never assumed absent. Only a definite 404 (the
+          # run no longer exists) prints nothing so the caller skips that marker; any other failure
+          # fails the guard, and an exhausted transient retry keeps its typed signal for retention.
+          owner_run_lookup() {
+            local error_file lookup_status=0 output
+            error_file="$RUNNER_TEMP/visual-review-owner-lookup.err"
+            output="$(protected_gh_api_retry \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$1" 2> "$error_file")" || lookup_status=$?
+            if (( lookup_status == 0 )); then
+              printf '%s\n' "$output"
+              return 0
+            fi
+            if [[ ! -f "${GITHUB_API_RETRY_UNAVAILABLE_SIGNAL:-/nonexistent}" ]] &&
+                grep -Fq '(HTTP 404)' "$error_file"; then
+              return 0
+            fi
+            cat -- "$error_file" >&2
+            return "$lookup_status"
+          }
           printf 'already_reviewed=false\n' >> "$GITHUB_OUTPUT"
           printf 'cooling=false\n' >> "$GITHUB_OUTPUT"
           printf 'reviewable=true\n' >> "$GITHUB_OUTPUT"
@@ -1074,8 +1093,7 @@ jobs:
             [[ "$size" =~ ^[1-9][0-9]*$ ]] || continue
             (( size <= 1048576 )) || continue
             [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || continue
-            block_run="$(protected_gh_api_retry \
-              "repos/$GITHUB_REPOSITORY/actions/runs/$block_run_id" 2>/dev/null || true)"
+            block_run="$(owner_run_lookup "$block_run_id")"
             if [[ -n "$block_run" ]] && jq -e \
                 --arg implementation_sha "$head_sha" \
                 --arg repository "$GITHUB_REPOSITORY" \
@@ -1140,8 +1158,7 @@ jobs:
             <<< "$reports" > /dev/null
           while IFS=$'\t' read -r report_run_id expired; do
             [[ -n "$report_run_id" && "$expired" == false ]] || continue
-            report_run="$(protected_gh_api_retry \
-              "repos/$GITHUB_REPOSITORY/actions/runs/$report_run_id" 2>/dev/null || true)"
+            report_run="$(owner_run_lookup "$report_run_id")"
             if [[ -n "$report_run" ]] && jq -e \
                 --arg repository "$GITHUB_REPOSITORY" \
                 '((.status == "completed" and
@@ -1179,8 +1196,7 @@ jobs:
                 '($created_at | fromdateiso8601) + 1800 > now'; then
               continue
             fi
-            attempt_run="$(protected_gh_api_retry \
-              "repos/$GITHUB_REPOSITORY/actions/runs/$attempt_run_id" 2>/dev/null || true)"
+            attempt_run="$(owner_run_lookup "$attempt_run_id")"
             if [[ -n "$attempt_run" ]] && jq -e \
                 --arg repository "$GITHUB_REPOSITORY" \
                 '((.status == "completed" and .conclusion == "failure") or
