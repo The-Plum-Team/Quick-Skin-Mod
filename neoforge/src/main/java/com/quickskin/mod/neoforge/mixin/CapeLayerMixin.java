@@ -59,7 +59,10 @@ public class CapeLayerMixin {
         boolean hasConfigCape = false;
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         boolean isLocalPlayer = mc.player != null && player.getUUID().equals(mc.player.getUUID());
-        if (!quickskin$previewing && !hasServiceCape && isLocalPlayer) {
+        // The saved cape stands in only on the title screen: in a world the session's appearance
+        // decides, and a session that wears no cape (an adopted saved record) shows none.
+        boolean useConfigCape = isLocalPlayer && mc.level == null;
+        if (!quickskin$previewing && !hasServiceCape && useConfigCape) {
             com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
             hasConfigCape = !config.activeCapeHash.isEmpty();
         }
@@ -84,7 +87,7 @@ public class CapeLayerMixin {
             if (hasServiceCape) {
                 capeTexture = player.getSkin().capeTexture();
             }
-            if (capeTexture == null && isLocalPlayer) {
+            if (capeTexture == null && useConfigCape) {
                 com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
                 if (!config.activeCapeHash.isEmpty()) {
                     capeTexture = com.quickskin.mod.client.services.CapeService.getInstance()
@@ -258,7 +261,10 @@ public class CapeLayerMixin {
         boolean isLocalPlayer = playerId != null
                 && playerId.equals(minecraft.getUser().getProfileId());
         ClientConfig config = ClientConfig.getInstance();
+        // The saved cape stands in only on the title screen: in a world the session's appearance
+        // decides, and a session that wears no cape (an adopted saved record) shows none.
         boolean hasConfigCape = !previewing && !hasServiceCape && isLocalPlayer
+                && minecraft.level == null
                 && !config.activeCapeHash.isEmpty();
         if (!previewing && !hasServiceCape && !hasConfigCape) {
             return;
@@ -429,7 +435,10 @@ public class CapeLayerMixin {
         // Check config-based cape for local player (works both title screen and in-world)
         boolean hasConfigCape = false;
         boolean isLocalPlayer = mc.player != null && mc.player.getUUID().equals(playerUUID);
-        if (!quickskin$previewing && !hasServiceCape && isLocalPlayer) {
+        // The saved cape stands in only on the title screen: in a world the session's appearance
+        // decides, and a session that wears no cape (an adopted saved record) shows none.
+        boolean useConfigCape = isLocalPlayer && mc.level == null;
+        if (!quickskin$previewing && !hasServiceCape && useConfigCape) {
             ClientConfig config = ClientConfig.getInstance();
             hasConfigCape = !config.activeCapeHash.isEmpty();
         }
@@ -458,7 +467,7 @@ public class CapeLayerMixin {
             if (hasServiceCape) {
                 capeTexture = service.getCapeLocation(playerUUID);
             }
-            if (capeTexture == null && isLocalPlayer) {
+            if (capeTexture == null && useConfigCape) {
                 ClientConfig config = ClientConfig.getInstance();
                 if (!config.activeCapeHash.isEmpty()) {
                     capeTexture = com.quickskin.mod.client.services.CapeService.getInstance()

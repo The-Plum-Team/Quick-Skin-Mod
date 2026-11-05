@@ -465,6 +465,23 @@ class MixinPolicyTest(unittest.TestCase):
                     }
                 self.assertEqual(expected - loaded, set())
 
+    def test_saved_cape_stands_in_only_on_the_title_screen(self) -> None:
+        # In a world the session's appearance decides the local player's cape: a session that
+        # adopted a saved record without a cape must not show the config's cape locally.
+        for path in (
+            CANONICAL_JAVA / "com/quickskin/mod/mixin/CapeLayerMixin.java",
+            ROOT / "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/CapeLayerMixin.java",
+        ):
+            with self.subTest(path=relative(path)):
+                source = JAVA_COMMENT.sub("", path.read_text(encoding="utf-8"))
+                gates = re.findall(
+                    r"boolean (?:hasConfigCape = !previewing|useConfigCape =)[^;]*;", source
+                )
+                self.assertTrue(gates)
+                for gate in gates:
+                    self.assertIn("level == null", gate)
+                self.assertNotRegex(source, r"&&\s*isLocalPlayer\s*\)")
+
     def test_ears_five_lookup_selects_every_overload(self) -> None:
         source = (
             CANONICAL_JAVA / "com/quickskin/mod/mixin/compat/EarsFiveMixin.java"
