@@ -658,6 +658,9 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         # in uncompiled sections, which once produced identical sky-only baseline/applied frames.
         self.assertEqual(2, remote.count("evidence.observerReady("))
         self.assertEqual(2, remote.count("evidence.checkSubjectRendered(minecraft)"))
+        # The late-join observer capture holds to the same rule.
+        self.assertEqual(1, late_join.count("evidence.observerReady("))
+        self.assertEqual(1, late_join.count("evidence.checkSubjectRendered(minecraft)"))
         self.assertIn("VanillaShim.isTerrainRenderReady(minecraft, position)", evidence)
         self.assertIn("VanillaShim.isTerrainRenderReady(minecraft, position.below())", evidence)
         self.assertIn('E2ELog.info(step + " waiting: " + reason)', evidence)
