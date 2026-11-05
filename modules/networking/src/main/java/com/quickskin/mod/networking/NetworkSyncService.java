@@ -88,6 +88,7 @@ public class NetworkSyncService {
     private ClientChannelDiscovery channelDiscovery;
     private volatile String adoptedSkinId;
     private volatile String adoptedCapeId;
+    private volatile String adoptedElytraId;
     /** The latest sync requested while the session waited for the server's record of its player. */
     private HeldSync heldSync;
 
@@ -178,13 +179,19 @@ public class NetworkSyncService {
                 && (!NetworkTransport.INSTANCE.canServerReceive(UpdateAppearanceV2Payload.TYPE)
                 || !NetworkTransport.INSTANCE.canServerReceive(TextureChunkV2Payload.TYPE))) return;
         //?}
+        //? if >=1.21 {
+        if (protocolProfile.supports(ProtocolCapability.ELYTRA_TEXTURE)
+                && !NetworkTransport.INSTANCE.canServerReceive(UpdateAppearanceElytraPayload.TYPE)) return;
+        //?}
         long token = syncSequence.incrementAndGet();
         String safeSkinId = skinId != null ? skinId : "";
         String safeCapeId = capeId != null ? capeId : "";
         String safeModel = model != null ? model : "classic";
+        // What the elytra wear goes with every sync of the player's own appearance
+        String safeElytraId = ownElytraId(playerId);
         DesiredSync desired = new DesiredSync(
                 token, sourceConnection, playerId,
-                safeSkinId, safeCapeId, safeModel, protocolProfile);
+                safeSkinId, safeCapeId, safeElytraId, safeModel, protocolProfile);
         synchronized (this) {
             heldSync = null;
             latestDesired = desired;
@@ -194,6 +201,14 @@ public class NetworkSyncService {
             retryAttempt = 0;
         }
         startPreparation(desired);
+    }
+
+    /** What the local player's elytra wear instead of the cape, or {@code ""} (the cape). */
+    private static String ownElytraId(UUID playerId) {
+        com.quickskin.mod.client.api.RemoteAppearanceTarget target = ClientNetworkHandler.appearanceTargetOrNull();
+        com.quickskin.mod.common.data.PlayerAppearance own = target != null ? target.ownAppearance(playerId) : null;
+        String elytraId = own != null ? own.getElytraId() : "";
+        return NetworkSecurity.isValidLocalAppearanceId(elytraId, "cape") ? elytraId : "";
     }
 
     /**
@@ -214,8 +229,14 @@ public class NetworkSyncService {
      * sync held during the wait described the look that record replaces, so it is dropped.
      */
     synchronized void adoptServerAppearance(String skinId, String capeId) {
+        adoptServerAppearance(skinId, capeId, "");
+    }
+
+    /** The same, with the cape the adopted record's elytra wear. */
+    synchronized void adoptServerAppearance(String skinId, String capeId, String elytraId) {
         adoptedSkinId = skinId;
         adoptedCapeId = capeId;
+        adoptedElytraId = elytraId;
         heldSync = null;
     }
 
@@ -256,7 +277,7 @@ public class NetworkSyncService {
         preparingToken = desired.token;
         ClientIoExecutor.supplyAsync(() -> prepareSync(
                 desired.token, desired.sourceConnection, desired.playerId,
-                desired.skinId, desired.capeId, desired.model, desired.protocolProfile))
+                desired.skinId, desired.capeId, desired.elytraId, desired.model, desired.protocolProfile))
                 .whenComplete((prepared, error) -> {
                     if (error != null) {
                         QuickSkinInfo.LOGGER.warn("Unable to prepare appearance network sync", error);
@@ -281,10 +302,10 @@ public class NetworkSyncService {
 
     private PreparedSync prepareSync(
             long token, Object sourceConnection, UUID playerId,
-            String skinId, String capeId, String model,
+            String skinId, String capeId, String elytraId, String model,
             ProtocolProfile protocolProfile) {
         if (syncSequence.get() != token || !isCurrentConnection(sourceConnection)) return null;
-        List<PreparedUpload> uploads = new ArrayList<>(2);
+        List<PreparedUpload> uploads = new ArrayList<>(3);
         String serverSkinId = skinId;
         String serverCapeId = capeId;
         PreparedMetadata metadata = null;
@@ -323,9 +344,41 @@ public class NetworkSyncService {
             }
         }
         if (syncSequence.get() != token || !isCurrentConnection(sourceConnection)) return null;
+
+        // The cape the elytra wear, uploaded as a cape, only to a server that tells it apart
+        String serverElytraId = "";
+        PreparedMetadata elytraMetadata = null;
+        PreparedMetadata expectedElytraMetadata = null;
+        if (protocolProfile.supports(ProtocolCapability.ELYTRA_TEXTURE)
+                && !elytraId.isEmpty() && !elytraId.equals(capeId)) {
+            serverElytraId = elytraId;
+            if (elytraId.startsWith("local_cape:") && !elytraId.equals(adoptedElytraId)) {
+                String localHash = elytraId.substring("local_cape:".length());
+                PreparedUpload upload = prepareUpload(localHash, "cape", protocolProfile);
+                // A cape this instance no longer has: the elytra wear the cape there
+                serverElytraId = upload == null || upload.networkHash == null
+                        ? "" : "local_cape:" + upload.networkHash;
+                if (upload != null && !upload.alreadySent) uploads.add(upload);
+                AnimationMetadata animation = upload == null || upload.networkHash == null ? null
+                        : LocalAssetManager.getInstance().getAnimationMetadata(localHash);
+                if (animation != null && protocolProfile.supports(ProtocolCapability.ANIMATION_METADATA)) {
+                    String json = animation.toJson();
+                    if (NetworkSecurity.isValidAnimationMetadata(json)) {
+                        expectedElytraMetadata = new PreparedMetadata(upload.networkHash, json);
+                        if (!json.equals(confirmedMetadata.get(upload.networkHash))
+                                && !isRecentMetadataSend(upload.networkHash, json)) {
+                            elytraMetadata = expectedElytraMetadata;
+                        }
+                    }
+                }
+            }
+            if (serverElytraId.equals(serverCapeId)) serverElytraId = "";
+        }
+        if (syncSequence.get() != token || !isCurrentConnection(sourceConnection)) return null;
         return new PreparedSync(
-                token, sourceConnection, playerId, serverSkinId, serverCapeId,
-                model, uploads, metadata, expectedMetadata, protocolProfile);
+                token, sourceConnection, playerId, serverSkinId, serverCapeId, serverElytraId,
+                model, uploads, metadata, expectedMetadata, elytraMetadata, expectedElytraMetadata,
+                protocolProfile);
     }
 
     private PreparedUpload prepareUpload(
@@ -515,6 +568,23 @@ public class NetworkSyncService {
                 }
                 putBounded(sentMetadata, sync.metadata.networkHash,
                         new SentMetadata(sync.metadata.json, System.currentTimeMillis()));
+                packets++;
+            }
+            if (sync.elytraMetadata != null
+                    && !sync.elytraMetadata.json.equals(
+                            confirmedMetadata.get(sync.elytraMetadata.networkHash))
+                    && !isRecentMetadataSend(
+                            sync.elytraMetadata.networkHash, sync.elytraMetadata.json)) {
+                try {
+                    sendAnimationMetadata(sync.elytraMetadata, sync.protocolProfile);
+                } catch (RuntimeException | LinkageError error) {
+                    QuickSkinInfo.LOGGER.warn("Unable to send animation metadata", error);
+                    activeSync = null;
+                    scheduleRetry();
+                    return;
+                }
+                putBounded(sentMetadata, sync.elytraMetadata.networkHash,
+                        new SentMetadata(sync.elytraMetadata.json, System.currentTimeMillis()));
                 packets++;
             }
             sync.metadataHandled = true;
@@ -721,14 +791,14 @@ public class NetworkSyncService {
                         latestDesired.skinId, "local_skin:", "skin");
                 invalidateConfirmedUpload(
                         latestDesired.capeId, "local_cape:", "cape");
-            } else if (!awaitingAcknowledgement.metadataAcknowledged
-                    && awaitingAcknowledgement.expectedMetadata != null) {
-                SentMetadata sent = sentMetadata.get(
-                        awaitingAcknowledgement.expectedMetadata.networkHash);
-                if (sent != null && sent.json.equals(
-                        awaitingAcknowledgement.expectedMetadata.json)) {
-                    sentMetadata.remove(
-                            awaitingAcknowledgement.expectedMetadata.networkHash, sent);
+                invalidateConfirmedUpload(
+                        latestDesired.elytraId, "local_cape:", "cape");
+            } else {
+                if (!awaitingAcknowledgement.metadataAcknowledged) {
+                    forgetSentMetadata(awaitingAcknowledgement.expectedMetadata);
+                }
+                if (!awaitingAcknowledgement.elytraMetadataAcknowledged) {
+                    forgetSentMetadata(awaitingAcknowledgement.expectedElytraMetadata);
                 }
             }
         }
@@ -736,6 +806,14 @@ public class NetworkSyncService {
         retryAtMillis = 0L;
         retryAttempt = Math.min(retryAttempt + 1, 30);
         startPreparation(latestDesired);
+    }
+
+    private void forgetSentMetadata(PreparedMetadata expected) {
+        if (expected == null) return;
+        SentMetadata sent = sentMetadata.get(expected.networkHash);
+        if (sent != null && sent.json.equals(expected.json)) {
+            sentMetadata.remove(expected.networkHash, sent);
+        }
     }
 
     private void invalidateConfirmedUpload(
@@ -751,9 +829,13 @@ public class NetworkSyncService {
         boolean metadataAcknowledged = sync.expectedMetadata == null
                 || sync.expectedMetadata.json.equals(
                         confirmedMetadata.get(sync.expectedMetadata.networkHash));
+        boolean elytraMetadataAcknowledged = sync.expectedElytraMetadata == null
+                || sync.expectedElytraMetadata.json.equals(
+                        confirmedMetadata.get(sync.expectedElytraMetadata.networkHash));
         awaitingAcknowledgement = new AwaitingAcknowledgement(
-                sync.token, sync.serverSkinId, sync.serverCapeId, sync.model,
-                sync.expectedMetadata, false, metadataAcknowledged);
+                sync.token, sync.serverSkinId, sync.serverCapeId, sync.serverElytraId, sync.model,
+                sync.expectedMetadata, sync.expectedElytraMetadata,
+                false, metadataAcknowledged, elytraMetadataAcknowledged);
         scheduleRetry();
     }
 
@@ -810,6 +892,17 @@ public class NetworkSyncService {
     }
 
     private void sendAppearance(PreparedSync sync) {
+        if (sync.protocolProfile.negotiated()
+                && sync.protocolProfile.supports(ProtocolCapability.ELYTRA_TEXTURE)) {
+            //? if <1.21 {
+            NetworkTransport.INSTANCE.sendAppearanceWithElytraToServer(
+                    sync.playerId, sync.serverSkinId, sync.serverCapeId, sync.serverElytraId, sync.model);
+            //?} else {
+            NetworkTransport.INSTANCE.sendToServer(new UpdateAppearanceElytraPayload(
+                    sync.playerId, sync.serverSkinId, sync.serverCapeId, sync.serverElytraId, sync.model));
+            //?}
+            return;
+        }
         if (sync.protocolProfile.negotiated()) {
             //? if <1.21 {
             NetworkTransport.INSTANCE.sendAppearanceV2ToServer(
@@ -846,19 +939,27 @@ public class NetworkSyncService {
     /** Confirms uploads only after the server echoes an appearance it actually authorized. */
     public synchronized boolean confirmAppearance(
             String skinId, String capeId, String model) {
+        return confirmAppearance(skinId, capeId, "", model);
+    }
+
+    /** The same, from a server that echoes what the elytra wear too. */
+    public synchronized boolean confirmAppearance(
+            String skinId, String capeId, String elytraId, String model) {
         boolean skinConfirmed = confirmTextureId(skinId, "local_skin:", "skin");
         boolean capeConfirmed = confirmTextureId(capeId, "local_cape:", "cape");
+        boolean elytraConfirmed = confirmTextureId(elytraId, "local_cape:", "cape");
         boolean appearanceConfirmed = false;
         AwaitingAcknowledgement awaiting = awaitingAcknowledgement;
         if (awaiting != null && awaiting.token == syncSequence.get()
                 && awaiting.serverSkinId.equals(skinId)
                 && awaiting.serverCapeId.equals(capeId)
+                && awaiting.serverElytraId.equals(elytraId != null ? elytraId : "")
                 && awaiting.model.equals(model)) {
             awaiting.appearanceAcknowledged = true;
             appearanceConfirmed = true;
             completeAcknowledgementIfReady(awaiting);
         }
-        return skinConfirmed || capeConfirmed || appearanceConfirmed;
+        return skinConfirmed || capeConfirmed || elytraConfirmed || appearanceConfirmed;
     }
 
     private boolean confirmTextureId(String textureId, String prefix, String textureType) {
@@ -896,6 +997,12 @@ public class NetworkSyncService {
             awaiting.metadataAcknowledged = true;
             completeAcknowledgementIfReady(awaiting);
         }
+        if (awaiting != null && awaiting.expectedElytraMetadata != null
+                && awaiting.expectedElytraMetadata.networkHash.equals(networkHash)
+                && awaiting.expectedElytraMetadata.json.equals(json)) {
+            awaiting.elytraMetadataAcknowledged = true;
+            completeAcknowledgementIfReady(awaiting);
+        }
         return true;
     }
 
@@ -903,7 +1010,8 @@ public class NetworkSyncService {
             AwaitingAcknowledgement awaiting) {
         if (awaitingAcknowledgement == awaiting
                 && awaiting.appearanceAcknowledged
-                && awaiting.metadataAcknowledged) {
+                && awaiting.metadataAcknowledged
+                && awaiting.elytraMetadataAcknowledged) {
             latestAcknowledgedSyncToken = awaiting.token;
             awaitingAcknowledgement = null;
             retryAtMillis = 0L;
@@ -967,6 +1075,7 @@ public class NetworkSyncService {
         channelDiscovery = null;
         adoptedSkinId = null;
         adoptedCapeId = null;
+        adoptedElytraId = null;
         heldSync = null;
         clearAppearanceSnapshotRequest();
     }
@@ -1014,6 +1123,7 @@ public class NetworkSyncService {
             UUID playerId,
             String skinId,
             String capeId,
+            String elytraId,
             String model,
             ProtocolProfile protocolProfile) {
     }
@@ -1022,22 +1132,29 @@ public class NetworkSyncService {
         private final long token;
         private final String serverSkinId;
         private final String serverCapeId;
+        private final String serverElytraId;
         private final String model;
         private final PreparedMetadata expectedMetadata;
+        private final PreparedMetadata expectedElytraMetadata;
         private boolean appearanceAcknowledged;
         private boolean metadataAcknowledged;
+        private boolean elytraMetadataAcknowledged;
 
         private AwaitingAcknowledgement(
-                long token, String serverSkinId, String serverCapeId, String model,
-                PreparedMetadata expectedMetadata,
-                boolean appearanceAcknowledged, boolean metadataAcknowledged) {
+                long token, String serverSkinId, String serverCapeId, String serverElytraId,
+                String model, PreparedMetadata expectedMetadata, PreparedMetadata expectedElytraMetadata,
+                boolean appearanceAcknowledged, boolean metadataAcknowledged,
+                boolean elytraMetadataAcknowledged) {
             this.token = token;
             this.serverSkinId = serverSkinId;
             this.serverCapeId = serverCapeId;
+            this.serverElytraId = serverElytraId;
             this.model = model;
             this.expectedMetadata = expectedMetadata;
+            this.expectedElytraMetadata = expectedElytraMetadata;
             this.appearanceAcknowledged = appearanceAcknowledged;
             this.metadataAcknowledged = metadataAcknowledged;
+            this.elytraMetadataAcknowledged = elytraMetadataAcknowledged;
         }
     }
 
@@ -1047,10 +1164,13 @@ public class NetworkSyncService {
         private final UUID playerId;
         private final String serverSkinId;
         private final String serverCapeId;
+        private final String serverElytraId;
         private final String model;
         private final List<PreparedUpload> uploads;
         private final PreparedMetadata metadata;
         private final PreparedMetadata expectedMetadata;
+        private final PreparedMetadata elytraMetadata;
+        private final PreparedMetadata expectedElytraMetadata;
         private final ProtocolProfile protocolProfile;
         private int uploadIndex;
         private int chunkIndex;
@@ -1059,19 +1179,23 @@ public class NetworkSyncService {
 
         private PreparedSync(
                 long token, Object sourceConnection, UUID playerId,
-                String serverSkinId, String serverCapeId, String model,
+                String serverSkinId, String serverCapeId, String serverElytraId, String model,
                 List<PreparedUpload> uploads, PreparedMetadata metadata,
-                PreparedMetadata expectedMetadata,
+                PreparedMetadata expectedMetadata, PreparedMetadata elytraMetadata,
+                PreparedMetadata expectedElytraMetadata,
                 ProtocolProfile protocolProfile) {
             this.token = token;
             this.sourceConnection = sourceConnection;
             this.playerId = playerId;
             this.serverSkinId = serverSkinId;
             this.serverCapeId = serverCapeId;
+            this.serverElytraId = serverElytraId;
             this.model = model;
             this.uploads = List.copyOf(uploads);
             this.metadata = metadata;
             this.expectedMetadata = expectedMetadata;
+            this.elytraMetadata = elytraMetadata;
+            this.expectedElytraMetadata = expectedElytraMetadata;
             this.protocolProfile = protocolProfile;
         }
     }

@@ -294,11 +294,19 @@ public class ServerTextureCache {
      */
     public synchronized boolean tryReplaceAppearancePins(
             UUID playerId, String skinId, String capeId) {
+        return tryReplaceAppearancePins(playerId, skinId, capeId, "");
+    }
+
+    /** The same, with the cape the elytra wear instead of the cape, which is pinned like it. */
+    public synchronized boolean tryReplaceAppearancePins(
+            UUID playerId, String skinId, String capeId, String elytraId) {
         if (playerId == null) return false;
         LinkedHashMap<String, Integer> requested = new LinkedHashMap<>();
         if (!collectAppearancePin(requested, playerId, skinId, "local_skin:", "skin")
                 || !collectAppearancePin(
-                        requested, playerId, capeId, "local_cape:", "cape")) return false;
+                        requested, playerId, capeId, "local_cape:", "cape")
+                || !collectAppearancePin(
+                        requested, playerId, elytraId, "local_cape:", "cape")) return false;
         return pinnedTextures.tryReplace(playerId, requested);
     }
 

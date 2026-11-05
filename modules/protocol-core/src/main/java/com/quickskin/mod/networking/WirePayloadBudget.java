@@ -79,6 +79,14 @@ public final class WirePayloadBudget {
                 + string(TextureTransferLimits.MAX_MODEL_BYTES);
     }
 
+    /**
+     * {@code [update|sync]_appearance_elytra}: player, skin id, cape id, the elytra's cape id and
+     * model.
+     */
+    public static int appearanceWithElytra() {
+        return appearance() + string(TextureTransferLimits.MAX_APPEARANCE_ID_BYTES);
+    }
+
     /** {@code sync_server_config}: one configuration document. */
     public static int serverConfig() {
         return ENVELOPE_BYTES + string(TextureTransferLimits.MAX_JSON_BYTES);

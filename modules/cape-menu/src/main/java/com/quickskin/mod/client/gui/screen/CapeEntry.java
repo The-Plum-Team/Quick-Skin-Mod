@@ -19,12 +19,29 @@ public class CapeEntry {
     private final KnownCapes knownCape;
     private final boolean isLocal;
     private final Path editorSource;
+    private final boolean vanillaElytra;
 
     private CapeEntry(AssetMetadata localCape, KnownCapes knownCape, boolean isLocal, Path editorSource) {
+        this(localCape, knownCape, isLocal, editorSource, false);
+    }
+
+    private CapeEntry(AssetMetadata localCape, KnownCapes knownCape, boolean isLocal, Path editorSource,
+                      boolean vanillaElytra) {
         this.localCape = localCape;
         this.knownCape = knownCape;
         this.isLocal = isLocal;
         this.editorSource = editorSource;
+        this.vanillaElytra = vanillaElytra;
+    }
+
+    /** The Elytra tab's choice of vanilla's own elytra, under whatever cape is worn. */
+    public static CapeEntry vanillaElytra() {
+        return new CapeEntry(null, null, false, null, true);
+    }
+
+    /** Whether this is the Elytra tab's choice of vanilla's elytra. */
+    public boolean isVanillaElytra() {
+        return vanillaElytra;
     }
 
     public static CapeEntry fromLocal(AssetMetadata metadata) {
@@ -103,6 +120,9 @@ public class CapeEntry {
     }
 
     public String getCapeId() {
+        if (vanillaElytra) {
+            return com.quickskin.mod.common.data.PlayerAppearance.VANILLA_ELYTRA;
+        }
         if (isLocal) {
             return localCape != null ? "local_cape:" + localCape.hash() : "";
         } else {

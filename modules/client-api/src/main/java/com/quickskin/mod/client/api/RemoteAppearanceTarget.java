@@ -8,6 +8,12 @@ import java.util.UUID;
 public interface RemoteAppearanceTarget {
     void applyLookFromNetwork(UUID playerId, String skinId, String capeId, String model);
 
+    /**
+     * What another player's elytra wear, from a server that negotiated {@code elytra-texture}: a
+     * cape id, {@link PlayerAppearance#VANILLA_ELYTRA} or {@code ""} for their cape.
+     */
+    void applyElytraFromNetwork(UUID playerId, String elytraId);
+
     void reloadSkinsForTransparencyChange();
 
     /**

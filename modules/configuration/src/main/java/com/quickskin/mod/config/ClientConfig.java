@@ -111,6 +111,7 @@ public class ClientConfig {
     @Deprecated // Now using per-skin model preferences stored in skin-preferences.json
     public String activeModelType = "auto"; // "auto", "classic", "slim" (deprecated - kept for compatibility)
     public String activeCapeHash = ""; // Active cape hash
+    public String activeElytraId = ""; // Cape id the elytra wear instead of the cape's ("": the cape's, "minecraft:elytra": vanilla's)
     public String playerOwnSkinHash = ""; // Hash of the player's own Mojang skin
     public boolean playerOwnSkinHidden = false; // The player deleted the own skin (older versions only hid its file)
     public String playerOwnSkinTexture = ""; // Mojang texture address the own skin was downloaded from
@@ -467,6 +468,8 @@ public class ClientConfig {
                 || "slim".equals(activeModelType))) activeModelType = "auto";
         if (activeCapeHash == null || activeCapeHash.length() > 256
                 || activeCapeHash.chars().anyMatch(Character::isISOControl)) activeCapeHash = "";
+        if (activeElytraId == null || activeElytraId.length() > 256
+                || activeElytraId.chars().anyMatch(Character::isISOControl)) activeElytraId = "";
         playerOwnSkinHash = validHashOrEmpty(playerOwnSkinHash);
         if (playerOwnSkinTexture == null || playerOwnSkinTexture.length() > 512 || playerOwnSkinHash.isEmpty()) {
             playerOwnSkinTexture = "";

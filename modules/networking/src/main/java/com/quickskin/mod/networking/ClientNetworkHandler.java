@@ -196,6 +196,56 @@ public class ClientNetworkHandler {
         });
     }
 
+    /** An appearance with the elytra's own cape, from a server that negotiated elytra-texture. */
+    //? if <1.21 {
+    public static void handleSyncAppearanceElytra(
+            FriendlyByteBuf buf, NetworkManager.PacketContext context) {
+        UUID receivedPlayerId = PacketHelper.readPlayerId(buf);
+        String receivedSkinId = PacketHelper.readString(
+                buf, TextureTransferLimits.MAX_APPEARANCE_ID_BYTES);
+        String receivedCapeId = PacketHelper.readString(
+                buf, TextureTransferLimits.MAX_APPEARANCE_ID_BYTES);
+        String receivedElytraId = PacketHelper.readString(
+                buf, TextureTransferLimits.MAX_APPEARANCE_ID_BYTES);
+        String receivedModel = PacketHelper.readString(buf, TextureTransferLimits.MAX_MODEL_BYTES);
+    //?} else {
+    public static void handleSyncAppearanceElytra(
+            SyncAppearanceElytraPayload payload, NetworkManager.PacketContext context) {
+        UUID receivedPlayerId = payload.playerId();
+        String receivedSkinId = payload.skinId();
+        String receivedCapeId = payload.capeId();
+        String receivedElytraId = payload.elytraId();
+        String receivedModel = payload.model();
+    //?}
+        Object sourceConnection = packetConnectionIdentity(context);
+        if (sourceConnection == null || !isCurrentConnection(sourceConnection)
+                || !acceptsWireMode(sourceConnection, true)
+                || !ProtocolSessions.getInstance().clientProfile(sourceConnection)
+                        .supports(com.quickskin.mod.networking.protocol.ProtocolCapability.ELYTRA_TEXTURE)
+                || !NetworkSecurity.isValidV2AppearanceId(receivedSkinId, "skin")
+                || !NetworkSecurity.isValidV2AppearanceId(receivedCapeId, "cape")
+                || !NetworkSecurity.isValidV2AppearanceId(receivedElytraId, "cape")
+                || !NetworkSecurity.isValidModel(receivedModel)
+                || !ClientTextureIngressLimiter.getInstance().allowControlBytes(controlBytes(
+                        receivedSkinId, receivedCapeId, receivedElytraId, receivedModel))) return;
+        context.queue(() -> {
+            if (!isCurrentConnection(sourceConnection)
+                    || !acceptsWireMode(sourceConnection, true)) return;
+            Minecraft minecraft = Minecraft.getInstance();
+            boolean ownPlayerUpdate = minecraft.player != null
+                    && receivedPlayerId.equals(minecraft.player.getUUID());
+            if (ownPlayerUpdate) {
+                NetworkSyncService.getInstance().confirmAppearance(
+                        receivedSkinId, receivedCapeId, receivedElytraId, receivedModel);
+                if (!adoptOwnServerAppearance(receivedPlayerId, sourceConnection,
+                        receivedSkinId, receivedCapeId, receivedElytraId)) return;
+            }
+            appearanceTarget().applyLookFromNetwork(
+                    receivedPlayerId, receivedSkinId, receivedCapeId, receivedModel);
+            appearanceTarget().applyElytraFromNetwork(receivedPlayerId, receivedElytraId);
+        });
+    }
+
     /**
      * An own-player update is only a confirmation, except for the first one of a session whose
      * launcher account has no skin selection here. A saved Quick Skin skin is then shown and
@@ -205,6 +255,11 @@ public class ClientNetworkHandler {
      */
     private static boolean adoptOwnServerAppearance(
             UUID playerId, Object connection, String skinId, String capeId) {
+        return adoptOwnServerAppearance(playerId, connection, skinId, capeId, "");
+    }
+
+    private static boolean adoptOwnServerAppearance(
+            UUID playerId, Object connection, String skinId, String capeId, String elytraId) {
         NetworkSyncService syncService = NetworkSyncService.getInstance();
         if (!syncService.awaitsOwnServerState(playerId, connection)) return false;
         if (!AccountSkinSession.getInstance().decide(playerId, connection, skinId)) {
@@ -215,7 +270,7 @@ public class ClientNetworkHandler {
         // not a selection of the account, so the next join asks the server again.
         com.quickskin.mod.config.ClientConfig.getInstance().activeSkinHash =
                 skinId.substring("local_skin:".length());
-        syncService.adoptServerAppearance(skinId, capeId);
+        syncService.adoptServerAppearance(skinId, capeId, elytraId);
         appearanceBootstrapSent = true;
         return true;
     }
@@ -1022,6 +1077,11 @@ public class ClientNetworkHandler {
         }
         settingsScreenOpen = java.util.Objects.requireNonNull(settingsOpen, "settingsOpen");
         remoteAppearanceTarget = java.util.Objects.requireNonNull(target, "target");
+    }
+
+    /** The configured appearance target, or null before the client composition root sets it. */
+    static RemoteAppearanceTarget appearanceTargetOrNull() {
+        return remoteAppearanceTarget;
     }
 
     private static RemoteAppearanceTarget appearanceTarget() {

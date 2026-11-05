@@ -110,6 +110,12 @@ public final class SavedAppearanceRestorer {
             com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
                     .applyLook(targetPlayerId, null, null, null);
         }
+
+        // The elytra's own cape, when the player chose one; it syncs with the look applied above
+        if (!config.activeElytraId.isEmpty()) {
+            com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
+                    .applyElytra(targetPlayerId, config.activeElytraId);
+        }
     }
 
 }

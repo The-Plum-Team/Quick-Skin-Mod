@@ -45,8 +45,9 @@ public abstract class MixinAbstractClientPlayer {
         boolean hasCustomSkin = service.hasActiveSkin(self.getUUID());
         boolean hasCustomCape = service.hasActiveCape(self.getUUID());
         boolean hasModelOverride = service.hasModelOverride(self.getUUID());
+        boolean hasSeparateElytra = service.hasSeparateElytra(self.getUUID());
 
-        if (!hasCustomSkin && !hasCustomCape && !hasModelOverride) {
+        if (!hasCustomSkin && !hasCustomCape && !hasModelOverride && !hasSeparateElytra) {
             return;
         }
 
@@ -91,6 +92,11 @@ public abstract class MixinAbstractClientPlayer {
                 capeTexture = null;
                 elytraTexture = null;
             }
+        }
+
+        if (hasSeparateElytra) {
+            // The elytra wear another cape, or vanilla's elytra, instead of the cape
+            elytraTexture = service.getSeparateElytraLocation(self.getUUID());
         }
 
         PlayerSkin customSkin = new PlayerSkin(
@@ -187,8 +193,9 @@ public abstract class MixinAbstractClientPlayer {
         boolean hasCustomSkin = service.hasActiveSkin(self.getUUID());
         boolean hasCustomCape = service.hasActiveCape(self.getUUID());
         boolean hasModelOverride = service.hasModelOverride(self.getUUID());
+        boolean hasSeparateElytra = service.hasSeparateElytra(self.getUUID());
 
-        if (!hasCustomSkin && !hasCustomCape && !hasModelOverride) {
+        if (!hasCustomSkin && !hasCustomCape && !hasModelOverride && !hasSeparateElytra) {
             return;
         }
 
@@ -263,6 +270,20 @@ public abstract class MixinAbstractClientPlayer {
                 capeTexture = null;
                 elytraTexture = null;
             }
+        }
+
+        if (hasSeparateElytra) {
+            // The elytra wear another cape, or vanilla's elytra, instead of the cape
+            //? if <1.21.11 {
+            ResourceLocation separateElytra = service.getSeparateElytraLocation(self.getUUID());
+            //?} else {
+            Identifier separateElytra = service.getSeparateElytraLocation(self.getUUID());
+            //?}
+            //? if <1.21.9 {
+            elytraTexture = separateElytra;
+            //?} else {
+            elytraTexture = new ClientAsset.ResourceTexture(separateElytra, separateElytra);
+            //?}
         }
 
         PlayerSkin customSkin = new PlayerSkin(

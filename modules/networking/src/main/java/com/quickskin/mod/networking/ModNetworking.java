@@ -107,6 +107,9 @@ public class ModNetworking implements NetworkTransport {
         NetworkManager.registerReceiver(
                 NetworkManager.c2s(), SkinAdminPayload.TYPE,
                 SkinAdminPayload.CODEC, ServerNetworkHandler::handleSkinAdmin);
+        NetworkManager.registerReceiver(
+                NetworkManager.c2s(), UpdateAppearanceElytraPayload.TYPE,
+                UpdateAppearanceElytraPayload.CODEC, ServerNetworkHandler::handleUpdateAppearanceElytra);
 
         // Register S2C (Server to Client) payload types ONLY on servers (not clients)
         // On clients, ClientNetworking.registerReceiver() handles both type and handler registration
@@ -140,6 +143,8 @@ public class ModNetworking implements NetworkTransport {
                     SkinAdminResultPayload.TYPE, SkinAdminResultPayload.CODEC);
             NetworkManager.registerS2CPayloadType(
                     SkinAdminStatePayload.TYPE, SkinAdminStatePayload.CODEC);
+            NetworkManager.registerS2CPayloadType(
+                    SyncAppearanceElytraPayload.TYPE, SyncAppearanceElytraPayload.CODEC);
         }
     }
 

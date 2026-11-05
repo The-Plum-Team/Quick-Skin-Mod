@@ -31,7 +31,13 @@ public enum ProtocolCapability {
      * The client may also tell the server which of its Cosmetic Armor Reworked pieces to hide, and
      * the server leaves them out of that mod's slot sync to every other player.
      */
-    HIDDEN_COSMETIC_ARMOR("hidden-cosmetic-armor", 1L << 8);
+    HIDDEN_COSMETIC_ARMOR("hidden-cosmetic-armor", 1L << 8),
+    /**
+     * Appearances carry what the elytra wear instead of the cape ({@code update_appearance_elytra}
+     * and {@code sync_appearance_elytra}); a peer without it keeps the plain appearance packets
+     * and sees the elytra wear the cape.
+     */
+    ELYTRA_TEXTURE("elytra-texture", 1L << 9);
 
     private final String id;
     private final long mask;

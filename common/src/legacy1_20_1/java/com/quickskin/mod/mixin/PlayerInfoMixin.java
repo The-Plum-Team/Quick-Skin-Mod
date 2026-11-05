@@ -241,6 +241,11 @@ public abstract class PlayerInfoMixin implements com.quickskin.mod.client.compat
         if (CPMCompatIntegration.shouldDeferToCPM()) return;
 
         PlayerAppearanceService service = PlayerAppearanceService.getInstance();
+        // The elytra wear another cape, or vanilla's elytra, instead of the cape
+        if (service.hasSeparateElytra(this.profile.getId())) {
+            cir.setReturnValue(service.getSeparateElytraLocation(this.profile.getId()));
+            return;
+        }
         if (service.hasActiveCape(this.profile.getId())) {
             cir.setReturnValue(service.getCapeLocation(this.profile.getId()));
             return;
@@ -248,6 +253,11 @@ public abstract class PlayerInfoMixin implements com.quickskin.mod.client.compat
 
         if (Minecraft.getInstance().level == null) {
             ClientConfig config = ClientConfig.getInstance();
+            ResourceLocation configuredElytra = service.getConfiguredElytraLocation();
+            if (configuredElytra != null) {
+                cir.setReturnValue(configuredElytra);
+                return;
+            }
             if (!config.activeCapeHash.isEmpty()) {
                 ResourceLocation capeLoc = com.quickskin.mod.client.services.CapeService.getInstance()
                         .getCapeLocation(null, config.activeCapeHash);

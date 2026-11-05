@@ -180,6 +180,7 @@ public class ServerAppearanceStorage {
             if (appearance == null || !playerId.equals(appearance.getPlayerId())
                     || !NetworkSecurity.isValidLocalAppearanceId(appearance.getSkinId(), "skin")
                     || !NetworkSecurity.isValidLocalAppearanceId(appearance.getCapeId(), "cape")
+                    || !NetworkSecurity.isValidLocalAppearanceId(appearance.getElytraId(), "cape")
                     || !NetworkSecurity.isValidModel(appearance.getModel())) {
                 QuickSkinInfo.LOGGER.warn("Ignoring invalid player appearance file {}", file);
                 return null;
@@ -206,15 +207,18 @@ public class ServerAppearanceStorage {
         ServerTextureCache textures = ServerTextureCache.getInstance();
         String skinId = textures.heldTextureOrEmpty(saved.getSkinId(), "local_skin:");
         String capeId = textures.heldTextureOrEmpty(saved.getCapeId(), "local_cape:");
+        String elytraId = textures.heldTextureOrEmpty(saved.getElytraId(), "local_cape:");
         boolean skinKept = Objects.equals(skinId, saved.getSkinId());
         boolean capeKept = Objects.equals(capeId, saved.getCapeId());
-        if (skinKept && capeKept) return null;
+        boolean elytraKept = Objects.equals(elytraId, saved.getElytraId());
+        if (skinKept && capeKept && elytraKept) return null;
         PlayerAppearance partial = new PlayerAppearance(
-                saved.getPlayerId(), skinId, capeId, saved.getModel());
+                saved.getPlayerId(), skinId, capeId, elytraId, saved.getModel());
         if (!repository.trySetAppearance(partial)) return null;
         QuickSkinInfo.LOGGER.info("Restored the saved appearance of {} without its {}: this server"
                         + " no longer holds that texture (over maxTextureUploadKilobytes or removed)",
-                saved.getPlayerId(), skinKept ? "cape" : capeKept ? "skin" : "skin and cape");
+                saved.getPlayerId(), !skinKept && !capeKept ? "skin and cape"
+                        : !skinKept ? "skin" : !capeKept ? "cape" : "elytra's cape");
         return partial;
     }
 

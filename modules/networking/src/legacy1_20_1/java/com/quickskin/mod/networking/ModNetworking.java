@@ -65,6 +65,8 @@ public class ModNetworking implements NetworkTransport {
         new ResourceLocation(QuickSkinInfo.MOD_ID, "skin_admin");
     public static final ResourceLocation ARMOR_VISIBILITY =
         new ResourceLocation(QuickSkinInfo.MOD_ID, "armor_visibility");
+    public static final ResourceLocation UPDATE_APPEARANCE_ELYTRA =
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "update_appearance_elytra");
 
     // Server to Client packets (S2C)
     public static final ResourceLocation SYNC_APPEARANCE =
@@ -108,6 +110,8 @@ public class ModNetworking implements NetworkTransport {
         new ResourceLocation(QuickSkinInfo.MOD_ID, "skin_admin_result");
     public static final ResourceLocation SKIN_ADMIN_STATE =
         new ResourceLocation(QuickSkinInfo.MOD_ID, "skin_admin_state");
+    public static final ResourceLocation SYNC_APPEARANCE_ELYTRA =
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "sync_appearance_elytra");
 
     /**
      * Initializes networking (registers server-side receivers)
@@ -187,6 +191,8 @@ public class ModNetworking implements NetworkTransport {
             NetworkManager.c2s(), SKIN_ADMIN, ServerNetworkHandler::handleSkinAdmin);
         NetworkManager.registerReceiver(
             NetworkManager.c2s(), ARMOR_VISIBILITY, ServerNetworkHandler::handleArmorVisibility);
+        NetworkManager.registerReceiver(
+            NetworkManager.c2s(), UPDATE_APPEARANCE_ELYTRA, ServerNetworkHandler::handleUpdateAppearanceElytra);
 
     }
 
@@ -251,6 +257,8 @@ public class ModNetworking implements NetworkTransport {
             NetworkManager.s2c(), SKIN_ADMIN_RESULT, ClientNetworkHandler::handleSkinAdminResult);
         NetworkManager.registerReceiver(
             NetworkManager.s2c(), SKIN_ADMIN_STATE, ClientNetworkHandler::handleSkinAdminState);
+        NetworkManager.registerReceiver(
+            NetworkManager.s2c(), SYNC_APPEARANCE_ELYTRA, ClientNetworkHandler::handleSyncAppearanceElytra);
     }
 
     @Override
@@ -379,6 +387,14 @@ public class ModNetworking implements NetworkTransport {
         buffer.writeInt(offer.maximumTextureBytes());
         buffer.writeInt(offer.maximumChunkBytes());
         NetworkManager.sendToServer(PROTOCOL_HELLO, buffer);
+    }
+
+    @Override
+    public void sendAppearanceWithElytraToServer(
+            UUID playerId, String skinId, String capeId, String elytraId, String model) {
+        NetworkManager.sendToServer(
+                UPDATE_APPEARANCE_ELYTRA,
+                PacketHelper.createAppearanceWithElytraPacket(playerId, skinId, capeId, elytraId, model));
     }
 
     @Override
@@ -614,6 +630,14 @@ public class ModNetworking implements NetworkTransport {
         buffer.writeInt(totalChunks);
         buffer.writeByteArray(chunkData);
         NetworkManager.sendToPlayer(player, SEND_TEXTURE_CHUNK_V2, buffer);
+    }
+
+    @Override
+    public void sendAppearanceWithElytraToPlayer(
+            ServerPlayer player, UUID playerId, String skinId, String capeId, String elytraId, String model) {
+        NetworkManager.sendToPlayer(
+                player, SYNC_APPEARANCE_ELYTRA,
+                PacketHelper.createAppearanceWithElytraPacket(playerId, skinId, capeId, elytraId, model));
     }
 
     @Override

@@ -41,8 +41,9 @@ public final class CapeEditorStyle {
             "...#...", "...#...", "...#...", "#######", "...#...", "...#...", "...#..."};
     public static final String[] ICON_MINUS = {
             ".......", ".......", ".......", "#######", ".......", ".......", "......."};
+    /** A cape hanging from the shoulders, its hem fringed. */
     public static final String[] ICON_CAPE = {
-            ".#####.", "#######", "#######", "#######", "#######", "#######", ".#####."};
+            "#######", ".#####.", ".#####.", ".#####.", ".#####.", ".#####.", ".#.#.#."};
     public static final String[] ICON_WINGS = {
             "##...##", "###.###", "###.###", "###.###", ".##.##.", ".##.##.", "..#.#.."};
     public static final String[] ICON_PLAY = {

@@ -71,9 +71,10 @@ public class SkinManagerMixin {
         boolean hasCustomSkin = service.hasActiveSkin(uuid);
         boolean hasCustomCape = service.hasActiveCape(uuid);
         boolean hasModelOverride = service.hasModelOverride(uuid);
+        boolean hasSeparateElytra = service.hasSeparateElytra(uuid);
 
         // Try service-based overrides
-        if (hasCustomSkin || hasCustomCape || hasModelOverride) {
+        if (hasCustomSkin || hasCustomCape || hasModelOverride || hasSeparateElytra) {
 //? if <1.21.9 {
             ResourceLocation skinTexture = original.texture();
             PlayerSkin.Model skinModel = original.model();
@@ -164,6 +165,21 @@ public class SkinManagerMixin {
                 }
             }
 
+            if (hasSeparateElytra) {
+                // The elytra wear another cape, or vanilla's elytra, instead of the cape
+//? if <1.21.11 {
+                ResourceLocation separateElytra = service.getSeparateElytraLocation(uuid);
+//?} else {
+                Identifier separateElytra = service.getSeparateElytraLocation(uuid);
+//?}
+//? if <1.21.9 {
+                elytraTexture = separateElytra;
+//?} else {
+                elytraTexture = new ClientAsset.ResourceTexture(separateElytra, separateElytra);
+//?}
+                anyOverride = true;
+            }
+
             if (anyOverride) {
                 return new PlayerSkin(
 //? if <1.21.9 {
@@ -193,8 +209,13 @@ public class SkinManagerMixin {
             ClientConfig config = ClientConfig.getInstance();
             boolean hasSkin = !config.activeSkinHash.isEmpty();
             boolean hasCape = !config.activeCapeHash.isEmpty();
+//? if <1.21.11 {
+            ResourceLocation configuredElytra = PlayerAppearanceService.getInstance().getConfiguredElytraLocation();
+//?} else {
+            Identifier configuredElytra = PlayerAppearanceService.getInstance().getConfiguredElytraLocation();
+//?}
 
-            if (hasSkin || hasCape) {
+            if (hasSkin || hasCape || configuredElytra != null) {
 //? if <1.21.9 {
                 ResourceLocation skinTexture = original.texture();
                 PlayerSkin.Model skinModel = original.model();
@@ -254,6 +275,15 @@ public class SkinManagerMixin {
 //?}
                         anyOverride = true;
                     }
+                }
+
+                if (configuredElytra != null) {
+//? if <1.21.9 {
+                    elytraTexture = configuredElytra;
+//?} else {
+                    elytraTexture = new ClientAsset.ResourceTexture(configuredElytra, configuredElytra);
+//?}
+                    anyOverride = true;
                 }
 
                 if (anyOverride) {
@@ -373,7 +403,8 @@ public class SkinManagerMixin {
         if (service != null) {
             hasServiceOverrides = service.hasActiveSkin(uuid)
                     || service.hasActiveCape(uuid)
-                    || service.hasModelOverride(uuid);
+                    || service.hasModelOverride(uuid)
+                    || service.hasSeparateElytra(uuid);
         }
 
 //? if <1.21.9 {
@@ -383,7 +414,8 @@ public class SkinManagerMixin {
         if (!hasServiceOverrides && isLocalPlayer) {
 //?}
             ClientConfig config = ClientConfig.getInstance();
-            hasTitleScreenFallback = !config.activeSkinHash.isEmpty() || !config.activeCapeHash.isEmpty();
+            hasTitleScreenFallback = !config.activeSkinHash.isEmpty() || !config.activeCapeHash.isEmpty()
+                    || !config.activeElytraId.isEmpty();
         }
 
         // Only wrap the future if we actually have overrides to apply

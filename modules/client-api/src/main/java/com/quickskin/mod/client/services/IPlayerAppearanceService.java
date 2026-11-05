@@ -41,6 +41,14 @@ public interface IPlayerAppearanceService {
     void applyCape(UUID playerId, String capeId);
 
     /**
+     * Sets what a player's elytra wear instead of their cape
+     * @param playerId The player's UUID
+     * @param elytraId A cape ID, {@link PlayerAppearance#VANILLA_ELYTRA} for vanilla's elytra,
+     *                 or {@code ""} for the cape
+     */
+    void applyElytra(UUID playerId, String elytraId);
+
+    /**
      * Gets a player's current appearance
      * @param playerId The player's UUID
      * @return The appearance data, or null if not set

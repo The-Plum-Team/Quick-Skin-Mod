@@ -146,6 +146,33 @@ class ServerUploadCoordinatorTest {
         coordinator.finishUpload(stale);
     }
 
+    @Test
+    void waitsForTheElytraCapeUploadToo() {
+        ServerUploadCoordinator coordinator =
+                new ServerUploadCoordinator(() -> 1L);
+        UUID playerId = UUID.randomUUID();
+        Object connection = new Object();
+        ServerUploadCoordinator.PendingAppearance appearance = new ServerUploadCoordinator.PendingAppearance(
+                "", "local_cape:" + HASH_A, "local_cape:" + HASH_B, "classic");
+
+        // No upload of the elytra's cape in flight: refused
+        assertFalse(coordinator.deferAppearance(
+                playerId, connection, appearance, null, null, HASH_B));
+
+        ServerUploadCoordinator.UploadTicket elytra = coordinator.beginUpload(
+                playerId, connection, "cape", HASH_B, 1);
+        assertNotNull(elytra);
+        assertTrue(coordinator.deferAppearance(
+                playerId, connection, appearance, null, null, HASH_B));
+        assertEquals(appearance, coordinator.finishUpload(elytra).appearance());
+    }
+
+    @Test
+    void anAppearanceFromAnOlderClientHasTheElytraWearTheCape() {
+        assertEquals("", new ServerUploadCoordinator.PendingAppearance("", "", "classic").elytraId());
+        assertEquals("", new ServerUploadCoordinator.PendingAppearance("", "", null, "classic").elytraId());
+    }
+
     private static ServerUploadCoordinator.PendingAppearance appearance(
             String skinHash, String capeHash) {
         return new ServerUploadCoordinator.PendingAppearance(

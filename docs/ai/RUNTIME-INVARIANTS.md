@@ -375,6 +375,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   and shrunk evenly into an atlas of at most 1024 per side and 64 MB. Such an atlas, like any GIF
   over 256 frames, always goes through the editor; only a GIF the catalogue loads as it is is
   copied unchanged.
+- The elytra may wear a cape of their own (ADR 0018): `PlayerAppearance.elytraId` is a cape id,
+  `minecraft:elytra` for vanilla's elytra, or `""` for the cape. Where it differs from the cape the
+  renderer hooks put that cape's current frame, or vanilla's elytra texture (also while that cape
+  is pending), on the elytra input, never an empty one, which vanilla fills with the cape. It
+  travels only as `update_appearance_elytra`/`sync_appearance_elytra` on a session that negotiated
+  `elytra-texture` (bit 9); the v1 and v2 appearance packets keep their schemas, and their peers
+  see the elytra wear the cape. Its texture is uploaded, deferred, pinned, saved and acknowledged
+  exactly as the cape's.
 - An active Quick Skin cape is authoritative for both the renderer's cape and profile-Elytra
   texture inputs. Never retain an unrelated Mojang/profile Elytra beside a custom cape: vanilla
   gives that dedicated field priority and would otherwise replace only the worn wings when the
