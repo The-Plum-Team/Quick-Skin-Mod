@@ -29,6 +29,11 @@ public class SkinPreferences {
     private Map<String, SkinPreference> preferences = new HashMap<>();
     // Runtime-only bridge while a verified on-disk alias migration is waiting to be retried.
     private transient Map<String, String> strongToLegacyFallbacks = new HashMap<>();
+    // Legacy entries a migration kept because their strong entry differs (strong -> legacy), so
+    // deleting the skin also drops them. Runtime only: each start's migration finds them again.
+    private transient Map<String, String> keptLegacyEntries = new HashMap<>();
+    // False when the file exists but could not be read: it is then never saved over.
+    private transient boolean persistable = true;
 
     /**
      * Individual skin preference
@@ -41,6 +46,17 @@ public class SkinPreferences {
             // Default constructor for Gson
         }
 
+        private SkinPreference copy() {
+            SkinPreference copy = new SkinPreference();
+            copy.modelType = modelType;
+            copy.favorite = favorite;
+            return copy;
+        }
+
+        private boolean sameAs(SkinPreference other) {
+            return other != null && favorite == other.favorite
+                    && java.util.Objects.equals(modelType, other.modelType);
+        }
     }
 
     /**
@@ -49,11 +65,7 @@ public class SkinPreferences {
      * @return Model type ("auto", "classic", or "slim"), defaults to "auto"
      */
     public synchronized String getModelType(String hash) {
-        SkinPreference pref = preferences.get(hash);
-        if (pref == null) {
-            String legacy = aliasFallbacks().get(hash);
-            if (legacy != null) pref = preferences.get(legacy);
-        }
+        SkinPreference pref = readable(hash);
         return pref != null && isModel(pref.modelType) ? pref.modelType : "auto";
     }
 
@@ -67,16 +79,12 @@ public class SkinPreferences {
                 || (!preferences.containsKey(hash) && preferences.size() >= MAX_PREFERENCES)) {
             return;
         }
-        preferences.computeIfAbsent(hash, k -> new SkinPreference()).modelType = modelType;
+        writable(hash).modelType = modelType;
     }
 
     /** Whether the player marked this skin as a favorite. */
     public synchronized boolean isFavorite(String hash) {
-        SkinPreference pref = preferences.get(hash);
-        if (pref == null) {
-            String legacy = aliasFallbacks().get(hash);
-            if (legacy != null) pref = preferences.get(legacy);
-        }
+        SkinPreference pref = readable(hash);
         return pref != null && pref.favorite;
     }
 
@@ -85,10 +93,33 @@ public class SkinPreferences {
         if (!isHash(hash) || (!preferences.containsKey(hash) && preferences.size() >= MAX_PREFERENCES)) {
             return;
         }
-        if (!favorite && !preferences.containsKey(hash)) {
+        if (!favorite && readable(hash) == null) {
             return;
         }
-        preferences.computeIfAbsent(hash, k -> new SkinPreference()).favorite = favorite;
+        writable(hash).favorite = favorite;
+    }
+
+    /** The skin's preference, through the legacy alias it is still stored under if need be. */
+    private SkinPreference readable(String hash) {
+        SkinPreference pref = preferences.get(hash);
+        if (pref == null) {
+            String legacy = aliasFallbacks().get(hash);
+            if (legacy != null) pref = preferences.get(legacy);
+        }
+        return pref;
+    }
+
+    /**
+     * The skin's own preference to change, created from the legacy alias's when the migration of
+     * that alias has not been written yet, so a change keeps the settings it does not touch.
+     */
+    private SkinPreference writable(String hash) {
+        SkinPreference existing = preferences.get(hash);
+        if (existing != null) return existing;
+        SkinPreference inherited = readable(hash);
+        SkinPreference created = inherited != null ? inherited.copy() : new SkinPreference();
+        preferences.put(hash, created);
+        return created;
     }
 
     /**
@@ -99,6 +130,8 @@ public class SkinPreferences {
         preferences.remove(hash);
         String legacy = aliasFallbacks().remove(hash);
         if (legacy != null) preferences.remove(legacy);
+        String kept = keptLegacy().remove(hash);
+        if (kept != null) preferences.remove(kept);
         aliasFallbacks().entrySet().removeIf(entry -> hash != null
                 && hash.equals(entry.getValue()));
     }
@@ -109,12 +142,15 @@ public class SkinPreferences {
     public synchronized void clear() {
         preferences.clear();
         aliasFallbacks().clear();
+        keptLegacy().clear();
     }
 
     /**
      * Load preferences from file
      * @param path Path to JSON file
-     * @return Loaded preferences, or new instance if file doesn't exist
+     * @return Loaded preferences, or new instance if the file is missing or empty. A file that
+     *     exists but cannot be read gives empty preferences that are never saved over it, so a
+     *     broken file cannot cost the player every favourite and model choice.
      */
     public static SkinPreferences load(Path path) {
         if (!Files.exists(path)) {
@@ -123,14 +159,26 @@ public class SkinPreferences {
 
         try {
             String json = BoundedFileReader.readUtf8(path, MAX_FILE_BYTES);
+            if (json.isBlank()) return new SkinPreferences();
             SkinPreferences prefs = GSON.fromJson(json, SkinPreferences.class);
-            if (prefs == null) return new SkinPreferences();
-            prefs.normalize();
-            return prefs;
+            if (prefs != null) {
+                prefs.normalize();
+                return prefs;
+            }
+            QuickSkinInfo.LOGGER.error("Skin preferences {} contained JSON null; leaving the file"
+                    + " untouched until it is fixed", path);
         } catch (IOException | RuntimeException e) {
-            QuickSkinInfo.LOGGER.warn("Unable to load skin preferences {}", path, e);
-            return new SkinPreferences();
+            QuickSkinInfo.LOGGER.error("Unable to load skin preferences {}; leaving the file"
+                    + " untouched until it is fixed", path, e);
         }
+        SkinPreferences unreadable = new SkinPreferences();
+        unreadable.persistable = false;
+        return unreadable;
+    }
+
+    /** Whether {@link #save} and {@link #migrateAliases} may write the file it was loaded from. */
+    public synchronized boolean isPersistable() {
+        return persistable;
     }
 
     /**
@@ -138,6 +186,11 @@ public class SkinPreferences {
      * @param path Path to JSON file
      */
     public synchronized void save(Path path) {
+        if (!persistable) {
+            QuickSkinInfo.LOGGER.warn("Not saving skin preferences {}: the file could not be read"
+                    + " at start, so it is left as it is", path);
+            return;
+        }
         try {
             normalize();
             writeVerified(path, preferences);
@@ -152,7 +205,7 @@ public class SkinPreferences {
      * in-memory map and the legacy file are both retained.
      */
     public synchronized boolean migrateAliases(Map<String, String> aliases, Path path) {
-        if (aliases == null || aliases.isEmpty() || path == null) return false;
+        if (aliases == null || aliases.isEmpty() || path == null || !persistable) return false;
         normalize();
         Map<String, SkinPreference> migrated = new HashMap<>(preferences);
         boolean changed = false;
@@ -165,6 +218,15 @@ public class SkinPreferences {
             }
             SkinPreference oldPreference = migrated.get(alias.getKey());
             if (oldPreference == null) continue;
+            SkinPreference existing = migrated.get(alias.getValue());
+            // The legacy entry goes only when the strong one is new, equal, or was created from
+            // it after a failed migration (and so holds the player's later choice); a strong
+            // entry that differs on its own keeps the legacy one, which is never discarded.
+            boolean derived = alias.getKey().equals(aliasFallbacks().get(alias.getValue()));
+            if (existing != null && !existing.sameAs(oldPreference) && !derived) {
+                keptLegacy().put(alias.getValue(), alias.getKey());
+                continue;
+            }
             migrated.putIfAbsent(alias.getValue(), oldPreference);
             migrated.remove(alias.getKey());
             changed = true;
@@ -211,6 +273,11 @@ public class SkinPreferences {
     private Map<String, String> aliasFallbacks() {
         if (strongToLegacyFallbacks == null) strongToLegacyFallbacks = new HashMap<>();
         return strongToLegacyFallbacks;
+    }
+
+    private Map<String, String> keptLegacy() {
+        if (keptLegacyEntries == null) keptLegacyEntries = new HashMap<>();
+        return keptLegacyEntries;
     }
 
     private static boolean isHash(String hash) {

@@ -49,10 +49,12 @@ public class HDTextureProcessor {
 
             // Images with alpha take an exact non-premultiplied copy: compositing (drawImage) would
             // rewrite the colour of every pixel whose alpha is below 255, which corrupts data stored in
-            // those pixels (e.g. CPM models). Images without alpha keep the drawImage blit, which copies
-            // raw grey samples as vanilla shows them (getRGB would gamma-convert CS_GRAY images).
+            // those pixels (e.g. CPM models). Greyscale-with-alpha images are read from their raster,
+            // since getRGB would gamma-convert their CS_GRAY samples (RawArgbImages). Images without
+            // alpha keep the drawImage blit, which copies raw grey samples as vanilla shows them.
             if (image.getType() != BufferedImage.TYPE_INT_ARGB) {
-                image = image.getColorModel().hasAlpha() ? copyToIntArgb(image) : drawToIntArgb(image);
+                image = image.getColorModel().hasAlpha()
+                        ? RawArgbImages.toIntArgb(image) : drawToIntArgb(image);
             }
 
             int width = image.getWidth();
@@ -84,22 +86,6 @@ public class HDTextureProcessor {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    /**
-     * Copies an image into a new TYPE_INT_ARGB image without compositing, so every pixel keeps its
-     * exact non-premultiplied ARGB value, including the colour of translucent and transparent pixels.
-     */
-    private static BufferedImage copyToIntArgb(BufferedImage source) {
-        int width = source.getWidth();
-        int height = source.getHeight();
-        BufferedImage copy = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-        int[] row = new int[width]; // row by row: O(width) extra memory, not 16 MB at 2048x2048
-        for (int y = 0; y < height; y++) {
-            source.getRGB(0, y, width, 1, row, 0, width);
-            copy.setRGB(0, y, width, 1, row, 0, width);
-        }
-        return copy;
     }
 
     /** Blits an image without alpha into a new TYPE_INT_ARGB image; nothing is translucent to composite. */

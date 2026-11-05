@@ -265,7 +265,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   validation.
 - Skin import copies decoded pixels that have alpha exactly and never composites them, except in
   its intended transforms (resizing to a supported resolution and the 64x32 legacy conversion);
-  images without alpha keep the plain blit, so greyscale skins are not gamma-shifted. Transparency
+  images without alpha keep the plain blit, so greyscale skins are not gamma-shifted, and a
+  greyscale image with alpha is read from its raster (`RawArgbImages`), since `getRGB` would
+  brighten its grey. Non-animated cape imports and the catalog scan read greyscale PNGs the same way. Transparency
   flattening forces opacity only on vanilla's own opaque regions, (0,0)-(32,16), (0,16)-(64,32)
   and (16,48)-(48,64), so data that other mods store in unused texels, such as a CPM model
   embedded in the skin, survives import with every alpha and colour byte intact.
@@ -273,9 +275,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   symbolic-link targets, and paths outside the configured root.
 - Persist mutable state using a temporary file plus atomic replace where supported. Keep the
   fallback contained and clean stale temporary files during initialization.
+- A client settings or preferences file that exists but cannot be read (`ClientConfig`,
+  `LocalAppearanceStorage`, `SkinPreferences`) leaves the defaults in memory and is never saved
+  over until it is fixed, so a broken hand edit cannot erase every launcher account's selections
+  or every skin's favourite and model. An empty file holds nothing to keep and is written over.
 - Local identity migration must copy/write and validate the strong-ID destination before removing
   a legacy file or preference. Preserve the legacy source whenever destination verification fails
-  or an existing strong destination differs.
+  or an existing strong destination differs. Such a kept legacy skin preference or cape speed is
+  never read again, since lookups prefer the strong id; it stays in the file within the store's
+  entry bound, and deleting the skin also drops a kept skin preference.
 - Keep cache accounting weighted by bytes/pixels where relevant, not only entry count. Active server
   appearance blobs remain pinned only within the hard global pinned-byte budget; reject an
   over-budget appearance gracefully instead of weakening the cap.

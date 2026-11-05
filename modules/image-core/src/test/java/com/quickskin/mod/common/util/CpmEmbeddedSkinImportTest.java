@@ -173,13 +173,27 @@ class CpmEmbeddedSkinImportTest {
         }
         BufferedImage grayAlpha = new BufferedImage(grayAlphaModel, grayAlphaRaster, false, null);
 
-        BufferedImage[] sources = {rgba, rgb, indexed, grayAlpha};
-        String[] names = {"RGBA", "RGB", "indexed+tRNS", "gray+alpha"};
+        BufferedImage[] sources = {rgba, rgb, indexed};
+        String[] names = {"RGBA", "RGB", "indexed+tRNS"};
         for (int i = 0; i < sources.length; i++) {
             BufferedImage decoded = SafeImageReader.readSkin(png(sources[i]));
             assertTrue(decoded.getType() != BufferedImage.TYPE_INT_ARGB, names[i] + " must take the conversion path");
             assertPixelsEqual(decoded, importSkin(decoded, true), names[i]);
         }
+
+        // Greyscale with alpha: getRGB would gamma-convert the grey (128 reads as 188), so the
+        // expected texels come from the raw samples written, as vanilla shows them.
+        BufferedImage decodedGrayAlpha = SafeImageReader.readSkin(png(grayAlpha));
+        assertTrue(decodedGrayAlpha.getType() != BufferedImage.TYPE_INT_ARGB,
+                "gray+alpha must take the conversion path");
+        BufferedImage rawGrayAlpha = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 64; y++) {
+            for (int x = 0; x < 64; x++) {
+                int gray = grayAlphaRaster.getSample(x, y, 0);
+                rawGrayAlpha.setRGB(x, y, (grayAlphaRaster.getSample(x, y, 1) << 24) | (gray * 0x010101));
+            }
+        }
+        assertPixelsEqual(rawGrayAlpha, importSkin(decodedGrayAlpha, true), "gray+alpha");
 
         // Greyscale without alpha (8 and 16 bit): getRGB would gamma-convert these, vanilla shows raw grey.
         BufferedImage gray8 = new BufferedImage(64, 64, BufferedImage.TYPE_BYTE_GRAY);
