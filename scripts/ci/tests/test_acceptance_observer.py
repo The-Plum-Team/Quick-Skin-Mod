@@ -340,6 +340,21 @@ class AcceptanceObserverTest(unittest.TestCase):
         self.assertEqual(10, self.clock() - started)
         self.assertEqual("read_error", self.view()["state"])
 
+    def test_large_inventory_keeps_a_realistic_per_read_timeout(self):
+        specs = [f"{1000 + index}:1:{SHA}" for index in range(observer.MAX_RUNS)]
+        self.state = observer.initialize(REPOSITORY, specs, 30, 10, self.clock())
+        calls = []
+
+        class FastReader:
+            def read(self, path, timeout, now):
+                calls.append(timeout)
+                raise observer.ReadFailure("timeout")
+
+        with observer.coordinator_lock(self.path):
+            self.coordinator(FastReader()).poll()
+        self.assertEqual(observer.MAX_RUNS, len(calls))
+        self.assertTrue(all(timeout == observer.MIN_REQUEST_TIMEOUT for timeout in calls))
+
     def test_watch_deadline_bounds_sweep_and_restart_prioritizes_unread_siblings(self):
         self.state = observer.initialize(REPOSITORY, [SPEC, f"124:1:{SHA}"], 10, 10, self.clock())
         calls = []
