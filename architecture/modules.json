@@ -753,6 +753,28 @@
       "libraries": {}
     },
     {
+      "id": "favourites-fan",
+      "path": "modules/favourites-fan",
+      "kind": "minecraft",
+      "environment": "client",
+      "api": [],
+      "implementation": [
+        "appearance-data",
+        "appearance-services",
+        "asset-catalog",
+        "client-foundation",
+        "client-input",
+        "configuration",
+        "cpm-integration",
+        "minecraft-adapter",
+        "platform-api",
+        "player-preview",
+        "ui-foundation"
+      ],
+      "runtime_only": [],
+      "libraries": {}
+    },
+    {
       "id": "common",
       "path": "common",
       "kind": "minecraft-assembly",
@@ -795,7 +817,8 @@
         "cape-menu",
         "skin-menu",
         "menu-integration",
-        "hud-preview"
+        "hud-preview",
+        "favourites-fan"
       ],
       "runtime_only": [],
       "libraries": {}

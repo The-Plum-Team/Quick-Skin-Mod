@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Mở menu skin",
+  "key.quickskin.favourites_fan": "Skin yêu thích (đổi nhanh)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Skin Nhanh",
@@ -404,5 +405,8 @@
   "quickskin.network.upload_too_large.skin": "[Skin Nhanh] Skin của bạn (%s) vượt quá giới hạn tải lên của máy chủ này (%s). Nó chỉ hiển thị trên màn hình của bạn; người chơi khác không nhìn thấy.",
   "quickskin.network.upload_too_large.cape": "[Skin Nhanh] Áo choàng của bạn (%s) vượt quá giới hạn tải lên của máy chủ này (%s). Nó chỉ hiển thị trên màn hình của bạn; người chơi khác không nhìn thấy.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Máy chủ này dùng Quick Skin cho skin và áo choàng tùy chỉnh. Hãy cài mod để thấy chúng và mặc của riêng bạn."
+  "quickskin.server.missing_mod_notice": "Máy chủ này dùng Quick Skin cho skin và áo choàng tùy chỉnh. Hãy cài mod để thấy chúng và mặc của riêng bạn.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Đánh dấu ★ cho skin trong menu skin để thấy chúng ở đây",
+  "quickskin.fan.cooldown": "Bạn có thể đổi skin lại sau %s giây"
 }

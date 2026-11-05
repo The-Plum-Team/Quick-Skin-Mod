@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Skin Menüsünü Aç",
+  "key.quickskin.favourites_fan": "Favori Skinler (Hızlı Değiştir)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Hızlı Skin",
@@ -404,5 +405,8 @@
   "quickskin.network.upload_too_large.skin": "[Hızlı Skin] Skinin (%s) bu sunucunun yükleme sınırını (%s) aşıyor. Yalnızca senin ekranında görünür; diğer oyuncular onu görmez.",
   "quickskin.network.upload_too_large.cape": "[Hızlı Skin] Pelerinin (%s) bu sunucunun yükleme sınırını (%s) aşıyor. Yalnızca senin ekranında görünür; diğer oyuncular onu görmez.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Bu sunucu özel skinler ve pelerinler için Quick Skin kullanıyor. Onları görmek ve kendininkini giymek için modu yükle."
+  "quickskin.server.missing_mod_notice": "Bu sunucu özel skinler ve pelerinler için Quick Skin kullanıyor. Onları görmek ve kendininkini giymek için modu yükle.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Burada görmek için skin menüsünde skinleri ★ ile işaretle",
+  "quickskin.fan.cooldown": "Skinini %s sn sonra yeniden değiştirebilirsin"
 }

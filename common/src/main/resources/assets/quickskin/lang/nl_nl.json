@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Open skinmenu",
+  "key.quickskin.favourites_fan": "Favoriete skins (snel wisselen)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Snelle Skin",
@@ -404,5 +405,8 @@
   "quickskin.network.upload_too_large.skin": "[Snelle Skin] Je skin (%s) is groter dan de uploadlimiet van deze server (%s). Die is alleen op je eigen scherm te zien; andere spelers zien hem niet.",
   "quickskin.network.upload_too_large.cape": "[Snelle Skin] Je cape (%s) is groter dan de uploadlimiet van deze server (%s). Die is alleen op je eigen scherm te zien; andere spelers zien hem niet.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Deze server gebruikt Quick Skin voor eigen skins en capes. Installeer de mod om ze te zien en je eigen te dragen."
+  "quickskin.server.missing_mod_notice": "Deze server gebruikt Quick Skin voor eigen skins en capes. Installeer de mod om ze te zien en je eigen te dragen.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Markeer skins met ★ in het skinmenu om ze hier te zien",
+  "quickskin.fan.cooldown": "Je kunt over %s s weer van skin wisselen"
 }

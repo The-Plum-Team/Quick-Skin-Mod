@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "فتح قائمة المظاهر",
+  "key.quickskin.favourites_fan": "المظاهر المفضلة (تغيير سريع)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "المظهر السريع",
@@ -404,5 +405,8 @@
   "quickskin.network.upload_too_large.skin": "[المظهر السريع] مظهرك (%s) يتجاوز حد الرفع لهذا الخادم البالغ %s. يظهر على شاشتك فقط؛ ولا يراه اللاعبون الآخرون.",
   "quickskin.network.upload_too_large.cape": "[المظهر السريع] عباءتك (%s) تتجاوز حد الرفع لهذا الخادم البالغ %s. تظهر على شاشتك فقط؛ ولا يراها اللاعبون الآخرون.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "يستخدم هذا الخادم Quick Skin للأشكال والعباءات المخصصة. ثبّت التعديل لتراها ولترتدي ما يخصك."
+  "quickskin.server.missing_mod_notice": "يستخدم هذا الخادم Quick Skin للأشكال والعباءات المخصصة. ثبّت التعديل لتراها ولترتدي ما يخصك.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "ضع علامة ★ على المظاهر في قائمة المظاهر لتراها هنا",
+  "quickskin.fan.cooldown": "يمكنك تغيير مظهرك مجددًا بعد %s ث"
 }

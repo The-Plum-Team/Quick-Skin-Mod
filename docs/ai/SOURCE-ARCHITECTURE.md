@@ -169,6 +169,12 @@ menu rendering. Its skin-menu action is another bootstrap callback, covered by
 `vanilla-menu-navigation`; it does not compile against the skin menu. `hud-preview` owns its overlay,
 mouse/tick/render callbacks and drag state independently of menu widgets. Bootstrap keeps CPM's
 frame-boundary callback after HUD extraction, including when the HUD is hidden.
+`favourites-fan` owns the favourites fan: its key (registered through `KeybindRegistry`), its HUD
+layer, the mouse buttons, wheel and Esc it takes while open, and the arithmetic of its cards
+(`FanMotion`, pure Java with its own tests). It puts a favourite on along the skin menu's own path
+without compiling against the skin menu (`FavouriteSkins`). Its cards' pictures come from
+`SkinBustTextures` in `player-preview`, which also draws the skin list's busts. Its two mixins,
+`MouseTurnMixin` and `PauseGameMixin`, are in `common`. `ClientEvents` initialises the fan and resets it with the session.
 The harness's `TitleMenuSteps` and `HudPreviewSteps` prepare their own reference appearance from
 `local_skin_apply`. HUD evidence compares a dedicated disabled control with the enabled overlay;
 it must not reuse the full-suite baseline and inherit unrelated image-comparison dependencies.

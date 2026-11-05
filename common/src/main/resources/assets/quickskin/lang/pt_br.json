@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Abrir menu de skin",
+  "key.quickskin.favourites_fan": "Skins favoritas (troca rápida)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Skin Rápida",
@@ -404,5 +405,8 @@
   "quickskin.network.upload_too_large.skin": "[Skin Rápida] Sua skin (%s) excede o limite de envio deste servidor, %s. Ela aparece só na sua tela; os outros jogadores não a veem.",
   "quickskin.network.upload_too_large.cape": "[Skin Rápida] Sua capa (%s) excede o limite de envio deste servidor, %s. Ela aparece só na sua tela; os outros jogadores não a veem.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Este servidor usa o Quick Skin para skins e capas personalizadas. Instale o mod para vê-las e usar as suas."
+  "quickskin.server.missing_mod_notice": "Este servidor usa o Quick Skin para skins e capas personalizadas. Instale o mod para vê-las e usar as suas.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Marque skins com ★ no menu de skin para vê-las aqui",
+  "quickskin.fan.cooldown": "Você poderá trocar de skin novamente em %s s"
 }

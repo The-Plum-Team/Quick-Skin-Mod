@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Buka Menu Skin",
+  "key.quickskin.favourites_fan": "Skin Favorit (Ganti Cepat)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Skin Cepat",
@@ -404,5 +405,8 @@
   "quickskin.network.upload_too_large.skin": "[Skin Cepat] Skin Anda (%s) melebihi batas unggah server ini, yaitu %s. Skin ini hanya terlihat di layar Anda; pemain lain tidak melihatnya.",
   "quickskin.network.upload_too_large.cape": "[Skin Cepat] Jubah Anda (%s) melebihi batas unggah server ini, yaitu %s. Jubah ini hanya terlihat di layar Anda; pemain lain tidak melihatnya.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Server ini menggunakan Quick Skin untuk skin dan jubah kustom. Pasang mod-nya untuk melihatnya dan memakai milik Anda sendiri."
+  "quickskin.server.missing_mod_notice": "Server ini menggunakan Quick Skin untuk skin dan jubah kustom. Pasang mod-nya untuk melihatnya dan memakai milik Anda sendiri.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Tandai skin dengan ★ di menu skin untuk melihatnya di sini",
+  "quickskin.fan.cooldown": "Kamu bisa mengganti skin lagi dalam %s dtk"
 }

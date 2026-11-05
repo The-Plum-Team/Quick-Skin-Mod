@@ -517,6 +517,43 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   because the 1.20.1 overlay replaces the canonical file on the only lane official TaCZ exists
   for. The animation plays on the real local player, so other first-person draws of that
   player's model show it too; it never reaches the first-person arms.
+- The favourites fan (`favourites-fan`) is a HUD layer, never a screen, so the player keeps
+  walking while it is open. Its key is unbound until the player binds it. One press opens it on
+  the skins and CPM models marked as favourites, in the skin menu's order, at most
+  `FanMotion.PAGE_SIZE` per page; the mouse wheel turns the page. With no favourites it only shows a
+  notice. While it is open:
+  - `MouseTurnMixin` hands the mouse movement gathered for the camera to the fan, so the view
+    holds still;
+  - Architectury's raw input events give it the mouse buttons and the wheel; a left click wears
+    the pointed card, while a right click, the key again or a click with the pointer by the hotbar
+    closes it;
+  - Esc closes it too. Forge reports keys only after the game has handled them, so
+    `PauseGameMixin` closes the fan in `Minecraft.pauseGame` instead, before the game opens the
+    pause menu or pauses its sounds; a window that loses focus pauses on the next tick. Should
+    that hook not apply, the fan cancels the pause screen Esc opens (`ClientGuiEvent.SET_SCREEN`);
+  - these inputs never reach the game, so the click never attacks and the wheel never changes the
+    hotbar slot.
+
+  The fan takes input only while it is open in the world with no screen, and a screen that opens
+  or the end of the session puts it away at once. `MouseTurnMixin` and `PauseGameMixin` are
+  degradable (`require = 0`). Fabric and Forge load them from `quickskin.mixins.json`; NeoForge
+  loads them from `quickskin-input.mixins.json`. A card is put on along the skin menu's path: CPM's own workflow and
+  `PlayerAppearanceService`. On a server with a skin-change cooldown the fan shows the seconds left
+  and changes nothing, counting from its own last change until the server reports its cooldown.
+  Every card shows a picture of the whole player, drawn off the render thread
+  (`SkinBustTextures.getBody`, in `player-preview`) once per size and turn, so it leans, fades,
+  dims and turns over with its card on every version; the pointed card's skin sways through
+  pictures 3 degrees apart. No card draws a live GUI model: from 1.21.6 Minecraft renders each
+  kind of GUI model through one picture-in-picture texture per frame, which several cards would
+  share and which cannot turn with its card. A card has no card stock: its face is only the skin's
+  floor shadow and, when pointed at, a soft light, and a chosen skin turns over showing its own
+  back (its picture turned 180 degrees); that face and the screen vignette behind the fan are
+  painted at their exact pixel size (`FanTextures`). Every card is drawn at the same depth, so
+  before 1.21.6, where the GUI tests depth, the order of drawing alone puts the pointed card in
+  front. A CPM model shows its icon.
+- Quick Skin's keys are registered while the mod is built on Forge and NeoForge
+  (`KeybindRegistry.registerKeys`), before Minecraft registers the controls and reads their
+  saved bindings; a key registered later works but forgets its binding at every restart.
 
 ## Public E2E evidence
 

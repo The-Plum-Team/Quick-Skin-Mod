@@ -34,16 +34,25 @@ public class KeybindRegistry {
 
     // Keybind definitions
     public static KeyMapping OPEN_SKIN_MENU;
+    /** Opens the favourites fan; see the favourites-fan module. */
+    public static KeyMapping FAVOURITES_FAN;
 
     /**
-     * Registers all keybinds
-     * Called from QuickSkinClient.init()
+     * Registers Quick Skin's keys, once. Forge and NeoForge call this while the mod is built,
+     * before Minecraft registers the controls and reads their saved bindings; a key registered
+     * later still works but forgets its binding at every restart. Fabric registers them from
+     * {@link #init}.
      */
-    public static void init(Runnable openSkinMenu) {
-        java.util.Objects.requireNonNull(openSkinMenu, "openSkinMenu");
-        // Create keybind for opening skin menu (default: none)
-        OPEN_SKIN_MENU = new KeyMapping(
-            "key." + QuickSkinInfo.MOD_ID + ".open_menu",
+    public static synchronized void registerKeys() {
+        if (OPEN_SKIN_MENU != null) return;
+        OPEN_SKIN_MENU = register("open_menu");
+        FAVOURITES_FAN = register("favourites_fan");
+    }
+
+    /** A Quick Skin key, unbound until the player binds it, in Quick Skin's category of the controls. */
+    private static KeyMapping register(String name) {
+        KeyMapping key = new KeyMapping(
+            "key." + QuickSkinInfo.MOD_ID + "." + name,
             //? if <26.3 {
             InputConstants.Type.KEYSYM,
             //?} else {
@@ -52,9 +61,17 @@ public class KeybindRegistry {
             InputConstants.UNKNOWN.getValue(),
             CATEGORY
         );
+        KeyMappingRegistry.register(key);
+        return key;
+    }
 
-        // Register with Architectury
-        KeyMappingRegistry.register(OPEN_SKIN_MENU);
+    /**
+     * Registers all keybinds
+     * Called from QuickSkinClient.init()
+     */
+    public static void init(Runnable openSkinMenu) {
+        java.util.Objects.requireNonNull(openSkinMenu, "openSkinMenu");
+        registerKeys();
 
         // Register tick handler to check for key presses
         ClientTickEvent.CLIENT_POST.register(client -> {

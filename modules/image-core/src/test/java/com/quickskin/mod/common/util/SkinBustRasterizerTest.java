@@ -56,6 +56,44 @@ class SkinBustRasterizerTest {
     }
 
     @Test
+    void drawsTheWholePlayerStandingOnTheBottomEdge() {
+        int[] skin = skin(1);
+        fill(skin, 64, 1, 0, 16, 16, 16, GREEN);  // right leg
+        fill(skin, 64, 1, 16, 48, 16, 16, GREEN); // left leg
+        int width = 64, height = 128;
+        int[] body = SkinBustRasterizer.renderBody(skin, 64, 64, false, width, height);
+        assertEquals(width * height, body.length);
+        assertTrue(Arrays.stream(body).anyMatch(SkinBustRasterizerTest::nearlyRed), "the head's front");
+        // The legs stand on the bottom rows and the head reaches near the top
+        boolean feet = false, head = false;
+        for (int x = 0; x < width; x++) {
+            int low = body[(height - 4) * width + x];
+            feet |= (low >>> 24) != 0 && ((low >> 8) & 0xFF) > 0x40 && (low & 0xFF0000) == 0;
+            head |= (body[6 * width + x] >>> 24) != 0;
+        }
+        assertTrue(feet, "the legs at the bottom");
+        assertTrue(head, "the head at the top");
+        assertEquals(0, body[0] >>> 24, "a transparent corner");
+    }
+
+    @Test
+    void turnsTheStandingPlayerAboutItsUprightAxis() {
+        int[] skin = skin(1);
+        int width = 64, height = 128;
+        assertArrayEquals(SkinBustRasterizer.renderBody(skin, 64, 64, false, width, height),
+                SkinBustRasterizer.renderBody(skin, 64, 64, false, width, height, SkinBustRasterizer.DEFAULT_YAW));
+        // Turned from the light the face is darker, but still red
+        int[] turned = SkinBustRasterizer.renderBody(skin, 64, 64, false, width, height, 60);
+        assertTrue(Arrays.stream(turned).anyMatch(SkinBustRasterizerTest::red), "the face, turned further");
+        int[] back = SkinBustRasterizer.renderBody(skin, 64, 64, false, width, height, 180);
+        assertFalse(Arrays.stream(back).anyMatch(SkinBustRasterizerTest::red), "the face, turned away");
+    }
+
+    private static boolean red(int argb) {
+        return (argb & 0xFF00FFFF) == 0xFF000000 && ((argb >> 16) & 0xFF) > 0x30;
+    }
+
+    @Test
     void leavesTheCornersAroundTheBustTransparent() {
         int[] bust = SkinBustRasterizer.render(skin(1), 64, 64, false, 120, 99);
         assertEquals(0, bust[0] >>> 24, "top-left corner");

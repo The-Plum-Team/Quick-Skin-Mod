@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Apri menu skin",
+  "key.quickskin.favourites_fan": "Skin preferite (cambio rapido)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Skin Veloce",
@@ -404,5 +405,8 @@
   "quickskin.network.upload_too_large.skin": "[Skin Veloce] La tua skin (%s) supera il limite di caricamento di questo server, %s. È visibile solo sul tuo schermo; gli altri giocatori non la vedono.",
   "quickskin.network.upload_too_large.cape": "[Skin Veloce] Il tuo mantello (%s) supera il limite di caricamento di questo server, %s. È visibile solo sul tuo schermo; gli altri giocatori non lo vedono.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Questo server usa Quick Skin per skin e mantelli personalizzati. Installa la mod per vederli e indossare i tuoi."
+  "quickskin.server.missing_mod_notice": "Questo server usa Quick Skin per skin e mantelli personalizzati. Installa la mod per vederli e indossare i tuoi.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Segna le skin con ★ nel menu skin per vederle qui",
+  "quickskin.fan.cooldown": "Potrai cambiare skin di nuovo tra %s s"
 }

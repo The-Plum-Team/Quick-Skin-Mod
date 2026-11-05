@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Otwórz menu skórek",
+  "key.quickskin.favourites_fan": "Ulubione skórki (szybka zmiana)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Szybka Skórka",
@@ -404,5 +405,8 @@
   "quickskin.network.upload_too_large.skin": "[Szybka Skórka] Twoja skórka (%s) przekracza limit przesyłania tego serwera (%s). Widzisz ją tylko na swoim ekranie; inni gracze jej nie widzą.",
   "quickskin.network.upload_too_large.cape": "[Szybka Skórka] Twoja peleryna (%s) przekracza limit przesyłania tego serwera (%s). Widzisz ją tylko na swoim ekranie; inni gracze jej nie widzą.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Ten serwer używa Quick Skin do własnych skórek i peleryn. Zainstaluj moda, aby je widzieć i nosić własne."
+  "quickskin.server.missing_mod_notice": "Ten serwer używa Quick Skin do własnych skórek i peleryn. Zainstaluj moda, aby je widzieć i nosić własne.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Oznacz skórki gwiazdką ★ w menu skórek, aby zobaczyć je tutaj",
+  "quickskin.fan.cooldown": "Skórkę możesz znów zmienić za %s s"
 }

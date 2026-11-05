@@ -20,7 +20,9 @@
     "armor.LocalArmorRenderMixin",
     "armor.LocalElytraLayerMixin",
     "armor.LocalHeadLayerMixin",
-    "armor.PreviewArmorPoseMixin"
+    "armor.PreviewArmorPoseMixin",
+    "input.MouseTurnMixin",
+    "input.PauseGameMixin"
   ],
   "mixins": [
     "ChunkMapAccessor",

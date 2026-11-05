@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "速易膚",
   "key.quickskin.open_menu": "啟膚選單",
+  "key.quickskin.favourites_fan": "所好之膚（速易）",
 
   "_comment_screens": "=== 畫面名 ===",
   "quickskin.screen.skin_menu.title": "速易膚",
@@ -404,5 +405,8 @@
   "quickskin.network.upload_too_large.skin": "[速易膚] 汝之膚（%s）逾此伺服器之呈遞限（%s），唯現於汝屏，他人不得見",
   "quickskin.network.upload_too_large.cape": "[速易膚] 汝之披風（%s）逾此伺服器之呈遞限（%s），唯現於汝屏，他人不得見",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "此服以 Quick Skin 設自製之膚與披風。裝此模組，則可見之，亦可自衣。"
+  "quickskin.server.missing_mod_notice": "此服以 Quick Skin 設自製之膚與披風。裝此模組，則可見之，亦可自衣。",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "於膚之選單以★識之，則見於此",
+  "quickskin.fan.cooldown": "俟%s秒，乃可復易其膚"
 }

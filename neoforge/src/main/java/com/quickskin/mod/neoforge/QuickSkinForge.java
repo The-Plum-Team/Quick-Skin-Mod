@@ -14,9 +14,13 @@ import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 @Mod(QuickSkinInfo.MOD_ID)
 public class QuickSkinForge {
 
-    public QuickSkinForge(net.neoforged.bus.api.IEventBus modEventBus) {
+    public QuickSkinForge(net.neoforged.bus.api.IEventBus modEventBus, net.neoforged.api.distmarker.Dist dist) {
         // Note: Architectury automatically registers events for NeoForge
         // No manual event bus registration needed in 1.21.1
+        // Quick Skin's keys must exist before NeoForge registers the controls and reads their bindings
+        if (dist.isClient()) {
+            QuickSkinForgeClient.registerKeys();
+        }
     }
 
     /**

@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "スキンメニューを開く",
+  "key.quickskin.favourites_fan": "お気に入りスキン（クイック変更）",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "クイックスキン",
@@ -404,5 +405,8 @@
   "quickskin.network.upload_too_large.skin": "[クイックスキン] スキン(%s)がこのサーバーのアップロード上限(%s)を超えています。あなたの画面にのみ表示され、他のプレイヤーには見えません。",
   "quickskin.network.upload_too_large.cape": "[クイックスキン] マント(%s)がこのサーバーのアップロード上限(%s)を超えています。あなたの画面にのみ表示され、他のプレイヤーには見えません。",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "このサーバーはカスタムスキンとマントにQuick Skinを使用しています。それらを見たり自分のものを着たりするには、このModを導入してください。"
+  "quickskin.server.missing_mod_notice": "このサーバーはカスタムスキンとマントにQuick Skinを使用しています。それらを見たり自分のものを着たりするには、このModを導入してください。",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "スキンメニューでスキンに★を付けると、ここに表示されます",
+  "quickskin.fan.cooldown": "あと%s秒でスキンを変更できます"
 }

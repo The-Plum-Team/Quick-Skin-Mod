@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Abrir menú de aspecto",
+  "key.quickskin.favourites_fan": "Aspectos favoritos (cambio rápido)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Aspecto rápido",
@@ -416,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[Aspecto rápido] Tu aspecto (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no lo ven.",
   "quickskin.network.upload_too_large.cape": "[Aspecto rápido] Tu capa (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no la ven.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Este servidor usa Quick Skin para aspectos y capas personalizados. Instala el mod para verlos y llevar los tuyos."
+  "quickskin.server.missing_mod_notice": "Este servidor usa Quick Skin para aspectos y capas personalizados. Instala el mod para verlos y llevar los tuyos.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Marca aspectos con ★ en el menú de aspecto para verlos aquí",
+  "quickskin.fan.cooldown": "Podrás cambiar de aspecto otra vez en %s s"
 }

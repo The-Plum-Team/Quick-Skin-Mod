@@ -30,6 +30,10 @@ config = "quickskin-nicknames.mixins.json"
 [[mixins]]
 config = "quickskin-armor.mixins.json"
 
+# The favourites fan: the mouse points at its cards instead of turning the camera
+[[mixins]]
+config = "quickskin-input.mixins.json"
+
 # Sharing the account skin with vanilla clients: the server accessors (ADR 0012)
 [[mixins]]
 config = "quickskin-account-skin.mixins.json"

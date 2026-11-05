@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "快速皮膚",
   "key.quickskin.open_menu": "開啟皮膚選單",
+  "key.quickskin.favourites_fan": "最愛的皮膚（快速切換）",
 
   "_comment_screens": "=== 畫面標題 ===",
   "quickskin.screen.skin_menu.title": "快速皮膚",
@@ -404,5 +405,8 @@
   "quickskin.network.upload_too_large.skin": "[快速皮膚] 你的皮膚（%s）超過此伺服器的上載限制（%s）。它只會顯示在你自己的畫面上，其他玩家看不到。",
   "quickskin.network.upload_too_large.cape": "[快速皮膚] 你的披風（%s）超過此伺服器的上載限制（%s）。它只會顯示在你自己的畫面上，其他玩家看不到。",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "此伺服器使用 Quick Skin 提供自訂皮膚與披風。安裝此模組即可看到它們並穿上你自己的。"
+  "quickskin.server.missing_mod_notice": "此伺服器使用 Quick Skin 提供自訂皮膚與披風。安裝此模組即可看到它們並穿上你自己的。",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "喺皮膚選單為皮膚標上 ★，就可以喺呢度見到",
+  "quickskin.fan.cooldown": "%s 秒後可以再換皮膚"
 }

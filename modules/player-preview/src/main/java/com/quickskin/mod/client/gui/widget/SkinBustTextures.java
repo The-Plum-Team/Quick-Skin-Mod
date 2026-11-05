@@ -30,7 +30,8 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Supplier;
 
 /**
- * The 3D busts of the skin list's rows, as textures.
+ * The 3D busts of the skin list's rows, and the whole standing players of the favourites fan's
+ * cards, turned to any angle, as textures.
  *
  * <p>A bust is drawn by {@link SkinBustRasterizer} on the client I/O workers, from the skin's
  * catalogued texture, and uploaded on the render thread. Each is made once per skin, arm width,
@@ -46,10 +47,11 @@ import java.util.function.Supplier;
 public final class SkinBustTextures {
 
     /**
-     * Busts kept as textures: a few screens of rows, at about 70 KiB each at GUI scale 3, and as
-     * much again for a colour bust's pixels.
+     * Pictures kept as textures: a few screens of rows, at about 70 KiB each at GUI scale 3, and as
+     * much again for a colour bust's pixels; or a page of the favourites fan and the turns of the
+     * card it points at, which keep no pixels.
      */
-    private static final int MAX_TEXTURES = 48;
+    private static final int MAX_TEXTURES = 64;
     /** Busts being drawn at once, so a long catalog does not fill the shared worker queue. */
     private static final int MAX_PENDING = 3;
 
@@ -89,7 +91,7 @@ public final class SkinBustTextures {
         boolean opaque = ClientConfig.getInstance().shouldDisableSkinTransparency();
         String key = hash + (slim ? "_slim" : "_wide") + (opaque ? "_opaque" : "") + "_" + width + "x" + height;
         if (!gray) {
-            return get(key, width, height, () -> draw(hash, slim, width, height));
+            return get(key, width, height, () -> draw(hash, slim, width, height), true);
         }
         String grayKey = key + "_gray";
         Slot existing = SLOTS.get(grayKey);
@@ -99,10 +101,33 @@ public final class SkinBustTextures {
         // The grey copy comes from the colour bust, which is drawn first when it is not yet
         Slot colour = SLOTS.get(key);
         if (colour == null || colour.pixels == null) {
-            get(key, width, height, () -> draw(hash, slim, width, height));
+            get(key, width, height, () -> draw(hash, slim, width, height), true);
             return null;
         }
         return putReady(grayKey, gray(colour.pixels.clone()), width, height);
+    }
+
+    /**
+     * The whole player of a skin, standing, at this many pixels and turned {@code yaw} whole degrees
+     * about its upright axis, or {@code null} while it is being drawn or when it cannot be. Call
+     * from the render thread.
+     */
+    //? if <1.21.11 {
+    @Nullable
+    public static ResourceLocation getBody(String hash, boolean slim, int width, int height, int yaw) {
+    //?} else {
+    @Nullable
+    public static Identifier getBody(String hash, boolean slim, int width, int height, int yaw) {
+    //?}
+        if (width < 1 || height < 1 || width > SkinBustRasterizer.MAX_SIZE || height > SkinBustRasterizer.MAX_SIZE) {
+            return null;
+        }
+        boolean opaque = ClientConfig.getInstance().shouldDisableSkinTransparency();
+        // A negative turn would read as a separator in the texture's path
+        int turn = Math.floorMod(yaw, 360);
+        String key = hash + "_body" + (slim ? "_slim" : "_wide") + (opaque ? "_opaque" : "")
+                + "_" + width + "x" + height + "_" + turn;
+        return get(key, width, height, () -> drawBody(hash, slim, width, height, turn), false);
     }
 
     /**
@@ -154,10 +179,12 @@ public final class SkinBustTextures {
 
     //? if <1.21.11 {
     @Nullable
-    private static ResourceLocation get(String key, int width, int height, Supplier<int @Nullable []> drawer) {
+    private static ResourceLocation get(String key, int width, int height, Supplier<int @Nullable []> drawer,
+                                        boolean keepPixels) {
     //?} else {
     @Nullable
-    private static Identifier get(String key, int width, int height, Supplier<int @Nullable []> drawer) {
+    private static Identifier get(String key, int width, int height, Supplier<int @Nullable []> drawer,
+                                  boolean keepPixels) {
     //?}
         Slot slot = SLOTS.get(key);
         if (slot != null) {
@@ -187,7 +214,7 @@ public final class SkinBustTextures {
                     }
                     created.location = upload(key, pixels, width, height);
                     created.failed = created.location == null;
-                    created.pixels = created.failed ? null : pixels;
+                    created.pixels = created.failed || !keepPixels ? null : pixels;
                     trim();
                 }));
         trim();
@@ -205,6 +232,21 @@ public final class SkinBustTextures {
             return SkinBustRasterizer.render(skin, image.getWidth(), image.getHeight(), slim, width, height);
         } catch (IllegalArgumentException e) {
             QuickSkinInfo.LOGGER.debug("Unable to draw the list bust of {}", hash, e);
+            return null;
+        }
+    }
+
+    /** Draws the whole player from the catalogued skin; {@code null} when the skin cannot be read. */
+    private static int @Nullable [] drawBody(String hash, boolean slim, int width, int height, int yaw) {
+        BufferedImage image = readSkin(hash);
+        if (image == null) {
+            return null;
+        }
+        try {
+            int[] skin = image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
+            return SkinBustRasterizer.renderBody(skin, image.getWidth(), image.getHeight(), slim, width, height, yaw);
+        } catch (IllegalArgumentException e) {
+            QuickSkinInfo.LOGGER.debug("Unable to draw the standing player of {}", hash, e);
             return null;
         }
     }

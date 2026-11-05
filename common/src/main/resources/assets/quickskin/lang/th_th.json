@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "เปิดเมนูสกิน",
+  "key.quickskin.favourites_fan": "สกินโปรด (เปลี่ยนด่วน)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "สกินด่วน",
@@ -404,5 +405,8 @@
   "quickskin.network.upload_too_large.skin": "[สกินด่วน] สกินของคุณ (%s) เกินขีดจำกัดการอัปโหลดของเซิร์ฟเวอร์นี้ (%s) จะแสดงบนหน้าจอของคุณเท่านั้น ผู้เล่นคนอื่นจะมองไม่เห็น",
   "quickskin.network.upload_too_large.cape": "[สกินด่วน] ผ้าคลุมของคุณ (%s) เกินขีดจำกัดการอัปโหลดของเซิร์ฟเวอร์นี้ (%s) จะแสดงบนหน้าจอของคุณเท่านั้น ผู้เล่นคนอื่นจะมองไม่เห็น",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "เซิร์ฟเวอร์นี้ใช้ Quick Skin สำหรับสกินและผ้าคลุมแบบกำหนดเอง ติดตั้งม็อดเพื่อดูและสวมใส่ของคุณเอง"
+  "quickskin.server.missing_mod_notice": "เซิร์ฟเวอร์นี้ใช้ Quick Skin สำหรับสกินและผ้าคลุมแบบกำหนดเอง ติดตั้งม็อดเพื่อดูและสวมใส่ของคุณเอง",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "ทำเครื่องหมาย ★ ให้สกินในเมนูสกินเพื่อให้แสดงที่นี่",
+  "quickskin.fan.cooldown": "คุณจะเปลี่ยนสกินได้อีกครั้งในอีก %s วินาที"
 }

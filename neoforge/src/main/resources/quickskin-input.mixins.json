@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "package": "com.quickskin.mod.mixin.input",
+  "compatibilityLevel": "JAVA_17",
+  "minVersion": "0.8",
+  "client": [
+    "MouseTurnMixin",
+    "PauseGameMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

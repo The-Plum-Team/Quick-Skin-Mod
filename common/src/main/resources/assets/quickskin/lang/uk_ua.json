@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Відкрити меню скінів",
+  "key.quickskin.favourites_fan": "Обрані скіни (швидка зміна)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Швидкий скін",
@@ -404,5 +405,8 @@
   "quickskin.network.upload_too_large.skin": "[Швидкий скін] Ваш скін (%s) перевищує ліміт завантаження цього сервера (%s). Його видно лише на вашому екрані; інші гравці його не бачать.",
   "quickskin.network.upload_too_large.cape": "[Швидкий скін] Ваш плащ (%s) перевищує ліміт завантаження цього сервера (%s). Його видно лише на вашому екрані; інші гравці його не бачать.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Цей сервер використовує Quick Skin для власних скінів і плащів. Встановіть мод, щоб бачити їх і носити свої."
+  "quickskin.server.missing_mod_notice": "Цей сервер використовує Quick Skin для власних скінів і плащів. Встановіть мод, щоб бачити їх і носити свої.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Позначте скіни зірочкою ★ у меню скінів, щоб бачити їх тут",
+  "quickskin.fan.cooldown": "Змінити скін знову можна через %s с"
 }

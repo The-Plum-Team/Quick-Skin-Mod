@@ -77,11 +77,19 @@ DEGRADABLE_MIXINS = {
     "main:com/quickskin/mod/mixin/PreviewSkinSwapPoseMixin.java",
     # 1.20.1 only: without it the notice for players without Quick Skin is in English.
     "main:com/quickskin/mod/mixin/ServerPlayerLanguageMixin.java",
+    # The favourites fan: a hook that fails leaves the camera turning while the fan is open, or
+    # Esc opening the pause menu over it.
+    "main:com/quickskin/mod/mixin/input/MouseTurnMixin.java",
+    "main:com/quickskin/mod/mixin/input/PauseGameMixin.java",
 }
 
 # Like the nickname mixins, NeoForge loads the hidden-armour mixins from their own config.
 ARMOR_MIXIN_PACKAGE = "com.quickskin.mod.mixin.armor"
 NEOFORGE_ARMOR_CONFIG = ROOT / "neoforge" / "src" / "main" / "resources" / "quickskin-armor.mixins.json"
+
+# And the favourites fan's input hooks from their own.
+INPUT_MIXIN_PACKAGE = "com.quickskin.mod.mixin.input"
+NEOFORGE_INPUT_CONFIG = ROOT / "neoforge" / "src" / "main" / "resources" / "quickskin-input.mixins.json"
 
 # NeoForge never reads quickskin.mixins.json, so it loads the nickname mixins from their own config.
 NICKNAME_MIXIN_PACKAGE = "com.quickskin.mod.mixin.nickname"
@@ -454,6 +462,26 @@ class MixinPolicyTest(unittest.TestCase):
         common = ROOT / "common/src/main/java/com/quickskin/mod/mixin/GuiSkinRendererMixin.java"
         neoforge = ROOT / "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/GuiSkinRendererMixin.java"
         self.assertEqual(body(common), body(neoforge))
+
+    def test_every_loader_loads_the_input_mixins(self) -> None:
+        input_sources = {
+            path.stem
+            for path in (CANONICAL_JAVA / "com/quickskin/mod/mixin/input").glob("*.java")
+            if MIXIN_MARKER.search(path.read_text(encoding="utf-8"))
+        }
+        self.assertTrue(input_sources)
+        for path in self.configs_named("quickskin.mixins.json"):
+            with self.subTest(config=relative(path)):
+                config = json.loads(path.read_text(encoding="utf-8"))
+                listed = {name.split(".", 1)[1] for name in config["client"] if name.startswith("input.")}
+                self.assertEqual(listed, input_sources)
+        neoforge = json.loads(NEOFORGE_INPUT_CONFIG.read_text(encoding="utf-8"))
+        self.assertEqual(neoforge["package"], INPUT_MIXIN_PACKAGE)
+        self.assertEqual(set(neoforge["client"]), input_sources)
+        self.assertNotIn("mixins", neoforge)
+        for toml in NEOFORGE_MOD_TOMLS:
+            with self.subTest(toml=relative(toml)):
+                self.assertIn('config = "quickskin-input.mixins.json"', toml.read_text(encoding="utf-8"))
 
     def test_neoforge_loads_every_server_mixin_of_its_targets(self) -> None:
         # NeoForge never reads quickskin.mixins.json, so each server mixin its targets' common
