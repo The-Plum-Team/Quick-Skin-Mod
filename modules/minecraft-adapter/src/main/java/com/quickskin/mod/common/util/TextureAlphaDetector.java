@@ -15,6 +15,8 @@ import net.fabricmc.api.Environment;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,11 +28,14 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TextureAlphaDetector {
     private static final int MAX_CACHE_ENTRIES = 4096;
 
-    // Cache to avoid repeatedly checking the same textures
+    // Cache to avoid repeatedly checking the same textures. Insertion ordered, so the bound
+    // evicts the oldest entry; every compound update holds the map's own lock.
     //? if <1.21.11 {
-    private static final Map<ResourceLocation, Boolean> transparencyCache = new ConcurrentHashMap<>();
+    private static final Map<ResourceLocation, Boolean> transparencyCache =
+            Collections.synchronizedMap(new LinkedHashMap<>());
     //?} else {
-    private static final Map<Identifier, Boolean> transparencyCache = new ConcurrentHashMap<>();
+    private static final Map<Identifier, Boolean> transparencyCache =
+            Collections.synchronizedMap(new LinkedHashMap<>());
     //?}
 
     // Track textures currently being analyzed to avoid duplicate work
@@ -97,17 +102,19 @@ public class TextureAlphaDetector {
         // Perform the analysis on a background thread
         ClientIoExecutor.runAsync(() -> {
             try {
-                boolean hasAlpha = detectTransparency(textureLocation);
+                // Quick Skin's own DynamicTextures are not resources: an analysis that cannot read
+                // the texture knows nothing and records the safe translucent answer. Only the
+                // texture's registration (cacheTransparencyResult) may record it as opaque.
+                Boolean detected = detectTransparency(textureLocation);
+                boolean hasAlpha = detected == null || detected;
 
                 // Update cache on the main thread to ensure thread safety with rendering
                 Minecraft mc = Minecraft.getInstance();
-                mc.execute(() -> {
-                    putBounded(textureLocation, hasAlpha);
-                });
+                mc.execute(() -> putBoundedIfAbsent(textureLocation, hasAlpha));
             } catch (Exception e) {
                 // On error, cache as transparent (safe default)
                 Minecraft mc = Minecraft.getInstance();
-                mc.execute(() -> putBounded(textureLocation, true));
+                mc.execute(() -> putBoundedIfAbsent(textureLocation, true));
             } finally {
                 // Remove from pending set
                 pendingAnalysis.remove(textureLocation);
@@ -117,7 +124,7 @@ public class TextureAlphaDetector {
                 pendingAnalysis.remove(textureLocation);
                 Minecraft minecraft = Minecraft.getInstance();
                 if (minecraft != null) {
-                    minecraft.execute(() -> putBounded(textureLocation, true));
+                    minecraft.execute(() -> putBoundedIfAbsent(textureLocation, true));
                 }
                 QuickSkinInfo.LOGGER.debug("Unable to schedule texture alpha analysis for {}",
                         textureLocation, error);
@@ -126,38 +133,42 @@ public class TextureAlphaDetector {
     }
 
     /**
-     * Actually detect if the texture has transparency by loading and examining it
+     * Actually detect if the texture has transparency by loading and examining it.
+     *
+     * @return whether it has transparent pixels, or null when the texture is not a readable
+     *     resource (Quick Skin's own DynamicTextures never are)
      */
     //? if <1.21.11 {
-    private static boolean detectTransparency(ResourceLocation textureLocation) {
+    private static Boolean detectTransparency(ResourceLocation textureLocation) {
     //?} else {
-    private static boolean detectTransparency(Identifier textureLocation) {
+    private static Boolean detectTransparency(Identifier textureLocation) {
     //?}
         try {
             Minecraft mc = Minecraft.getInstance();
             if (mc.getResourceManager() == null) {
-                return false;
+                return null;
             }
 
             // Try to get the resource
             Resource resource = mc.getResourceManager().getResource(textureLocation).orElse(null);
             if (resource == null) {
-                return false;
+                return null;
             }
 
             // Load the image
             try (InputStream inputStream = resource.open()) {
                 byte[] encoded = inputStream.readNBytes((int) SafeImageReader.MAX_ENCODED_BYTES + 1);
-                if (encoded.length > SafeImageReader.MAX_ENCODED_BYTES) return false;
+                if (encoded.length > SafeImageReader.MAX_ENCODED_BYTES) return null;
                 BufferedImage image = SafeImageReader.readPng(encoded);
+                if (image == null) return null;
 
                 return hasTransparentPixels(image);
 
             }
         } catch (IOException e) {
-            return false;
+            return null;
         } catch (Exception e) {
-            return false;
+            return null;
         }
     }
 
@@ -212,12 +223,30 @@ public class TextureAlphaDetector {
     private static synchronized void putBounded(
             Identifier textureLocation, boolean hasTransparency) {
     //?}
-        if (!transparencyCache.containsKey(textureLocation)
-                && transparencyCache.size() >= MAX_CACHE_ENTRIES) {
-            var eldest = transparencyCache.keySet().iterator();
-            if (eldest.hasNext()) transparencyCache.remove(eldest.next());
+        synchronized (transparencyCache) {
+            if (!transparencyCache.containsKey(textureLocation)
+                    && transparencyCache.size() >= MAX_CACHE_ENTRIES) {
+                var eldest = transparencyCache.keySet().iterator();
+                if (eldest.hasNext()) {
+                    eldest.next();
+                    eldest.remove();
+                }
+            }
+            transparencyCache.put(textureLocation, hasTransparency);
         }
-        transparencyCache.put(textureLocation, hasTransparency);
+    }
+
+    /** Records an analysis result unless the texture's registration recorded one meanwhile. */
+    //? if <1.21.11 {
+    private static synchronized void putBoundedIfAbsent(
+            ResourceLocation textureLocation, boolean hasTransparency) {
+    //?} else {
+    private static synchronized void putBoundedIfAbsent(
+            Identifier textureLocation, boolean hasTransparency) {
+    //?}
+        if (!transparencyCache.containsKey(textureLocation)) {
+            putBounded(textureLocation, hasTransparency);
+        }
     }
 
     /**
