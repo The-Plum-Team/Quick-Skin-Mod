@@ -416,7 +416,6 @@ public class SettingsScreen extends Screen {
     }
 
     private void createServerSettings() {
-        ServerConfig config = ServerConfig.getInstance();
         int spacing = 30;
         // Settings content area starts below tabs
         int startY = DialogFrame.bodyTop(dialogY) + 14;
@@ -454,12 +453,14 @@ public class SettingsScreen extends Screen {
                 editBoxWidth, 20,
                 Component.translatable("quickskin.settings.cooldown_label")
         );
-        skinChangeCooldownEditBox.setValue(String.valueOf(config.skinChangeCooldownSeconds));
+        skinChangeCooldownEditBox.setValue(String.valueOf(shownServerCooldown(serverOverride)));
         skinChangeCooldownEditBox.setMaxLength(5);
         //? if <26.1 {
         skinChangeCooldownEditBox.setFilter(text -> text.isEmpty() || text.matches("\\d+"));
         //?}
-        skinChangeCooldownEditBox.active = isAdmin;
+        // The cooldown has no packet of its own: only the server this client hosts can be set from
+        // here; a remote server's is set in its own configuration file
+        skinChangeCooldownEditBox.active = isAdmin && hostsServer();
         skinChangeCooldownEditBox.setTooltip(Tooltip.create(Component.translatable("quickskin.settings.cooldown_seconds.tooltip")));
         serverSettingWidgets.add(skinChangeCooldownEditBox);
 
@@ -988,16 +989,33 @@ public class SettingsScreen extends Screen {
                 "disableSkinTransparency", serverDisableSkinTransparencyCheckbox.selected());
     }
 
+    /** Whether this client hosts the server it plays on (singleplayer or LAN). */
+    private boolean hostsServer() {
+        return minecraft != null && minecraft.hasSingleplayerServer();
+    }
+
+    /**
+     * The skin change cooldown of the server the player is on: the hosted server's own setting,
+     * else the configuration the server synced, else 0 (a server without Quick Skin has none).
+     */
+    private int shownServerCooldown(ServerConfig serverOverride) {
+        if (hostsServer()) {
+            return ServerConfig.getInstance().skinChangeCooldownSeconds;
+        }
+        return serverOverride != null ? serverOverride.skinChangeCooldownSeconds : 0;
+    }
+
     private void applyCooldownSetting() {
-        if (!isAdmin() || skinChangeCooldownEditBox == null || skinChangeCooldownEditBox.getValue().isEmpty()) {
+        if (!isAdmin() || !hostsServer() || skinChangeCooldownEditBox == null
+                || skinChangeCooldownEditBox.getValue().isEmpty()) {
             return;
         }
         try {
             int cooldownSeconds = Integer.parseInt(skinChangeCooldownEditBox.getValue());
             if (cooldownSeconds >= 0 && cooldownSeconds <= 86400) { // Max 24 hours
-                ServerConfig config = ServerConfig.getInstance();
-                config.skinChangeCooldownSeconds = cooldownSeconds;
-                config.save();
+                // Set on the hosted server's thread, which saves it and sends it to every player
+                com.quickskin.mod.client.api.ClientNetworkApi.actions()
+                        .updateHostedServerCooldown(cooldownSeconds);
             }
         } catch (NumberFormatException e) {
             // Invalid input, keep existing value
