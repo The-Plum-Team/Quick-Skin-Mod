@@ -2,6 +2,7 @@ package com.quickskin.mod.networking;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.Suggestions;
@@ -45,6 +46,10 @@ import java.util.concurrent.ThreadLocalRandom;
  *   <li>{@code skin reset [players]} takes those back (with no players, of everyone);</li>
  *   <li>{@code skin pool list|add|remove|reload} keeps the world's skin pool, which also takes
  *       the PNG files in {@code config/quickskin-skins/}.</li>
+ *   <li>{@code silent nickname ...} and {@code silent skin ...} do the same telling nobody but
+ *       the players they change, for games where nobody may know who is who, admins who play
+ *       included: no feedback to whoever runs them (a command block too) or to other operators,
+ *       and the nicknames they give are secret (no account name beside them anywhere).</li>
  * </ul>
  *
  * Messages carry English for clients without Quick Skin and for the server console.
@@ -57,51 +62,8 @@ public final class QuickSkinCommands {
                                 CommandBuildContext context, Commands.CommandSelection selection) {
         dispatcher.register(Commands.literal("quickskin")
                 .requires(QuickSkinCommands::isAdmin)
-                .then(Commands.literal("nickname")
-                        .then(Commands.literal("set")
-                                .then(Commands.argument("player", EntityArgument.player())
-                                        .then(Commands.argument("nickname", StringArgumentType.greedyString())
-                                                .executes(c -> setNickname(c.getSource(),
-                                                        EntityArgument.getPlayer(c, "player"),
-                                                        StringArgumentType.getString(c, "nickname"))))))
-                        .then(Commands.literal("random")
-                                .then(Commands.argument("players", EntityArgument.players())
-                                        .executes(c -> randomNicknames(c.getSource(), players(c)))))
-                        .then(Commands.literal("reset")
-                                .executes(c -> resetAllNicknames(c.getSource()))
-                                .then(Commands.argument("players", EntityArgument.players())
-                                        .executes(c -> resetNicknames(c.getSource(), players(c)))))
-                        .then(Commands.literal("clear")
-                                .then(Commands.argument("players", EntityArgument.players())
-                                        .executes(c -> clearNicknames(c.getSource(), players(c)))))
-                        .then(Commands.literal("lock")
-                                .then(Commands.argument("players", EntityArgument.players())
-                                        .executes(c -> lockNicknames(c.getSource(), players(c), true))))
-                        .then(Commands.literal("unlock")
-                                .then(Commands.argument("players", EntityArgument.players())
-                                        .executes(c -> lockNicknames(c.getSource(), players(c), false)))))
-                .then(Commands.literal("skin")
-                        .then(Commands.literal("set")
-                                .then(Commands.argument("players", EntityArgument.players())
-                                        .then(Commands.argument("skin", StringArgumentType.word())
-                                                .suggests(QuickSkinCommands::suggestPoolSkins)
-                                                .executes(c -> setSkin(c.getSource(), players(c),
-                                                        StringArgumentType.getString(c, "skin"))))))
-                        .then(Commands.literal("copy")
-                                .then(Commands.argument("players", EntityArgument.players())
-                                        .then(Commands.argument("from", EntityArgument.player())
-                                                .executes(c -> copySkin(c.getSource(), players(c),
-                                                        EntityArgument.getPlayer(c, "from"))))))
-                        .then(Commands.literal("random")
-                                .then(Commands.argument("players", EntityArgument.players())
-                                        .executes(c -> randomSkins(c.getSource(), players(c)))))
-                        .then(Commands.literal("shuffle")
-                                .then(Commands.argument("players", EntityArgument.players())
-                                        .executes(c -> shuffleSkins(c.getSource(), players(c)))))
-                        .then(Commands.literal("reset")
-                                .executes(c -> resetAllSkins(c.getSource()))
-                                .then(Commands.argument("players", EntityArgument.players())
-                                        .executes(c -> resetSkins(c.getSource(), players(c)))))
+                .then(nicknameCommands(false))
+                .then(skinCommands(false)
                         .then(Commands.literal("pool")
                                 .then(Commands.literal("list")
                                         .executes(c -> listPool(c.getSource())))
@@ -117,7 +79,74 @@ public final class QuickSkinCommands {
                                                 .executes(c -> removeFromPool(c.getSource(),
                                                         StringArgumentType.getString(c, "skin")))))
                                 .then(Commands.literal("reload")
-                                        .executes(c -> reloadPool(c.getSource()))))));
+                                        .executes(c -> reloadPool(c.getSource())))))
+                // The same commands, told to nobody but the players they change: no feedback to
+                // whoever runs them (a command block included) or to other operators, and the
+                // nicknames they give show no account name beside them, operators included
+                .then(Commands.literal("silent")
+                        .then(nicknameCommands(true))
+                        .then(skinCommands(true))));
+    }
+
+    /** {@code nickname ...}; {@code silent} runs it without feedback and gives secret nicknames. */
+    private static LiteralArgumentBuilder<CommandSourceStack> nicknameCommands(boolean silent) {
+        return Commands.literal("nickname")
+                .then(Commands.literal("set")
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .then(Commands.argument("nickname", StringArgumentType.greedyString())
+                                        .executes(c -> setNickname(source(c, silent),
+                                                EntityArgument.getPlayer(c, "player"),
+                                                StringArgumentType.getString(c, "nickname"), silent)))))
+                .then(Commands.literal("random")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .executes(c -> randomNicknames(source(c, silent), players(c), silent))))
+                .then(Commands.literal("reset")
+                        .executes(c -> resetAllNicknames(source(c, silent)))
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .executes(c -> resetNicknames(source(c, silent), players(c)))))
+                .then(Commands.literal("clear")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .executes(c -> clearNicknames(source(c, silent), players(c)))))
+                .then(Commands.literal("lock")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .executes(c -> lockNicknames(source(c, silent), players(c), true))))
+                .then(Commands.literal("unlock")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .executes(c -> lockNicknames(source(c, silent), players(c), false))));
+    }
+
+    /** {@code skin ...} but its pool; {@code silent} runs it without feedback. */
+    private static LiteralArgumentBuilder<CommandSourceStack> skinCommands(boolean silent) {
+        return Commands.literal("skin")
+                .then(Commands.literal("set")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .then(Commands.argument("skin", StringArgumentType.word())
+                                        .suggests(QuickSkinCommands::suggestPoolSkins)
+                                        .executes(c -> setSkin(source(c, silent), players(c),
+                                                StringArgumentType.getString(c, "skin"))))))
+                .then(Commands.literal("copy")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .then(Commands.argument("from", EntityArgument.player())
+                                        .executes(c -> copySkin(source(c, silent), players(c),
+                                                EntityArgument.getPlayer(c, "from"))))))
+                .then(Commands.literal("random")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .executes(c -> randomSkins(source(c, silent), players(c)))))
+                .then(Commands.literal("shuffle")
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .executes(c -> shuffleSkins(source(c, silent), players(c)))))
+                .then(Commands.literal("reset")
+                        .executes(c -> resetAllSkins(source(c, silent)))
+                        .then(Commands.argument("players", EntityArgument.players())
+                                .executes(c -> resetSkins(source(c, silent), players(c)))));
+    }
+
+    /**
+     * The command's source; a silent one tells nobody what the command did, as vanilla runs a
+     * function's commands. The result count still reaches a command block's comparator.
+     */
+    private static CommandSourceStack source(CommandContext<CommandSourceStack> context, boolean silent) {
+        return silent ? context.getSource().withSuppressedOutput() : context.getSource();
     }
 
     /** Admins, here, are those with permission level 2, who also change Quick Skin's server settings. */
@@ -134,7 +163,7 @@ public final class QuickSkinCommands {
         return EntityArgument.getPlayers(context, "players");
     }
 
-    private static int setNickname(CommandSourceStack source, ServerPlayer player, String typed) {
+    private static int setNickname(CommandSourceStack source, ServerPlayer player, String typed, boolean secret) {
         String nickname = Nickname.normalize(typed);
         if (nickname == null || nickname.isEmpty()) {
             source.sendFailure(Component.translatableWithFallback("quickskin.command.nickname.invalid",
@@ -147,7 +176,7 @@ public final class QuickSkinCommands {
                     nickname));
             return 0;
         }
-        ServerNicknameStore.Result result = ServerNicknames.assign(player, nickname, source.getTextName());
+        ServerNicknameStore.Result result = ServerNicknames.assign(player, nickname, source.getTextName(), secret);
         switch (result.status()) {
             case ACCEPTED -> {
                 source.sendSuccess(() -> Component.translatableWithFallback("quickskin.command.nickname.set",
@@ -166,7 +195,7 @@ public final class QuickSkinCommands {
         return 0;
     }
 
-    private static int randomNicknames(CommandSourceStack source, Collection<ServerPlayer> players) {
+    private static int randomNicknames(CommandSourceStack source, Collection<ServerPlayer> players, boolean secret) {
         Path file = poolFile();
         List<String> pool = NicknamePool.load(file);
         if (pool.isEmpty()) {
@@ -174,7 +203,8 @@ public final class QuickSkinCommands {
                     "The nickname list %s has no valid names", file.toString()));
             return 0;
         }
-        int named = ServerNicknames.assignRandom(players, pool, ThreadLocalRandom.current(), source.getTextName());
+        int named = ServerNicknames.assignRandom(players, pool, ThreadLocalRandom.current(), source.getTextName(),
+                secret);
         int unnamed = players.size() - named;
         if (named > 0) {
             if (players.size() == 1) {

@@ -6,7 +6,7 @@ Date: 2026-10-23
 
 Accepted. Complements [ADR 0011](0011-show-quick-skin-appearances-only-to-quick-skin-clients.md):
 appearances stay on the Quick Skin protocol; a nickname is text that the server shows. Amended
-2026-10-24 with admin commands.
+2026-10-24 with admin commands and 2026-11-05 with silent ones.
 
 ## Context
 
@@ -107,6 +107,13 @@ A player may pick a cosmetic nickname; the account name keeps every role it has 
   whether they may change their nickname: `ASSIGNED` or `LOCKED` while they may not,
   `UNCHANGED` while they may, when the session becomes ready and after each admin change. While
   they may not, the skin menu's name tag opens no dialog and its tooltip says why.
+- **Silent commands.** For games where admins play too, `/quickskin silent nickname ...` (and
+  `silent skin ...`, the pool's commands excepted) runs the same commands with vanilla's
+  suppressed output, as a function's commands run: no feedback to whoever runs them, a command
+  block included, nor to other operators, while the result count still reaches a comparator.
+  The nicknames they give are `secret` in the store (saved with it): join and leave messages and
+  the operators' tab list show them without the account name, and the server log notes the
+  change without pairing them. Only the player learns the name; the secret ends with it.
 - **Loaders.** The four mixins live in `com.quickskin.mod.mixin.nickname`, listed in every
   `quickskin.mixins.json` for Fabric and Forge and in `quickskin-nicknames.mixins.json`, which both
   NeoForge `neoforge.mods.toml` files declare. Each injector is degradable (`require = 0`): a

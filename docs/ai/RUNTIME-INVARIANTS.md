@@ -203,6 +203,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   on each run and gives each player a different free name, after taking back their earlier
   admin names; players it cannot name are reported, never given a repeat. An absent player's
   admin name stays theirs, and blocks it, until a `reset` without players takes back everyone's.
+  `/quickskin silent nickname|skin ...` runs the same commands (the pool's excepted) through
+  `withSuppressedOutput`, so no feedback reaches whoever runs them, a command block included, or
+  other operators, while the result count still does; the nicknames it gives are `secret` in the
+  store, so neither join and leave messages nor the operators' tab list show the account name
+  beside them, and the server log does not pair them. The secret ends with the name it kept.
 - An assigned skin (ADR 0016) never replaces a player's own appearance: the repository keeps the
   record the player's client uploaded and acknowledges, and `ServerSkinAssignments.shownToOthers`
   swaps in the assigned skin and model only for recipients other than that player, so echoes,

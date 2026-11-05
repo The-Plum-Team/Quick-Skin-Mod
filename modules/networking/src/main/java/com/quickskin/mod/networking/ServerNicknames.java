@@ -81,6 +81,15 @@ public final class ServerNicknames {
         return ServerConfig.getInstance().allowNicknames ? store.nickname(playerId) : "";
     }
 
+    /**
+     * Whether the nickname a player shows is one an admin gave silently: nobody, operators
+     * included, sees the account name beside it, in join and leave messages or the tab list.
+     */
+    public static boolean isSecret(UUID playerId) {
+        ServerNicknameStore store = ServerNicknameStore.getInstance();
+        return store.isSecret(playerId) && !store.assignedNickname(playerId).isEmpty();
+    }
+
     /** Whether the tab-list name being built is for an operator, who also sees the account name. */
     public static boolean buildingOperatorView() {
         return BUILDING_OPERATOR_VIEW.get();
@@ -169,15 +178,34 @@ public final class ServerNicknames {
      * who is who.
      */
     public static ServerNicknameStore.Result assign(ServerPlayer player, String nickname, String admin) {
+        return assign(player, nickname, admin, false);
+    }
+
+    /**
+     * The same; a {@code secret} nickname shows without the account name beside it to anyone,
+     * operators included, and the server log does not say which name the player got.
+     */
+    public static ServerNicknameStore.Result assign(ServerPlayer player, String nickname, String admin,
+                                                    boolean secret) {
         MinecraftServer server = server(player);
-        ServerNicknameStore.Result result = ServerNicknameStore.getInstance().assign(
+        ServerNicknameStore store = ServerNicknameStore.getInstance();
+        boolean wasSecret = isSecret(player.getUUID());
+        ServerNicknameStore.Result result = store.assign(
                 player.getUUID(), player.getScoreboardName(), nickname,
-                otherNames(server, player), System.currentTimeMillis());
+                otherNames(server, player), System.currentTimeMillis(), secret);
         if (result.changed()) {
-            LOGGER.info("{} gave {} ({}) the nickname {}", admin, player.getScoreboardName(),
-                    player.getUUID(), result.nickname());
+            if (secret) {
+                LOGGER.info("{} secretly gave {} ({}) a nickname", admin, player.getScoreboardName(),
+                        player.getUUID());
+            } else {
+                LOGGER.info("{} gave {} ({}) the nickname {}", admin, player.getScoreboardName(),
+                        player.getUUID(), result.nickname());
+            }
             shownNameChanged(server, List.of(player));
             tellAssigned(player, result.nickname());
+        } else if (wasSecret != isSecret(player.getUUID())) {
+            // The same name, kept secret now or no longer: operators' tab lists change
+            shownNameChanged(server, List.of(player));
         }
         return result;
     }
@@ -191,6 +219,12 @@ public final class ServerNicknames {
      */
     public static int assignRandom(Collection<ServerPlayer> players, List<String> pool,
                                    java.util.Random random, String admin) {
+        return assignRandom(players, pool, random, admin, false);
+    }
+
+    /** The same; {@code secret} names show without account names beside them (see {@link #assign}). */
+    public static int assignRandom(Collection<ServerPlayer> players, List<String> pool,
+                                   java.util.Random random, String admin, boolean secret) {
         if (players.isEmpty()) return 0;
         MinecraftServer server = server(players.iterator().next());
         ServerNicknameStore store = ServerNicknameStore.getInstance();
@@ -207,7 +241,7 @@ public final class ServerNicknames {
             while (next < names.size()) {
                 String candidate = names.get(next++);
                 if (store.isAvailable(player.getUUID(), player.getScoreboardName(), candidate, others)) {
-                    result = store.assign(player.getUUID(), player.getScoreboardName(), candidate, others, now);
+                    result = store.assign(player.getUUID(), player.getScoreboardName(), candidate, others, now, secret);
                     break;
                 }
             }
@@ -217,7 +251,8 @@ public final class ServerNicknames {
                 unnamed.add(player);
             }
         }
-        LOGGER.info("{} gave {} players random nicknames", admin, named.size());
+        LOGGER.info(secret ? "{} secretly gave {} players random nicknames" : "{} gave {} players random nicknames",
+                admin, named.size());
         List<ServerPlayer> changed = new ArrayList<>(named);
         changed.addAll(unnamed);
         shownNameChanged(server, changed);
