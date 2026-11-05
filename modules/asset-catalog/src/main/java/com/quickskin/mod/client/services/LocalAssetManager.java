@@ -1158,18 +1158,32 @@ public class LocalAssetManager {
      * favorites, each group in the mode's order
      */
     private Comparator<AssetMetadata> getSortComparator(SkinSortMode mode, String playerSkinHash) {
+        SkinPreferences preferences = skinPreferences;
+        return sortComparator(mode, playerSkinHash,
+                hash -> preferences != null && preferences.isFavorite(hash));
+    }
+
+    /**
+     * The list order: the own skin, then favourites, then the rest, each group oldest first,
+     * newest first or by name. Equal times fall back to the name so the order is stable.
+     */
+    static Comparator<AssetMetadata> sortComparator(
+            SkinSortMode mode, String playerSkinHash, java.util.function.Predicate<String> favorite) {
         Comparator<AssetMetadata> pinned = Comparator
                 .comparing((AssetMetadata meta) -> !meta.hash().equals(playerSkinHash))
-                .thenComparing(meta -> skinPreferences == null || !skinPreferences.isFavorite(meta.hash()));
+                .thenComparing(meta -> !favorite.test(meta.hash()));
+        Comparator<AssetMetadata> byName = Comparator.comparing(AssetMetadata::friendlyName);
         return switch (mode) {
             case LATEST_LAST -> pinned
-                    .thenComparing(AssetMetadata::friendlyName);
+                    .thenComparing(Comparator.comparingLong(AssetMetadata::lastModifiedTime))
+                    .thenComparing(byName);
 
             case LATEST_FIRST -> pinned
-                    .thenComparing(Comparator.comparing(AssetMetadata::lastModifiedTime).reversed());
+                    .thenComparing(Comparator.comparingLong(AssetMetadata::lastModifiedTime).reversed())
+                    .thenComparing(byName);
 
             case ALPHABETICAL -> pinned
-                    .thenComparing(AssetMetadata::friendlyName);
+                    .thenComparing(byName);
         };
     }
 
