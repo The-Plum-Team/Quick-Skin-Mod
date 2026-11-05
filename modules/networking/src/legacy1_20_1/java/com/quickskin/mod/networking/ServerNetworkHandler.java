@@ -760,7 +760,7 @@ public class ServerNetworkHandler {
      * @param player The player whose appearance to send
      */
     static void appearanceShownChanged(UUID playerId) {
-        APPEARANCE_COORDINATOR.notifyAppearance(playerId);
+        APPEARANCE_COORDINATOR.notifyShownAppearance(playerId);
     }
 
     public static void sendAppearanceToAllPlayers(ServerPlayer player) {

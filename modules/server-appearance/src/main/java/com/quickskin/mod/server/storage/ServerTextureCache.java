@@ -23,6 +23,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,6 +53,8 @@ public class ServerTextureCache {
     private long cachedBytes;
     /** The administrator's per-texture limit; nothing larger is staged, loaded or served. */
     private int uploadLimitBytes = TextureTransferLimits.DEFAULT_SERVER_UPLOAD_BYTES;
+    /** Stored textures left unloaded only for their size, bounded by the listing's entry cap. */
+    private final Set<String> retainedOverLimit = new HashSet<>();
     private Path storageDirectory;
     private long generation;
 
@@ -86,6 +89,7 @@ public class ServerTextureCache {
         cancelPendingDeletions();
         textureCache.clear();
         contentAliases.clear();
+        retainedOverLimit.clear();
         cachedBytes = 0;
         pinnedTextures.clear();
         storageDirectory = worldPath.resolve("quickskin").resolve("textures").toAbsolutePath().normalize();
@@ -366,6 +370,15 @@ public class ServerTextureCache {
         return false;
     }
 
+    /**
+     * Whether this content ID names a stored texture that was left unloaded only because it is
+     * over this server's upload limit. Its files stay for a later, larger limit, and so must the
+     * animation metadata bound to it.
+     */
+    public synchronized boolean isRetainedOverLimit(String contentId) {
+        return NetworkSecurity.isValidContentId(contentId) && retainedOverLimit.contains(contentId);
+    }
+
     /** Returns the cache's stable storage key for either authenticated wire alias. */
     public synchronized @Nullable String resolveContentId(String contentId) {
         if (!NetworkSecurity.isValidContentId(contentId)) return null;
@@ -429,6 +442,7 @@ public class ServerTextureCache {
         generation++;
         textureCache.clear();
         contentAliases.clear();
+        retainedOverLimit.clear();
         cachedBytes = 0;
         pinnedTextures.clear();
         deleteStagedFiles(storageDirectory);
@@ -566,6 +580,7 @@ public class ServerTextureCache {
                 }
                 if (size > uploadLimitBytes) {
                     // Kept on disk for a later, larger limit, but never served or referenced.
+                    retainedOverLimit.add(hash);
                     LOGGER.info("Not loading stored texture {} ({} bytes): it is over this"
                             + " server's {} byte upload limit", hash, size, uploadLimitBytes);
                     continue;

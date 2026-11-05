@@ -92,7 +92,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   a smaller texture; no server change can fix them, so `ServerRuntime` warns at startup whenever
   the limit is below the default. A saved appearance whose texture is no longer held (over a
   lowered limit or removed) is restored without that texture; a held texture owned by another
-  player or pins over budget still refuse it whole. The limit is read at server start and the
+  player or pins over budget still refuse it whole. A stored texture over a lowered limit stays
+  on disk unloaded, and so do a cape's animation metadata, identity and authority, neither loaded
+  nor deleted, so a raised limit restores its timing and first writer. The limit is read at server start and the
   server writes its settings back at stop, so it is edited while the server is stopped. A setting
   with an invalid number is clamped or ignored on its own, and a file that cannot be parsed is
   left untouched (defaults apply until it is fixed), never overwritten.
