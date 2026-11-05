@@ -632,6 +632,9 @@ def collect_evidence(
     lane_ids: set[str] = set()
     frame_ids: set[str] = set()
     comparison_ids: set[str] = set()
+    # One screenshot file backs exactly one capture: a path named by two capture steps
+    # would otherwise count one image as coverage of two semantic checkpoints.
+    screenshot_paths: set[Path] = set()
 
     compatibility_contract = (
         load_compatibility_contract(compatibility_contract_path)
@@ -869,6 +872,12 @@ def collect_evidence(
                         f"uncatalogued screenshot step: {scenario}/{role}/{step}"
                     )
                 screenshot = _safe_screenshot(profile, role, screenshot_name)
+                if screenshot in screenshot_paths:
+                    raise VisualEvidenceError(
+                        f"screenshot {screenshot.name!r} backs more than one capture: "
+                        f"{lane_id}/{role}/{step}"
+                    )
+                screenshot_paths.add(screenshot)
                 metrics = validate_screenshot_metrics(
                     screenshot_metrics.get(step), f"pixel metrics for {lane_id}/{role}/{step}"
                 )
