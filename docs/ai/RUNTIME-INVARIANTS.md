@@ -267,7 +267,7 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   its intended transforms (resizing to a supported resolution and the 64x32 legacy conversion);
   images without alpha keep the plain blit, so greyscale skins are not gamma-shifted, and a
   greyscale image with alpha is read from its raster (`RawArgbImages`), since `getRGB` would
-  brighten its grey. Still cape imports and the catalog scan read greyscale PNGs the same way. Transparency
+  brighten its grey. Non-animated cape imports and the catalog scan read greyscale PNGs the same way. Transparency
   flattening forces opacity only on vanilla's own opaque regions, (0,0)-(32,16), (0,16)-(64,32)
   and (16,48)-(48,64), so data that other mods store in unused texels, such as a CPM model
   embedded in the skin, survives import with every alpha and colour byte intact.
