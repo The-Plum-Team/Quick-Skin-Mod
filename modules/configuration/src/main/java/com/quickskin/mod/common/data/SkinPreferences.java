@@ -29,6 +29,8 @@ public class SkinPreferences {
     private Map<String, SkinPreference> preferences = new HashMap<>();
     // Runtime-only bridge while a verified on-disk alias migration is waiting to be retried.
     private transient Map<String, String> strongToLegacyFallbacks = new HashMap<>();
+    // False when the file exists but could not be read: it is then never saved over.
+    private transient boolean persistable = true;
 
     /**
      * Individual skin preference
@@ -140,7 +142,9 @@ public class SkinPreferences {
     /**
      * Load preferences from file
      * @param path Path to JSON file
-     * @return Loaded preferences, or new instance if file doesn't exist
+     * @return Loaded preferences, or new instance if the file is missing or empty. A file that
+     *     exists but cannot be read gives empty preferences that are never saved over it, so a
+     *     broken file cannot cost the player every favourite and model choice.
      */
     public static SkinPreferences load(Path path) {
         if (!Files.exists(path)) {
@@ -149,14 +153,26 @@ public class SkinPreferences {
 
         try {
             String json = BoundedFileReader.readUtf8(path, MAX_FILE_BYTES);
+            if (json.isBlank()) return new SkinPreferences();
             SkinPreferences prefs = GSON.fromJson(json, SkinPreferences.class);
-            if (prefs == null) return new SkinPreferences();
-            prefs.normalize();
-            return prefs;
+            if (prefs != null) {
+                prefs.normalize();
+                return prefs;
+            }
+            QuickSkinInfo.LOGGER.error("Skin preferences {} contained JSON null; leaving the file"
+                    + " untouched until it is fixed", path);
         } catch (IOException | RuntimeException e) {
-            QuickSkinInfo.LOGGER.warn("Unable to load skin preferences {}", path, e);
-            return new SkinPreferences();
+            QuickSkinInfo.LOGGER.error("Unable to load skin preferences {}; leaving the file"
+                    + " untouched until it is fixed", path, e);
         }
+        SkinPreferences unreadable = new SkinPreferences();
+        unreadable.persistable = false;
+        return unreadable;
+    }
+
+    /** Whether {@link #save} and {@link #migrateAliases} may write the file it was loaded from. */
+    public synchronized boolean isPersistable() {
+        return persistable;
     }
 
     /**
@@ -164,6 +180,11 @@ public class SkinPreferences {
      * @param path Path to JSON file
      */
     public synchronized void save(Path path) {
+        if (!persistable) {
+            QuickSkinInfo.LOGGER.warn("Not saving skin preferences {}: the file could not be read"
+                    + " at start, so it is left as it is", path);
+            return;
+        }
         try {
             normalize();
             writeVerified(path, preferences);
@@ -178,7 +199,7 @@ public class SkinPreferences {
      * in-memory map and the legacy file are both retained.
      */
     public synchronized boolean migrateAliases(Map<String, String> aliases, Path path) {
-        if (aliases == null || aliases.isEmpty() || path == null) return false;
+        if (aliases == null || aliases.isEmpty() || path == null || !persistable) return false;
         normalize();
         Map<String, SkinPreference> migrated = new HashMap<>(preferences);
         boolean changed = false;

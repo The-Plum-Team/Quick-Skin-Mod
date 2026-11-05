@@ -276,8 +276,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Persist mutable state using a temporary file plus atomic replace where supported. Keep the
   fallback contained and clean stale temporary files during initialization.
 - A client settings or preferences file that exists but cannot be read (`ClientConfig`,
-  `LocalAppearanceStorage`) leaves the defaults in memory and is never saved over until it is
-  fixed, so a broken hand edit cannot erase every launcher account's selections.
+  `LocalAppearanceStorage`, `SkinPreferences`) leaves the defaults in memory and is never saved
+  over until it is fixed, so a broken hand edit cannot erase every launcher account's selections
+  or every skin's favourite and model. An empty file holds nothing to keep and is written over.
 - Local identity migration must copy/write and validate the strong-ID destination before removing
   a legacy file or preference. Preserve the legacy source whenever destination verification fails
   or an existing strong destination differs.
