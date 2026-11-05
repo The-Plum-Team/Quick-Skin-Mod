@@ -2151,16 +2151,16 @@
               "capture": {
                 "title": "Cape menu",
                 "review_tier": "all",
-                "expectation": "The Quick Skin cape menu is open: on the left a grid of capes on dark bevelled cards under readable My Capes and Quick Skin Exclusives headings (the My Capes heading pinned at the top), with the None card blue as the worn one and an import tile (corner marks, a tray icon and Import / or drop) stretching across the rest of the My Capes row; on the right one large rear 3D player centred in the space beside the grid, with no heading over it; and the Import Cape, Remove Cape and Done buttons along the bottom. A hover tooltip for the cape under the resting mouse (such as BMO Cape) may be shown, and the player then wears that cape.",
+                "expectation": "The Quick Skin cape menu is open: on the left the Cape and Elytra tabs, with Cape selected, over a grid of capes on dark bevelled cards under readable My Capes and Quick Skin Exclusives headings (the My Capes heading pinned under the tabs), with the None card blue as the worn one and an import tile (corner marks, a tray icon and Import / or drop) stretching across the rest of the My Capes row; on the right one large rear 3D player centred in the space beside the grid, with no heading over it; and the Import Cape, Remove Cape and Done buttons along the bottom. A hover tooltip for the cape under the resting mouse (such as BMO Cape) may be shown, and the player then wears that cape.",
                 "probes": [
                   {
                     "kind": "required-gui-text",
                     "label": "cape menu title",
                     "box": [
                       55,
-                      25,
+                      75,
                       190,
-                      55
+                      105
                     ],
                     "minimum_luma_exclusive": 159,
                     "minimum_pixels": 400
