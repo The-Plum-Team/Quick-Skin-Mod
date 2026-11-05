@@ -76,14 +76,16 @@ public class EarsCompatIntegration {
                 // SimpleEarsFeatureStorage.put(String, UUID, EarsFeatures)
                 Object storageObj = earsFeaturesStorageInstance.get(null);
                 storagePutMethod = storageObj.getClass().getMethod("put", String.class, UUID.class, earsFeaturesClass);
-            } catch (Exception e) {
+            } catch (Exception | LinkageError e) {
                 // Storage API may not be available in all Ears versions
                 earsFeaturesStorageInstance = null;
                 storagePutMethod = null;
             }
 
             MOD_AVAILABLE = true;
-        } catch (Exception e) {
+        } catch (Exception | LinkageError e) {
+            // An incompatible Ears build can fail to link; that must only disable the bridge, never
+            // fail this class's initialisation for every caller of isAvailable().
             MOD_AVAILABLE = false;
         }
     }
