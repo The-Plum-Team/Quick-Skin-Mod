@@ -323,11 +323,13 @@ final class SettingsSteps {
                                 + "for a non-admin");
                     if (cooldown.active)
                         return Step.Result.fail("skinChangeCooldownEditBox is active for a non-admin");
+                    // A remote server's cooldown: the configuration it synced, not this client's
+                    ServerConfig synced = ClientConfig.getInstance().getServerOverride();
                     String expectedCooldown = String.valueOf(
-                            ServerConfig.getInstance().skinChangeCooldownSeconds);
+                            synced == null ? 0 : synced.skinChangeCooldownSeconds);
                     if (!expectedCooldown.equals(cooldown.getValue()))
                         return Step.Result.fail("skinChangeCooldownEditBox='" + cooldown.getValue()
-                                + "' expected ServerConfig.skinChangeCooldownSeconds="
+                                + "' expected the server's synced skinChangeCooldownSeconds="
                                 + expectedCooldown);
                     String notice = Component.translatable("quickskin.settings.server_notice").getString();
                     if (notice.isEmpty() || notice.equals("quickskin.settings.server_notice"))
@@ -339,7 +341,7 @@ final class SettingsSteps {
                             + " (server override disableSkinTransparency="
                             + (override == null ? "<none>" : String.valueOf(override.disableSkinTransparency))
                             + "); skinChangeCooldownEditBox active=false value='"
-                            + cooldown.getValue() + "' == ServerConfig.skinChangeCooldownSeconds="
+                            + cooldown.getValue() + "' == server's synced skinChangeCooldownSeconds="
                             + expectedCooldown + "; render draws the yellow notice '" + notice + "'";
                     s.onClose();
                     if (VanillaShim.currentScreen(mc) instanceof SettingsScreen)

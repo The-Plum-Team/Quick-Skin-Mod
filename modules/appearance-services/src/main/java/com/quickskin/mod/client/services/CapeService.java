@@ -167,8 +167,10 @@ public class CapeService implements ICapeService {
                         CapeAnimationIds.KNOWN_PREFIX + capeId);
                 AnimatedTextureManager animManager = AnimatedTextureManager.getInstance();
 
-                // Only register the animation if it's not already running
-                if (!animManager.isAnimated(animationId)) {
+                // Only register the animation if it's not already running, and decode the atlas
+                // only when a slot would take it: a refused registration otherwise decodes the PNG
+                // again on every frame that draws this cape
+                if (!animManager.isAnimated(animationId) && animManager.canStartAnimation(animationId)) {
                     try {
                         //? if <1.21.11 {
                         ResourceLocation capeTexture = cape.getTextureLocation();

@@ -886,6 +886,23 @@ public class AnimatedTextureManager {
         return animations.containsKey(animationId) || pendingRegistrations.containsKey(animationId);
     }
 
+    /**
+     * Whether a registration of this animation would be admitted now: it is neither running nor
+     * loading, the pending queue has room and a slot is free or held by an animation nobody has
+     * drawn for a while. A caller that must decode its atlas before registering checks this first,
+     * so a refused animation is not decoded again on every frame.
+     */
+    public synchronized boolean canStartAnimation(String animationId) {
+        if (animationId == null || animationId.isEmpty()
+                || animations.containsKey(animationId)
+                || pendingRegistrations.containsKey(animationId)
+                || pendingRegistrations.size() >= MAX_ANIMATIONS) {
+            return false;
+        }
+        return slotPolicy.plan(animationId, animations.keySet()).kind()
+                != AnimationSlotPolicy.Kind.STATIC_FALLBACK;
+    }
+
     /** Records that a render path is actually using this animation candidate. */
     public synchronized void markAnimationVisible(String animationId) {
         slotPolicy.markVisible(animationId);

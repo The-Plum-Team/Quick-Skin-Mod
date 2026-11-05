@@ -1182,6 +1182,20 @@ public class ServerNetworkHandler {
     }
 
     /**
+     * Sets the skin change cooldown of the server the local client hosts, on its server thread,
+     * and sends the changed configuration to every player, the host included, so their copies
+     * (which the skin menu's cooldown reads) follow at once.
+     */
+    public static void setHostedSkinChangeCooldown(net.minecraft.server.MinecraftServer server, int seconds) {
+        com.quickskin.mod.config.ServerConfig serverConfig = com.quickskin.mod.config.ServerConfig.getInstance();
+        int cooldownSeconds = Math.max(0, Math.min(seconds, 86_400));
+        if (serverConfig.skinChangeCooldownSeconds == cooldownSeconds) return;
+        serverConfig.skinChangeCooldownSeconds = cooldownSeconds;
+        serverConfig.save();
+        broadcastServerConfigToAllPlayers(server);
+    }
+
+    /**
      * Broadcasts server config to ALL players on the server
      * Called when an admin changes a server setting
      */

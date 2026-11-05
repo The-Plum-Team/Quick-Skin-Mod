@@ -599,12 +599,30 @@ public final class MenuIntegration {
     private static String determineScreenType(Screen screen) {
         if (screen instanceof TitleScreen) {
             return "title";
-        } else if (screen instanceof PauseScreen) {
-            return "pause";
+        } else if (screen instanceof PauseScreen pauseScreen) {
+            // F3+Esc pauses with no menu at all: nothing of Quick Skin's belongs on it either
+            return showsPauseMenu(pauseScreen) ? "pause" : null;
         }
 
         // Don't add widgets to any other screens (skin menu, world selection, etc.)
         return null;
+    }
+
+    /**
+     * Whether this pause screen shows its menu, rather than being the menu-less screen F3+Esc
+     * opens. Before 1.21 the flag has no accessor, but the menu-less screen has no buttons.
+     */
+    private static boolean showsPauseMenu(PauseScreen pauseScreen) {
+        //? if <1.21 {
+        for (net.minecraft.client.gui.components.events.GuiEventListener listener : pauseScreen.children()) {
+            if (listener instanceof Button) {
+                return true;
+            }
+        }
+        return false;
+        //?} else {
+        return pauseScreen.showsPauseMenu();
+        //?}
     }
 
     /**
