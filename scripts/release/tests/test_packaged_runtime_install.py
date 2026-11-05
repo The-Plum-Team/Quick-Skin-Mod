@@ -1567,6 +1567,19 @@ class PackagedRuntimeSessionAndEvidenceTest(unittest.TestCase):
             wait_for_group.call_args_list,
         )
 
+    def test_marker_still_being_written_is_not_ready(self) -> None:
+        game_dir = self.root / "client_a"
+        marker = game_dir / "e2e-report" / "done.marker"
+        self.assertIsNone(packaged_runtime.marker_value(game_dir, "client_a"))
+        marker.parent.mkdir(parents=True)
+        marker.write_bytes(b"")
+        self.assertIsNone(packaged_runtime.marker_value(game_dir, "client_a"))
+        marker.write_text("pass\n", encoding="utf-8")
+        self.assertEqual("pass", packaged_runtime.marker_value(game_dir, "client_a"))
+        marker.write_text("maybe", encoding="utf-8")
+        with self.assertRaises(packaged_runtime.RuntimeFailure):
+            packaged_runtime.marker_value(game_dir, "client_a")
+
     def test_one_failed_process_stop_still_stops_every_group_and_closes_handles(self) -> None:
         server, client_a, client_b = mock.Mock(pid=1), mock.Mock(pid=2), mock.Mock(pid=3)
         handles = [mock.Mock(), mock.Mock(), mock.Mock()]

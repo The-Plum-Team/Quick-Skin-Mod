@@ -5,7 +5,10 @@ import com.quickskin.mod.e2e.generated.ScenarioContract;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -48,9 +51,17 @@ public final class E2EReport {
             Files.createDirectories(dir.toPath());
             File report = new File(dir, "report.json");
             Files.write(report.toPath(), toJson().getBytes(StandardCharsets.UTF_8));
-            // Sentinel written LAST so the orchestrator never reads a partial report.
-            Files.write(new File(dir, "done.marker").toPath(),
-                    (allPassed() ? "pass" : "fail").getBytes(StandardCharsets.UTF_8));
+            // Sentinel written LAST so the orchestrator never reads a partial report. It appears
+            // whole through a rename: the orchestrator polls it and must never see it empty. The
+            // temporary file lives beside e2e-report/, outside the exported evidence directory.
+            Path marker = new File(dir, "done.marker").toPath();
+            Path temporary = new File(System.getProperty("user.dir"), "e2e-report.done.marker.tmp").toPath();
+            Files.write(temporary, (allPassed() ? "pass" : "fail").getBytes(StandardCharsets.UTF_8));
+            try {
+                Files.move(temporary, marker, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(temporary, marker, StandardCopyOption.REPLACE_EXISTING);
+            }
             return report;
         } catch (IOException e) {
             return null;

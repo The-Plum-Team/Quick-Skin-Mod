@@ -1842,6 +1842,10 @@ def marker_value(game_dir: Path, role: str) -> str | None:
     if not marker.is_file():
         return None
     value = marker.read_text(encoding="utf-8").strip()
+    if not value:
+        # Older harnesses create the sentinel before writing its value; an empty marker is
+        # still being written, not a verdict.
+        return None
     if value not in {"pass", "fail"}:
         raise RuntimeFailure(f"invalid {role} done.marker value {value!r}")
     return value
