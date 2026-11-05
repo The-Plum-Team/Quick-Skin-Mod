@@ -642,7 +642,7 @@ public class LocalAssetManager {
                         return null;
                     }
                     image = HDTextureProcessor.resizeAnimationStrip(image, resolution.getWidth());
-                    if (!ImageIO.write(image, "PNG", path.toFile())) return null;
+                    replaceWithPng(path, image);
                     width = image.getWidth();
                     height = image.getHeight();
                 }
@@ -657,7 +657,7 @@ public class LocalAssetManager {
                         }
                         // Resize the image and overwrite the file so loadTexture works correctly
                         image = HDTextureProcessor.resizeToResolution(image, resolution);
-                        if (!ImageIO.write(image, "PNG", path.toFile())) return null;
+                        replaceWithPng(path, image);
                         width = image.getWidth();
                         height = image.getHeight();
                     }
@@ -680,7 +680,7 @@ public class LocalAssetManager {
                             } else {
                                 image = HDTextureProcessor.resizeToResolution(image, resolution);
                             }
-                            if (!ImageIO.write(image, "PNG", path.toFile())) return null;
+                            replaceWithPng(path, image);
                             width = image.getWidth();
                             height = image.getHeight();
                         }
@@ -736,6 +736,7 @@ public class LocalAssetManager {
             }
 
         } catch (Exception e) {
+            QuickSkinInfo.LOGGER.warn("Leaving {} out of the catalog: {}", path, e.toString());
             return null;
         }
     }
@@ -888,7 +889,7 @@ public class LocalAssetManager {
                                 null);
                     }
                     g.dispose();
-                    ImageIO.write(resizedAtlas, "PNG", atlasPath.toFile());
+                    replaceWithPng(atlasPath, resizedAtlas);
                 }
 //?} else {
                 resolution = SkinResolution.STANDARD;
@@ -1064,7 +1065,21 @@ public class LocalAssetManager {
                 root, target, pngBytes, MAX_ASSET_BYTES, LocalAssetManager::isValidPngBytes);
     }
 
-    private void writeVerifiedCacheFile(
+    /**
+     * Replaces a PNG the catalog rewrites, which may be the player's only copy of that skin or
+     * cape, without ever destroying it: the encoded image goes to a verified temporary file beside
+     * it that then atomically replaces it, so a full disk or a crash leaves the original.
+     */
+    static void replaceWithPng(Path target, BufferedImage image) throws IOException {
+        java.io.ByteArrayOutputStream encoded = new java.io.ByteArrayOutputStream();
+        if (!ImageIO.write(image, "PNG", encoded)) throw new IOException("No PNG encoder");
+        Path parent = target.toAbsolutePath().normalize().getParent();
+        if (parent == null) throw new IOException("PNG has no parent directory");
+        writeVerifiedCacheFile(parent, target, encoded.toByteArray(),
+                MAX_ASSET_BYTES, LocalAssetManager::isValidPngBytes);
+    }
+
+    private static void writeVerifiedCacheFile(
             Path root,
             Path target,
             byte[] bytes,
@@ -2203,7 +2218,7 @@ public class LocalAssetManager {
 
             BufferedImage masked = CapeElytraSilhouette.maskedCopy(composited, frameCount);
             if (composited != atlas || masked != atlas) {
-                ImageIO.write(masked, "PNG", atlasPath.toFile());
+                replaceWithPng(atlasPath, masked);
             }
         } catch (Exception e) {
             // Non-critical — elytra just won't have the vanilla fallback
