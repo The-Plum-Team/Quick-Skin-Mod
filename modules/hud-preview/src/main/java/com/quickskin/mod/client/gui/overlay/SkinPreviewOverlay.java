@@ -47,6 +47,10 @@ public class SkinPreviewOverlay {
     // Cached bounds for mouse interaction
     private static int cachedModelCenterX, cachedModelCenterY;
     private static float cachedScale;
+    /** When the overlay was last drawn ({@link System#nanoTime()}), or 0 before its first draw. */
+    private static long lastDrawnNanos;
+    /** How long after its last draw the overlay still takes input, for frames between ticks. */
+    private static final long DRAWN_INPUT_WINDOW_NANOS = 500_000_000L;
 
     // Cached fields for performance
     //? if <1.21.11 {
@@ -189,6 +193,7 @@ public class SkinPreviewOverlay {
         cachedModelCenterX = modelCenterX;
         cachedModelCenterY = modelCenterY;
         cachedScale = scale;
+        lastDrawnNanos = System.nanoTime();
 
         // Use the rotation from config
         float rotationAngle = config.hudOverlayRotation;
@@ -322,7 +327,27 @@ public class SkinPreviewOverlay {
         }
     }
 
+    /**
+     * Whether the overlay is on screen now, so input may reach it: drawn within the last moment
+     * and, before 1.21, where nothing but chat covers the HUD. Its cached bounds are otherwise
+     * stale, and a hidden overlay must not be dragged, rotated, resized or swallow a scroll.
+     */
+    private static boolean isDrawnNow() {
+        if (lastDrawnNanos == 0L || System.nanoTime() - lastDrawnNanos > DRAWN_INPUT_WINDOW_NANOS) {
+            return false;
+        }
+        //? if <1.21 {
+        net.minecraft.client.gui.screens.Screen screen = Minecraft.getInstance().screen;
+        return screen == null || screen instanceof net.minecraft.client.gui.screens.ChatScreen;
+        //?} else {
+        return true;
+        //?}
+    }
+
     private static boolean isMouseOver(double mouseX, double mouseY) {
+        if (!isDrawnNow()) {
+            return false;
+        }
         int modelHeight = (int)(cachedScale * 2.0f);
         int modelWidth = (int)(modelHeight * 0.6f);
         int left = cachedModelCenterX - modelWidth / 2;
