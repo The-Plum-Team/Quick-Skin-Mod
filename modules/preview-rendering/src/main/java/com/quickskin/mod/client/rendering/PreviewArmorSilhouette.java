@@ -290,6 +290,10 @@ public final class PreviewArmorSilhouette {
         try {
 //? if <1.21.2 {
             if (CuriosPreview.isAccessory(piece)) {
+                if (PreviewEquipment.curiosPieceLayer(layers.quickskin$previewLayers()) == null) {
+                    // Curios' layer failed and is left out of the preview: nothing to outline
+                    return null;
+                }
                 CuriosPreview.renderPiece(player, piece, renderer, poseStack, (MultiBufferSource) sink::buffer, 15728880);
                 return sink.silhouette();
             }

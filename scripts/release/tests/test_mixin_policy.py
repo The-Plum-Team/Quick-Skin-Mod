@@ -410,6 +410,21 @@ class MixinPolicyTest(unittest.TestCase):
             with self.subTest(toml=relative(toml)):
                 self.assertIn('config = "quickskin-armor.mixins.json"', toml.read_text(encoding="utf-8"))
 
+    def test_neoforge_preview_mixin_matches_the_common_copy(self) -> None:
+        # NeoForge never loads the common mixin config, so its own GuiSkinRendererMixin is the one
+        # that draws the skin menu's PiP preview there. A fix made in one copy only (3D Skin
+        # Layers' injected meshes, #1403) leaves NeoForge drawing the old way.
+        def body(path: Path) -> str:
+            source = path.read_text(encoding="utf-8")
+            source = re.sub(r"^package [\w.]+;$", "package _;", source, count=1, flags=re.MULTILINE)
+            start = source.index("/**\n * ")
+            end = source.index("*/", start) + 2
+            return source[:start] + source[end:]
+
+        common = ROOT / "common/src/main/java/com/quickskin/mod/mixin/GuiSkinRendererMixin.java"
+        neoforge = ROOT / "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/GuiSkinRendererMixin.java"
+        self.assertEqual(body(common), body(neoforge))
+
     def test_ears_five_lookup_selects_every_overload(self) -> None:
         source = (
             CANONICAL_JAVA / "com/quickskin/mod/mixin/compat/EarsFiveMixin.java"

@@ -12,6 +12,7 @@ import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -68,6 +69,26 @@ class CapeVisibilityMarkingTest {
 
         CapeAnimationHelper.markCapeVisible(cape.capeId());
         assertTrue(isMarked(cape));
+    }
+
+    @Test
+    void aFrameTickCountsNoSlotTick() throws ReflectiveOperationException {
+        // A preview advances the frames every rendered frame; only the client tick may count the
+        // slot clock, or its grace and retry windows shrink from ticks to frames.
+        CapeRenderKey cape = markedKnownCape();
+        Field field = AnimatedTextureManager.class.getDeclaredField("slotPolicy");
+        field.setAccessible(true);
+        AnimationSlotPolicy policy = (AnimationSlotPolicy) field.get(AnimatedTextureManager.getInstance());
+        long before = policy.currentTick();
+
+        for (int frame = 0; frame < 5; frame++) {
+            AnimatedTextureManager.getInstance().tickFrames();
+        }
+
+        assertEquals(before, policy.currentTick(), "frame ticks must not advance the slot clock");
+        assertTrue(isMarked(cape), "frame ticks must not drop the tick's visibility marks");
+        AnimatedTextureManager.getInstance().tick();
+        assertEquals(before + 1, policy.currentTick());
     }
 
     @Test
