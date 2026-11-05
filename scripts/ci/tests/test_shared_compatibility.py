@@ -120,7 +120,10 @@ class SharedCompatibilityTest(unittest.TestCase):
 
     def test_in_progress_reviewer_defers_without_reading_report_bytes(self):
         self.api.runs[self.record["workflow_run"]["id"]]["status"] = "in_progress"
-        self.assertIsNone(self.admit())
+        # Every poll of a running owner costs one run lookup, never a runtime authentication.
+        with patch.object(shared.review, "authenticate_full") as authenticate:
+            self.assertIsNone(self.admit())
+        authenticate.assert_not_called()
         self.assertEqual([], self.api.downloaded)
 
     def test_request_cannot_select_another_owner_target_digest_or_source(self):

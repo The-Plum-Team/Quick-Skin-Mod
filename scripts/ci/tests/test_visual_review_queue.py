@@ -24,6 +24,8 @@ from visual_review_queue import (  # noqa: E402
     DRAIN_WORKFLOW,
     GitHubApi,
     GitHubRateLimitError,
+    MAX_API_BYTES,
+    MAX_API_ERROR_BYTES,
     MAX_NAMED_ARTIFACTS,
     MAX_NAMED_PAGES,
     MAX_PENDING_KEYS,
@@ -481,6 +483,34 @@ class VisualReviewQueueTest(unittest.TestCase):
         )
 
         self.assertTrue(GitHubApi._retryable_http_error(error))
+
+    def test_api_response_is_read_within_a_byte_bound(self) -> None:
+        api = GitHubApi(
+            repository=REPOSITORY,
+            token="token",
+            api_url="https://api.github.test",
+        )
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = b" " * (MAX_API_BYTES + 1)
+
+        with patch(
+            "visual_review_queue.urllib.request.urlopen", return_value=response
+        ), patch("visual_review_queue.time.sleep") as sleep:
+            with self.assertRaisesRegex(QueueError, "exceeds"):
+                api._request("/repos/example")
+
+        response.read.assert_called_once_with(MAX_API_BYTES + 1)
+        sleep.assert_not_called()
+
+    def test_error_body_is_read_within_a_byte_bound(self) -> None:
+        body = BytesIO(b"x" * (MAX_API_ERROR_BYTES * 4))
+        error = urllib.error.HTTPError(
+            "https://api.github.test", 403, "forbidden", {}, body
+        )
+
+        self.assertFalse(GitHubApi._retryable_http_error(error))
+        self.assertEqual(body.tell(), MAX_API_ERROR_BYTES)
 
     def test_installation_rate_limit_has_a_longer_bounded_retry_window(self) -> None:
         api = GitHubApi(

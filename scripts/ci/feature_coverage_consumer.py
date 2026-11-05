@@ -294,7 +294,9 @@ def resolve(api: publisher.Api, *, repository: Path, head: str, policy: str,
     try:
         authenticate_execution(api, repository, run_id=run_id, tested_sha=head,
                                policy_sha=policy, pull_number=pull_number)
-        candidates = api.artifacts(name=coverage.BASELINE_ARTIFACT_NAME)
+        # Certificates accumulate for their 90-day retention; only the newest few can be used,
+        # so a history longer than one page must not force every generation to full profiles.
+        candidates = api.artifacts(name=coverage.BASELINE_ARTIFACT_NAME, newest_page=True)
         parsed = sorted((parse_artifact(item) for item in candidates), key=lambda item: item.order, reverse=True)
         by_id = {item["id"]: item for item in candidates}
         if len(by_id) != len(parsed):

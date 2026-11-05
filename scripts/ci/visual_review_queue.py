@@ -64,6 +64,10 @@ REQUEST_ATTEMPTS = 4
 RATE_LIMIT_REQUEST_ATTEMPTS = 4
 MAX_RATE_LIMIT_WAIT_SECONDS = 300
 RETRYABLE_HTTP_STATUSES = frozenset({408, 429, 500, 502, 503, 504})
+# A 100-entry listing page is well below 1 MiB; the bound only stops a hostile or broken
+# response from being buffered whole. Error bodies only feed the rate-limit classification.
+MAX_API_BYTES = 8 * 1024 * 1024
+MAX_API_ERROR_BYTES = 64 * 1024
 
 
 class QueueError(RuntimeError):
@@ -702,12 +706,19 @@ class GitHubApi:
             or "rate limit" in detail.lower()
         )
 
+    @staticmethod
+    def _error_detail(exc: urllib.error.HTTPError) -> str:
+        try:
+            raw = exc.read(MAX_API_ERROR_BYTES)
+        except (OSError, ValueError):
+            return ""
+        if not isinstance(raw, bytes):
+            return ""
+        return raw.decode("utf-8", errors="replace")
+
     @classmethod
     def _retryable_http_error(cls, exc: urllib.error.HTTPError) -> bool:
-        try:
-            detail = exc.read().decode("utf-8", errors="replace")
-        except OSError:
-            detail = ""
+        detail = cls._error_detail(exc)
         if exc.code in RETRYABLE_HTTP_STATUSES:
             return True
         return cls._rate_limited_http_error(exc, detail)
@@ -758,16 +769,17 @@ class GitHubApi:
             )
             try:
                 with urllib.request.urlopen(request, timeout=30) as response:
-                    payload = response.read()
+                    payload = response.read(MAX_API_BYTES + 1)
+                if len(payload) > MAX_API_BYTES:
+                    raise QueueError(
+                        f"GitHub API response exceeds {MAX_API_BYTES} bytes: {path}"
+                    )
                 break
             except urllib.error.HTTPError as exc:
                 if exc.code == 404 and missing_ok:
                     return None
                 last_error = exc
-                try:
-                    detail = exc.read().decode("utf-8", errors="replace")
-                except OSError:
-                    detail = ""
+                detail = self._error_detail(exc)
                 rate_limited = self._rate_limited_http_error(exc, detail)
                 retryable = rate_limited or exc.code in RETRYABLE_HTTP_STATUSES
                 if rate_limited:

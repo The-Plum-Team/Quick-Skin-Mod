@@ -93,7 +93,7 @@ class FixtureApi(publisher.Api):
         if len(matches) != 1: raise ValueError("fixture artifact is missing or duplicated")
         return matches[0]
 
-    def artifacts(self, *, run_id=None, name=None):
+    def artifacts(self, *, run_id=None, name=None, newest_page=False):
         if name is not None:
             self.queries.append(name)
             return self.records.get(name, [])
@@ -440,6 +440,22 @@ class FeatureCoverageApiTest(unittest.TestCase):
                        {"total_count": 1, "artifacts": []}, {"total_count": 1, "artifacts": [{"name": "foreign"}]}):
             with self.subTest(record=record), patch.object(self.api, "json", return_value=record), self.assertRaises(ValueError):
                 self.api.artifacts(name="visual-review-55--mc1.20.1")
+
+    def test_newest_page_admits_only_a_full_first_page_of_the_exact_name(self):
+        name = publisher.coverage.BASELINE_ARTIFACT_NAME
+        page = [{"id": 1000 - index, "name": name} for index in range(publisher.MAX_INVENTORY)]
+        record = {"total_count": 250, "artifacts": page}
+        with patch.object(self.api, "json", return_value=record):
+            with self.assertRaises(publisher.ArtifactInventoryLimit):
+                self.api.artifacts(name=name)
+            self.assertEqual(page, self.api.artifacts(name=name, newest_page=True))
+        for invalid in ({"total_count": 250, "artifacts": page[:99]},
+                        {"total_count": 250, "artifacts": [*page[:99], {"id": 1, "name": "foreign"}]}):
+            with self.subTest(invalid=len(invalid["artifacts"])), \
+                    patch.object(self.api, "json", return_value=invalid), self.assertRaises(ValueError):
+                self.api.artifacts(name=name, newest_page=True)
+        with self.assertRaises(ValueError):
+            self.api.artifacts(run_id=55, newest_page=True)
 
     def test_cli_transport_is_read_only_and_bounds_stdout_before_parsing(self):
         with tempfile.TemporaryDirectory() as temporary:
