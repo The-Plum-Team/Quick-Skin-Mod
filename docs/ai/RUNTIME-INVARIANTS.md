@@ -757,16 +757,20 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   both commits are authenticated ancestors and the protected complete-diff classifier returns
   non-impacting. The adapter's `family_validate` hook decides the impact; the kit proves the
   ancestry itself before it publishes. A runtime, loader, assembly, harness, contract, lock,
-  workflow, classifier, mixed, malformed, or unknown change invalidates that carry-forward and
+  runtime workflow, mixed, malformed, or unknown change invalidates that carry-forward and
   requires a new compatibility wave; a change made only of module-owned sources invalidates it
   exactly when the module graph proves its reverse dependency closure reaches a compatibility
   scenario step or a clean reference capture, and is carried forward otherwise. A change that invalidates the
   carry-forward also keeps the complete packaged profile, so the generation that invalidated the
   published evidence is the generation that regenerates it. Evidence that no generation has
   produced yet, or whose wave never completed, is restored by the next change that reaches that
-  closure or by a manual complete run, not by a later non-impacting merge. Publication-only review
-  workflow changes are explicitly non-impacting so
-  generating the compact bundle cannot recursively schedule the expensive matrix.
+  closure or by a manual complete run, not by a later non-impacting merge. Review policy and its
+  workflows, publication (`scripts/pages/`, `site/`), documentation, policy tests and the
+  classifier's own allowlist (`scripts/ci/mod_compatibility_impact.py`) are explicitly
+  non-impacting ([ADR 0006](../architecture/decisions/0006-admit-ai-by-generation-and-product-impact.md)):
+  none of them changes the packaged game or an optional-mod integration, and generating the
+  compact bundle must not recursively schedule the expensive matrix. Every edit to that allowlist
+  is a reviewed protected-policy change.
 - A compatibility bundle bound to a superseded scenario or optional-mod contract is `superseded`,
   and a lineage or impact refusal is `unavailable`; neither is a failure of the atomic ordinary
   site. The kit omits that key's compatibility gallery until a current wave replaces it. Any
