@@ -63,7 +63,7 @@ jobs:
       actions: read
       contents: read
       pull-requests: read
-    uses: The-Plum-Team/mod-base/.github/workflows/build.yml@fa8b7cd54f941b781f61e9ff58ecb6b98d359693 # v1.8.1
+    uses: The-Plum-Team/mod-base/.github/workflows/build.yml@32c13301907f77811f2d25ff835e08d9aa224017 # v1.8.2
     with:
       kit-sha: ${{ needs.guard.outputs.kit-sha }}
       pr-number: ${{ format('{0}', github.event.pull_request.number) }}
