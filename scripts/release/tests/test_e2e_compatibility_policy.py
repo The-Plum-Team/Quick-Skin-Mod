@@ -576,6 +576,23 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertNotIn("SkinLayers3DIntegration.render3DLayers(", gui_renderer_mixin)
         self.assertIn('"injectedPreviewSuccessLogged"', feature)
 
+    def test_3d_skin_layers_preview_closes_the_skin_images_it_decodes(self) -> None:
+        integration = (
+            java_source('client/rendering/SkinLayers3DIntegration.java', source_set='main', repository=ROOT)
+        ).read_text(encoding="utf-8")
+        # Every image decoded for a mesh is owned and closed; a texture's own pixels are not.
+        self.assertNotIn("return NativeImage.read(stream);", integration)
+        self.assertEqual(2, integration.count("return SkinPixels.decoded(NativeImage.read(stream));"))
+        self.assertIn("return SkinPixels.decoded(getQuickSkinLocalTexture(skinLocation));", integration)
+        self.assertIn("return new SkinPixels(pixels, false);", integration)
+        mesh = integration[integration.index("pixels = getSkinTexture(skinLocation);"):]
+        mesh = mesh[: mesh.index("private static PlayerMeshes cacheMeshes(")]
+        self.assertIn("} finally {", mesh)
+        self.assertIn("pixels.close();", mesh)
+        # A skin that cannot carry 3D layers is decoded once, not every frame.
+        self.assertIn("REFUSED_SKINS.add(key);", mesh)
+        self.assertIn("REFUSED_SKINS.clear();", integration[integration.index("public static void clearCache()"):])
+
     def test_remote_optional_mod_scenarios_assert_the_second_client_renderer(self) -> None:
         remote = (
             E2E_JAVA / "scenario" / "ModCompatibilityRemoteScenario.java"
