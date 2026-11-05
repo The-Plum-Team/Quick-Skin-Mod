@@ -177,16 +177,11 @@ public final class ServerSkinAssignments {
         String hash = skinId.substring("local_skin:".length());
         if (!textures().isSkin(hash)) return Outcome.of(SkinAdminStatus.MISSING_TEXTURE);
         if (players.isEmpty()) return Outcome.of(SkinAdminStatus.NOTHING);
-        int changed = 0;
-        boolean full = false;
-        for (ServerPlayer player : players) {
-            int result = give(player, skinId, model);
-            if (result > 0) changed++;
-            if (result < 0) full = true;
-        }
-        if (changed > 0) LOGGER.info("{} gave {} players the skin {}", admin, changed, hash);
-        if (changed == 0 && full) return Outcome.of(SkinAdminStatus.NO_ROOM);
-        return new Outcome(SkinAdminStatus.DONE, changed);
+        List<Integer> results = new ArrayList<>();
+        for (ServerPlayer player : players) results.add(give(player, skinId, model));
+        Outcome outcome = tally(results);
+        if (outcome.count() > 0) LOGGER.info("{} gave {} players the skin {}", admin, outcome.count(), hash);
+        return outcome;
     }
 
     /**
@@ -201,18 +196,15 @@ public final class ServerSkinAssignments {
         if (pool.isEmpty()) return Outcome.of(SkinAdminStatus.POOL_EMPTY);
         if (players.isEmpty()) return Outcome.of(SkinAdminStatus.NOTHING);
         java.util.Collections.shuffle(pool, random);
-        int changed = 0;
+        List<Integer> results = new ArrayList<>();
         int index = 0;
-        boolean full = false;
         for (ServerPlayer player : players) {
             PoolSkinEntry skin = pool.get(index++ % pool.size());
-            int result = give(player, skin.skinId(), skin.model());
-            if (result >= 0) changed++;
-            else full = true;
+            results.add(give(player, skin.skinId(), skin.model()));
         }
-        LOGGER.info("{} gave {} players random skins from the pool", admin, changed);
-        if (changed == 0 && full) return Outcome.of(SkinAdminStatus.NO_ROOM);
-        return new Outcome(SkinAdminStatus.DONE, changed);
+        Outcome outcome = tally(results);
+        LOGGER.info("{} gave {} players random skins from the pool", admin, outcome.count());
+        return outcome;
     }
 
     /**
@@ -239,17 +231,14 @@ public final class ServerSkinAssignments {
             order[i] = order[j];
             order[j] = swap;
         }
-        int changed = 0;
-        boolean full = false;
+        List<Integer> results = new ArrayList<>();
         for (int i = 0; i < taking.size(); i++) {
             String[] skin = skins.get(order[i]);
-            int result = give(taking.get(i), skin[0], skin[1]);
-            if (result >= 0) changed++;
-            else full = true;
+            results.add(give(taking.get(i), skin[0], skin[1]));
         }
-        LOGGER.info("{} swapped the skins of {} players", admin, changed);
-        if (changed == 0 && full) return Outcome.of(SkinAdminStatus.NO_ROOM);
-        return new Outcome(SkinAdminStatus.DONE, changed);
+        Outcome outcome = tally(results);
+        LOGGER.info("{} swapped the skins of {} players", admin, outcome.count());
+        return outcome;
     }
 
     /** Takes back the skins admins gave these players, who show their own again. */
@@ -355,6 +344,23 @@ public final class ServerSkinAssignments {
      * Gives one player a skin: 1 when it changed what others see, 0 when they had it already, -1
      * when the store or the texture budget had no room.
      */
+    /**
+     * The outcome of giving skins to several players, from each {@link #give} result: only the
+     * players whose shown skin changed count, a player who already had that skin does not, and
+     * the budget's refusal is reported only when nobody changed.
+     */
+    static Outcome tally(Collection<Integer> results) {
+        int changed = 0;
+        boolean full = false;
+        for (int result : results) {
+            if (result > 0) changed++;
+            if (result < 0) full = true;
+        }
+        if (changed == 0 && full) return Outcome.of(SkinAdminStatus.NO_ROOM);
+        return new Outcome(SkinAdminStatus.DONE, changed);
+    }
+
+    /** @return 1 when the player now shows the skin, 0 when they already did, -1 when there is no room */
     private static int give(ServerPlayer player, String skinId, String model) {
         UUID playerId = player.getUUID();
         ServerSkinAssignmentStore.AssignedSkin current = store().assigned(playerId);
