@@ -29,6 +29,9 @@ public class SkinPreferences {
     private Map<String, SkinPreference> preferences = new HashMap<>();
     // Runtime-only bridge while a verified on-disk alias migration is waiting to be retried.
     private transient Map<String, String> strongToLegacyFallbacks = new HashMap<>();
+    // Legacy entries a migration kept because their strong entry differs (strong -> legacy), so
+    // deleting the skin also drops them. Runtime only: each start's migration finds them again.
+    private transient Map<String, String> keptLegacyEntries = new HashMap<>();
     // False when the file exists but could not be read: it is then never saved over.
     private transient boolean persistable = true;
 
@@ -127,6 +130,8 @@ public class SkinPreferences {
         preferences.remove(hash);
         String legacy = aliasFallbacks().remove(hash);
         if (legacy != null) preferences.remove(legacy);
+        String kept = keptLegacy().remove(hash);
+        if (kept != null) preferences.remove(kept);
         aliasFallbacks().entrySet().removeIf(entry -> hash != null
                 && hash.equals(entry.getValue()));
     }
@@ -137,6 +142,7 @@ public class SkinPreferences {
     public synchronized void clear() {
         preferences.clear();
         aliasFallbacks().clear();
+        keptLegacy().clear();
     }
 
     /**
@@ -217,7 +223,10 @@ public class SkinPreferences {
             // it after a failed migration (and so holds the player's later choice); a strong
             // entry that differs on its own keeps the legacy one, which is never discarded.
             boolean derived = alias.getKey().equals(aliasFallbacks().get(alias.getValue()));
-            if (existing != null && !existing.sameAs(oldPreference) && !derived) continue;
+            if (existing != null && !existing.sameAs(oldPreference) && !derived) {
+                keptLegacy().put(alias.getValue(), alias.getKey());
+                continue;
+            }
             migrated.putIfAbsent(alias.getValue(), oldPreference);
             migrated.remove(alias.getKey());
             changed = true;
@@ -264,6 +273,11 @@ public class SkinPreferences {
     private Map<String, String> aliasFallbacks() {
         if (strongToLegacyFallbacks == null) strongToLegacyFallbacks = new HashMap<>();
         return strongToLegacyFallbacks;
+    }
+
+    private Map<String, String> keptLegacy() {
+        if (keptLegacyEntries == null) keptLegacyEntries = new HashMap<>();
+        return keptLegacyEntries;
     }
 
     private static boolean isHash(String hash) {

@@ -103,4 +103,20 @@ class SkinPreferencesMigrationTest {
         assertEquals("slim", preferences.getModelType(strong));
         assertEquals("slim", preferences.getModelType(legacy));
     }
+
+    @Test
+    void deletingTheSkinAlsoDropsALegacyEntryTheMigrationKept() {
+        String legacy = "7".repeat(40);
+        String strong = "sha256-" + "8".repeat(64);
+        Path file = temporaryDirectory.resolve("skin-preferences.json");
+        SkinPreferences preferences = new SkinPreferences();
+        preferences.setModelType(legacy, "slim");
+        preferences.setModelType(strong, "classic");
+        preferences.save(file);
+
+        assertFalse(preferences.migrateAliases(Map.of(legacy, strong), file));
+        preferences.remove(strong);
+        preferences.save(file);
+        assertEquals(0, SkinPreferences.load(file).size());
+    }
 }

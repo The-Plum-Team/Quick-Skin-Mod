@@ -281,7 +281,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   or every skin's favourite and model. An empty file holds nothing to keep and is written over.
 - Local identity migration must copy/write and validate the strong-ID destination before removing
   a legacy file or preference. Preserve the legacy source whenever destination verification fails
-  or an existing strong destination differs.
+  or an existing strong destination differs. Such a kept legacy skin preference or cape speed is
+  never read again, since lookups prefer the strong id; it stays in the file within the store's
+  entry bound, and deleting the skin also drops a kept skin preference.
 - Keep cache accounting weighted by bytes/pixels where relevant, not only entry count. Active server
   appearance blobs remain pinned only within the hard global pinned-byte budget; reject an
   over-budget appearance gracefully instead of weakening the cap.
