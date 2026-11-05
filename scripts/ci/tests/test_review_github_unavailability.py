@@ -326,14 +326,30 @@ class QueueGuardUnavailableTest(Workspace):
                 self.assert_transient("queue_guard", *classify(self.runner_temp, {"steps.guard.outcome": "failure"}))
                 shutil.rmtree(self.runner_temp / "visual-review-capsule")
 
-    def test_identity_failure_after_a_tolerated_outage_stays_terminal(self):
+    def test_an_unreadable_marker_owner_is_never_treated_as_absent(self):
+        # An exhausted owner lookup fails the guard with its typed signal before any capsule read,
+        # so a report whose owner could not be read cannot let the capsule reach the model.
         reports = json.dumps([{"artifacts": [{"name": "visual-review-55--mc1.21.6", "workflow_run": {"id": 99},
                                               "expired": False}]}])
-        changed = {"id": 77, "name": "foreign", "digest": "sha256:" + "c" * 64}
-        result, _ = self.guard(REPORTS=reports, REPORT_OWNER="UNAVAILABLE", METADATA=json.dumps(changed))
+        result, step_outputs = self.guard(REPORTS=reports, REPORT_OWNER="UNAVAILABLE")
         self.assertNotEqual(0, result.returncode)
         routes = (self.runner_temp / "requests").read_text().splitlines()
         self.assertEqual(4, sum(route.endswith("/actions/runs/99") for route in routes))
+        self.assertFalse(any(route.endswith("/actions/artifacts/77") for route in routes))
+        self.assertNotIn("already_reviewed", {k for k, v in step_outputs.items() if v == "true"})
+        self.assertTrue((self.runner_temp / "github-api-unavailable-guard").is_file())
+        self.assert_transient("queue_guard", *classify(self.runner_temp, {"steps.guard.outcome": "failure"}))
+
+    def test_identity_failure_after_a_deleted_marker_owner_stays_terminal(self):
+        # Only a definite 404 skips a marker; the later identity failure is not an outage.
+        reports = json.dumps([{"artifacts": [{"name": "visual-review-55--mc1.21.6", "workflow_run": {"id": 99},
+                                              "expired": False}]}])
+        changed = {"id": 77, "name": "foreign", "digest": "sha256:" + "c" * 64}
+        result, _ = self.guard(REPORTS=reports, REPORT_OWNER="MISSING", METADATA=json.dumps(changed))
+        self.assertNotEqual(0, result.returncode)
+        routes = (self.runner_temp / "requests").read_text().splitlines()
+        self.assertEqual(1, sum(route.endswith("/actions/runs/99") for route in routes))
+        self.assertTrue(any(route.endswith("/actions/artifacts/77") for route in routes))
         self.assertFalse((self.runner_temp / "github-api-unavailable-guard").exists())
         self.assert_terminal(*classify(self.runner_temp, {"steps.guard.outcome": "failure"}))
 
