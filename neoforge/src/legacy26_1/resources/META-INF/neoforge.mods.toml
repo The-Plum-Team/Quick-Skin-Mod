@@ -30,6 +30,10 @@ config = "quickskin-nicknames.mixins.json"
 [[mixins]]
 config = "quickskin-armor.mixins.json"
 
+# Sharing the account skin with vanilla clients: the server accessors (ADR 0012)
+[[mixins]]
+config = "quickskin-account-skin.mixins.json"
+
 [[mixins]]
 config = "quickskin-architectury-26_1-compat.mixins.json"
 

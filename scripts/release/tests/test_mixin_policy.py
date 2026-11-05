@@ -425,6 +425,46 @@ class MixinPolicyTest(unittest.TestCase):
         neoforge = ROOT / "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/GuiSkinRendererMixin.java"
         self.assertEqual(body(common), body(neoforge))
 
+    def test_neoforge_loads_every_server_mixin_of_its_targets(self) -> None:
+        # NeoForge never reads quickskin.mixins.json, so each server mixin its targets' common
+        # config lists must come from a config a NeoForge mods.toml declares; otherwise a cast to
+        # an accessor (ADR 0012's ChunkMapAccessor, for one) throws on every NeoForge server.
+        neoforge_versions = {
+            artifact["artifact_version"]
+            for artifact in MATRIX["artifacts"]
+            if artifact["loader"] == "neoforge"
+        }
+        self.assertTrue(neoforge_versions)
+        routes = MATRIX["source_overlays"]["common"]
+        expected: set[str] = set()
+        for version in neoforge_versions:
+            overlay = routes.get(version)
+            root = ROOT / "common" / "src" / (overlay or "main") / "resources"
+            path = root / "quickskin.mixins.json"
+            if not path.is_file():
+                path = ROOT / "common" / "src" / "main" / "resources" / "quickskin.mixins.json"
+            config = json.loads(path.read_text(encoding="utf-8"))
+            expected |= {f"{config['package']}.{name}" for name in config["mixins"]}
+        self.assertIn("com.quickskin.mod.mixin.ChunkMapAccessor", expected)
+        resources = ROOT / "neoforge" / "src" / "main" / "resources"
+        for toml in NEOFORGE_MOD_TOMLS:
+            with self.subTest(toml=relative(toml)):
+                declared = re.findall(r'^config = "([^"]+)"$', toml.read_text(encoding="utf-8"), re.M)
+                loaded: set[str] = set()
+                for name in declared:
+                    candidates = (
+                        toml.parents[1] / name,
+                        resources / name,
+                        ROOT / "common" / "src" / "main" / "resources" / name,
+                    )
+                    path = next((c for c in candidates if c.is_file()), candidates[-1])
+                    self.assertTrue(path.is_file(), name)
+                    config = json.loads(path.read_text(encoding="utf-8"))
+                    loaded |= {
+                        f"{config['package']}.{mixin}" for mixin in config.get("mixins", [])
+                    }
+                self.assertEqual(expected - loaded, set())
+
     def test_ears_five_lookup_selects_every_overload(self) -> None:
         source = (
             CANONICAL_JAVA / "com/quickskin/mod/mixin/compat/EarsFiveMixin.java"

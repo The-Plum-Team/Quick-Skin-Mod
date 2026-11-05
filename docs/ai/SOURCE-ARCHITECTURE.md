@@ -113,6 +113,8 @@ the actual import owner and exercise the same composed saved-appearance path.
 hands it over and sends the service's `accountSkinVisibility` with the server configuration. `ServerRuntime` binds the service to the running server through
 `AccountSkinProfileTarget`, the `common` bridge that owns the `ChunkMap`, tracked-entity and
 `Player.gameProfile` accessors and the player-info and entity-pairing packets (ADR 0012).
+NeoForge, which never reads `quickskin.mixins.json`, loads those accessors from its own
+`quickskin-account-skin.mixins.json`.
 `skin-upload` reports a successful upload through `ClientNetworkActions`.
 
 Nicknames (ADR 0015) follow the same split. `Nickname` (content-core) owns the rules;
