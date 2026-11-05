@@ -443,9 +443,9 @@ public final class MenuIntegration {
                         Button animButton = Button.builder(
                                 Component.literal(String.valueOf(index + 1)),
                                 button -> {
-                                    // Set the animation on the player widget
+                                    // A pick, with the move that leads into it (the jump onto the block for Sitting)
                                     if (playerWidget != null) {
-                                        playerWidget.setAnimation(animName);
+                                        playerWidget.pickAnimation(animName);
                                         // Save animation state for persistence across all screens
                                         PreviewAnimationState.set(animName);
                                     }
