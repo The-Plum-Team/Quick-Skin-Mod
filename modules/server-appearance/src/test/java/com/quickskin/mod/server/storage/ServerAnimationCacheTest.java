@@ -3,6 +3,7 @@ package com.quickskin.mod.server.storage;
 import com.quickskin.mod.common.data.ContentAliases;
 import com.quickskin.mod.common.data.ContentId;
 import com.quickskin.mod.common.util.HashUtil;
+import com.quickskin.mod.networking.TextureTransferLimits;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,6 +18,7 @@ import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -108,6 +110,64 @@ class ServerAnimationCacheTest {
         assertFalse(Files.exists(animations.resolve(aliases.sha1() + ".json")));
         assertFalse(Files.exists(animations.resolve(aliases.sha1() + ".identity")));
         assertFalse(Files.exists(animations.resolve(aliases.sha1() + ".authority")));
+    }
+
+    @Test
+    void aCapeOverALoweredLimitKeepsItsTimingAndFirstWriter() throws Exception {
+        Path world = tempDirectory.resolve("world-limit");
+        Path animations = world.resolve("quickskin").resolve("animations");
+        ServerTextureCache textureCache = ServerTextureCache.getInstance();
+        ServerAnimationCache animationCache = ServerAnimationCache.getInstance();
+        byte[] cape = noiseCapePng();
+        assertTrue(cape.length > TextureTransferLimits.MIN_SERVER_UPLOAD_BYTES,
+                "fixture must exceed the lowered limit");
+        ContentAliases aliases = ContentAliases.forBytes(cape);
+        String original = metadata(50);
+        try {
+            textureCache.clear();
+            animationCache.clear();
+            textureCache.init(world);
+            animationCache.init(world);
+            assertTrue(textureCache.storeTexture(aliases.sha1(), OWNER, "cape", cape));
+            assertTrue(animationCache.storeMetadata(aliases.sha1(), original, OWNER));
+
+            restart(world, TextureTransferLimits.MIN_SERVER_UPLOAD_BYTES);
+            assertNull(animationCache.getMetadata(aliases.sha256()));
+            assertTrue(textureCache.isRetainedOverLimit(aliases.sha256()));
+            for (String suffix : new String[] {".json", ".identity", ".authority"}) {
+                assertTrue(Files.isRegularFile(animations.resolve(aliases.sha256() + suffix)),
+                        suffix + " must stay for a later, larger limit");
+            }
+
+            restart(world, TextureTransferLimits.DEFAULT_SERVER_UPLOAD_BYTES);
+            assertEquals(original, animationCache.getMetadata(aliases.sha256()));
+            assertFalse(animationCache.storeMetadata(
+                    aliases.sha1(), metadata(125), UUID.randomUUID()),
+                    "the first writer's timing stays bound to the cape");
+        } finally {
+            textureCache.configureUploadLimit(TextureTransferLimits.DEFAULT_SERVER_UPLOAD_BYTES);
+        }
+    }
+
+    private static void restart(Path world, int uploadLimit) {
+        ServerAnimationCache.getInstance().clear();
+        ServerTextureCache.getInstance().clear();
+        ServerTextureCache.getInstance().configureUploadLimit(uploadLimit);
+        ServerTextureCache.getInstance().init(world);
+        ServerAnimationCache.getInstance().init(world);
+    }
+
+    private static byte[] noiseCapePng() throws Exception {
+        BufferedImage image = new BufferedImage(512, 256, BufferedImage.TYPE_INT_ARGB);
+        java.util.Random random = new java.util.Random(512L * 256L);
+        for (int y = 0; y < 256; y++) {
+            for (int x = 0; x < 512; x++) {
+                image.setRGB(x, y, 0xFF000000 | random.nextInt(0x1000000));
+            }
+        }
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        assertTrue(ImageIO.write(image, "png", output));
+        return output.toByteArray();
     }
 
     private static String metadata(int delay) {

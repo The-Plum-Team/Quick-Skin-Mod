@@ -760,7 +760,7 @@ public class ServerNetworkHandler {
      * @param player The player whose appearance to send
      */
     static void appearanceShownChanged(UUID playerId) {
-        APPEARANCE_COORDINATOR.notifyAppearance(playerId);
+        APPEARANCE_COORDINATOR.notifyShownAppearance(playerId);
     }
 
     public static void sendAppearanceToAllPlayers(ServerPlayer player) {
@@ -1266,6 +1266,20 @@ public class ServerNetworkHandler {
                 com.quickskin.mod.server.vanilla.AccountSkinShareService.getInstance().accountSkinVisibility());
 
         NetworkTransport.INSTANCE.sendServerConfigToPlayer(player, configJson);
+    }
+
+    /**
+     * Sets the skin change cooldown of the server the local client hosts, on its server thread,
+     * and sends the changed configuration to every player, the host included, so their copies
+     * (which the skin menu's cooldown reads) follow at once.
+     */
+    public static void setHostedSkinChangeCooldown(net.minecraft.server.MinecraftServer server, int seconds) {
+        com.quickskin.mod.config.ServerConfig serverConfig = com.quickskin.mod.config.ServerConfig.getInstance();
+        int cooldownSeconds = Math.max(0, Math.min(seconds, 86_400));
+        if (serverConfig.skinChangeCooldownSeconds == cooldownSeconds) return;
+        serverConfig.skinChangeCooldownSeconds = cooldownSeconds;
+        serverConfig.save();
+        broadcastServerConfigToAllPlayers(server);
     }
 
     /**

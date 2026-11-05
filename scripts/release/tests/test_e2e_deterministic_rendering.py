@@ -516,6 +516,37 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
         self.assertIn("dispatchReadyCapture(mc);", source)
         self.assertIn("captured completed rendered frame", source)
 
+    def test_flush_regrabs_only_the_final_step_through_the_capture_procedure(self) -> None:
+        source = E2E_HARNESS.read_text(encoding="utf-8")
+        flush = source.split("private void tickFlush(Minecraft mc)", 1)[1].split(
+            "private Step finalCaptureStep()", 1
+        )[0]
+        final_step = source.split("private Step finalCaptureStep()", 1)[1].split(
+            "private void tickRegrab", 1
+        )[0]
+        regrab = source.split("private void tickRegrab(Minecraft mc, Step step)", 1)[1].split(
+            "private void dispatchReadyRegrab", 1
+        )[0]
+        dispatch = source.split("private void dispatchReadyRegrab(Minecraft mc)", 1)[1].split(
+            "private static File screenshotFile", 1
+        )[0]
+
+        # An earlier step's checkpoint is never overwritten with the current, different scene.
+        self.assertIn("lastShotStepIndex = stepIndex;", source)
+        self.assertIn("lastShotStepIndex != steps.size() - 1", final_step)
+        self.assertIn("Step finalStep = finalCaptureStep();", flush)
+        self.assertNotIn("VanillaShim.screenshot", flush)
+        # The re-grab holds the step's ready state through its settle window, clears overlays,
+        # then waits for two complete rendered passes before grabbing from the client-post tick.
+        self.assertIn("safe(step.ready)", regrab)
+        self.assertIn("step.settleTicks", regrab)
+        self.assertIn("VanillaShim.clearTransientOverlays(mc)", regrab)
+        self.assertIn("renderedFrame + CAPTURE_SETTLE_FRAMES", regrab)
+        self.assertNotIn("VanillaShim.screenshot", regrab)
+        self.assertIn("renderedFrame < regrabFrame", dispatch)
+        self.assertIn("VanillaShim.screenshot(mc, lastShot);", dispatch)
+        self.assertIn("dispatchReadyRegrab(mc);", source)
+
     def test_hud_preview_targets_the_authored_lower_right_region(self) -> None:
         source = FULL_SCENARIO.with_name("HudPreviewSteps.java").read_text(encoding="utf-8")
 

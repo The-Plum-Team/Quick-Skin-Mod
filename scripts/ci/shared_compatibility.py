@@ -47,6 +47,11 @@ def request_identity(payload: Any, policy_sha: str) -> dict[str, Any]:
 def admit(api: publisher.Api, payload: Any, *, repository: Path, policy_sha: str,
           directory: Path) -> dict[str, Any] | None:
     request = request_identity(payload, policy_sha)
+    # The caller polls every few seconds while the dispatching review finishes its final job:
+    # settle that wait with one run lookup before any runtime authentication or download.
+    owner = api.run(request["review_artifact_run_id"])
+    if owner.get("status") != "completed":
+        return None
     source = api.run(request["source_run_id"])
     kind = "native-anchors" if source.get("event") == "schedule" else "pr-anchors"
     # Strict on purpose: the wave's review owner (mod-compatibility-review.yml) and its Pages
@@ -58,9 +63,6 @@ def admit(api: publisher.Api, payload: Any, *, repository: Path, policy_sha: str
     if any(artifact.get(key) != request["review_artifact_" + field] for key, field in (
             ("id", "id"), ("name", "name"), ("digest", "digest"), ("size_in_bytes", "size"))):
         raise coverage.CoverageError("optional-mod request substituted its normalized review metadata")
-    owner = api.run(request["review_artifact_run_id"])
-    if owner.get("status") != "completed":
-        return None  # The dispatching review workflow may still be finishing its final job.
     metadata = coverage.validate_review_owner(artifact, owner, api.jobs(owner),
         github_repository=api.repository, source_sha=policy_sha,
         source_run_id=request["source_run_id"], bundle_key=request["bundle_key"])

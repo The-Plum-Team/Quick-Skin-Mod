@@ -713,7 +713,8 @@ entities in uncompiled sections, so passing appearance checks alone once produce
 sky-only frames. Each changed waiting reason is logged, up to a bound, so a timeout names the
 condition that never held. In the sequential late-join scenario,
 Bob launches only after Alice has completed a genuine CPM horn model or an Ears-authored TALL/BACK
-skin, respectively, and must recover that already-active renderer state. Reflection failures never
+skin, respectively, and must recover that already-active renderer state; its capture and
+assertion wait on the same compiled terrain at and below Alice. Reflection failures never
 count as a successful CPM observation or reset.
 
 ReplayMod's E2E-only startup guard prevents Quick Play from racing its initial

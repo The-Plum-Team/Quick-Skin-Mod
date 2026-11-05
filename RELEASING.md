@@ -113,7 +113,7 @@ trusted Build gate push or manual run on protected `master` may publish a Gradle
 Existing branch-scoped release caches remain useful read-only fallbacks. A protected daily cleanup
 discovers live branches directly. It deletes absent-branch caches and superseded, unambiguously
 SHA-bound Gradle-home generations by exact cache ID, while retaining the newest generation per
-OS/job/cache-version restore family whose SHA completed the real `Build and verify` job successfully.
+OS/job-instance/cache-version restore family whose SHA completed the real `Build and verify` job successfully.
 A family without that proof is not pruned. Unknown cache formats and non-branch refs are preserved.
 Packaged runtime keeps the second cache family, the installed Forge/NeoForge server, under its
 exact recipe digest rather than a commit; only a declared writer job of a `workflow_dispatch` on

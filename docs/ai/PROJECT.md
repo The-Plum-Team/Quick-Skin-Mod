@@ -152,7 +152,7 @@ the repository.
   scheduled owner-read tradeoff. A
   protected schedule also deletes by exact cache ID Actions caches scoped to branch
   refs that no longer exist. On live branches it recognizes only SHA-bearing `setup-gradle` home
-  keys, preserves the newest restorable generation per OS/job/cache-version family that has a
+  keys, preserves the newest restorable generation per OS/job-instance/cache-version family that has a
   successful Build job, and protects the complete cache inventory while any potentially
   cache-consuming run is active anywhere in the repository. It deletes only superseded generations
   after exact candidate, compatible-replacement, branch, and repository-wide run revalidation. The

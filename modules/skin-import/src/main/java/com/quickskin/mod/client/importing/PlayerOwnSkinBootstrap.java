@@ -120,7 +120,39 @@ public final class PlayerOwnSkinBootstrap {
      */
     static boolean staysDeleted(boolean deleted, boolean defaultSkin, String textureUrl,
                                 String deletedTexture, boolean otherSkinsListed) {
-        return deleted && otherSkinsListed && (defaultSkin || textureUrl.equals(deletedTexture));
+        return deleted && otherSkinsListed && (defaultSkin || sameTexture(textureUrl, deletedTexture));
+    }
+
+    /**
+     * One texture address in one spelling: Mojang's texture host over HTTPS, as the start-up
+     * check stores it. The upload reply names the same texture over plain HTTP, and earlier
+     * versions stored that spelling. Any other address is kept as it is.
+     */
+    static String canonicalTextureUrl(String textureUrl) {
+        if (textureUrl == null || textureUrl.isEmpty() || textureUrl.length() > 512) {
+            return textureUrl != null ? textureUrl : "";
+        }
+        try {
+            java.net.URI uri = java.net.URI.create(textureUrl);
+            String scheme = uri.getScheme();
+            String path = uri.getRawPath();
+            if (("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))
+                    && "textures.minecraft.net".equalsIgnoreCase(uri.getHost())
+                    && uri.getRawUserInfo() == null && uri.getPort() == -1
+                    && uri.getRawQuery() == null && uri.getRawFragment() == null
+                    && path != null && path.startsWith("/texture/")) {
+                return "https://textures.minecraft.net" + path;
+            }
+        } catch (IllegalArgumentException malformed) {
+            // Not a URI: compared as it is
+        }
+        return textureUrl;
+    }
+
+    /** Whether two non-empty addresses name the same Mojang texture. */
+    static boolean sameTexture(String textureUrl, String other) {
+        String canonical = canonicalTextureUrl(textureUrl);
+        return !canonical.isEmpty() && canonical.equals(canonicalTextureUrl(other));
     }
 
     /**
@@ -140,8 +172,7 @@ public final class PlayerOwnSkinBootstrap {
             // compared rather than a hash of the pixels.
             com.quickskin.mod.config.ClientConfig ownConfig = com.quickskin.mod.config.ClientConfig.getInstance();
             boolean wearsReplaced = replacedSkin != null && replacedSkin.equals(ownConfig.activeSkinHash);
-            if (!wearsReplaced && !skinData.textureUrl.isEmpty()
-                    && skinData.textureUrl.equals(ownConfig.playerOwnSkinTexture)
+            if (!wearsReplaced && sameTexture(skinData.textureUrl, ownConfig.playerOwnSkinTexture)
                     && LocalAssetManager.getInstance().getMetadata(ownConfig.playerOwnSkinHash) != null) {
                 return;
             }
@@ -189,7 +220,7 @@ public final class PlayerOwnSkinBootstrap {
             String previousOwnSkin = config.playerOwnSkinHash;
             if (!wearsReplaced && finalHash.equals(previousOwnSkin) && assetManager.getMetadata(finalHash) != null) {
                 // Mojang still serves the listed own skin; remember which texture it is
-                config.playerOwnSkinTexture = skinData.textureUrl;
+                config.playerOwnSkinTexture = canonicalTextureUrl(skinData.textureUrl);
                 config.save();
                 return;
             }
@@ -216,7 +247,7 @@ public final class PlayerOwnSkinBootstrap {
                 config.playerOwnSkinHidden = false;
             }
             config.playerOwnSkinHash = finalHash;
-            config.playerOwnSkinTexture = skinData.textureUrl;
+            config.playerOwnSkinTexture = canonicalTextureUrl(skinData.textureUrl);
             config.playerOwnSkinAccount = account != null ? account : "";
 
             // Whoever wore the previous own skin wears the new one: it is the same account skin
@@ -272,11 +303,14 @@ public final class PlayerOwnSkinBootstrap {
         java.util.UUID profileId = minecraft.getUser().getProfileId();
         String account = com.quickskin.mod.config.AccountSkinPreferences.key(profileId, playerName);
         String uploadedHash = uploaded != null ? uploaded.hash() : null;
-        MojangApiService.getInstance().downloadSkinImage(textureUrl)
+        // Mojang's reply names the texture over plain HTTP; the start-up check compares the HTTPS
+        // address it stores, so a deleted upload must not come back at the next start.
+        String texture = canonicalTextureUrl(textureUrl);
+        MojangApiService.getInstance().downloadSkinImage(texture)
                 .thenAccept(image -> minecraft.execute(() -> {
                     if (!closed && image != null) {
                         handlePlayerOwnSkinFetched(new MojangApiService.MojangSkinData(
-                                playerName, profileId, image, model, textureUrl), account, uploadedHash, false);
+                                playerName, profileId, image, model, texture), account, uploadedHash, false);
                     }
                 }))
                 .exceptionally(throwable -> {

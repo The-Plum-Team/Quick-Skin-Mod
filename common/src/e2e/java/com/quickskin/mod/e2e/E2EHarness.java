@@ -65,10 +65,19 @@ public final class E2EHarness {
 
     // Track the last dispatched screenshot so FLUSH can confirm it landed at full size and re-grab a
     // transient undersized capture (a macOS window-resize race, observed as a tiny e.g. 90x110 PNG on
-    // the LAST step, whose async write has the least time to flush before done.marker).
+    // the LAST step, whose async write has the least time to flush before done.marker). Only a
+    // capture of the final executed step may be re-grabbed: an earlier step's scene is gone, and a
+    // grab of the current screen under its name would replace that checkpoint with another scene.
     private String lastShot;
+    private int lastShotStepIndex = -1;
     private int lastShotRegrabTick = 0;
     private int lastShotRetries = 0;
+    // A FLUSH re-grab follows the ordinary capture procedure: the final step's ready state holds
+    // for its settle window, transient overlays are cleared, then two complete passes render.
+    private boolean regrabPending = false;
+    private int regrabReadyTick = -1;
+    private boolean regrabArmed = false;
+    private long regrabFrame = -1;
     private static final int MAX_SHOT_RETRIES = 5;
 
     private static boolean started = false;
@@ -146,6 +155,7 @@ public final class E2EHarness {
         captureArmed = false;
         if (captureSucceeded) {
             lastShot = step.screenshot;
+            lastShotStepIndex = stepIndex;
             E2ELog.info("step[" + stepIndex + "] " + step.name
                     + " : captured completed rendered frame " + renderedFrame);
         }
@@ -184,6 +194,7 @@ public final class E2EHarness {
                 case DONE -> { /* idle until the orchestrator tears the JVM down */ }
             }
             dispatchReadyCapture(mc);
+            dispatchReadyRegrab(mc);
         } catch (Throwable t) {
             E2ELog.error("harness tick crashed", t);
             report.record("harness_crash", "fail", t.toString(), null);
@@ -426,15 +437,20 @@ public final class E2EHarness {
      * occasionally capture a transient undersized framebuffer (a macOS window resize mid-grab -> e.g. a
      * 90x110 PNG) even though the propagation/render state is correct. Because the last step's scene is
      * still on screen while we idle here, re-grab it (bounded retries) until the written PNG is full
-     * size. This also covers a missing/0-byte last frame.
+     * size. This also covers a missing/0-byte last frame. Only a capture of the final executed step
+     * is re-grabbed, through that step's own ready, settle, overlay and rendered-pass procedure; an
+     * earlier step's undersized capture is reported at the deadline, never replaced.
      */
     private void tickFlush(Minecraft mc) {
-        // A re-grab of a final cape-menu capture must show the same held frames its recorded
-        // message describes, so the hold stays in force while the last screenshot flushes.
-        if (lastShot != null && AnimationHold.applies(mc)) {
+        Step finalStep = finalCaptureStep();
+        if (regrabPending && finalStep != null) {
+            tickRegrab(mc, finalStep);
+        } else if (finalStep != null && AnimationHold.applies(mc)) {
+            // A re-grab of a final cape-menu capture must show the same held frames its recorded
+            // message describes, so the hold stays in force while the last screenshot flushes.
             AnimationHold.hold();
         }
-        if (lastShot != null && lastShotRetries < MAX_SHOT_RETRIES && tick - lastShotRegrabTick >= 20) {
+        if (!regrabPending && finalStep != null && lastShotRetries < MAX_SHOT_RETRIES && tick - lastShotRegrabTick >= 20) {
             int[] dimensions = pngDimensions(screenshotFile(lastShot));
             if (!expectedDimensions(dimensions)) {
                 lastShotRetries++;
@@ -444,9 +460,12 @@ public final class E2EHarness {
                         + dimensions[0] + "x" + dimensions[1]
                         + "); re-grabbing (attempt " + lastShotRetries + "/"
                         + MAX_SHOT_RETRIES + ")");
-                VanillaShim.screenshot(mc, lastShot);
-                lastShotRegrabTick = tick;
-                flushDeadline = Math.max(flushDeadline, tick + 40); // let the re-grab flush
+                regrabPending = true;
+                regrabReadyTick = -1;
+                regrabArmed = false;
+                regrabFrame = -1;
+                // Room for the settle window, the two rendered passes and the write to flush.
+                flushDeadline = Math.max(flushDeadline, tick + finalStep.settleTicks + 60);
                 return;
             }
         }
@@ -465,6 +484,57 @@ public final class E2EHarness {
             }
             finish(mc);
         }
+    }
+
+    /** The final executed step when it produced {@link #lastShot}, else {@code null}. */
+    private Step finalCaptureStep() {
+        if (lastShot == null || steps == null || lastShotStepIndex != steps.size() - 1) return null;
+        Step step = steps.get(lastShotStepIndex);
+        return lastShot.equals(step.screenshot) ? step : null;
+    }
+
+    /**
+     * Prepare a FLUSH re-grab exactly as the step prepared its capture: its ready state must hold
+     * through its settle window (restarting when it flickers), then overlays are cleared and the
+     * grab waits for two complete rendered passes. A scene that no longer satisfies the step, or
+     * overlays that cannot be cleared, leave the undersized file for the deadline check to fail.
+     */
+    private void tickRegrab(Minecraft mc, Step step) {
+        if (regrabArmed) return;
+        AnimationHold.release();
+        boolean ready = step.ready == null || safe(step.ready);
+        if (!ready) {
+            regrabReadyTick = -1;
+            return;
+        }
+        if (VanillaShim.currentScreen(mc) == null && mc.player != null) {
+            DefaultSkinEvidenceView.pinStandingMotion(mc.player);
+        }
+        if (AnimationHold.applies(mc)) {
+            AnimationHold.hold();
+        }
+        if (regrabReadyTick < 0) regrabReadyTick = tick;
+        if (tick - regrabReadyTick < step.settleTicks) return;
+        String overlayFailure = VanillaShim.clearTransientOverlays(mc);
+        if (overlayFailure != null) {
+            E2ELog.warn("cannot re-grab " + lastShot + ": " + overlayFailure);
+            regrabPending = false;
+            lastShotRetries = MAX_SHOT_RETRIES;
+            return;
+        }
+        regrabArmed = true;
+        regrabFrame = renderedFrame + CAPTURE_SETTLE_FRAMES;
+    }
+
+    /** Dispatch an armed FLUSH re-grab from the client-post tick, like {@link #dispatchReadyCapture}. */
+    private void dispatchReadyRegrab(Minecraft mc) {
+        if (state != State.FLUSH || !regrabArmed || renderedFrame < regrabFrame) return;
+        regrabArmed = false;
+        regrabPending = false;
+        VanillaShim.screenshot(mc, lastShot);
+        E2ELog.info("re-grabbed " + lastShot + " from completed rendered frame " + renderedFrame);
+        lastShotRegrabTick = tick;
+        flushDeadline = Math.max(flushDeadline, tick + 40); // let the re-grab flush
     }
 
     /** The on-disk path a dispatched screenshot is written to: {@code <runDir>/screenshots/<name>}. */

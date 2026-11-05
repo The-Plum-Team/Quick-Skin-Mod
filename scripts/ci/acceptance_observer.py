@@ -28,6 +28,9 @@ MAX_BYTES = 2 * 1024 * 1024
 MAX_RESPONSE_BYTES = 512 * 1024
 MAX_JSON_DEPTH = 64
 MAX_ERRORS = 20
+# `gh api` itself takes about 0.35 s per read; below this floor a large inventory would time out
+# every read instead of observing it.
+MIN_REQUEST_TIMEOUT = 2.0
 STATUSES = {"queued", "in_progress", "completed", "waiting", "requested", "pending"}
 CONCLUSIONS = {"success", "failure", "neutral", "cancelled", "skipped", "timed_out",
                "action_required", "stale", "startup_failure"}
@@ -436,10 +439,12 @@ class Coordinator:
     def poll(self, deadline: float | None = None) -> None:
         state = self.state
         self.save()
-        # Reserve at most one interval for a complete sweep, so one slow sibling cannot hold
-        # terminal observation of another behind N full request timeouts.
+        # Share one interval among the sweep's reads, so one slow sibling cannot hold terminal
+        # observation of another behind N full request timeouts, but never below a realistic read
+        # time: a large inventory then sweeps over several intervals instead of failing every read.
         pending_count = sum(remote_state(run) == "pending" for run in state["runs"])
-        timeout = min(state["timeout"], state["interval"] / max(1, pending_count))
+        timeout = min(state["timeout"],
+                      max(MIN_REQUEST_TIMEOUT, state["interval"] / max(1, pending_count)))
         for run in sorted(state["runs"], key=lambda item: item["next_poll_at"]):
             remaining = float("inf") if deadline is None else deadline - self.monotonic()
             if remaining <= 0:

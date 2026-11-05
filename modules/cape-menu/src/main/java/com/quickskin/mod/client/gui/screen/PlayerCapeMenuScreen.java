@@ -1486,10 +1486,25 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             Identifier texture = cape.getTextureLocation();
 //?}
             if (texture != null && cape.isAnimated()) {
+                // A drawn tile is a visible use, which is what lets it take an animation slot
+                // another, undrawn animation holds once every slot is in use
+                com.quickskin.mod.client.services.CapeAnimationHelper.markCapeVisible(cape.getCapeId());
                 ensureAnimationRegistered(cape);
-                texture = com.quickskin.mod.client.services.AnimatedTextureManager.getInstance()
-                        .getAnimationFrame(texture)
-                        .orElse(texture);
+//? if <1.21.11 {
+                java.util.Optional<ResourceLocation> frame =
+//?} else {
+                java.util.Optional<Identifier> frame =
+//?}
+                        com.quickskin.mod.client.services.AnimatedTextureManager.getInstance()
+                                .getAnimationFrame(texture);
+                if (frame.isPresent()) {
+                    texture = frame.get();
+                } else if (!cape.isLocal()) {
+                    // No slot (yet): a built-in cape's texture is its whole atlas, which drawn as
+                    // one frame shows every frame squashed together, so the tile shows the loading
+                    // outline instead. The catalogue registers a local cape's first frame alone.
+                    texture = null;
+                }
             }
             if (texture != null) {
                 renderCapeTexture(graphics, texture, cape, cx - this.capeDisplaySize / 2, capeTop);

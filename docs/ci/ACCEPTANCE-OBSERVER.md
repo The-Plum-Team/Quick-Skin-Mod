@@ -97,8 +97,10 @@ attempts, errors, due times and provider cooldowns. Missing/unreadable local sta
 
 The first two retry delays are 2 and 4 seconds, capped at the polling interval. Further failures
 fall back to one retry per interval. Every request has a timeout, capped further by interval /
-unfinished-attempt count so a slow sweep cannot consume one full timeout per sibling. Choose an
-interval that permits realistic API latency for the inventory's size. Healthy terminal recovery is
+unfinished-attempt count so a slow sweep cannot consume one full timeout per sibling, but never
+below two seconds (or the configured timeout, if smaller): a large inventory of slow reads then
+spans several intervals instead of timing out every read. Choose an interval that permits
+realistic API latency for the inventory's size. Healthy terminal recovery is
 observed by the next two polling intervals; declared rate-limit waits and continued failed reads
 are explicit exceptions, not evidence that remote execution continues.
 

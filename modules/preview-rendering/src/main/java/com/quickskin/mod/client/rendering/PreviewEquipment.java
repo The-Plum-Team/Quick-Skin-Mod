@@ -497,6 +497,20 @@ public final class PreviewEquipment {
     }
 
     /**
+     * The Curios layer among a renderer's layers that draws accessories one by one as pieces, or
+     * null when there is none or it failed, whose accessories the preview then leaves out.
+     */
+    @Nullable
+    static Object curiosPieceLayer(List<?> layers) {
+        for (Object layer : layers) {
+            if (drawsAccessories(layer) && CuriosPreview.drawsInstead(layer)) {
+                return layer;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Draws an accessory mod's layer, which is not Quick Skin's to vouch for: should it fail, the
      * preview goes on without it.
      */
@@ -640,7 +654,7 @@ public final class PreviewEquipment {
                         if (drawsEquipment(layer)) {
                             alongBody(layer, preview, poseStack, () -> ((RenderLayer) layer).render(poseStack, buffers,
                                     LIGHT, player, 0.0F, 0.0F, 1.0F, player.tickCount, 0.0F, 0.0F));
-                        } else if (CuriosPreview.drawsInstead(layer)) {
+                        } else if (drawsAccessories(layer) && CuriosPreview.drawsInstead(layer)) {
                             // Curios' accessories one by one, so the ghost's one is left out
                             int leftOut = ghostShown() ? ghostPiece : 0;
                             drawAccessories(layer, poseStack, () -> CuriosPreview.render(player, worn.renderer(), poseStack,
@@ -698,7 +712,13 @@ public final class PreviewEquipment {
 //? if <1.21.2 {
             AbstractClientPlayer player = (AbstractClientPlayer) worn.subject();
             if (CuriosPreview.isAccessory(piece)) {
-                CuriosPreview.renderPiece(player, piece, worn.renderer(), poseStack, ghostBuffers, LIGHT);
+                // Through the Curios layer's own guard: an accessory that fails to draw leaves the
+                // ghost out, as it leaves the layer out of the preview, and never ends the frame
+                Object curios = curiosPieceLayer(layers);
+                if (curios != null) {
+                    drawAccessories(curios, poseStack, () -> CuriosPreview.renderPiece(player, piece, worn.renderer(),
+                            poseStack, ghostBuffers, LIGHT));
+                }
                 return;
             }
             // A piece hidden through Cosmetic Armor Reworked as well

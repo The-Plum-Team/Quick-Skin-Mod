@@ -99,6 +99,31 @@ class BoundedZipTest(unittest.TestCase):
             with self.assertRaisesRegex(bounded_zip.ArchiveError, "total byte"):
                 bounded_zip.extract_bounded_zip(archive, root / "out", limits)
 
+    def test_corrupt_deflate_data_is_an_archive_error_and_leaves_no_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            payload = bytes(range(256)) * 64
+            archive = self._archive(root, {"first.txt": b"intact\n", "second.bin": payload})
+            with zipfile.ZipFile(archive) as source:
+                info = source.getinfo("second.bin")
+                header = info.header_offset
+            data = bytearray(archive.read_bytes())
+            name_length = int.from_bytes(data[header + 26 : header + 28], "little")
+            extra_length = int.from_bytes(data[header + 28 : header + 30], "little")
+            start = header + 30 + name_length + extra_length
+            # 0xff starts a deflate block of the reserved type 3, which zlib rejects.
+            data[start : start + 8] = b"\xff" * 8
+            archive.write_bytes(bytes(data))
+            destination = root / "extracted"
+
+            with self.assertRaises(bounded_zip.ArchiveError):
+                bounded_zip.extract_bounded_zip(archive, destination)
+
+            self.assertFalse(destination.exists())
+            self.assertEqual(
+                sorted(path.name for path in root.iterdir()), ["evidence.zip"]
+            )
+
     def test_rejects_existing_destination_and_archive_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

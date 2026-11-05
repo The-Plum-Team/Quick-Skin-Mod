@@ -216,11 +216,18 @@ def extract_bounded_zip(
             if actual_total != declared_total:
                 raise ArchiveError("archive expanded size does not match its directory")
         os.replace(temporary, destination)
-    except (ArchiveError, OSError, zipfile.BadZipFile, RuntimeError) as exc:
+    except Exception as exc:
+        # Corrupt entries surface as zlib.error, EOFError and other decoder
+        # errors besides BadZipFile; none may leave the untrusted partial tree.
         _remove_tree(temporary)
         if isinstance(exc, ArchiveError):
             raise
-        raise ArchiveError(f"cannot safely extract archive: {exc}") from exc
+        raise ArchiveError(
+            f"cannot safely extract archive: {type(exc).__name__}: {exc}"
+        ) from exc
+    except BaseException:
+        _remove_tree(temporary)
+        raise
     return {"entries": len(accepted), "files": file_count, "bytes": actual_total}
 
 

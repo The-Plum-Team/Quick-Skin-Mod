@@ -92,7 +92,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   a smaller texture; no server change can fix them, so `ServerRuntime` warns at startup whenever
   the limit is below the default. A saved appearance whose texture is no longer held (over a
   lowered limit or removed) is restored without that texture; a held texture owned by another
-  player or pins over budget still refuse it whole. The limit is read at server start and the
+  player or pins over budget still refuse it whole. A stored texture over a lowered limit stays
+  on disk unloaded, and so do a cape's animation metadata, identity and authority, neither loaded
+  nor deleted, so a raised limit restores its timing and first writer. The limit is read at server start and the
   server writes its settings back at stop, so it is edited while the server is stopped. A setting
   with an invalid number is clamped or ignored on its own, and a file that cannot be parsed is
   left untouched (defaults apply until it is fixed), never overwritten.
@@ -265,7 +267,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   validation.
 - Skin import copies decoded pixels that have alpha exactly and never composites them, except in
   its intended transforms (resizing to a supported resolution and the 64x32 legacy conversion);
-  images without alpha keep the plain blit, so greyscale skins are not gamma-shifted. Transparency
+  images without alpha keep the plain blit, so greyscale skins are not gamma-shifted, and a
+  greyscale image with alpha is read from its raster (`RawArgbImages`), since `getRGB` would
+  brighten its grey. Non-animated cape imports and the catalog scan read greyscale PNGs the same way. Transparency
   flattening forces opacity only on vanilla's own opaque regions, (0,0)-(32,16), (0,16)-(64,32)
   and (16,48)-(48,64), so data that other mods store in unused texels, such as a CPM model
   embedded in the skin, survives import with every alpha and colour byte intact.
@@ -273,9 +277,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   symbolic-link targets, and paths outside the configured root.
 - Persist mutable state using a temporary file plus atomic replace where supported. Keep the
   fallback contained and clean stale temporary files during initialization.
+- A client settings or preferences file that exists but cannot be read (`ClientConfig`,
+  `LocalAppearanceStorage`, `SkinPreferences`) leaves the defaults in memory and is never saved
+  over until it is fixed, so a broken hand edit cannot erase every launcher account's selections
+  or every skin's favourite and model. An empty file holds nothing to keep and is written over.
 - Local identity migration must copy/write and validate the strong-ID destination before removing
   a legacy file or preference. Preserve the legacy source whenever destination verification fails
-  or an existing strong destination differs.
+  or an existing strong destination differs. Such a kept legacy skin preference or cape speed is
+  never read again, since lookups prefer the strong id; it stays in the file within the store's
+  entry bound, and deleting the skin also drops a kept skin preference.
 - Keep cache accounting weighted by bytes/pixels where relevant, not only entry count. Active server
   appearance blobs remain pinned only within the hard global pinned-byte budget; reject an
   over-budget appearance gracefully instead of weakening the cap.
@@ -327,7 +337,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   listed again when the player imports or searches it again, and when a new own skin (the
   account's skin changed) arrives. An own skin hidden by an older version keeps its file, and
   `LocalAssetManager.getAllSkins` leaves it out of the list while the flag is set. Deleting the
-  worn skin wears the first listed skin (the own skin, pinned first, when it is listed). An import
+  worn skin wears the first listed skin (the own skin, pinned first, when it is listed). While a
+  CPM model is the look the saved skin is only remembered: deleting it remembers the first listed
+  skin instead (`CpmModelWorkflow.rememberSkin`, never a CPM model), without resetting CPM or
+  wearing anything (`SkinDeletionLook`). An import
   or search whose content is already catalogued writes no second file and selects the catalogued
   skin.
 - A cape saved through the cape editor keeps its original PNG, WebP or GIF in
@@ -659,10 +672,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   texture bridge, or the CustomNPCs display-skin transition) must assert that integration state;
   coexistence lanes assert the unchanged plaid skin. The reviewer receives per-mod expectation
   overrides for that one capture id.
-- A live `mod-compatibility-remote` observer capture requires, besides the asserted remote state
-  and rear vantage, that the observer's renderer has compiled the terrain at and below the
-  subject. Vanilla skips entities in uncompiled sections, so appearance state alone can pass on
-  a sky-only frame.
+- A live `mod-compatibility-remote` or sequential `mod-compatibility-late-join` observer capture
+  requires, besides the asserted remote state and rear vantage, that the observer's renderer has
+  compiled the terrain at and below the subject. Vanilla skips entities in uncompiled sections, so
+  appearance state alone can pass on a sky-only frame.
 - The CPM apply checkpoints (`mod-compatibility` local apply and the live remote apply/observe
   pair) first prove, without a capture, Quick Skin's own skin that carries a CPM model in its
   pixels, imported through the ordinary skin import: on every band the stored file (locally) and
@@ -757,16 +770,20 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   both commits are authenticated ancestors and the protected complete-diff classifier returns
   non-impacting. The adapter's `family_validate` hook decides the impact; the kit proves the
   ancestry itself before it publishes. A runtime, loader, assembly, harness, contract, lock,
-  workflow, classifier, mixed, malformed, or unknown change invalidates that carry-forward and
+  runtime workflow, mixed, malformed, or unknown change invalidates that carry-forward and
   requires a new compatibility wave; a change made only of module-owned sources invalidates it
   exactly when the module graph proves its reverse dependency closure reaches a compatibility
   scenario step or a clean reference capture, and is carried forward otherwise. A change that invalidates the
   carry-forward also keeps the complete packaged profile, so the generation that invalidated the
   published evidence is the generation that regenerates it. Evidence that no generation has
   produced yet, or whose wave never completed, is restored by the next change that reaches that
-  closure or by a manual complete run, not by a later non-impacting merge. Publication-only review
-  workflow changes are explicitly non-impacting so
-  generating the compact bundle cannot recursively schedule the expensive matrix.
+  closure or by a manual complete run, not by a later non-impacting merge. Review policy and its
+  workflows, publication (`scripts/pages/`, `site/`), documentation, policy tests and the
+  classifier's own allowlist (`scripts/ci/mod_compatibility_impact.py`) are explicitly
+  non-impacting ([ADR 0006](../architecture/decisions/0006-admit-ai-by-generation-and-product-impact.md)):
+  none of them changes the packaged game or an optional-mod integration, and generating the
+  compact bundle must not recursively schedule the expensive matrix. Every edit to that allowlist
+  is a reviewed protected-policy change.
 - A compatibility bundle bound to a superseded scenario or optional-mod contract is `superseded`,
   and a lineage or impact refusal is `unavailable`; neither is a failure of the atomic ordinary
   site. The kit omits that key's compatibility gallery until a current wave replaces it. Any

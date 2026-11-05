@@ -189,6 +189,36 @@ class CandidateSelectionTest(unittest.TestCase):
         self.assertEqual([item.cache_id for item in candidates], [1, 3])
         self.assertEqual([item.cache_id for item in protected], [5, 2])
 
+    def test_matrix_job_instances_of_one_sha_form_independent_restore_families(
+        self,
+    ) -> None:
+        # Every Build matrix target uploads its own home for the same SHA; each one is the
+        # newest generation of its target and none supersedes a sibling's.
+        old_sha = "1" * 40
+        sha = "2" * 40
+        first = "a" * 32
+        second = "b" * 32
+        values = [
+            cache(1, "refs/heads/master", key=gradle_key(sha, workflow_hash=first),
+                  created_at="2026-08-02T00:00:00Z"),
+            cache(2, "refs/heads/master", key=gradle_key(sha, workflow_hash=second),
+                  created_at="2026-08-02T00:01:00Z"),
+            cache(3, "refs/heads/master", key=gradle_key(old_sha, workflow_hash=first),
+                  created_at="2026-08-01T00:00:00Z"),
+            cache(4, "refs/heads/master", key=gradle_key(old_sha, workflow_hash=second),
+                  created_at="2026-08-01T00:01:00Z"),
+        ]
+
+        candidates, protected = select_superseded_generations(
+            values,
+            existing_branches={"master"},
+            active_run_branches=set(),
+            successful_build_shas={"master": {old_sha, sha}},
+        )
+
+        self.assertEqual([item.cache_id for item in candidates], [3, 4])
+        self.assertEqual([item.cache_id for item in protected], [1, 2])
+
     def test_live_branch_without_successful_replacement_is_preserved(self) -> None:
         values = [
             cache(1, "refs/heads/stable", key=gradle_key("1" * 40)),

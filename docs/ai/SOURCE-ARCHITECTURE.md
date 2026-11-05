@@ -581,7 +581,7 @@ Quick Skin's sources below own the scenarios, the adapter and the review semanti
   runs, exact successful Build jobs, and caches from paginated GitHub APIs. It revalidates each
   immutable cache before deleting by exact ID. Absent-branch caches are disposable; on a live
   branch, only superseded SHA-bearing Gradle-home generations are eligible after preserving the
-  latest successful generation for each OS/job/cache-version restore family. A family with no proven
+  latest successful generation for each OS/job-instance/cache-version restore family. A family with no proven
   successful generation and unknown keys are retained. Any potentially cache-consuming active run
   protects the complete repository cache inventory because topic runs may restore `master` and pull
   requests may restore their base branch. Only the protected pruner's own run is ignored, because

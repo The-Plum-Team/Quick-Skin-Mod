@@ -145,6 +145,44 @@ public final class ServerAppearanceSyncCoordinator {
         return coveredSessions;
     }
 
+    /**
+     * Coalesces a target whose shown appearance changed while the repository's revision did not,
+     * such as a skin an admin assigned, into every registered session, including those with a
+     * running snapshot.
+     *
+     * <p>A running snapshot restarts only on a new repository revision, so its cursor may already
+     * have passed this target and sent the old look. Such a session therefore also queues the
+     * target directly, which it sends once the snapshot finishes; when the global direct bound is
+     * full, its snapshot cursor restarts instead.</p>
+     *
+     * @return the number of registered sessions covered by a direct entry or a snapshot
+     */
+    public synchronized int notifyShownAppearance(UUID targetPlayerId) {
+        if (targetPlayerId == null) return 0;
+
+        int coveredSessions = 0;
+        for (SessionState state : sessions.values()) {
+            coveredSessions++;
+            if (state.pendingDirectTargets.contains(targetPlayerId)) {
+                schedule(state);
+                continue;
+            }
+            if (pendingDirectNotifications < MAX_PENDING_DIRECT_NOTIFICATIONS) {
+                state.pendingDirectTargets.add(targetPlayerId);
+                pendingDirectNotifications++;
+            } else {
+                clearDirectTargets(state);
+                if (!state.snapshotActive) {
+                    state.snapshotActive = true;
+                    state.serverInitiatedSnapshot = true;
+                }
+                resetSnapshotCursor(state);
+            }
+            schedule(state);
+        }
+        return coveredSessions;
+    }
+
     /** Requeues one failed appearance send without replaying it to unrelated recipients. */
     public synchronized boolean retryAppearance(
             UUID playerId, Object connection, UUID targetPlayerId) {
