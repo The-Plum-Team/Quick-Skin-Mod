@@ -2792,13 +2792,18 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
             // Deleting the skin that is worn wears the first listed skin straight away (the own
             // skin, pinned first, when it is listed), so the look never names a file that no
-            // longer exists. Otherwise the worn skin stays selected, when it is listed.
+            // longer exists. While a CPM model is the look, the saved skin was only remembered:
+            // the next skin is remembered in its place and CPM keeps its model. Otherwise the
+            // worn skin stays selected, when it is listed.
             List<AssetMetadata> listed = assets.getAllSkins();
-            if (skinListPanel != null && !listed.isEmpty()) {
-                if (wasApplied) {
-                    AssetMetadata next = listed.stream().filter(meta -> !meta.isCpmModel())
-                            .findFirst().orElse(listed.get(0));
-                    skinListPanel.setSelected(next, true);
+            boolean cpmModelIsTheLook = com.quickskin.mod.client.compat.CpmLook.owner().withholdsQuickSkinSkin();
+            SkinDeletionLook.Outcome outcome = SkinDeletionLook.decide(wasApplied, cpmModelIsTheLook, listed);
+            if (outcome.action() == SkinDeletionLook.Action.REMEMBER) {
+                com.quickskin.mod.client.compat.CpmModelWorkflow.rememberSkin(
+                        outcome.next() != null ? outcome.next().hash() : "");
+            } else if (skinListPanel != null && !listed.isEmpty() && !cpmModelIsTheLook) {
+                if (outcome.action() == SkinDeletionLook.Action.WEAR && outcome.next() != null) {
+                    skinListPanel.setSelected(outcome.next(), true);
                     applySelection();
                 } else {
                     AssetMetadata worn = config.activeSkinHash.isEmpty()

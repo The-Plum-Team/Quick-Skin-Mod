@@ -327,7 +327,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   listed again when the player imports or searches it again, and when a new own skin (the
   account's skin changed) arrives. An own skin hidden by an older version keeps its file, and
   `LocalAssetManager.getAllSkins` leaves it out of the list while the flag is set. Deleting the
-  worn skin wears the first listed skin (the own skin, pinned first, when it is listed). An import
+  worn skin wears the first listed skin (the own skin, pinned first, when it is listed). While a
+  CPM model is the look the saved skin is only remembered: deleting it remembers the first listed
+  skin instead (`CpmModelWorkflow.rememberSkin`, never a CPM model), without resetting CPM or
+  wearing anything (`SkinDeletionLook`). An import
   or search whose content is already catalogued writes no second file and selects the catalogued
   skin.
 - A cape saved through the cape editor keeps its original PNG, WebP or GIF in

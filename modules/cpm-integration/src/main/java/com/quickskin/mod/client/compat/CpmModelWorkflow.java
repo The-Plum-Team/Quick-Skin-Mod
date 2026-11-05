@@ -137,6 +137,22 @@ public final class CpmModelWorkflow {
     }
 
     /**
+     * Replaces the remembered Quick Skin skin while a CPM model is the look, as when that skin is
+     * deleted. No look choice: CPM keeps its model and nothing is applied or reset. An empty hash
+     * remembers no skin.
+     */
+    public static void rememberSkin(String skinHash) {
+        ClientConfig config = ClientConfig.getInstance();
+        config.activeSkinHash = skinHash != null ? skinHash : "";
+        if (config.activeSkinHash.isEmpty()) {
+            config.accountSkins.remove(currentAccount());
+        } else {
+            config.accountSkins.select(currentAccount(), config.activeSkinHash);
+        }
+        config.save();
+    }
+
+    /**
      * The launcher account that owns a selection made now, or null when it cannot be read. A
      * selection outranks a server record its session may still be waiting for.
      */
