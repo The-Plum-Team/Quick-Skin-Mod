@@ -28,6 +28,7 @@
     "nickname.PlayerListJoinMessageMixin",
     "nickname.ServerGamePacketListenerLeaveMessageMixin",
     "nickname.ServerPlayerTabNameMixin",
+    "armor.ConnectionCosmeticArmorFilterMixin",
     "armor.ServerEquipmentFilterMixin",
     "PlayerGameProfileAccessor",
     "ServerPlayerLanguageMixin",

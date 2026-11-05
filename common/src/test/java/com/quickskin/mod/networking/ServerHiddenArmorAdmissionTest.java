@@ -41,6 +41,21 @@ class ServerHiddenArmorAdmissionTest {
         assertFalse(ServerHiddenArmor.admits(null, SENDER, SENDER));
     }
 
+    @Test
+    void cosmeticPiecesNeedTheirOwnCapability() {
+        int cosmeticHelmet = HiddenArmor.cosmetic(HiddenArmor.HEAD);
+        ProtocolProfile armourOnly = negotiated(V2 | hiddenArmor());
+        ProtocolProfile withCosmetics = negotiated(V2 | hiddenArmor()
+                | ProtocolCapability.HIDDEN_COSMETIC_ARMOR.mask());
+
+        assertTrue(ServerHiddenArmor.admitsMask(armourOnly, HiddenArmor.HEAD));
+        assertFalse(ServerHiddenArmor.admitsMask(armourOnly, HiddenArmor.HEAD | cosmeticHelmet),
+                "a session that did not negotiate cosmetic pieces cannot name them");
+        assertTrue(ServerHiddenArmor.admitsMask(withCosmetics, HiddenArmor.HEAD | cosmeticHelmet));
+        assertFalse(ServerHiddenArmor.admitsMask(withCosmetics, 1 << 8));
+        assertFalse(ServerHiddenArmor.admitsMask((ProtocolProfile) null, cosmeticHelmet));
+    }
+
     private static long hiddenArmor() {
         return ProtocolCapability.HIDDEN_ARMOR.mask();
     }

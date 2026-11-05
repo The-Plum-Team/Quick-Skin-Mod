@@ -292,7 +292,7 @@ public class ServerNetworkHandler {
         UUID reportedPlayerId = PacketHelper.readPlayerId(buf);
         int hidden = buf.readUnsignedByte();
         ServerPlayer sender = (ServerPlayer) context.getPlayer();
-        if (!ServerHiddenArmor.admits(sender, reportedPlayerId) || !HiddenArmor.isValid(hidden)
+        if (!ServerHiddenArmor.admits(sender, reportedPlayerId) || !ServerHiddenArmor.admitsMask(sender, hidden)
                 || !TextureTransferRateLimiter.getInstance().allowStorageMutation(
                         sender.getUUID(), sender.connection)) return;
         MinecraftServer server = sender.server;

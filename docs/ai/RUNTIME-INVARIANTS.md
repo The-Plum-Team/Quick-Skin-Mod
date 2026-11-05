@@ -148,7 +148,17 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   copy of the equipment packet, alone or in a bundle, for every client, Quick Skin or not. The item
   stays worn; nothing is written to the player. `allowHiddenArmor` (default on) turns it off. The
   player's own client hides the pieces only where the server does. On NeoForge these mixins load
-  from `quickskin-armor.mixins.json`.
+  from `quickskin-armor.mixins.json`. A Cosmetic Armor Reworked piece over an armour piece is a
+  piece of its own, four bits up in the same mask, sent only on a session that also negotiated
+  `hidden-cosmetic-armor` (an older server refuses the whole update otherwise) and kept per account
+  in a map apart, so an older client reading the configuration keeps the armour pieces. The server
+  leaves a hidden cosmetic piece out of every other player's copy of that mod's slot sync
+  (`CosmeticArmorSync`: the Forge 1.20.1 bytes `CosmeticArmorSyncMessage` reads, the payload record
+  from 1.20.5, reached by reflection), also on the Forge 1.20.1 paths that send to one player past
+  the listener (`ConnectionCosmeticArmorFilterMixin`), and asks the mod to send the player's slots
+  again when the mask changes. Their Cosmetic Armor then draws the armour piece, which the
+  equipment filter hides in turn if the player hides it too. A slot showing its cosmetic piece is
+  never hidden on the player's own client for its armour piece, which everyone else sees covered.
 - A cosmetic nickname (ADR 0015) is text, not an appearance, and reaches every client through
   display names; account names keep every other role. `Nickname` (content-core) is the only rule
   set, applied by the client's text box, the wire check (`NetworkSecurity.isValidNickname`, 32
@@ -466,14 +476,20 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   behind it: it lies on the floor round the turntable ring as its item (`PedestalDrops`), and a
   click there puts it back on. Cosmetic Armor Reworked's armour shows on that model as it does in the world
   (`CosmeticArmorPreview`, reflection only through its API, no compatibility lane): for the length
-  of each of the preview's own equipment draws its cosmetic pieces fill the armour slots, a piece
-  hidden for the skin empties its slot, and the worn armour is put back after, as the mod itself
-  does around each draw of the player in the world. The skin menu treats each such slot as one
-  piece, its cosmetic piece where it has one: a slot hidden for the skin lies on the floor and is
-  never covered, and a click on a piece the player does not hide through Quick Skin flips the
-  mod's own hidden-for-the-skin toggle on this client and its server (the packet its slot toggle
-  sends, through the original's network or the fork's platform helper), so the mod stores and
-  syncs it. The cape editor's Elytra view
+  of each of the preview's own equipment draws its cosmetic pieces fill the armour slots, a slot
+  hidden for the skin is emptied, a cosmetic piece the player hides through Quick Skin leaves the
+  worn piece, and the worn armour is put back after, as the mod itself does around each draw of
+  the player in the world. Before 1.21.2 that mod also swaps for the first-person hand and puts the
+  worn pieces back only at its next draw, so every read and draw here first puts them back. The
+  skin menu treats each such slot as two pieces, the cosmetic one and the armour piece under it,
+  which the cosmetic one covers while it shows; each hides on its own through Quick Skin, a state
+  the mod itself lacks, and lies on the floor when hidden. The mod's own hidden-for-the-skin toggle
+  hides both: putting one back on turns it off and keeps the other one hidden through Quick Skin.
+  In the world a fail-open `@Pseudo` hook on the mod's render handler
+  (`CosmeticArmorRenderMixin`, gated on its class file) keeps the local player's hidden cosmetic
+  piece out of the slot. Where the server does not hide cosmetic pieces, a click on one flips the
+  mod's own toggle on this client and its server (the packet its slot toggle sends, through the
+  original's network or the fork's platform helper), so the mod stores and syncs it. The cape editor's Elytra view
   is no exception: it draws its own model with vanilla's folded wings wearing the edited cape's
   texture (`PreviewPlayerData.isElytraPreview`), never the elytra the player has equipped. The
   one exception is the HUD preview keeping a held TaCZ (Timeless and Classics Zero) gun readable, so TaCZ poses and draws

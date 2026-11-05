@@ -193,4 +193,21 @@ class ProtocolNegotiatorTest {
         assertTrue(withOlderPeer.supports(ProtocolCapability.ASSIGNED_SKINS));
         assertFalse(withOlderPeer.supports(ProtocolCapability.HIDDEN_ARMOR));
     }
+
+    @Test
+    void hiddenCosmeticArmorIsAnOptionalCapabilityThatOlderPeersDrop() {
+        assertTrue((QuickSkinProtocol.CAPABILITIES
+                & ProtocolCapability.HIDDEN_COSMETIC_ARMOR.mask()) != 0L);
+        assertEquals(0L, QuickSkinProtocol.REQUIRED_CAPABILITIES
+                & ProtocolCapability.HIDDEN_COSMETIC_ARMOR.mask());
+
+        long olderPeer = QuickSkinProtocol.CAPABILITIES & ~ProtocolCapability.HIDDEN_COSMETIC_ARMOR.mask();
+        ProtocolProfile withOlderPeer = ProtocolNegotiator.negotiate(
+                QuickSkinProtocol.POLICY,
+                new ProtocolOffer(2, 2, olderPeer, 1024 * 1024, 30 * 1024));
+
+        assertTrue(withOlderPeer.negotiated());
+        assertTrue(withOlderPeer.supports(ProtocolCapability.HIDDEN_ARMOR));
+        assertFalse(withOlderPeer.supports(ProtocolCapability.HIDDEN_COSMETIC_ARMOR));
+    }
 }

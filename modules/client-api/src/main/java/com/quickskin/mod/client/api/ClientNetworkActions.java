@@ -64,12 +64,21 @@ public interface ClientNetworkActions {
 
     /**
      * Tells the connected server which armour pieces the player hides from everyone, one bit per
-     * piece ({@code HiddenArmor}), when the session negotiated {@code hidden-armor}.
+     * piece ({@code HiddenArmor}) and the Cosmetic Armor Reworked pieces four bits up, when the
+     * session negotiated {@code hidden-armor}.
      */
     void updateHiddenArmor(int hidden);
 
-    /** The armour pieces nobody sees now: those the player hides, where the server hides them. */
+    /**
+     * The armour pieces nobody sees now: those the player hides, where the server hides them, the
+     * Cosmetic Armor Reworked pieces four bits up where it hides those too.
+     */
     int hiddenArmorInEffect();
+
+    /** Whether the server hides Cosmetic Armor Reworked pieces too ({@code hidden-cosmetic-armor}). */
+    default boolean hidesCosmeticArmor() {
+        return false;
+    }
 
     /**
      * The server's skin pool and who has a skin an admin gave them, while the player is an admin

@@ -24,8 +24,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * The armour pieces each connected player hides from everyone (ADR 0017). Every packet the server
  * sends passes {@link #filter} on its way to one player: the equipment of another player who hides
  * a piece goes out with that piece empty, so no client, Quick Skin or not, draws it. The item stays
- * on the player and protects as usual; only what others are told changes. With
- * {@code allowHiddenArmor} off nothing is filtered.
+ * on the player and protects as usual; only what others are told changes. A Cosmetic Armor
+ * Reworked piece the player hides is left out of that mod's slot sync the same way
+ * ({@link CosmeticArmorSync}). With {@code allowHiddenArmor} off nothing is filtered.
  */
 public final class ServerHiddenArmor {
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerHiddenArmor.class);
@@ -47,6 +48,16 @@ public final class ServerHiddenArmor {
         return sender != null && admits(ProtocolNetwork.profile(sender), sender.getUUID(), playerId);
     }
 
+    /** Whether {@code sender}'s client may hide {@code mask}: cosmetic pieces only if it negotiated them. */
+    static boolean admitsMask(ServerPlayer sender, int mask) {
+        return admitsMask(sender == null ? null : ProtocolNetwork.profile(sender), mask);
+    }
+
+    static boolean admitsMask(ProtocolProfile senderProfile, int mask) {
+        return HiddenArmor.isValid(mask) || senderProfile != null
+                && senderProfile.supports(ProtocolCapability.HIDDEN_COSMETIC_ARMOR) && HiddenArmor.isValidWithCosmetics(mask);
+    }
+
     static boolean admits(ProtocolProfile senderProfile, UUID senderId, UUID playerId) {
         return senderProfile != null
                 && ProtocolNetwork.acceptsV2(senderProfile)
@@ -57,14 +68,16 @@ public final class ServerHiddenArmor {
 
     /** Server thread: the player's client says which pieces it hides from now on. */
     static void request(ServerPlayer player, int mask) {
-        if (player == null || !HiddenArmor.isValid(mask)) return;
+        if (player == null || !HiddenArmor.isValidWithCosmetics(mask)) return;
         Hidden previous = mask == HiddenArmor.NONE
                 ? HIDDEN.remove(player.getUUID())
                 : HIDDEN.put(player.getUUID(), new Hidden(player.connection, mask));
         int before = previous == null ? HiddenArmor.NONE : previous.mask();
         if (before == mask) return;
         LOGGER.debug("{} hides armour pieces {}", player.getScoreboardName(), mask);
-        if (ServerConfig.getInstance().allowHiddenArmor) resend(player);
+        if (!ServerConfig.getInstance().allowHiddenArmor) return;
+        if (((before ^ mask) & HiddenArmor.ALL) != 0) resend(player);
+        if (((before ^ mask) & HiddenArmor.COSMETICS) != 0) CosmeticArmorSync.resend(player);
     }
 
     /** The pieces {@code playerId} hides, as other players see them now. */
@@ -77,7 +90,8 @@ public final class ServerHiddenArmor {
     /**
      * The packet as {@code recipient} may receive it: another player's equipment without the
      * pieces that player hides, also inside a bundle (the equipment sent when a player comes into
-     * view). The player's own equipment and everything else pass unchanged.
+     * view), and Cosmetic Armor Reworked's sync of another player's slot without the cosmetic
+     * piece that player hides. The player's own equipment and everything else pass unchanged.
      */
     public static Packet<?> filter(Packet<?> packet, ServerPlayer recipient) {
         if (HIDDEN.isEmpty() || recipient == null) return packet;
@@ -87,7 +101,17 @@ public final class ServerHiddenArmor {
         if (packet instanceof ClientboundBundlePacket bundle) {
             return filterBundle(bundle, recipient);
         }
-        return packet;
+        return filterCosmetics(packet, recipient);
+    }
+
+    /**
+     * The packet as {@code recipient} may receive it, Cosmetic Armor Reworked's sync of another
+     * player's slot without the cosmetic piece that player hides; for the paths that mod sends to
+     * one player without passing {@link #filter} (Forge 1.20.1).
+     */
+    public static Packet<?> filterCosmetics(Packet<?> packet, ServerPlayer recipient) {
+        if (HIDDEN.isEmpty() || recipient == null || !ServerConfig.getInstance().allowHiddenArmor) return packet;
+        return CosmeticArmorSync.filter(packet, recipient, ServerHiddenArmor::hidden);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -97,7 +121,7 @@ public final class ServerHiddenArmor {
         for (Object sub : bundle.subPackets()) {
             Packet<?> original = (Packet<?>) sub;
             Packet<?> filtered = original instanceof ClientboundSetEquipmentPacket equipment
-                    ? filterEquipment(equipment, recipient) : original;
+                    ? filterEquipment(equipment, recipient) : filterCosmetics(original, recipient);
             changed |= filtered != original;
             packets.add(filtered);
         }

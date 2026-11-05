@@ -190,7 +190,7 @@ public final class PreviewEquipment {
         if (!leavingOutGhost) {
             return false;
         }
-        int piece = ghostPiece;
+        int piece = CosmeticArmorPreview.slotOf(ghostPiece);
         return slot == net.minecraft.world.entity.EquipmentSlot.HEAD ? piece == 8
                 : slot == net.minecraft.world.entity.EquipmentSlot.CHEST ? piece == 4
                 : slot == net.minecraft.world.entity.EquipmentSlot.LEGS ? piece == 2
@@ -327,7 +327,8 @@ public final class PreviewEquipment {
     }
 
     /**
-     * The outline an armour piece ({@code HiddenArmor} bit) would have on the skin menu's model,
+     * The outline an armour piece ({@code HiddenArmor} bit, or a Cosmetic Armor Reworked piece over
+     * it) would have on the skin menu's model,
      * as one convex polygon of GUI coordinates per box it covers ({x0, y0, x1, y1, ...}); empty
      * when no preview was drawn. Where the polygons overlap, the caller draws only their union's
      * edge. {@code elytra} outlines the chest piece as folded wings.
@@ -338,7 +339,7 @@ public final class PreviewEquipment {
         if (model == null) {
             return polygons;
         }
-        float[][] boxes = switch (piece) {
+        float[][] boxes = switch (CosmeticArmorPreview.slotOf(piece)) {
             case 8 -> HEAD_BOXES;
             case 4 -> elytra ? ELYTRA_BOXES : outlineSlim ? SLIM_CHEST_BOXES : CHEST_BOXES;
             case 2 -> LEGS_BOXES;
@@ -674,7 +675,8 @@ public final class PreviewEquipment {
         if (ghostShown()) {
             // renderGhost draws it
             PlayerModelRenderer.blankPieces(
-                    (net.minecraft.client.renderer.entity.state.EntityRenderState) worn.subject(), ghostPiece);
+                    (net.minecraft.client.renderer.entity.state.EntityRenderState) worn.subject(),
+                    CosmeticArmorPreview.slotOf(ghostPiece));
         }
         for (Object layer : layers) {
             if (drawsEquipment(layer)) {
@@ -721,8 +723,9 @@ public final class PreviewEquipment {
                 }
                 return;
             }
-            // A piece hidden through Cosmetic Armor Reworked as well
-            CosmeticArmorPreview.wearing(player, piece, () -> PlayerModelRenderer.withOnlyPiece(player, piece, () -> {
+            // A piece hidden through Cosmetic Armor Reworked as well, alone in its slot
+            CosmeticArmorPreview.wearing(player, piece, () -> PlayerModelRenderer.withOnlyPiece(player,
+                    CosmeticArmorPreview.slotOf(piece), () -> {
                 for (Object layer : layers) {
                     if (drawsWornPiece(layer)) {
                         alongBody(layer, preview, poseStack, () -> ((RenderLayer) layer).render(poseStack, ghostBuffers,
@@ -736,7 +739,7 @@ public final class PreviewEquipment {
                     () -> ((LivingEntityRenderer) worn.renderer()).createRenderState(player, 1.0F));
             net.minecraft.client.renderer.entity.state.EntityRenderState ghostState =
                     (net.minecraft.client.renderer.entity.state.EntityRenderState) state;
-            PlayerModelRenderer.blankPieces(ghostState, 15 & ~piece);
+            PlayerModelRenderer.blankPieces(ghostState, 15 & ~CosmeticArmorPreview.slotOf(piece));
             for (Object layer : layers) {
                 if (drawsWornPiece(layer)) {
                     alongBody(layer, preview, poseStack,
@@ -877,7 +880,8 @@ public final class PreviewEquipment {
         if (ghostShown()) {
             // submitGhost draws it
             PlayerModelRenderer.blankPieces(
-                    (net.minecraft.client.renderer.entity.state.EntityRenderState) worn.subject(), ghostPiece);
+                    (net.minecraft.client.renderer.entity.state.EntityRenderState) worn.subject(),
+                    CosmeticArmorPreview.slotOf(ghostPiece));
         }
         for (Object layer : ((RendererLayers) worn.renderer()).quickskin$previewLayers()) {
             if (drawsEquipment(layer)) {
@@ -913,7 +917,7 @@ public final class PreviewEquipment {
         }
         net.minecraft.client.renderer.entity.state.EntityRenderState ghostState =
                 (net.minecraft.client.renderer.entity.state.EntityRenderState) state;
-        PlayerModelRenderer.blankPieces(ghostState, 15 & ~piece);
+        PlayerModelRenderer.blankPieces(ghostState, 15 & ~CosmeticArmorPreview.slotOf(piece));
         synchronized (BOUND_POSES) {
             BOUND_POSES.put(state, storePose(preview));
         }

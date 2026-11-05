@@ -520,7 +520,7 @@ public class PlayerModelRenderer {
             Player player, PreviewPlayerData playerData) {
         if (showsEquipment(player, playerData)) {
             // As the world shows the player: without the armour pieces they hide from everyone
-            return slotsShownWithout(com.quickskin.mod.client.services.LocalHiddenArmor.inEffect());
+            return slotsShownWithout(ownHiddenPieces());
         }
         if (!playerData.isHeldGunVisible() || player != Minecraft.getInstance().player) {
             return NO_VISIBLE_SLOTS;
@@ -558,7 +558,7 @@ public class PlayerModelRenderer {
             // The skin menu draws it see-through once the preview is drawn
             return true;
         }
-        int hidden = com.quickskin.mod.client.services.LocalHiddenArmor.inEffect();
+        int hidden = ownHiddenPieces();
         if (hidden == 0) {
             return false;
         }
@@ -567,6 +567,16 @@ public class PlayerModelRenderer {
         if (slot == EquipmentSlot.LEGS) return (hidden & 2) != 0;
         if (slot == EquipmentSlot.FEET) return (hidden & 1) != 0;
         return false;
+    }
+
+    /**
+     * The local player's armour pieces nobody sees now ({@code HiddenArmor} bits): those hidden
+     * where the server hides them, but for a slot that shows its Cosmetic Armor Reworked piece
+     * over the hidden one, which everyone still sees (ADR 0017).
+     */
+    static int ownHiddenPieces() {
+        int hidden = com.quickskin.mod.client.services.LocalHiddenArmor.inEffect() & 15;
+        return hidden == 0 ? 0 : hidden & ~CosmeticArmorPreview.cosmeticsShown(Minecraft.getInstance().player);
     }
 
     /**
@@ -654,7 +664,7 @@ public class PlayerModelRenderer {
         if (entity == null || entity != Minecraft.getInstance().player || PreviewEquipment.isCapturing()) {
             return;
         }
-        blankPieces(state, com.quickskin.mod.client.services.LocalHiddenArmor.inEffect());
+        blankPieces(state, ownHiddenPieces());
     }
 
     /** Leaves the armour pieces {@code pieces} names ({@code HiddenArmor} bits) out of a render state. */

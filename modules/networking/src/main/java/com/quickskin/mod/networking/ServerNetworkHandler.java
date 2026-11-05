@@ -247,7 +247,7 @@ public class ServerNetworkHandler {
     public static void handleArmorVisibility(
             ArmorVisibilityPayload payload, NetworkManager.PacketContext context) {
         ServerPlayer sender = (ServerPlayer) context.getPlayer();
-        if (!ServerHiddenArmor.admits(sender, payload.playerId()) || !HiddenArmor.isValid(payload.hidden())
+        if (!ServerHiddenArmor.admits(sender, payload.playerId()) || !ServerHiddenArmor.admitsMask(sender, payload.hidden())
                 || !TextureTransferRateLimiter.getInstance().allowStorageMutation(
                         sender.getUUID(), sender.connection)) return;
         MinecraftServer server = sender.level().getServer();

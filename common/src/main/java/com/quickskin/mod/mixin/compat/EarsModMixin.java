@@ -34,7 +34,6 @@ public class EarsModMixin {
             cancellable = true,
             require = 0,
             expect = 1,
-            allow = 2,
             remap = false
     )
     // Ears follows Minecraft's renderer API: the hook receives the player through 1.21.1,

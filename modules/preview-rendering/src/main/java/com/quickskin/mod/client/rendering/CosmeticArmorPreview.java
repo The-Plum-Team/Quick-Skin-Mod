@@ -23,12 +23,22 @@ import java.util.function.Supplier;
  * of the player, a piece hidden for the skin as an empty slot, and putting the worn armour back
  * after. The preview draws the player's equipment itself, so it does the same around its own
  * draws, by the mod's own rules: nothing while the player turned the mod off on this client, an
- * empty slot for a piece hidden for the skin, and the cosmetic piece in a slot that has one.
+ * empty slot for a piece hidden for the skin, and the cosmetic piece in a slot that has one,
+ * unless the player hides that cosmetic piece through Quick Skin.
  *
- * <p>The skin menu treats such a slot as one piece: it shows the cosmetic piece where there is
- * one ({@link #stack}), lays a slot hidden for the skin on the floor ({@link #hides}), and a click
- * flips that hiding as the toggle under the mod's own slots does ({@link #toggle}), so the mod
- * stores and syncs it.
+ * <p>The skin menu treats such a slot as two pieces (ADR 0017): the cosmetic piece
+ * ({@code HiddenArmor.cosmetic}, {@link #cosmeticStack}) and the armour piece under it, which the
+ * cosmetic piece covers while it is shown ({@link #cosmeticShown}). Each hides on its own through
+ * Quick Skin, a state the mod itself lacks: the mod's own hidden-for-the-skin toggle hides both
+ * ({@link #hides}). The world follows: a cosmetic piece the player hides is not put in the slot
+ * ({@link #drawnCosmetic}, from a hook in the mod's render handler), and the server leaves it out
+ * of what other players are told. Where the server does not hide cosmetic pieces, a click on one
+ * flips the mod's toggle instead ({@link #toggle}), as the toggle under the mod's own slots does,
+ * so the mod stores and syncs it.
+ *
+ * <p>Before 1.21.2 the mod swaps the pieces for the first-person hand too and puts the worn ones
+ * back only at its next draw, so a menu open over the world finds its swap still in the slots;
+ * every draw here first puts them back ({@link #showWorn}).
  *
  * <p>The mod is reached by reflection through its API, so it is no dependency; should the
  * installed one not match, the preview draws the armour actually worn, as before. It exists for
@@ -47,17 +57,20 @@ public final class CosmeticArmorPreview {
     /** ...and the fork's: {@code PlatformHelper.sendToServer(payload)}. */
     private static final String FORK_PLATFORM = "lain.mods.cos.impl.platform.PlatformHelper";
     private static final String FORK_PAYLOAD = "lain.mods.cos.impl.network.payload.PayloadSetSkinArmor";
+    private static final int COSMETICS = 15 << 4;
 
     /** The mod's API as this game has it; null until resolved, and {@link #MISSING} without it. */
     @Nullable
     private static volatile Api api;
-    private static final Api MISSING = new Api(null, null, null, null);
+    private static final Api MISSING = new Api(null, null, null, null, null, null);
     /** How a hiding reaches the mod's server; null until resolved, and {@link #NO_SENDER} without one. */
     @Nullable
     private static volatile Sender sender;
     private static final Sender NO_SENDER = new Sender(null, null, null, null);
 
-    private record Api(Method stacksOf, Method stackInSlot, Method isSkinArmor, @Nullable Field disabled) {
+    /** The mod's API, its client switch and the queues of worn pieces its render handler puts back. */
+    private record Api(Method stacksOf, Method stackInSlot, Method isSkinArmor, @Nullable Field disabled,
+                       @Nullable Object putBack, @Nullable Method putBackOf) {
     }
 
     /** {@code CAStacksBase.setSkinArmor}, and the packet that tells the server: {@code send.invoke(target, packet(slot, hidden))}. */
@@ -74,8 +87,9 @@ public final class CosmeticArmorPreview {
 
     /**
      * Runs a draw of {@code player}'s equipment with the cosmetic armour in its slots, the piece
-     * {@code shown} ({@code HiddenArmor} bit, 0 for none) as it would be were it not hidden for the
-     * skin: how the skin menu draws a hidden piece's ghost and traces its outline.
+     * {@code shown} drawn whether it is hidden or not, alone in its slot (0 for none): a cosmetic
+     * piece puts its item in the slot, an armour piece leaves the worn one there. How the skin
+     * menu draws a piece's ghost and traces its outline.
      */
     static void wearing(Player player, int shown, Runnable draw) {
         wearing(player, shown, () -> {
@@ -106,29 +120,81 @@ public final class CosmeticArmorPreview {
     }
 
     /**
-     * What the skin menu shows of an armour piece ({@code HiddenArmor} bit) whose slot holds
-     * {@code worn}: the cosmetic piece in that slot when there is one, hidden or not, and else what
-     * is worn.
+     * The slot of a piece, as its armour piece's {@code HiddenArmor} bit: a cosmetic piece's slot,
+     * an armour piece itself, and anything else (a Curios accessory) as it is.
      */
-    public static ItemStack stack(@Nullable Player player, int piece, ItemStack worn) {
+    public static int slotOf(int piece) {
+        return piece > 0 && piece < 16 ? piece : (piece & COSMETICS) == piece && piece != 0 ? piece >> 4 : piece;
+    }
+
+    /** Whether {@code piece} is a cosmetic piece ({@code HiddenArmor.cosmetic}). */
+    public static boolean isCosmetic(int piece) {
+        return piece != 0 && (piece & COSMETICS) == piece;
+    }
+
+    /** The cosmetic item in the slot of {@code piece}, hidden or not, or an empty stack. */
+    public static ItemStack cosmeticStack(@Nullable Player player, int piece) {
 //? if <1.21.5 {
         Object stacks = stacks(player);
         if (stacks == null) {
-            return worn;
+            return ItemStack.EMPTY;
         }
         try {
-            Object cosmetic = api.stackInSlot().invoke(stacks, slot(piece));
-            return cosmetic instanceof ItemStack stack && !stack.isEmpty() ? stack : worn;
+            Object cosmetic = api.stackInSlot().invoke(stacks, slot(slotOf(piece)));
+            return cosmetic instanceof ItemStack stack ? stack : ItemStack.EMPTY;
         } catch (ReflectiveOperationException | RuntimeException error) {
             fail(error);
-            return worn;
+            return ItemStack.EMPTY;
         }
 //?} else {
-        return worn;
+        return ItemStack.EMPTY;
 //?}
     }
 
-    /** Whether the player hides an armour piece ({@code HiddenArmor} bit) for the skin, through the mod. */
+    /**
+     * Whether the slot of {@code piece} shows its cosmetic piece now, over the armour piece: it
+     * has one, the mod does not hide the slot for the skin, and the player does not hide the
+     * cosmetic piece where the server hides it.
+     */
+    public static boolean cosmeticShown(@Nullable Player player, int piece) {
+        int slot = slotOf(piece);
+        return slot > 0 && slot < 16 && (hiddenCosmetics() & slot << 4) == 0
+                && !cosmeticStack(player, slot).isEmpty() && !hides(player, slot);
+    }
+
+    /** The armour pieces of {@code player} whose slot shows a cosmetic piece now, as {@code HiddenArmor} bits. */
+    public static int cosmeticsShown(@Nullable Player player) {
+        int shown = 0;
+        for (int slot = 1; slot < 16; slot <<= 1) {
+            if (cosmeticShown(player, slot)) {
+                shown |= slot;
+            }
+        }
+        return shown;
+    }
+
+    /**
+     * What the mod's render handler puts in slot {@code slot} (0 for the feet up to 3 for the head)
+     * of the player whose slots {@code stacks} are: its cosmetic item, or nothing for the local
+     * player's cosmetic piece hidden through Quick Skin, so the worn piece stays. The handler's
+     * own read of the slot, which a hook replaces with this one.
+     */
+    public static ItemStack drawnCosmetic(Object stacks, int slot) {
+        ItemStack cosmetic;
+        try {
+            cosmetic = api() == MISSING ? ItemStack.EMPTY : (ItemStack) api.stackInSlot().invoke(stacks, slot);
+        } catch (ReflectiveOperationException | RuntimeException error) {
+            fail(error);
+            return ItemStack.EMPTY;
+        }
+        if (cosmetic == null || cosmetic.isEmpty() || slot < 0 || slot > 3 || (hiddenCosmetics() & 1 << slot + 4) == 0) {
+            return cosmetic == null ? ItemStack.EMPTY : cosmetic;
+        }
+        Player local = net.minecraft.client.Minecraft.getInstance().player;
+        return local != null && stacks == stacks(local) ? ItemStack.EMPTY : cosmetic;
+    }
+
+    /** Whether the player hides the slot of a piece for the skin through the mod, both its pieces. */
     public static boolean hides(@Nullable Player player, int piece) {
 //? if <1.21.5 {
         Object stacks = stacks(player);
@@ -136,7 +202,7 @@ public final class CosmeticArmorPreview {
             return false;
         }
         try {
-            return (Boolean) api.isSkinArmor().invoke(stacks, slot(piece));
+            return (Boolean) api.isSkinArmor().invoke(stacks, slot(slotOf(piece)));
         } catch (ReflectiveOperationException | RuntimeException error) {
             fail(error);
             return false;
@@ -146,6 +212,11 @@ public final class CosmeticArmorPreview {
 //?}
     }
 
+    /** The local player's cosmetic pieces nobody sees now, as {@code HiddenArmor} bits. */
+    private static int hiddenCosmetics() {
+        return com.quickskin.mod.client.services.LocalHiddenArmor.inEffect() & COSMETICS;
+    }
+
     /**
      * Hides an armour piece ({@code HiddenArmor} bit) for the skin, or shows it again, as the
      * toggle under the mod's slot does: on this client and on the server, which tells everyone.
@@ -153,15 +224,25 @@ public final class CosmeticArmorPreview {
      * changed.
      */
     public static boolean toggle(@Nullable Player player, int piece) {
+        return setHidden(player, piece, !hides(player, piece));
+    }
+
+    /**
+     * Hides the slot of a piece for the skin through the mod, or shows it again, as {@link #toggle};
+     * false when nothing changed.
+     */
+    public static boolean setHidden(@Nullable Player player, int piece, boolean hide) {
 //? if <1.21.5 {
         Object stacks = stacks(player);
         Sender sender = stacks == null ? NO_SENDER : sender();
         if (sender == NO_SENDER) {
             return false;
         }
-        int slot = slot(piece);
+        int slot = slot(slotOf(piece));
         try {
-            boolean hide = !(Boolean) api.isSkinArmor().invoke(stacks, slot);
+            if (hide == (Boolean) api.isSkinArmor().invoke(stacks, slot)) {
+                return false;
+            }
             sender.send().invoke(sender.target(), sender.packet().newInstance(slot, hide));
             sender.setSkinArmor().invoke(stacks, slot, hide);
             return true;
@@ -173,6 +254,29 @@ public final class CosmeticArmorPreview {
 //?} else {
         return false;
 //?}
+    }
+
+    /**
+     * Puts back the worn armour pieces the mod's render handler left in {@code player}'s slots
+     * after it drew them, as the handler itself does at its next draw.
+     */
+    public static void showWorn(@Nullable Player player) {
+        Api api = api();
+        if (player == null || api.putBackOf() == null) {
+            return;
+        }
+        try {
+            if (api.putBackOf().invoke(api.putBack(), player) instanceof java.util.Deque<?> queue) {
+                Object putBack;
+                while ((putBack = queue.poll()) != null) {
+                    if (putBack instanceof Runnable runnable) {
+                        runnable.run();
+                    }
+                }
+            }
+        } catch (ReflectiveOperationException | RuntimeException error) {
+            fail(error);
+        }
     }
 
     /** The mod's armour slot of an armour piece ({@code HiddenArmor} bit): 0 for the feet up to 3 for the head. */
@@ -206,16 +310,24 @@ public final class CosmeticArmorPreview {
         if (stacks == null) {
             return null;
         }
+        // The worn pieces, not the mod's swap left over from its last draw
+        showWorn(player);
         NonNullList<ItemStack> armor = player.getInventory().armor;
         ItemStack[] worn = null;
+        int hiddenCosmetics = hiddenCosmetics();
         try {
             for (int slot = 0; slot < armor.size(); slot++) {
+                int piece = 1 << slot;
                 ItemStack shown;
-                if (shownPiece != 1 << slot && (Boolean) api.isSkinArmor().invoke(stacks, slot)) {
+                if (shownPiece == piece) {
+                    // The armour piece alone: the worn one stays
+                    continue;
+                } else if (shownPiece != piece << 4 && (Boolean) api.isSkinArmor().invoke(stacks, slot)) {
                     shown = ItemStack.EMPTY;
                 } else {
                     Object cosmetic = api.stackInSlot().invoke(stacks, slot);
-                    if (!(cosmetic instanceof ItemStack stack) || stack.isEmpty()) {
+                    if (!(cosmetic instanceof ItemStack stack) || stack.isEmpty()
+                            || shownPiece != piece << 4 && (hiddenCosmetics & piece << 4) != 0) {
                         continue;
                     }
                     shown = stack;
@@ -266,15 +378,29 @@ public final class CosmeticArmorPreview {
             Class<?> apiClass = Class.forName(API, false, loader);
             Class<?> stacks = Class.forName(STACKS, false, loader);
             Field disabled = null;
+            Object putBack = null;
+            Method putBackOf = null;
             try {
-                disabled = Class.forName(RENDER_HANDLER, false, loader).getField("Disabled");
-            } catch (ReflectiveOperationException | LinkageError absent) {
+                Class<?> handler = Class.forName(RENDER_HANDLER, false, loader);
+                disabled = handler.getField("Disabled");
+                // The handler's one instance keeps, per player, what to put back after its draw
+                Object instance = handler.isEnum() ? handler.getEnumConstants()[0] : null;
+                for (Field field : handler.getDeclaredFields()) {
+                    if (instance != null && !Modifier.isStatic(field.getModifiers())
+                            && com.google.common.cache.Cache.class.isAssignableFrom(field.getType())
+                            && field.getGenericType().getTypeName().contains("Deque")) {
+                        field.setAccessible(true);
+                        putBack = field.get(instance);
+                        putBackOf = com.google.common.cache.Cache.class.getMethod("getIfPresent", Object.class);
+                    }
+                }
+            } catch (ReflectiveOperationException | LinkageError | RuntimeException absent) {
                 // Without the client toggle the cosmetic armour always shows
             }
             return new Api(apiClass.getMethod("getCAStacksClient", UUID.class),
                     stacks.getMethod("getStackInSlot", int.class),
                     stacks.getMethod("isSkinArmor", int.class),
-                    disabled);
+                    disabled, putBack, putBack == null ? null : putBackOf);
         } catch (ClassNotFoundException absent) {
             return MISSING;
         } catch (ReflectiveOperationException | LinkageError | RuntimeException changed) {

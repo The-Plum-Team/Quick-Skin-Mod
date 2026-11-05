@@ -78,6 +78,8 @@ public class PlayerPreviewPanel extends AbstractWidget {
         playerWidget.setContext(PlayerWidget.WidgetContext.SKIN_MENU);
         playerWidget.setCustomReferencePoint(centerX, feetY);
         playerWidget.setScaleCap(scaleCap);
+        // The model draws before this panel, so its first frame needs the pose already
+        syncOwnPose();
 
         // Restore shared animation state from title screen
         String savedAnimation = com.quickskin.mod.client.services.PreviewAnimationState.get();
@@ -285,6 +287,7 @@ public class PlayerPreviewPanel extends AbstractWidget {
         playerWidget.visible = true;
         playerWidget.setSkin(skinLocation);
         applyModelTypeToPreview();
+        syncOwnPose();
     }
 
     /** Changes the previewed arm width: "auto", "classic" or "slim". */
@@ -344,6 +347,18 @@ public class PlayerPreviewPanel extends AbstractWidget {
         return modelType != null && "slim".equals(modelType.toLowerCase(Locale.ROOT)) ? "slim" : "classic";
     }
 
+    /**
+     * In a world too the model shows the chosen pose rather than copying what the player does; only
+     * a CPM model needs the live player, which CPM draws it on. Without it from the first frame, a
+     * model built anew (the column switching view, a resize) shows the live player for a frame.
+     */
+    private void syncOwnPose() {
+        updateCpmWearingState();
+        if (playerWidget != null) {
+            playerWidget.setOwnPose(!isCpmLook());
+        }
+    }
+
     private void updateCpmWearingState() {
         long elapsed = System.currentTimeMillis() - skinChangedAt;
         lastCpmWearing = elapsed < 2000
@@ -357,12 +372,7 @@ public class PlayerPreviewPanel extends AbstractWidget {
     //?} else {
     protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
     //?}
-        updateCpmWearingState();
-        if (playerWidget != null) {
-            // In a world too the model shows the chosen pose rather than copying what the player
-            // does; only a CPM model needs the live player, which CPM draws it on
-            playerWidget.setOwnPose(!isCpmLook());
-        }
+        syncOwnPose();
         if (cpmIconLocation == null) {
             return;
         }

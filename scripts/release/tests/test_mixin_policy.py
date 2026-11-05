@@ -20,6 +20,10 @@ MIXIN_MARKER = re.compile(r"@Mixin\s*\(")
 INJECTOR_MARKER = re.compile(r"@(Inject|ModifyArg|ModifyVariable|Redirect)\s*\(")
 HANDLER_MARKER = re.compile(r"\b(quickskin\$[A-Za-z0-9_$]+)\s*\(")
 JAVA_COMMENT = re.compile(r"//[^\n]*|/\*.*?\*/", re.DOTALL)
+# A RETURN hook takes every return of its target, and another mod's transformer may add returns
+# (CustomSkinLoader adds one to SkinManager.getInsecureSkinInformation on 1.20.1), so it declares
+# no upper bound, which would stop the game in production; its expect still counts vanilla's.
+RETURN_POINT = re.compile(r'@At\(\s*(?:value\s*=\s*)?"RETURN"')
 
 
 def relative(path: Path) -> str:
@@ -67,6 +71,8 @@ DEGRADABLE_MIXINS = {
     "main:com/quickskin/mod/mixin/armor/LocalHeadLayerMixin.java",
     "main:com/quickskin/mod/mixin/armor/PreviewArmorPoseMixin.java",
     "main:com/quickskin/mod/mixin/armor/ServerEquipmentFilterMixin.java",
+    # Forge 1.20.1 only: a hook that fails leaves other players seeing a hidden cosmetic piece.
+    "overlay:com/quickskin/mod/mixin/armor/ConnectionCosmeticArmorFilterMixin.java",
     "main:com/quickskin/mod/mixin/PreviewEquipmentMixin.java",
     "main:com/quickskin/mod/mixin/PreviewSkinSwapPoseMixin.java",
     # 1.20.1 only: without it the notice for players without Quick Skin is in English.
@@ -101,6 +107,7 @@ OPTIONAL_MIXINS = {
     "main:com/quickskin/mod/mixin/compat/RealCameraTextureIdMixin.java",
     "main:com/quickskin/mod/mixin/compat/JourneyMapIgnSkinMixin.java",
     "main:com/quickskin/mod/mixin/compat/JourneyMapTextureCacheMixin.java",
+    "main:com/quickskin/mod/mixin/compat/CosmeticArmorRenderMixin.java",
     "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
     "overlay:com/quickskin/mod/mixin/compat/ReplayModCompatMixin.java",
 }
@@ -140,6 +147,16 @@ ALTERNATIVE_HOOKS = {
     (
         "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
         "quickskin$skipStaleExtractedModel",
+    ),
+    # Cosmetic Armor Reworked's original and its NeoForge fork read the slot with Mojang names,
+    # its Fabric fork with intermediary ones; a runtime takes exactly one of the two.
+    (
+        "main:com/quickskin/mod/mixin/compat/CosmeticArmorRenderMixin.java",
+        "quickskin$cosmeticUnlessHidden",
+    ),
+    (
+        "main:com/quickskin/mod/mixin/compat/CosmeticArmorRenderMixin.java",
+        "quickskin$cosmeticUnlessHiddenIntermediary",
     ),
 }
 
@@ -190,14 +207,16 @@ INJECTION_COUNT_OVERRIDES = {
 }
 
 ALLOW_COUNT_OVERRIDES = {
+    # Audited builds: the original reads a slot three times (1.20.1, 1.21.1) or once (from 1.21.3),
+    # its fork four times, twice in handlePreRenderPlayer.
     (
-        "main:com/quickskin/mod/mixin/compat/EarsLayerRendererMixin.java",
-        "quickskin$getEarsFeatures",
-    ): {2},
+        "main:com/quickskin/mod/mixin/compat/CosmeticArmorRenderMixin.java",
+        "quickskin$cosmeticUnlessHidden",
+    ): {4},
     (
-        "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
-        "quickskin$getEarsFeatures",
-    ): {2},
+        "main:com/quickskin/mod/mixin/compat/CosmeticArmorRenderMixin.java",
+        "quickskin$cosmeticUnlessHiddenIntermediary",
+    ): {4},
     (
         "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
         "quickskin$skipStaleExtractedModel",
@@ -264,10 +283,13 @@ class MixinPolicyTest(unittest.TestCase):
                 )
                 with self.subTest(source=source_name, handler=handler_name):
                     self.assertEqual(assignment_values(context, "require"), {expected_require})
-                    self.assertEqual(
-                        assignment_values(context, "allow"),
-                        ALLOW_COUNT_OVERRIDES.get((source_name, handler_name), expected_counts),
-                    )
+                    if RETURN_POINT.search(JAVA_COMMENT.sub("", context)):
+                        self.assertEqual(assignment_values(context, "allow"), set())
+                    else:
+                        self.assertEqual(
+                            assignment_values(context, "allow"),
+                            ALLOW_COUNT_OVERRIDES.get((source_name, handler_name), expected_counts),
+                        )
                     if (source_name, handler_name) in ALTERNATIVE_HOOKS:
                         self.assertEqual(assignment_values(context, "expect"), {0})
                     else:
@@ -385,11 +407,14 @@ class MixinPolicyTest(unittest.TestCase):
                 )
 
     def test_every_loader_loads_the_armor_mixins(self) -> None:
-        armor_sources = {
-            path.stem
-            for path in (CANONICAL_JAVA / "com/quickskin/mod/mixin/armor").glob("*.java")
-            if MIXIN_MARKER.search(path.read_text(encoding="utf-8"))
-        }
+        def armor_mixins(java_root: Path) -> set[str]:
+            return {
+                path.stem
+                for path in (java_root / "com/quickskin/mod/mixin/armor").glob("*.java")
+                if MIXIN_MARKER.search(path.read_text(encoding="utf-8"))
+            }
+
+        armor_sources = armor_mixins(CANONICAL_JAVA)
         self.assertTrue(armor_sources)
         for path in self.configs_named("quickskin.mixins.json"):
             with self.subTest(config=relative(path)):
@@ -399,7 +424,12 @@ class MixinPolicyTest(unittest.TestCase):
                     for name in config["mixins"] + config["client"]
                     if name.startswith("armor.")
                 }
-                self.assertEqual(listed, armor_sources)
+                # An overlay's config also lists the armour mixins only that overlay has
+                overlay_java = path.parent.parent / "java"
+                expected = armor_sources | (
+                    armor_mixins(overlay_java) if overlay_java in OVERLAY_JAVA else set()
+                )
+                self.assertEqual(listed, expected)
                 self.assertIn("armor.ServerEquipmentFilterMixin", config["mixins"])
         neoforge = json.loads(NEOFORGE_ARMOR_CONFIG.read_text(encoding="utf-8"))
         self.assertEqual(neoforge["package"], ARMOR_MIXIN_PACKAGE)

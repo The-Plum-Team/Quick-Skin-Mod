@@ -51,8 +51,7 @@ public abstract class MixinAbstractClientPlayer {
             at = @At("RETURN"),
             cancellable = true,
             require = 1,
-            expect = 1,
-            allow = 1
+            expect = 1
     )
     private void quickskin$modifySkin(CallbackInfoReturnable<PlayerSkin> cir) {
         if (CPMCompatIntegration.shouldDeferToCPM()) return;

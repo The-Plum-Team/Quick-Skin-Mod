@@ -40,7 +40,7 @@ import net.minecraft.util.Util;
  * settles. At rest the glow holds still. While the mouse is on the ring or the model turns, the
  * glow eases into a slow, brighter breath, and when the mouse leaves it eases back to rest; the
  * glow blends between the two states rather than adding them. The skin menu turns the model when
- * a drag starts on the ring, and eases it back to face the viewer when the drag lets go.
+ * a drag starts on the ring, and the model stays turned when the drag lets go.
  */
 @Environment(EnvType.CLIENT)
 public class RotationArcWidget extends AbstractWidget {

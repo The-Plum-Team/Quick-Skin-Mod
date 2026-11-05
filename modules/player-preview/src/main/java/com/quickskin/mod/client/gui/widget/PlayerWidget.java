@@ -60,6 +60,8 @@ public class PlayerWidget extends AbstractWidget {
     private float rotationDragStartYaw = 0.0f;
     private float originalYRotation = 20.0f; // Original rotation to return to
     private boolean shouldReturnToOriginal = false;
+    // Whether a drag of the model itself lets go of it to ease back to the resting yaw
+    private boolean returnsToRest = true;
     private static final float ROTATION_SENSITIVITY = 0.5f; // Degrees per pixel
 //?} else {
 //?}
@@ -401,6 +403,16 @@ public class PlayerWidget extends AbstractWidget {
 //? if <1.21 {
         this.originalYRotation = yaw;
         this.shouldReturnToOriginal = false;
+//?}
+    }
+
+    /**
+     * Whether a drag of the model itself, which happens only before 1.21, lets go of it to ease
+     * back to the resting yaw ({@link #setRestingYRotation}); otherwise it stays turned.
+     */
+    public void setReturnsToRest(boolean returnsToRest) {
+//? if <1.21 {
+        this.returnsToRest = returnsToRest;
 //?}
     }
 
@@ -1190,9 +1202,11 @@ public class PlayerWidget extends AbstractWidget {
         // Handle rotation dragging release (left-click in normal mode, or right-click in any mode)
         if (isRotating && (button == InputConstants.MOUSE_BUTTON_LEFT || button == InputConstants.MOUSE_BUTTON_RIGHT)) {
             isRotating = false;
-            // Back to the resting yaw by the shortest way, not by unwinding every turn the drag made
-            originalYRotation += 360.0f * Math.round((targetYRotation - originalYRotation) / 360.0f);
-            shouldReturnToOriginal = true; // Start smooth return to original rotation
+            if (returnsToRest) {
+                // Back to the resting yaw by the shortest way, not by unwinding every turn the drag made
+                originalYRotation += 360.0f * Math.round((targetYRotation - originalYRotation) / 360.0f);
+                shouldReturnToOriginal = true; // Start smooth return to original rotation
+            }
             if (activeInteractionWidget == this) {
                 activeInteractionWidget = null; // Clear active widget
             }

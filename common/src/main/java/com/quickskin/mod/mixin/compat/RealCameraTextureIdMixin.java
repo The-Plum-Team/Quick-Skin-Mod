@@ -29,7 +29,6 @@ public abstract class RealCameraTextureIdMixin {
             cancellable = true,
             require = 0,
             expect = 1,
-            allow = 1,
             remap = false
     )
     private void quickskin$aliasQuickSkinSkin(CallbackInfoReturnable<String> cir) {
