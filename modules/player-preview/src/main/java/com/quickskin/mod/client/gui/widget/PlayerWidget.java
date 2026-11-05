@@ -706,11 +706,10 @@ public class PlayerWidget extends AbstractWidget {
             }
         }
 
-        // Tick animations (updates frame indices for animated capes)
-        // This is necessary because ClientTickEvent.CLIENT_POST doesn't fire in menus
-        com.quickskin.mod.client.services.AnimatedTextureManager animManager =
-            com.quickskin.mod.client.services.AnimatedTextureManager.getInstance();
-        animManager.tick();
+        // Advance the animated capes' frames each rendered frame, so the preview's cape moves as
+        // smoothly as the screen draws. Only the client tick counts slot ticks: counting frames
+        // there would shrink the slot policy's grace and retry windows to frames.
+        com.quickskin.mod.client.services.AnimatedTextureManager.getInstance().tickFrames();
 //? if <1.21 {
 
         // Handle return-to-original animation when not rotating
