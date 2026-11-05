@@ -1567,6 +1567,27 @@ class PackagedRuntimeSessionAndEvidenceTest(unittest.TestCase):
             wait_for_group.call_args_list,
         )
 
+    def test_one_failed_process_stop_still_stops_every_group_and_closes_handles(self) -> None:
+        server, client_a, client_b = mock.Mock(pid=1), mock.Mock(pid=2), mock.Mock(pid=3)
+        handles = [mock.Mock(), mock.Mock(), mock.Mock()]
+        stopped: list[object] = []
+
+        def stop(process: object) -> None:
+            stopped.append(process)
+            if process is client_b:
+                raise packaged_runtime.RuntimeFailure("group 3 did not quiesce")
+
+        with mock.patch.object(packaged_runtime, "stop_process", side_effect=stop):
+            errors = packaged_runtime.stop_processes_and_close(
+                [server, client_a, client_b], handles
+            )
+
+        self.assertEqual([client_b, client_a, server], stopped)
+        for handle in handles:
+            handle.close.assert_called_once_with()
+        self.assertEqual(1, len(errors))
+        self.assertIn("did not quiesce", errors[0])
+
     def test_exited_forge_shell_does_not_hide_lingering_java_child(self) -> None:
         process = mock.Mock()
         process.pid = 4242
