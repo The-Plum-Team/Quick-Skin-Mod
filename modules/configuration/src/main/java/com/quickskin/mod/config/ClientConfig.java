@@ -152,6 +152,11 @@ public class ClientConfig {
         if (Files.exists(configPath)) {
             try {
                 String json = BoundedFileReader.readUtf8(configPath, MAX_CONFIG_BYTES);
+                if (json.isBlank()) {
+                    // An empty file holds nothing to keep: replace it with the defaults, as if
+                    // it were missing, so the settings stay savable.
+                    return writeDefaults(configPath);
+                }
                 ClientConfig config = parse(json);
                 if (config != null) {
                     if (config.migrate()) {
@@ -171,7 +176,11 @@ public class ClientConfig {
             return fallback;
         }
 
-        // Return default config and save it
+        return writeDefaults(configPath);
+    }
+
+    /** The default settings, saved to {@code configPath}. */
+    private static ClientConfig writeDefaults(Path configPath) {
         ClientConfig config = new ClientConfig();
         config.configVersion = CURRENT_CONFIG_VERSION;
         config.save(configPath);

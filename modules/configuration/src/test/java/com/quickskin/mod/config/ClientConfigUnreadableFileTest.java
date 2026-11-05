@@ -48,4 +48,19 @@ class ClientConfigUnreadableFileTest {
         assertTrue(config.save(file));
         assertEquals("c".repeat(40), ClientConfig.load(file).activeSkinHash);
     }
+
+    @Test
+    void anEmptyOrBlankFileIsReplacedWithTheDefaultsAndStaysWritable() throws Exception {
+        for (String blank : new String[] {"", "  \n\t"}) {
+            Path file = directory.resolve("blank.json");
+            Files.writeString(file, blank, StandardCharsets.UTF_8);
+
+            ClientConfig config = ClientConfig.load(file);
+            assertTrue(Files.size(file) > blank.length());
+            config.activeSkinHash = "d".repeat(40);
+            assertTrue(config.save(file));
+            assertEquals("d".repeat(40), ClientConfig.load(file).activeSkinHash);
+            Files.delete(file);
+        }
+    }
 }
