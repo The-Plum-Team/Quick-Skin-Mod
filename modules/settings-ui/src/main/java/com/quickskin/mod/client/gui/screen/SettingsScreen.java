@@ -807,8 +807,7 @@ public class SettingsScreen extends Screen {
         // Handle setting a keybind with a mouse click
         if (this.selectedKey != null) {
             this.selectedKey.setKey(InputConstants.Type.MOUSE.getOrCreate(button));
-            KeyMapping.resetMapping();
-            this.selectedKey = null;
+            commitKeyBinding();
             return true;
         }
 
@@ -871,8 +870,7 @@ public class SettingsScreen extends Screen {
                 this.selectedKey.setKey(InputConstants.getKey(event));
                 //?}
             }
-            KeyMapping.resetMapping();
-            this.selectedKey = null;
+            commitKeyBinding();
             return true;
         }
 
@@ -1003,6 +1001,18 @@ public class SettingsScreen extends Screen {
             }
         } catch (NumberFormatException e) {
             // Invalid input, keep existing value
+        }
+    }
+
+    /**
+     * Ends a key capture: rebuilds the key lookup and writes options.txt, as vanilla's own key
+     * binds screen does, so the new binding survives a restart.
+     */
+    private void commitKeyBinding() {
+        KeyMapping.resetMapping();
+        this.selectedKey = null;
+        if (this.minecraft != null) {
+            this.minecraft.options.save();
         }
     }
 
