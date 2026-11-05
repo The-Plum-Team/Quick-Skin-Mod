@@ -13,6 +13,7 @@ import com.quickskin.mod.common.util.HashUtil;
 import com.quickskin.mod.common.util.BoundedFileReader;
 import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import com.quickskin.mod.common.util.HDTextureProcessor;
+import com.quickskin.mod.common.util.RawArgbImages;
 import com.quickskin.mod.common.util.SkinModelDetector;
 import com.quickskin.mod.common.util.SafeImageReader;
 import com.quickskin.mod.config.ClientConfig;
@@ -569,6 +570,11 @@ public class LocalAssetManager {
             BufferedImage image = SafeImageReader.readPng(sourceBytes);
             if (image == null) {
                 return null;
+            }
+            // A greyscale PNG is resized and read through getRGB below, which would brighten its
+            // raw grey samples; read it as vanilla shows it.
+            if (RawArgbImages.isRawGray(image)) {
+                image = RawArgbImages.toIntArgb(image);
             }
 
             AnimationMetadata animMeta = null;

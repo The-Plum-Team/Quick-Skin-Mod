@@ -53,6 +53,23 @@ class CapeImportProcessorTest {
     }
 
     @Test
+    void aGreyscalePngCapeKeepsItsRawGreySamples() throws IOException {
+        java.awt.image.ComponentColorModel model = new java.awt.image.ComponentColorModel(
+                java.awt.color.ColorSpace.getInstance(java.awt.color.ColorSpace.CS_GRAY), true, false,
+                java.awt.Transparency.TRANSLUCENT, java.awt.image.DataBuffer.TYPE_BYTE);
+        java.awt.image.WritableRaster raster = model.createCompatibleWritableRaster(64, 32);
+        raster.setSample(2, 3, 0, 128);
+        raster.setSample(2, 3, 1, 200);
+        Path source = temporaryDirectory.resolve("grey.png");
+        assertTrue(ImageIO.write(new BufferedImage(model, raster, false, null), "png", source.toFile()));
+
+        CapeImportProcessor.PreparedCape prepared = preparePng(source);
+
+        // getRGB would read grey 128 as 188; vanilla shows 128.
+        assertEquals(0xC8808080, prepared.atlas().getRGB(2, 3));
+    }
+
+    @Test
     void preparesAValidStandardWebp() throws IOException {
         // A lossless 64x32 WebP, transparent but for an opaque red cape face at (1,1)-(10,16)
         Path source = temporaryDirectory.resolve("cape.webp");
