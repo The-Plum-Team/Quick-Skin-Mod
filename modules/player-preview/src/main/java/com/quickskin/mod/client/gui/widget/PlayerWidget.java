@@ -461,6 +461,9 @@ public class PlayerWidget extends AbstractWidget {
     private void syncNaturalBounds() {
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
         float scaleForConfig = PreviewLayoutBox.scaleForPercentage(getSliderPercentageFromConfig(config));
+        if (scaleCap != null) {
+            scaleForConfig = Math.min(scaleForConfig, scaleCap);
+        }
         PreviewLayoutBox.Box box = PreviewLayoutBox.natural(
                 layoutAnchorX + getPositionOffsetXFromConfig(config),
                 layoutAnchorFeetY + getPositionOffsetYFromConfig(config),

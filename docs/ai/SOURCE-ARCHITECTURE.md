@@ -166,7 +166,10 @@ Settings reconstruct their parent through `RestylableScreen`; key handling recei
 callback from bootstrap. Neither mechanism introduces a settings-to-skin-menu compile dependency.
 `menu-integration` owns injected title/pause controls, preview rotation/animation state and deferred
 menu rendering. Its skin-menu action is another bootstrap callback, covered by
-`vanilla-menu-navigation`; it does not compile against the skin menu. `hud-preview` owns its overlay,
+`vanilla-menu-navigation`; it does not compile against the skin menu.
+At its default size and place the title preview shrinks only as far as the window and GUI
+scale need to keep it below the logo and the splash text (`TitleSplashClearance`); a size or
+position the player set is drawn as configured. `hud-preview` owns its overlay,
 mouse/tick/render callbacks and drag state independently of menu widgets. Bootstrap keeps CPM's
 frame-boundary callback after HUD extraction, including when the HUD is hidden.
 `favourites-fan` owns the favourites fan: its key (registered through `KeybindRegistry`), its HUD
