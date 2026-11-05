@@ -87,8 +87,12 @@ public class LocalAppearanceStorage {
             return;
         }
 
-        // Load existing preferences
+        // Load existing preferences; a file that cannot be read is never saved over, since that
+        // would drop every other player's preferences along with the damaged ones.
         PreferencesData data = loadPreferencesData();
+        if (data == null) {
+            return;
+        }
 
         // Get or create preferences for this player
         PlayerPreferences prefs = data.players.computeIfAbsent(
@@ -114,6 +118,9 @@ public class LocalAppearanceStorage {
             return false;
         }
         PreferencesData data = loadPreferencesData();
+        if (data == null) {
+            return false;
+        }
         boolean changed = false;
         for (PlayerPreferences preferences : data.players.values()) {
             String migrated = aliases.get(preferences.lastSkinId);
@@ -126,7 +133,10 @@ public class LocalAppearanceStorage {
     }
 
     /**
-     * Load all preferences from disk
+     * Load all preferences from disk.
+     *
+     * @return the stored preferences, empty ones when there is no file, or null when the file
+     *     exists but cannot be read; such a file is left untouched until it is fixed
      */
     private PreferencesData loadPreferencesData() {
         if (storageFile == null || !Files.isRegularFile(storageFile)) {
@@ -136,8 +146,12 @@ public class LocalAppearanceStorage {
         try {
             long size = Files.size(storageFile);
             if (size <= 0 || size > MAX_PREFERENCES_BYTES) {
-                QuickSkinInfo.LOGGER.warn("Ignoring oversized local appearance preferences {}", storageFile);
-                return new PreferencesData();
+                if (size <= 0) {
+                    return new PreferencesData();
+                }
+                QuickSkinInfo.LOGGER.error("Ignoring oversized local appearance preferences {} and"
+                        + " leaving the file untouched", storageFile);
+                return null;
             }
             String json = BoundedFileReader.readUtf8(storageFile, MAX_PREFERENCES_BYTES);
             PreferencesData data = GSON.fromJson(json, PreferencesData.class);
@@ -147,8 +161,9 @@ public class LocalAppearanceStorage {
             normalize(data);
             return data;
         } catch (IOException | RuntimeException e) {
-            QuickSkinInfo.LOGGER.warn("Unable to load local appearance preferences {}", storageFile, e);
-            return new PreferencesData();
+            QuickSkinInfo.LOGGER.error("Unable to load local appearance preferences {}; leaving the"
+                    + " file untouched until it is fixed", storageFile, e);
+            return null;
         }
     }
 

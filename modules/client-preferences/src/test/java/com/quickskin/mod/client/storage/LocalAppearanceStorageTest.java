@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LocalAppearanceStorageTest {
@@ -31,5 +32,19 @@ class LocalAppearanceStorageTest {
         assertEquals(strong, data.players.get(playerId.toString()).lastSkinId);
         assertEquals("slim", data.players.get(playerId.toString()).lastModelType);
         assertTrue(data.players.get(playerId.toString()).favorites.isEmpty());
+    }
+
+    @Test
+    void anUnreadablePreferencesFileIsNeverSavedOver() throws Exception {
+        LocalAppearanceStorage storage = LocalAppearanceStorage.getInstance();
+        storage.init(directory);
+        Path file = directory.resolve("quickskin_preferences.json");
+        String broken = "{\"players\": {\"" + UUID.randomUUID() + "\": {\"lastSkinId\": [}}}";
+        Files.writeString(file, broken);
+
+        storage.savePlayerPreferences(UUID.randomUUID(), "a".repeat(40), "slim");
+        assertFalse(storage.migrateContentIds(Map.of("a".repeat(40), "sha256-" + "b".repeat(64))));
+
+        assertEquals(broken, Files.readString(file));
     }
 }

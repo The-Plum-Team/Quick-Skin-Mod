@@ -98,9 +98,8 @@ public final class ModCompatibilityLateJoinScenario implements Scenario {
                 .minTicks(5)
                 .ready(() -> {
                     evidence.stepTowardVantage(minecraft);
-                    return evidence.atVantage(minecraft)
-                            && evidence.checkRemoteState(
-                                    minecraft, modId, appliedState).pass();
+                    return evidence.observerReady(
+                            "observe_late_join_state", minecraft, modId, appliedState);
                 })
                 .settleTicks(20)
                 .timeoutTicks(20 * 90)
@@ -114,6 +113,8 @@ public final class ModCompatibilityLateJoinScenario implements Scenario {
             Minecraft minecraft, String modId, boolean appliedState) {
         Step.Result state = evidence.checkRemoteState(minecraft, modId, appliedState);
         if (!state.pass()) return state;
+        Step.Result rendered = evidence.checkSubjectRendered(minecraft);
+        if (!rendered.pass()) return rendered;
         Step.Result rear = evidence.checkRearComposition(minecraft);
         if (!rear.pass()) return rear;
         return Step.Result.pass("Bob joined after Alice completed the state and recovered it "

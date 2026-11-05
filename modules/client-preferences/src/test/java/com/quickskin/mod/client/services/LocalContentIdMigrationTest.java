@@ -35,6 +35,20 @@ class LocalContentIdMigrationTest {
     }
 
     @Test
+    void capeSpeedsMoveToTheStrongIdWithoutDiscardingADifferentOne() {
+        Map<String, String> aliases = Map.of(LEGACY, STRONG);
+
+        assertEquals(Map.of("local_cape:" + STRONG, 0.5f), LocalContentIdMigration.migrateCapeSpeeds(
+                new java.util.HashMap<>(Map.of("local_cape:" + LEGACY, 0.5f)), aliases));
+        assertEquals(Map.of("local_cape:" + STRONG, 0.5f), LocalContentIdMigration.migrateCapeSpeeds(
+                new java.util.HashMap<>(Map.of("local_cape:" + LEGACY, 0.5f, "local_cape:" + STRONG, 0.5f)),
+                aliases));
+        assertEquals(Map.of("local_cape:" + LEGACY, 0.5f, "local_cape:" + STRONG, 2.0f),
+                LocalContentIdMigration.migrateCapeSpeeds(new java.util.HashMap<>(
+                        Map.of("local_cape:" + LEGACY, 0.5f, "local_cape:" + STRONG, 2.0f)), aliases));
+    }
+
+    @Test
     void rejectsInvalidDirectionsAtTheMigrationBoundary() {
         Map<String, String> aliases = LocalContentIdMigration.validatedAliases(Map.of(
                 LEGACY, STRONG,

@@ -4,6 +4,7 @@ import com.quickskin.mod.common.data.AnimationMetadata;
 import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import com.quickskin.mod.common.util.HashUtil;
 import com.quickskin.mod.common.util.BoundedFileReader;
+import com.quickskin.mod.common.util.RawArgbImages;
 import com.quickskin.mod.common.util.SafeImageReader;
 import com.quickskin.mod.common.util.GifDecoder;
 import com.quickskin.mod.common.util.UserFacingIOException;
@@ -87,6 +88,11 @@ public final class CapeImportProcessor {
             image = SafeImageReader.readStillCape(source);
         } catch (IOException unreadable) {
             throw new UserFacingIOException(unreadable.getMessage(), "quickskin.cape.error.invalid_image");
+        }
+        // A greyscale PNG keeps the raw grey samples vanilla shows; every later step reads getRGB,
+        // which would brighten them.
+        if (RawArgbImages.isRawGray(image)) {
+            image = RawArgbImages.toIntArgb(image);
         }
         validateAtlas(image.getWidth(), image.getHeight(), 1);
         return new PreparedCape(source, image, 1, null, false,

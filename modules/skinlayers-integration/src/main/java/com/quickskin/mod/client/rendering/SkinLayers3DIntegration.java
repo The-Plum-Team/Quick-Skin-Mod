@@ -49,6 +49,7 @@ import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -88,6 +89,12 @@ public final class SkinLayers3DIntegration {
 
 //?}
     private static final ConcurrentMap<MeshCacheKey, PlayerMeshes> MESH_CACHE = new ConcurrentHashMap<>();
+    /**
+     * Skins decoded once that cannot carry 3D layers (not 64x64), so a preview showing one does
+     * not decode it again every frame; cleared with the mesh cache.
+     */
+    private static final int MAX_REFUSED_SKINS = 64;
+    private static final Set<MeshCacheKey> REFUSED_SKINS = ConcurrentHashMap.newKeySet();
 
     private static volatile CapabilityState meshCapability = CapabilityState.UNCHECKED;
     private static volatile CapabilityState refreshCapability = CapabilityState.UNCHECKED;
@@ -564,6 +571,7 @@ public final class SkinLayers3DIntegration {
 
     public static void clearCache() {
         MESH_CACHE.clear();
+        REFUSED_SKINS.clear();
         cachedCpmLocalModelActive = false;
         nextCpmModelProbeNanos = 0L;
     }
@@ -1032,9 +1040,21 @@ public final class SkinLayers3DIntegration {
         if (cached != null) MESH_CACHE.remove(key, cached);
 
 //?}
+        if (REFUSED_SKINS.contains(key)) {
+            return null;
+        }
+        SkinPixels pixels = null;
         try {
-            NativeImage skin = getSkinTexture(skinLocation);
-            if (skin == null || skin.getWidth() != 64 || skin.getHeight() != 64) {
+            pixels = getSkinTexture(skinLocation);
+            if (pixels == null) {
+                return null;
+            }
+            NativeImage skin = pixels.image();
+            if (skin.getWidth() != 64 || skin.getHeight() != 64) {
+                if (REFUSED_SKINS.size() >= MAX_REFUSED_SKINS) {
+                    REFUSED_SKINS.clear();
+                }
+                REFUSED_SKINS.add(key);
                 return null;
             }
             PlayerMeshes created = new PlayerMeshes(
@@ -1065,6 +1085,10 @@ public final class SkinLayers3DIntegration {
                 );
             }
             return null;
+        } finally {
+            if (pixels != null) {
+                pixels.close();
+            }
         }
     }
 
@@ -1118,17 +1142,33 @@ public final class SkinLayers3DIntegration {
         );
     }
 
+    /**
+     * A skin's pixels for mesh creation. Only an image decoded for it is {@code owned} and closed
+     * after use; a texture's own pixels stay the texture's.
+     */
+    private record SkinPixels(NativeImage image, boolean owned) {
+        static SkinPixels decoded(NativeImage image) {
+            return image == null ? null : new SkinPixels(image, true);
+        }
+
+        void close() {
+            if (owned) {
+                image.close();
+            }
+        }
+    }
+
 //? if <1.21.11 {
-    private static NativeImage getSkinTexture(ResourceLocation skinLocation) {
+    private static SkinPixels getSkinTexture(ResourceLocation skinLocation) {
 //?} else {
-    private static NativeImage getSkinTexture(Identifier skinLocation) {
+    private static SkinPixels getSkinTexture(Identifier skinLocation) {
 //?}
         try {
             Minecraft minecraft = Minecraft.getInstance();
             var resource = minecraft.getResourceManager().getResource(skinLocation);
             if (resource.isPresent()) {
                 try (InputStream stream = resource.get().open()) {
-                    return NativeImage.read(stream);
+                    return SkinPixels.decoded(NativeImage.read(stream));
                 }
             }
         } catch (Exception | LinkageError ignored) {
@@ -1139,19 +1179,19 @@ public final class SkinLayers3DIntegration {
             if (texture instanceof DynamicTexture dynamicTexture) {
                 NativeImage pixels = dynamicTexture.getPixels();
                 if (pixels != null) {
-                    return pixels;
+                    return new SkinPixels(pixels, false);
                 }
             }
             File backingFile = findTextureBackingFile(texture);
             if (backingFile != null && backingFile.isFile()) {
                 try (FileInputStream stream = new FileInputStream(backingFile)) {
-                    return NativeImage.read(stream);
+                    return SkinPixels.decoded(NativeImage.read(stream));
                 }
             }
         } catch (Exception | LinkageError ignored) {
         }
         // A texture-manager miss must not bypass Quick Skin's authoritative local asset store.
-        return getQuickSkinLocalTexture(skinLocation);
+        return SkinPixels.decoded(getQuickSkinLocalTexture(skinLocation));
     }
 
 //? if <1.21.11 {

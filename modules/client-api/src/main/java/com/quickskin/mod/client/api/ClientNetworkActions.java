@@ -18,6 +18,15 @@ public interface ClientNetworkActions {
     void updateServerConfig(String key, boolean value);
 
     /**
+     * Sets the skin change cooldown of the server this client hosts (singleplayer or LAN), on
+     * that server's thread, and sends its configuration to every player. The cooldown has no
+     * packet of its own, so a remote server's cooldown is set in its configuration file instead.
+     *
+     * @return false when this client hosts no server
+     */
+    boolean updateHostedServerCooldown(int seconds);
+
+    /**
      * Reports a successful, user-initiated upload to the player's own Mojang account to the
      * connected server, when it negotiated {@code account-skin-refresh}.
      *

@@ -1606,6 +1606,31 @@ def _wait_for_posix_process_group_exit(
         time.sleep(min(PROCESS_GROUP_POLL_SECONDS, remaining))
 
 
+def stop_processes_and_close(
+    processes: list[subprocess.Popen[bytes]],
+    handles: list[BinaryIO],
+) -> list[str]:
+    """Stop every launched process group, newest first, then close every log handle.
+
+    One group that cannot be stopped must not leave the server or the remaining groups
+    running, so each stop is attempted independently and its failure is returned instead
+    of raised. Handles are closed only after every stop has been attempted.
+    """
+
+    errors: list[str] = []
+    for process in reversed(processes):
+        try:
+            stop_process(process)
+        except Exception as exc:  # noqa: BLE001 - every group must still be attempted
+            errors.append(f"pid {getattr(process, 'pid', '?')}: {exc}")
+    for handle in handles:
+        try:
+            handle.close()
+        except Exception as exc:  # noqa: BLE001 - close the remaining handles
+            errors.append(f"log handle: {exc}")
+    return errors
+
+
 def stop_process(process: subprocess.Popen[bytes] | None) -> None:
     if process is None:
         return
@@ -1817,6 +1842,10 @@ def marker_value(game_dir: Path, role: str) -> str | None:
     if not marker.is_file():
         return None
     value = marker.read_text(encoding="utf-8").strip()
+    if not value:
+        # Older harnesses create the sentinel before writing its value; an empty marker is
+        # still being written, not a verdict.
+        return None
     if value not in {"pass", "fail"}:
         raise RuntimeFailure(f"invalid {role} done.marker value {value!r}")
     return value
@@ -2971,13 +3000,25 @@ def run_packaged_row(
     except Exception as exc:
         result["error"] = str(exc)
     finally:
-        for process in reversed(processes):
-            stop_process(process)
-        for handle in handles:
-            handle.close()
+        stop_errors = stop_processes_and_close(processes, handles)
+        if stop_errors:
+            result["status"] = "fail"
+            result.pop("reports", None)
+            previous_error = result.get("error")
+            stop_error = "process stop failed: " + "; ".join(stop_errors)
+            result["error"] = (
+                f"{previous_error}; {stop_error}" if previous_error else stop_error
+            )
         result["elapsed_s"] = round(time.monotonic() - started, 1)
         try:
-            export_profile_evidence(profile, evidence_profile, result)
+            # A group that was never reaped may still be writing its logs, screenshots
+            # and reports, so only result.json (carrying the stop error) is frozen then.
+            export_profile_evidence(
+                profile,
+                evidence_profile,
+                result,
+                include_runtime_files=not stop_errors,
+            )
         except Exception as export_error:
             result["status"] = "fail"
             previous_error = result.get("error")
@@ -2995,4 +3036,8 @@ def run_packaged_row(
                 )
             except Exception:
                 pass
+    if stop_errors:
+        # An un-reaped process group may still hold the port, the runtime store lease
+        # or the display, so the whole run stops here instead of starting the next row.
+        raise RuntimeFailure(f"{identity}: {result['error']}")
     return result

@@ -422,6 +422,34 @@ class VisualEvidenceTest(unittest.TestCase):
         )
         self.assertEqual([], comparisons)
 
+    def test_rejects_one_screenshot_file_backing_two_captures(self) -> None:
+        self.write_catalog(
+            [
+                ("phase0-smoke", "client_a", "baseline"),
+                ("phase0-smoke", "client_a", "second"),
+            ]
+        )
+        result_path = self.write_result("phase0-smoke")
+        data = json.loads(result_path.read_text(encoding="utf-8"))
+        report = data["reports"]["client_a"]
+        first = report["steps"][0]
+        report["steps"].append(dict(first, name="second"))
+        screenshots = report["pixel_validation"]["screenshots"]
+        screenshots["second"] = dict(screenshots["baseline"])
+        result_path.write_text(json.dumps(data), encoding="utf-8")
+
+        with self.assertRaisesRegex(VisualEvidenceError, "more than one capture"):
+            collect_evidence(self.e2e_root, load_catalog(self.catalog_path))
+
+        # The same report with a distinct file per capture is accepted.
+        (result_path.parent / "client_a" / "screenshots" / "second.png").write_bytes(PNG)
+        report["steps"][1]["screenshot"] = "second.png"
+        result_path.write_text(json.dumps(data), encoding="utf-8")
+        _lanes, frames, _comparisons = collect_evidence(
+            self.e2e_root, load_catalog(self.catalog_path)
+        )
+        self.assertEqual(2, len(frames))
+
     def test_rejects_digest_drift_non_pass_and_path_traversal(self) -> None:
         self.write_catalog([("phase0-smoke", "client_a", "baseline")])
         cases = (

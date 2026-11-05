@@ -119,6 +119,9 @@ public class ClientConfig {
     public AccountNicknames accountNicknames = new AccountNicknames(); // Cosmetic nickname per launcher account
     public AccountHiddenArmor accountHiddenArmor = new AccountHiddenArmor(); // Armour pieces each launcher account hides
 
+    /** False when the file could not be read; such a file is never overwritten. */
+    private transient boolean persistable = true;
+
     // Server Config Override (set by server, not saved to file)
     public transient volatile ServerConfig serverOverride = null;
 
@@ -137,28 +140,50 @@ public class ClientConfig {
      * Load configuration from file
      */
     private static ClientConfig load() {
-        Path configPath = getConfigPath();
+        return load(getConfigPath());
+    }
 
+    /**
+     * Reads the file, or writes the defaults when there is none. A file that cannot be read is
+     * left untouched: the defaults used instead are never saved over it, so a hand edit that
+     * broke the JSON cannot cost every launcher account its selections.
+     */
+    static ClientConfig load(Path configPath) {
         if (Files.exists(configPath)) {
             try {
                 String json = BoundedFileReader.readUtf8(configPath, MAX_CONFIG_BYTES);
+                if (json.isBlank()) {
+                    // An empty file holds nothing to keep: replace it with the defaults, as if
+                    // it were missing, so the settings stay savable.
+                    return writeDefaults(configPath);
+                }
                 ClientConfig config = parse(json);
                 if (config != null) {
                     if (config.migrate()) {
-                        config.save();
+                        config.save(configPath);
                     }
                     return config;
                 }
-                QuickSkinInfo.LOGGER.warn("Client config {} contained JSON null; using defaults", configPath);
+                QuickSkinInfo.LOGGER.error("Client config {} contained JSON null; using defaults and"
+                        + " leaving the file untouched until it is fixed", configPath);
             } catch (Exception e) {
-                QuickSkinInfo.LOGGER.warn("Could not load client config {}; using defaults", configPath, e);
+                QuickSkinInfo.LOGGER.error("Could not read client config {}; using defaults and"
+                        + " leaving the file untouched until it is fixed", configPath, e);
             }
+            ClientConfig fallback = new ClientConfig();
+            fallback.configVersion = CURRENT_CONFIG_VERSION;
+            fallback.persistable = false;
+            return fallback;
         }
 
-        // Return default config and save it
+        return writeDefaults(configPath);
+    }
+
+    /** The default settings, saved to {@code configPath}. */
+    private static ClientConfig writeDefaults(Path configPath) {
         ClientConfig config = new ClientConfig();
         config.configVersion = CURRENT_CONFIG_VERSION;
-        config.save();
+        config.save(configPath);
         return config;
     }
 
@@ -193,8 +218,15 @@ public class ClientConfig {
      * Save configuration to file
      */
     public synchronized boolean save() {
-        Path configPath = getConfigPath();
+        return save(getConfigPath());
+    }
 
+    synchronized boolean save(Path configPath) {
+        if (!persistable) {
+            QuickSkinInfo.LOGGER.warn("Not saving client config {}: it could not be read at start,"
+                    + " so it is left as it is", configPath);
+            return false;
+        }
         try {
             // Ensure config directory exists
             Files.createDirectories(configPath.getParent());

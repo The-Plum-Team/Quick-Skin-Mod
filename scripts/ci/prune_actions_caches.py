@@ -27,9 +27,13 @@ from typing import Any, Protocol
 
 REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
+# setup-gradle keys a home as ``gradle-home-vN|<os>|<job>[<job instance>]-<sha>``.  The job
+# instance hashes the workflow name and the job's matrix values, so every Build matrix target
+# restores its own ``...|<job>[<instance>]`` prefix first: the instance is part of the restore
+# family, and a generation of one target never replaces another target's.
 GRADLE_HOME_KEY = re.compile(
     r"^(gradle-home-v[1-9][0-9]*\|[A-Za-z0-9_.-]+\|"
-    r"[A-Za-z0-9_.-]+)\[[0-9a-f]{32}\]-([0-9a-f]{40})$"
+    r"[A-Za-z0-9_.-]+\[[0-9a-f]{32}\])-([0-9a-f]{40})$"
 )
 BRANCH_REF_PREFIX = "refs/heads/"
 ACTIVE_RUN_STATUSES = ("requested", "pending", "queued", "in_progress", "waiting")
@@ -94,7 +98,7 @@ class CacheEntry:
 
     @property
     def gradle_home_generation(self) -> tuple[str, str] | None:
-        """Return the broad restore family and commit SHA for a known key."""
+        """Return the job-instance restore family and commit SHA for a known key."""
         match = GRADLE_HOME_KEY.fullmatch(self.key)
         if match is None:
             return None

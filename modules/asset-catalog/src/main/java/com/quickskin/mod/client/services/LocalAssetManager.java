@@ -13,6 +13,7 @@ import com.quickskin.mod.common.util.HashUtil;
 import com.quickskin.mod.common.util.BoundedFileReader;
 import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import com.quickskin.mod.common.util.HDTextureProcessor;
+import com.quickskin.mod.common.util.RawArgbImages;
 import com.quickskin.mod.common.util.SkinModelDetector;
 import com.quickskin.mod.common.util.SafeImageReader;
 import com.quickskin.mod.config.ClientConfig;
@@ -570,6 +571,11 @@ public class LocalAssetManager {
             if (image == null) {
                 return null;
             }
+            // A greyscale PNG is resized and read through getRGB below, which would brighten its
+            // raw grey samples; read it as vanilla shows it.
+            if (RawArgbImages.isRawGray(image)) {
+                image = RawArgbImages.toIntArgb(image);
+            }
 
             AnimationMetadata animMeta = null;
             if ("cape".equals(type)) {
@@ -642,7 +648,7 @@ public class LocalAssetManager {
                         return null;
                     }
                     image = HDTextureProcessor.resizeAnimationStrip(image, resolution.getWidth());
-                    if (!ImageIO.write(image, "PNG", path.toFile())) return null;
+                    replaceWithPng(path, image);
                     width = image.getWidth();
                     height = image.getHeight();
                 }
@@ -657,7 +663,7 @@ public class LocalAssetManager {
                         }
                         // Resize the image and overwrite the file so loadTexture works correctly
                         image = HDTextureProcessor.resizeToResolution(image, resolution);
-                        if (!ImageIO.write(image, "PNG", path.toFile())) return null;
+                        replaceWithPng(path, image);
                         width = image.getWidth();
                         height = image.getHeight();
                     }
@@ -680,7 +686,7 @@ public class LocalAssetManager {
                             } else {
                                 image = HDTextureProcessor.resizeToResolution(image, resolution);
                             }
-                            if (!ImageIO.write(image, "PNG", path.toFile())) return null;
+                            replaceWithPng(path, image);
                             width = image.getWidth();
                             height = image.getHeight();
                         }
@@ -736,6 +742,7 @@ public class LocalAssetManager {
             }
 
         } catch (Exception e) {
+            QuickSkinInfo.LOGGER.warn("Leaving {} out of the catalog: {}", path, e.toString());
             return null;
         }
     }
@@ -888,7 +895,7 @@ public class LocalAssetManager {
                                 null);
                     }
                     g.dispose();
-                    ImageIO.write(resizedAtlas, "PNG", atlasPath.toFile());
+                    replaceWithPng(atlasPath, resizedAtlas);
                 }
 //?} else {
                 resolution = SkinResolution.STANDARD;
@@ -1064,7 +1071,21 @@ public class LocalAssetManager {
                 root, target, pngBytes, MAX_ASSET_BYTES, LocalAssetManager::isValidPngBytes);
     }
 
-    private void writeVerifiedCacheFile(
+    /**
+     * Replaces a PNG the catalog rewrites, which may be the player's only copy of that skin or
+     * cape, without ever destroying it: the encoded image goes to a verified temporary file beside
+     * it that then atomically replaces it, so a full disk or a crash leaves the original.
+     */
+    static void replaceWithPng(Path target, BufferedImage image) throws IOException {
+        java.io.ByteArrayOutputStream encoded = new java.io.ByteArrayOutputStream();
+        if (!ImageIO.write(image, "PNG", encoded)) throw new IOException("No PNG encoder");
+        Path parent = target.toAbsolutePath().normalize().getParent();
+        if (parent == null) throw new IOException("PNG has no parent directory");
+        writeVerifiedCacheFile(parent, target, encoded.toByteArray(),
+                MAX_ASSET_BYTES, LocalAssetManager::isValidPngBytes);
+    }
+
+    private static void writeVerifiedCacheFile(
             Path root,
             Path target,
             byte[] bytes,
@@ -1137,18 +1158,32 @@ public class LocalAssetManager {
      * favorites, each group in the mode's order
      */
     private Comparator<AssetMetadata> getSortComparator(SkinSortMode mode, String playerSkinHash) {
+        SkinPreferences preferences = skinPreferences;
+        return sortComparator(mode, playerSkinHash,
+                hash -> preferences != null && preferences.isFavorite(hash));
+    }
+
+    /**
+     * The list order: the own skin, then favourites, then the rest, each group oldest first,
+     * newest first or by name. Equal times fall back to the name so the order is stable.
+     */
+    static Comparator<AssetMetadata> sortComparator(
+            SkinSortMode mode, String playerSkinHash, java.util.function.Predicate<String> favorite) {
         Comparator<AssetMetadata> pinned = Comparator
                 .comparing((AssetMetadata meta) -> !meta.hash().equals(playerSkinHash))
-                .thenComparing(meta -> skinPreferences == null || !skinPreferences.isFavorite(meta.hash()));
+                .thenComparing(meta -> !favorite.test(meta.hash()));
+        Comparator<AssetMetadata> byName = Comparator.comparing(AssetMetadata::friendlyName);
         return switch (mode) {
             case LATEST_LAST -> pinned
-                    .thenComparing(AssetMetadata::friendlyName);
+                    .thenComparing(Comparator.comparingLong(AssetMetadata::lastModifiedTime))
+                    .thenComparing(byName);
 
             case LATEST_FIRST -> pinned
-                    .thenComparing(Comparator.comparing(AssetMetadata::lastModifiedTime).reversed());
+                    .thenComparing(Comparator.comparingLong(AssetMetadata::lastModifiedTime).reversed())
+                    .thenComparing(byName);
 
             case ALPHABETICAL -> pinned
-                    .thenComparing(AssetMetadata::friendlyName);
+                    .thenComparing(byName);
         };
     }
 
@@ -1906,10 +1941,12 @@ public class LocalAssetManager {
             registered = true;
 
             // Cache transparency info for the first-person arm rendering mixin
-            // DynamicTextures aren't accessible via resource manager, so we check here
+            // DynamicTextures aren't accessible via resource manager, so we check here. Every
+            // texel is read (stopping at the first translucent one): a sampled grid misses
+            // translucent texels between its points and records the texture as opaque.
             boolean hasAlpha = false;
-            for (int y = 0; y < nativeImage.getHeight() && !hasAlpha; y += Math.max(1, nativeImage.getHeight() / 32)) {
-                for (int x = 0; x < nativeImage.getWidth() && !hasAlpha; x += Math.max(1, nativeImage.getWidth() / 32)) {
+            for (int y = 0; y < nativeImage.getHeight() && !hasAlpha; y++) {
+                for (int x = 0; x < nativeImage.getWidth() && !hasAlpha; x++) {
 //? if <1.21 {
                     int pixel = MinecraftCompat.INSTANCE.getPixel(nativeImage, x, y);
 //?} else if <1.21.11 {
@@ -2203,7 +2240,7 @@ public class LocalAssetManager {
 
             BufferedImage masked = CapeElytraSilhouette.maskedCopy(composited, frameCount);
             if (composited != atlas || masked != atlas) {
-                ImageIO.write(masked, "PNG", atlasPath.toFile());
+                replaceWithPng(atlasPath, masked);
             }
         } catch (Exception e) {
             // Non-critical — elytra just won't have the vanilla fallback

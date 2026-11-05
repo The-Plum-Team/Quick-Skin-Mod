@@ -160,6 +160,12 @@ public class PlayerWidget extends AbstractWidget {
      * one of them is opened from the skin or cape menu, whose previews never defer.)
      */
     private boolean previewSubmissionPending;
+    /** How long a cape animation this preview asked for waits before it is asked for again. */
+    private static final long ANIMATION_REQUEST_RETRY_NANOS = 1_000_000_000L;
+    /** The cape animation this preview last asked for, so a refused one is not asked every frame. */
+    @Nullable
+    private String requestedAnimationId;
+    private long animationRequestNanos;
 
     /** Mouse position the deferred frame was rendered with, replayed verbatim on submission. */
     private int pendingMouseX;
@@ -654,6 +660,21 @@ public class PlayerWidget extends AbstractWidget {
         config.save();
     }
 
+    /**
+     * Whether the preview may ask for a cape's animation now: at once for a cape it has not
+     * asked for, and a second later for the one it did, which the slot policy may have refused.
+     */
+    private boolean mayRequestAnimation(String animationId) {
+        long now = System.nanoTime();
+        if (animationId.equals(requestedAnimationId)
+                && now - animationRequestNanos < ANIMATION_REQUEST_RETRY_NANOS) {
+            return false;
+        }
+        requestedAnimationId = animationId;
+        animationRequestNanos = now;
+        return true;
+    }
+
     @Override
 //? if <26.1 {
     public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
@@ -681,23 +702,19 @@ public class PlayerWidget extends AbstractWidget {
                 com.quickskin.mod.client.services.AnimatedTextureManager animManager =
                     com.quickskin.mod.client.services.AnimatedTextureManager.getInstance();
 
-                if (!animManager.isAnimated(animationId)) {
+                if (!animManager.isAnimated(animationId) && mayRequestAnimation(animationId)) {
                     // Animation not registered yet - try to register it now
                     if (capeId.startsWith("local_cape:")) {
                         String hash = capeId.substring("local_cape:".length());
-//? if <26.1 {
-                        com.quickskin.mod.common.data.AnimationMetadata metadata =
-                            com.quickskin.mod.client.services.LocalAssetManager.getInstance().getAnimationMetadata(hash);
-                        java.awt.image.BufferedImage atlasImage =
-                            com.quickskin.mod.client.services.LocalAssetManager.getInstance().getSourceImage(hash);
-
-                        if (metadata != null && atlasImage != null) {
-                            animManager.registerAnimation(animationId, capeId, previewData.getCapeLocation(), atlasImage, metadata);
+                        // The catalogue's in-memory entry says whether the cape is animated; a
+                        // static cape reads nothing, and an animated one is decoded off the render
+                        // thread
+                        com.quickskin.mod.common.data.AssetMetadata asset =
+                            com.quickskin.mod.client.services.LocalAssetManager.getInstance().getMetadata(hash);
+                        if (asset != null && asset.isAnimated()) {
+                            animManager.registerAnimationAsync(
+                                    animationId, capeId, previewData.getCapeLocation(), hash);
                         }
-//?} else {
-                        animManager.registerAnimationAsync(
-                                animationId, capeId, previewData.getCapeLocation(), hash);
-//?}
                     } else if (capeId.startsWith("known:")) {
                         String knownId = capeId.substring("known:".length());
                         com.quickskin.mod.client.services.CapeService.getInstance().loadKnownCape(knownId);
@@ -706,11 +723,10 @@ public class PlayerWidget extends AbstractWidget {
             }
         }
 
-        // Tick animations (updates frame indices for animated capes)
-        // This is necessary because ClientTickEvent.CLIENT_POST doesn't fire in menus
-        com.quickskin.mod.client.services.AnimatedTextureManager animManager =
-            com.quickskin.mod.client.services.AnimatedTextureManager.getInstance();
-        animManager.tick();
+        // Advance the animated capes' frames each rendered frame, so the preview's cape moves as
+        // smoothly as the screen draws. Only the client tick counts slot ticks: counting frames
+        // there would shrink the slot policy's grace and retry windows to frames.
+        com.quickskin.mod.client.services.AnimatedTextureManager.getInstance().tickFrames();
 //? if <1.21 {
 
         // Handle return-to-original animation when not rotating

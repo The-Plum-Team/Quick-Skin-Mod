@@ -46,6 +46,14 @@ public final class NetworkClientActions implements ClientNetworkActions {
     }
 
     @Override
+    public boolean updateHostedServerCooldown(int seconds) {
+        net.minecraft.server.MinecraftServer server = Minecraft.getInstance().getSingleplayerServer();
+        if (server == null) return false;
+        server.execute(() -> ServerNetworkHandler.setHostedSkinChangeCooldown(server, seconds));
+        return true;
+    }
+
+    @Override
     public AccountSkinVisibility notifyAccountSkinChanged() {
         Minecraft minecraft = Minecraft.getInstance();
         Object connection = minecraft.getConnection();

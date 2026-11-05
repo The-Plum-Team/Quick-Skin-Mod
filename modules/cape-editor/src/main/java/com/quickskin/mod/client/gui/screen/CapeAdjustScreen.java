@@ -23,6 +23,7 @@ import com.quickskin.mod.common.data.AnimationMetadata;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.common.data.TextureQuality;
 import com.quickskin.mod.common.util.CapeAnimationTimeline;
+import com.quickskin.mod.common.util.CapeAtlasFrames;
 import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import com.quickskin.mod.common.util.CapeOpaqueFill;
 import com.quickskin.mod.common.util.CapeZoomRange;
@@ -2166,13 +2167,10 @@ public class CapeAdjustScreen extends Screen {
                 java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 
         for (int i = 0; i < frames.length; i++) {
-            int srcY = frames[i] * srcFrameHeight;
-            int dstYOffset = i * capeH;
-            // Draw this frame at the user's chosen position/scale in cape space
-            g.drawImage(sourceImage,
-                    drawX, dstYOffset + drawY, drawX + drawW, dstYOffset + drawY + drawH,
-                    0, srcY, srcW, srcY + srcFrameHeight,
-                    null);
+            // Draw this frame at the user's chosen position/scale in cape space, clipped to its
+            // own rows as composeFrame's separate canvas is, so it never spills into a neighbour
+            CapeAtlasFrames.drawFrame(g, sourceImage, frames[i] * srcFrameHeight, srcFrameHeight,
+                    i * capeH, capeW, capeH, drawX, drawY, drawW, drawH);
         }
         g.dispose();
 

@@ -90,6 +90,17 @@ class FeatureCoverageConsumerTest(unittest.TestCase):
         self.assertNotIn("hud-preview", proof["unchanged_module_fingerprints"])
         self.assertEqual([50000], self.api.downloaded)
 
+    def test_certificate_history_beyond_one_page_still_selects_the_newest_baseline(self):
+        complete = self.api.artifacts
+        def artifacts(*, run_id=None, name=None, newest_page=False):
+            if name == coverage.BASELINE_ARTIFACT_NAME and not newest_page:
+                raise consumer.publisher.ArtifactInventoryLimit("more than one page of certificates")
+            return complete(run_id=run_id, name=name, newest_page=newest_page)
+        with patch.object(self.api, "artifacts", side_effect=artifacts):
+            selected, proof = self.resolve()
+        self.assertTrue(selected.enabled)
+        self.assertEqual(50000, proof["baseline"]["id"])
+
     def test_cumulative_baseline_keeps_an_earlier_editor_change_when_the_tip_only_changes_hud(self):
         changed = dict(self.changed)
         changed["modules/hud-preview/src/main/java/example/Owned.java"] = ("100644", b"class Owned { int size; }\n")
