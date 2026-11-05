@@ -2510,6 +2510,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                     metadata = SkinImporter.importSkin(filePath);
                 }
                 if (metadata != null) {
+                    // Importing the deleted own skin again lists it again, as a drop does
+                    relistOwnSkin(metadata);
                     // Reload the skin list
                     refreshSkinList();
 
