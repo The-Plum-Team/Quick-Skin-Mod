@@ -659,10 +659,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   texture bridge, or the CustomNPCs display-skin transition) must assert that integration state;
   coexistence lanes assert the unchanged plaid skin. The reviewer receives per-mod expectation
   overrides for that one capture id.
-- A live `mod-compatibility-remote` observer capture requires, besides the asserted remote state
-  and rear vantage, that the observer's renderer has compiled the terrain at and below the
-  subject. Vanilla skips entities in uncompiled sections, so appearance state alone can pass on
-  a sky-only frame.
+- A live `mod-compatibility-remote` or sequential `mod-compatibility-late-join` observer capture
+  requires, besides the asserted remote state and rear vantage, that the observer's renderer has
+  compiled the terrain at and below the subject. Vanilla skips entities in uncompiled sections, so
+  appearance state alone can pass on a sky-only frame.
 - The CPM apply checkpoints (`mod-compatibility` local apply and the live remote apply/observe
   pair) first prove, without a capture, Quick Skin's own skin that carries a CPM model in its
   pixels, imported through the ordinary skin import: on every band the stored file (locally) and
