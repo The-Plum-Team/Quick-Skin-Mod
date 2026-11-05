@@ -1601,6 +1601,84 @@ class PackagedRuntimeSessionAndEvidenceTest(unittest.TestCase):
         self.assertEqual(1, len(errors))
         self.assertIn("did not quiesce", errors[0])
 
+    def test_failed_process_stop_fails_row_freezes_only_result_and_stops_run(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            profile = root / "runtime-profile"
+            profile.mkdir()
+            session = mock.Mock()
+            session.scenario_profile.return_value = profile
+            exports: list[tuple[dict[str, object], bool]] = []
+
+            def export(
+                _execution: Path,
+                _evidence: Path,
+                result: dict[str, object],
+                *,
+                include_runtime_files: bool = True,
+            ) -> Path:
+                exports.append((dict(result), include_runtime_files))
+                return _evidence
+
+            row = {"artifact_node": "1.20.1-fabric", "runtime_version": "1.20.1", "loader": "fabric"}
+            with mock.patch.object(
+                packaged_runtime, "allocate_port", return_value=25565
+            ), mock.patch.object(
+                packaged_runtime,
+                "artifact_record",
+                side_effect=packaged_runtime.RuntimeFailure("scenario failed"),
+            ), mock.patch.object(
+                packaged_runtime,
+                "stop_processes_and_close",
+                return_value=["pid 3: group 3 did not quiesce"],
+            ), mock.patch.object(
+                packaged_runtime, "export_profile_evidence", side_effect=export
+            ):
+                with self.assertRaisesRegex(
+                    packaged_runtime.RuntimeFailure, "did not quiesce"
+                ):
+                    packaged_runtime.run_packaged_row(
+                        root, {}, row, "phase0-smoke", {}, root / "artifacts.json",
+                        root / "evidence", session,
+                    )
+
+        self.assertEqual(1, len(exports))
+        exported, include_runtime_files = exports[0]
+        self.assertFalse(include_runtime_files)
+        self.assertEqual("fail", exported["status"])
+        self.assertNotIn("reports", exported)
+        self.assertEqual(
+            "scenario failed; process stop failed: pid 3: group 3 did not quiesce",
+            exported["error"],
+        )
+
+    def test_successful_process_stop_exports_runtime_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            profile = root / "runtime-profile"
+            profile.mkdir()
+            session = mock.Mock()
+            session.scenario_profile.return_value = profile
+            row = {"artifact_node": "1.20.1-fabric", "runtime_version": "1.20.1", "loader": "fabric"}
+            with mock.patch.object(
+                packaged_runtime, "allocate_port", return_value=25565
+            ), mock.patch.object(
+                packaged_runtime,
+                "artifact_record",
+                side_effect=packaged_runtime.RuntimeFailure("scenario failed"),
+            ), mock.patch.object(
+                packaged_runtime, "stop_processes_and_close", return_value=[]
+            ), mock.patch.object(
+                packaged_runtime, "export_profile_evidence"
+            ) as export:
+                result = packaged_runtime.run_packaged_row(
+                    root, {}, row, "phase0-smoke", {}, root / "artifacts.json",
+                    root / "evidence", session,
+                )
+
+        self.assertEqual("scenario failed", result["error"])
+        self.assertTrue(export.call_args.kwargs["include_runtime_files"])
+
     def test_exited_forge_shell_does_not_hide_lingering_java_child(self) -> None:
         process = mock.Mock()
         process.pid = 4242

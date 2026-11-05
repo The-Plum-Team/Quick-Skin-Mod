@@ -3011,7 +3011,14 @@ def run_packaged_row(
             )
         result["elapsed_s"] = round(time.monotonic() - started, 1)
         try:
-            export_profile_evidence(profile, evidence_profile, result)
+            # A group that was never reaped may still be writing its logs, screenshots
+            # and reports, so only result.json (carrying the stop error) is frozen then.
+            export_profile_evidence(
+                profile,
+                evidence_profile,
+                result,
+                include_runtime_files=not stop_errors,
+            )
         except Exception as export_error:
             result["status"] = "fail"
             previous_error = result.get("error")
@@ -3029,4 +3036,8 @@ def run_packaged_row(
                 )
             except Exception:
                 pass
+    if stop_errors:
+        # An un-reaped process group may still hold the port, the runtime store lease
+        # or the display, so the whole run stops here instead of starting the next row.
+        raise RuntimeFailure(f"{identity}: {result['error']}")
     return result
