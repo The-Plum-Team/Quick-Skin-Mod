@@ -322,6 +322,7 @@ public class ServerAnimationCache {
             deleteFile(path);
             return;
         }
+        if (isKeptForALaterLimit(hash)) return;
         String primary = ServerTextureCache.getInstance().resolveContentId(hash);
         if (primary == null) {
             LOGGER.warn("Ignoring animation metadata without a unique texture alias {}", hash);
@@ -387,6 +388,7 @@ public class ServerAnimationCache {
                     .forEach(path -> {
                         String name = path.getFileName().toString();
                         String hash = name.substring(0, name.length() - ".identity".length());
+                        if (isKeptForALaterLimit(hash)) return;
                         String primary = NetworkSecurity.isValidContentId(hash)
                                 ? ServerTextureCache.getInstance().resolveContentId(hash)
                                 : null;
@@ -504,11 +506,21 @@ public class ServerAnimationCache {
                         else return;
                         String hash = name.substring(0, name.length() - suffix.length());
                         if (!NetworkSecurity.isValidContentId(hash)
-                                || !ServerTextureCache.getInstance().isRequestable(hash, "cape")) {
+                                || (!ServerTextureCache.getInstance().isRequestable(hash, "cape")
+                                        && !isKeptForALaterLimit(hash))) {
                             deleteFile(path);
                         }
                     });
         }
+    }
+
+    /**
+     * A cape stored on disk but left unloaded only for its size keeps its metadata, identity and
+     * authority untouched, neither loaded nor deleted, so raising the limit again restores its
+     * timing and its first writer.
+     */
+    private static boolean isKeptForALaterLimit(String hash) {
+        return ServerTextureCache.getInstance().isRetainedOverLimit(hash);
     }
 
     private void deleteEntryFiles(String hash) {
