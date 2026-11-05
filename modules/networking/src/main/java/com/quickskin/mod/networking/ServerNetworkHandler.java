@@ -671,7 +671,7 @@ public class ServerNetworkHandler {
 
     /** What others see of this player changed without their own appearance changing. */
     static void appearanceShownChanged(UUID playerId) {
-        APPEARANCE_COORDINATOR.notifyAppearance(playerId);
+        APPEARANCE_COORDINATOR.notifyShownAppearance(playerId);
     }
 
     /**

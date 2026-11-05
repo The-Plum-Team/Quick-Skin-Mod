@@ -271,6 +271,36 @@ class ServerAppearanceSyncCoordinatorTest {
     }
 
     @Test
+    void shownChangeOfATargetTheSnapshotAlreadySentReachesThatSession() {
+        ServerAppearanceSyncCoordinator coordinator =
+                new ServerAppearanceSyncCoordinator();
+        UUID recipient = uuid(56_000);
+        Object connection = new Object();
+        List<UUID> rosterIds = ids(3);
+        ServerAppearanceSyncCoordinator.RosterView roster =
+                new ServerAppearanceSyncCoordinator.RosterView(8L, rosterIds);
+        coordinator.requestSnapshot(recipient, connection, 322L);
+
+        ServerAppearanceSyncCoordinator.Action first = coordinator.tick(roster).get(0);
+        assertEquals(rosterIds.get(0), first.targetPlayerId());
+        // An assigned skin changes what others see without a new repository revision
+        assertEquals(1, coordinator.notifyShownAppearance(rosterIds.get(0)));
+
+        List<ServerAppearanceSyncCoordinator.Action> actions = drain(coordinator, roster, 20);
+        List<ServerAppearanceSyncCoordinator.ActionType> types = actions.stream()
+                .map(ServerAppearanceSyncCoordinator.Action::type)
+                .toList();
+        assertEquals(List.of(
+                ServerAppearanceSyncCoordinator.ActionType.APPEARANCE,
+                ServerAppearanceSyncCoordinator.ActionType.APPEARANCE,
+                ServerAppearanceSyncCoordinator.ActionType.SNAPSHOT_COMPLETE,
+                ServerAppearanceSyncCoordinator.ActionType.APPEARANCE), types);
+        assertEquals(rosterIds.get(0), actions.get(3).targetPlayerId());
+        assertEquals(0, coordinator.pendingDirectCount());
+        assertEquals(0, coordinator.queuedSessionCount());
+    }
+
+    @Test
     void exactOldSessionCancellationCannotRemoveReplacement() {
         ServerAppearanceSyncCoordinator coordinator =
                 new ServerAppearanceSyncCoordinator();
