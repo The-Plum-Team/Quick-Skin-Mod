@@ -140,9 +140,19 @@ class Api:
                 raise coverage.CoverageError("job inventory is truncated")
         raise coverage.CoverageError("job inventory pagination exceeds its limit")
 
-    def artifacts(self, *, run_id: int | None = None, name: str | None = None) -> list[dict[str, Any]]:
+    def artifacts(self, *, run_id: int | None = None, name: str | None = None,
+                  newest_page: bool = False) -> list[dict[str, Any]]:
+        """The complete inventory of one owner run or exact name.
+
+        ``newest_page`` (name queries only) instead returns GitHub's first page, its newest
+        ``MAX_INVENTORY`` artifacts, when the complete inventory is larger. Only a caller that
+        inspects a bounded number of the newest candidates and authenticates each one may use
+        it: an older record left off the page is never needed and never admitted unseen.
+        """
         if (run_id is None) == (name is None):
             raise coverage.CoverageError("artifact query requires one exact owner or name")
+        if newest_page and name is None:
+            raise coverage.CoverageError("only an exact name query may read its newest page")
         if run_id is not None:
             coverage._positive_integer(run_id, "artifact owner run")
             endpoint = f"actions/runs/{run_id}/artifacts?per_page={MAX_INVENTORY}"
@@ -159,6 +169,8 @@ class Api:
                 and len(record["artifacts"]) == MAX_INVENTORY
                 and all(isinstance(item, dict) and isinstance(item.get("name"), str)
                         and (name is None or item["name"] == name) for item in record["artifacts"])):
+            if newest_page:
+                return record["artifacts"]
             raise ArtifactInventoryLimit("artifact inventory exceeds its limit")
         if (not isinstance(record, dict) or type(record.get("total_count")) is not int
                 or not isinstance(record.get("artifacts"), list)
