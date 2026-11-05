@@ -81,9 +81,7 @@ public class ClientEvents {
             com.quickskin.mod.networking.NetworkSyncService.getInstance().tick();
             // The latest look choice between Quick Skin and CPM decides the local look.
             com.quickskin.mod.client.services.CpmLookArbiter.tick();
-            //? if >=1.21 {
             com.quickskin.mod.client.compat.ReplayModHelper.tick();
-            //?}
         });
 
         // Download player's own skin on startup (async, won't block). Platforms whose client entry
