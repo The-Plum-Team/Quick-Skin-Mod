@@ -96,7 +96,10 @@ public class CapeLayerMixin {
         boolean isLocalPlayer = playerId != null
                 && playerId.equals(minecraft.getUser().getProfileId());
         ClientConfig config = ClientConfig.getInstance();
+        // The saved cape stands in only on the title screen: in a world the session's appearance
+        // decides, and a session that wears no cape (an adopted saved record) shows none.
         boolean hasConfigCape = !previewing && !hasServiceCape && isLocalPlayer
+                && minecraft.level == null
                 && !config.activeCapeHash.isEmpty();
         if (!previewing && !hasServiceCape && !hasConfigCape) {
             return;

@@ -376,4 +376,46 @@ class ServerNicknameStoreTest {
         assertTrue(store.isAvailable(NOTCH, "Notch", "Bravo", List.of()), "the names are free again");
         assertTrue(store.liftAll().isEmpty());
     }
+
+    @Test
+    void aSecretNicknameIsKeptSecretAcrossRestartsUntilItIsTakenBack() {
+        ServerNicknameStore store = store();
+        store.request(STEVE, "Steve", "Sir Lancelot", true, List.of(), NOW);
+
+        assertEquals(ServerNicknameStore.Status.ACCEPTED,
+                store.assign(STEVE, "Steve", "Alpha", List.of(), NOW, true).status());
+        assertTrue(store.isSecret(STEVE));
+        store.saveNow();
+
+        ServerNicknameStore reloaded = store();
+        assertEquals("Alpha", reloaded.assignedNickname(STEVE));
+        assertTrue(reloaded.isSecret(STEVE));
+
+        assertEquals("Alpha", reloaded.lift(STEVE));
+        assertFalse(reloaded.isSecret(STEVE), "the secret goes with the name it kept");
+        assertEquals("Sir Lancelot", reloaded.nickname(STEVE));
+    }
+
+    @Test
+    void givingTheSameNicknameAgainOnlyChangesWhetherItIsSecret() {
+        ServerNicknameStore store = store();
+        store.assign(STEVE, "Steve", "Alpha", List.of(), NOW);
+        assertFalse(store.isSecret(STEVE));
+
+        assertEquals(ServerNicknameStore.Status.UNCHANGED,
+                store.assign(STEVE, "Steve", "Alpha", List.of(), NOW + 1, true).status());
+        assertTrue(store.isSecret(STEVE));
+
+        store.assign(STEVE, "Steve", "Bravo", List.of(), NOW + 2);
+        assertFalse(store.isSecret(STEVE), "a nickname given aloud is no secret");
+        assertTrue(store.liftAll().contains(STEVE));
+        assertFalse(store.isSecret(STEVE));
+    }
+
+    @Test
+    void aPlayersOwnNicknameIsNeverSecret() {
+        ServerNicknameStore store = store();
+        store.request(STEVE, "Steve", "Sir Lancelot", true, List.of(), NOW);
+        assertFalse(store.isSecret(STEVE));
+    }
 }

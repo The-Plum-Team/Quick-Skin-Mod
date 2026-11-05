@@ -20,8 +20,7 @@ public abstract class ServerPlayerTabNameMixin {
             at = @At("RETURN"),
             cancellable = true,
             require = 0,
-            expect = 1,
-            allow = 1)
+            expect = 1)
     private void quickskin$tabListNickname(CallbackInfoReturnable<Component> callback) {
         Component current = callback.getReturnValue();
         Component name = NicknameDisplay.tabListName((ServerPlayer) (Object) this, current);

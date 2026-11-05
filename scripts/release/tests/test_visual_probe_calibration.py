@@ -32,12 +32,12 @@ TEXT_CANARY = {
         ("skin column counter", (16, 96, 120, 156), 175, 200),
         ("player name tag", (600, 116, 1000, 162), 175, 100),
     ),
-    # The cape menu draws at its own scale: "My Capes" heads the grid at its top-left corner and
-    # the import tile stretches across the rest of the My Capes row under it, its words centred.
-    # The Fabric 1.20.1 anchor keeps about 506 title and 346 import-tile glyph pixels above
-    # luma 159 after the 1600x900 resize.
+    # The cape menu draws at its own scale: the Cape and Elytra tabs sit over the grid, "My Capes"
+    # heads the grid under them and the import tile stretches across the rest of the My Capes row
+    # under it, its words centred. The Fabric 1.20.1 anchor keeps about 506 title and 544
+    # import-tile glyph pixels above luma 159 after the 1600x900 resize.
     ("full", "client_a", "cape_menu_screen"): (
-        ("cape menu title", (55, 25, 190, 55), 159, 400),
+        ("cape menu title", (55, 75, 190, 105), 159, 400),
         ("cape drop-zone instructions", (575, 150, 695, 215), 159, 250),
     ),
     # The title and the hint share the editor's header strip, the title from its left edge and

@@ -181,6 +181,36 @@ public class ServerNetworkHandler {
         });
     }
 
+    /** An appearance with the elytra's own cape, from a session that negotiated elytra-texture. */
+    public static void handleUpdateAppearanceElytra(
+            FriendlyByteBuf buf, NetworkManager.PacketContext context) {
+        UUID playerId = PacketHelper.readPlayerId(buf);
+        String skinId = PacketHelper.readString(buf, TextureTransferLimits.MAX_APPEARANCE_ID_BYTES);
+        String capeId = PacketHelper.readString(buf, TextureTransferLimits.MAX_APPEARANCE_ID_BYTES);
+        String elytraId = PacketHelper.readString(buf, TextureTransferLimits.MAX_APPEARANCE_ID_BYTES);
+        String model = PacketHelper.readString(buf, TextureTransferLimits.MAX_MODEL_BYTES);
+        ServerPlayer sender = (ServerPlayer) context.getPlayer();
+        if (sender == null || !ProtocolNetwork.acceptsV2(sender)
+                || !ProtocolNetwork.acceptsElytraTexture(ProtocolNetwork.profile(sender))
+                || !sender.getUUID().equals(playerId)
+                || !NetworkSecurity.isValidV2AppearanceId(skinId, "skin")
+                || !NetworkSecurity.isValidV2AppearanceId(capeId, "cape")
+                || !NetworkSecurity.isValidV2AppearanceId(elytraId, "cape")
+                || !NetworkSecurity.isValidModel(model)
+                || !TextureTransferRateLimiter.getInstance().allowStorageMutation(
+                        sender.getUUID(), sender.connection)) return;
+        MinecraftServer server = sender.server;
+        Object connection = sender.connection;
+        context.queue(() -> {
+            ServerPlayer player = activePlayer(server, playerId, connection);
+            if (player == null || !ProtocolNetwork.acceptsV2(player)) return;
+            acceptOrDeferAppearance(
+                    player,
+                    new ServerUploadCoordinator.PendingAppearance(skinId, capeId, elytraId, model),
+                    true);
+        });
+    }
+
     public static void handleRequestTextureV2(
             FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         UUID playerId = PacketHelper.readPlayerId(buf);
@@ -292,7 +322,7 @@ public class ServerNetworkHandler {
         UUID reportedPlayerId = PacketHelper.readPlayerId(buf);
         int hidden = buf.readUnsignedByte();
         ServerPlayer sender = (ServerPlayer) context.getPlayer();
-        if (!ServerHiddenArmor.admits(sender, reportedPlayerId) || !HiddenArmor.isValid(hidden)
+        if (!ServerHiddenArmor.admits(sender, reportedPlayerId) || !ServerHiddenArmor.admitsMask(sender, hidden)
                 || !TextureTransferRateLimiter.getInstance().allowStorageMutation(
                         sender.getUUID(), sender.connection)) return;
         MinecraftServer server = sender.server;
@@ -715,6 +745,7 @@ public class ServerNetworkHandler {
         if (appearance != null) {
             if (!NetworkSecurity.isValidLocalAppearanceId(appearance.getSkinId(), "skin")
                     || !NetworkSecurity.isValidLocalAppearanceId(appearance.getCapeId(), "cape")
+                    || !NetworkSecurity.isValidLocalAppearanceId(appearance.getElytraId(), "cape")
                     || !NetworkSecurity.isValidModel(appearance.getModel())) {
                 LOGGER.warn("Skipping invalid stored appearance for {}", targetPlayerId);
                 return;
@@ -724,21 +755,29 @@ public class ServerNetworkHandler {
                     targetPlayerId,
                     appearance.getSkinId(),
                     appearance.getCapeId(),
+                    appearance.getElytraId(),
                     appearance.getModel())) return;
 
             // Texture bytes are demand-driven: the appearance hash lets a cache-missing client
             // request only what it needs. Animation metadata is small and can accompany the hash.
-            String capeId = appearance.getCapeId();
-            if (capeId != null && capeId.startsWith("local_cape:")) {
-                String hash = capeId.substring("local_cape:".length());
-                String primary = ServerTextureCache.getInstance().resolveContentId(hash);
-                String metadata = primary == null ? null
-                        : ServerAnimationCache.getInstance().getMetadata(primary);
-                if (metadata != null) {
-                    ProtocolNetwork.sendAnimationMetadata(recipient, hash, metadata);
-                }
+            sendCapeAnimationMetadata(recipient, appearance.getCapeId());
+            if (appearance.hasSeparateElytra()
+                    && ProtocolNetwork.acceptsElytraTexture(ProtocolNetwork.profile(recipient))) {
+                sendCapeAnimationMetadata(recipient, appearance.getElytraId());
             }
 
+        }
+    }
+
+    /** The animation metadata of an animated cape, beside an appearance that names it. */
+    private static void sendCapeAnimationMetadata(ServerPlayer recipient, String capeId) {
+        if (capeId == null || !capeId.startsWith("local_cape:")) return;
+        String hash = capeId.substring("local_cape:".length());
+        String primary = ServerTextureCache.getInstance().resolveContentId(hash);
+        String metadata = primary == null ? null
+                : ServerAnimationCache.getInstance().getMetadata(primary);
+        if (metadata != null) {
+            ProtocolNetwork.sendAnimationMetadata(recipient, hash, metadata);
         }
     }
 
@@ -1087,7 +1126,8 @@ public class ServerNetworkHandler {
     ) {
         if (!NetworkSecurity.isValidModel(appearance.model())
                 || !NetworkSecurity.isValidLocalAppearanceId(appearance.skinId(), "skin")
-                || !NetworkSecurity.isValidLocalAppearanceId(appearance.capeId(), "cape")) {
+                || !NetworkSecurity.isValidLocalAppearanceId(appearance.capeId(), "cape")
+                || !NetworkSecurity.isValidLocalAppearanceId(appearance.elytraId(), "cape")) {
             LOGGER.warn("Rejected invalid appearance update from {}", player.getUUID());
             return;
         }
@@ -1099,10 +1139,12 @@ public class ServerNetworkHandler {
                 player, appearance.skinId(), "local_skin:", "skin");
         String missingCapeHash = missingOwnedTextureHash(
                 player, appearance.capeId(), "local_cape:", "cape");
-        if (missingSkinHash != null || missingCapeHash != null) {
+        String missingElytraHash = appearance.elytraId().equals(appearance.capeId()) ? null
+                : missingOwnedTextureHash(player, appearance.elytraId(), "local_cape:", "cape");
+        if (missingSkinHash != null || missingCapeHash != null || missingElytraHash != null) {
             if (UPLOAD_COORDINATOR.deferAppearance(
                     player.getUUID(), player.connection, appearance,
-                    missingSkinHash, missingCapeHash)) {
+                    missingSkinHash, missingCapeHash, missingElytraHash)) {
                 return;
             }
             LOGGER.warn("Rejected unauthorized appearance update from {}", player.getUUID());
@@ -1128,7 +1170,8 @@ public class ServerNetworkHandler {
                 && ServerCooldownManager.getInstance().isPlayerOnCooldown(playerId)) return;
 
         if (!ServerPlayerAppearanceRepository.getInstance().tryUpdateAppearance(
-                playerId, appearance.skinId(), appearance.capeId(), appearance.model())) {
+                playerId, appearance.skinId(), appearance.capeId(),
+                appearance.elytraId(), appearance.model())) {
             LOGGER.warn("Refused appearance update from {} because the global active-texture byte cap was reached",
                     playerId);
             sendAppearanceToPlayer(player, playerId);

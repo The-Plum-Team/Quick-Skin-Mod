@@ -59,6 +59,7 @@ public class ServerPlayerAppearanceRepository {
         return new PlayerAppearance(playerId,
                 textures.heldTextureOrEmpty(left.getSkinId(), "local_skin:"),
                 textures.heldTextureOrEmpty(left.getCapeId(), "local_cape:"),
+                textures.heldTextureOrEmpty(left.getElytraId(), "local_cape:"),
                 left.getModel());
     }
 
@@ -77,7 +78,8 @@ public class ServerPlayerAppearanceRepository {
         }
         PlayerAppearance accepted = copy(appearance);
         if (!ServerTextureCache.getInstance().tryReplaceAppearancePins(
-                accepted.getPlayerId(), accepted.getSkinId(), accepted.getCapeId())) return false;
+                accepted.getPlayerId(), accepted.getSkinId(), accepted.getCapeId(),
+                accepted.getElytraId())) return false;
         PlayerAppearance previous = appearances.put(accepted.getPlayerId(), accepted);
         PlayerAppearance left = offline.remove(accepted.getPlayerId());
         if (!sameAppearance(previous != null ? previous : left, accepted)) revision++;
@@ -102,18 +104,34 @@ public class ServerPlayerAppearanceRepository {
             @Nullable String capeId,
             @Nullable String model
     ) {
+        return tryUpdateAppearance(playerId, skinId, capeId, null, model);
+    }
+
+    /**
+     * The same, with what the elytra wear instead of the cape ({@code ""}: the cape; null keeps
+     * what they wore).
+     */
+    public synchronized boolean tryUpdateAppearance(
+            UUID playerId,
+            @Nullable String skinId,
+            @Nullable String capeId,
+            @Nullable String elytraId,
+            @Nullable String model
+    ) {
         if (playerId == null) return false;
         PlayerAppearance current = appearances.get(playerId);
         String nextSkin = skinId != null
                 ? skinId : current != null ? current.getSkinId() : "";
         String nextCape = capeId != null
                 ? capeId : current != null ? current.getCapeId() : "";
+        String nextElytra = elytraId != null
+                ? elytraId : current != null ? current.getElytraId() : "";
         String nextModel = model != null
                 ? model : current != null ? current.getModel() : "classic";
         PlayerAppearance candidate = new PlayerAppearance(
-                playerId, nextSkin, nextCape, nextModel);
+                playerId, nextSkin, nextCape, nextElytra, nextModel);
         if (!ServerTextureCache.getInstance().tryReplaceAppearancePins(
-                playerId, nextSkin, nextCape)) return false;
+                playerId, nextSkin, nextCape, nextElytra)) return false;
         appearances.put(playerId, candidate);
         PlayerAppearance left = offline.remove(playerId);
         if (!sameAppearance(current != null ? current : left, candidate)) revision++;
@@ -218,7 +236,7 @@ public class ServerPlayerAppearanceRepository {
     private static PlayerAppearance copy(PlayerAppearance appearance) {
         return new PlayerAppearance(
                 appearance.getPlayerId(), appearance.getSkinId(),
-                appearance.getCapeId(), appearance.getModel());
+                appearance.getCapeId(), appearance.getElytraId(), appearance.getModel());
     }
 
     private static boolean sameAppearance(
@@ -226,6 +244,7 @@ public class ServerPlayerAppearanceRepository {
         return first != null
                 && first.getSkinId().equals(second.getSkinId())
                 && first.getCapeId().equals(second.getCapeId())
+                && first.getElytraId().equals(second.getElytraId())
                 && first.getModel().equals(second.getModel());
     }
 

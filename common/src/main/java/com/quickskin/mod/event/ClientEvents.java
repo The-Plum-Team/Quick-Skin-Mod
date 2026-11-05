@@ -81,9 +81,7 @@ public class ClientEvents {
             com.quickskin.mod.networking.NetworkSyncService.getInstance().tick();
             // The latest look choice between Quick Skin and CPM decides the local look.
             com.quickskin.mod.client.services.CpmLookArbiter.tick();
-            //? if >=1.21 {
             com.quickskin.mod.client.compat.ReplayModHelper.tick();
-            //?}
         });
 
         // Download player's own skin on startup (async, won't block). Platforms whose client entry
@@ -133,6 +131,7 @@ public class ClientEvents {
                 com.quickskin.mod.client.gui.GuiCompat.openScreen(new PlayerSkinMenuScreen(parent)));
 
         com.quickskin.mod.client.gui.overlay.HudPreviewIntegration.init();
+        com.quickskin.mod.client.gui.fan.FavouritesFanIntegration.init();
 
         //? if <1.21 {
         ClientScreenInputEvent.MOUSE_RELEASED_PRE.register((client, screen, mouseX, mouseY, button) -> {
@@ -244,6 +243,7 @@ public class ClientEvents {
     private static void resetSessionUiState() {
         com.quickskin.mod.client.gui.integration.MenuIntegration.resetSessionState();
         com.quickskin.mod.client.gui.overlay.HudPreviewIntegration.resetSessionState();
+        com.quickskin.mod.client.gui.fan.FavouritesFanIntegration.resetSessionState();
     }
 
     /** Unregisters internal service listeners during explicit client shutdown. */

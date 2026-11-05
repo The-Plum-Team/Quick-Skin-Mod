@@ -24,6 +24,7 @@ Accepted project decisions:
 - [ADR 0015: Show cosmetic nicknames through display names](0015-show-cosmetic-nicknames-through-display-names.md)
 - [ADR 0016: Assign skins over players' own appearances](0016-assign-skins-over-players-own-appearances.md)
 - [ADR 0017: Hide armour pieces from everyone](0017-hide-armour-pieces-from-everyone.md)
+- [ADR 0018: Give the elytra a cape of their own](0018-give-the-elytra-a-cape-of-their-own.md)
 
 An ADR records the evidence and trade-offs behind a decision. Operational instructions remain in
 the focused human and AI documentation linked from the repository root. A later decision marks an

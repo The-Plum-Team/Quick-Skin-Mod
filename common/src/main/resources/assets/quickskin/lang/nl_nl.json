@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Open skinmenu",
+  "key.quickskin.favourites_fan": "Favoriete skins (snel wisselen)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Snelle Skin",
@@ -160,6 +161,18 @@
   "quickskin.tooltip.static_cape": "Statische cape",
   "quickskin.tooltip.resolution": "Resolutie: %s",
   "quickskin.tooltip.click_preview": "Klik om te bekijken",
+  "quickskin.cape.tab.cape": "Cape",
+  "quickskin.cape.tab.elytra": "Dekschilden",
+  "quickskin.cape.tab.cape_tip": "Kies de cape die je draagt",
+  "quickskin.cape.tab.elytra_tip": "Kies wat je dekschilden dragen: je cape, de gewone dekschilden of een andere cape",
+  "quickskin.cape.option.same_as_cape": "Zoals de cape",
+  "quickskin.cape.option.same_as_cape.tip": "Je dekschilden dragen je cape",
+  "quickskin.cape.option.vanilla_elytra": "Vanilla",
+  "quickskin.cape.option.vanilla_elytra.tip": "De dekschilden van Minecraft, welke cape je ook draagt",
+  "quickskin.context.wear_on_elytra": "Op dekschilden dragen",
+  "quickskin.context.elytra_same_as_cape": "Dekschilden: zoals de cape",
+  "quickskin.tooltip.on_elytra": "Op je dekschilden",
+  "quickskin.tooltip.click_elytra": "Klik om op je dekschilden te dragen",
   "quickskin.cape.animation_speed": "Animatiesnelheid: %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -404,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[Snelle Skin] Je skin (%s) is groter dan de uploadlimiet van deze server (%s). Die is alleen op je eigen scherm te zien; andere spelers zien hem niet.",
   "quickskin.network.upload_too_large.cape": "[Snelle Skin] Je cape (%s) is groter dan de uploadlimiet van deze server (%s). Die is alleen op je eigen scherm te zien; andere spelers zien hem niet.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Deze server gebruikt Quick Skin voor eigen skins en capes. Installeer de mod om ze te zien en je eigen te dragen."
+  "quickskin.server.missing_mod_notice": "Deze server gebruikt Quick Skin voor eigen skins en capes. Installeer de mod om ze te zien en je eigen te dragen.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Markeer skins met ★ in het skinmenu om ze hier te zien",
+  "quickskin.fan.cooldown": "Je kunt over %s s weer van skin wisselen"
 }

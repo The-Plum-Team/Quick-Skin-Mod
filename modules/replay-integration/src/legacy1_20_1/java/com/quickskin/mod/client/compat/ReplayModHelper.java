@@ -22,6 +22,10 @@ public class ReplayModHelper {
     private static final String CAMERA_ENTITY_CLASS = "com.replaymod.replay.camera.CameraEntity";
     private static final AtomicBoolean skinAppliedInReplay = new AtomicBoolean(false);
     private static final AtomicInteger interceptedPacketCount = new AtomicInteger();
+    private static final int MAX_WATCHER_TICKS = 20 * 60;
+    private static final Object WATCHER_LOCK = new Object();
+    private static boolean watcherActive;
+    private static int watcherTicks;
 
     /** Returns whether the ReplayMod client API needed by this bridge is installed. */
     public static boolean isAvailable() {
@@ -47,7 +51,8 @@ public class ReplayModHelper {
 
     /**
      * Gets the UUID of the player to apply skin changes to.
-     * During replay, this finds the first real player entity (not the camera).
+     * During replay, this finds the recorded player entity (not the camera). Call it on the
+     * Minecraft thread.
      * During normal gameplay, this returns mc.player.getUUID().
      *
      * @return The UUID to use for skin operations, or null if no suitable player found
@@ -65,7 +70,12 @@ public class ReplayModHelper {
             return mc.player.getUUID();
         }
 
-        // In replay mode - find the first real player in the world
+        // In replay mode - the recorded player whose recorded appearance carries a skin, else
+        // the first real player in the world
+        UUID recorded = recordedPlayerWithSkin();
+        if (recorded != null) {
+            return recorded;
+        }
         if (mc.level != null) {
             for (Player player : mc.level.players()) {
                 // Skip the camera entity
@@ -142,6 +152,9 @@ public class ReplayModHelper {
 
     /** Resets the observable state before opening a new replay file. */
     public static void resetReplayEvidenceState() {
+        synchronized (WATCHER_LOCK) {
+            watcherActive = false;
+        }
         skinAppliedInReplay.set(false);
         interceptedPacketCount.set(0);
     }
@@ -171,78 +184,84 @@ public class ReplayModHelper {
     }
 
     /**
-     * Starts a background task that periodically checks for recorded players and applies skins.
-     * This handles the case where player entities load after the initial join event.
+     * Starts watching the replay for the recorded player. The watch runs from the client tick
+     * ({@link #tick()}), on the Minecraft thread, because the level's players may only be read
+     * there; a second call while the watch runs is a no-op.
      */
     public static void startReplayPlayerWatcher() {
         if (!isInReplay()) {
             return;
         }
-
-        resetSkinAppliedState();
-
-        // Start a background thread that checks for players every 200ms for up to 10 seconds
-        Thread watcherThread = new Thread(() -> {
-            int attempts = 0;
-            int maxAttempts = 50; // 50 * 200ms = 10 seconds
-
-            while (attempts < maxAttempts && !hasSkinBeenApplied() && isInReplay()) {
-                try {
-                    Thread.sleep(200);
-                } catch (InterruptedException e) {
-                    break;
-                }
-
-                attempts++;
-
-                // Check for recorded players
-                UUID targetUUID = getTargetPlayerUUID();
-                if (targetUUID != null && !hasSkinBeenApplied()) {
-                    // Found a player! Apply the saved skin on the main thread
-                    Minecraft.getInstance().execute(() -> {
-                        if (!hasSkinBeenApplied()) {
-                            markSkinApplied();
-                            applySavedSkinToPlayer(targetUUID);
-                        }
-                    });
-                    break;
-                }
+        synchronized (WATCHER_LOCK) {
+            if (watcherActive) {
+                return;
             }
+            resetSkinAppliedState();
+            watcherTicks = 0;
+            watcherActive = true;
+        }
+    }
 
-            
-        }, "QuickSkin-ReplayPlayerWatcher");
-
-        watcherThread.setDaemon(true);
-        watcherThread.start();
+    /** One bounded pass, called on the Minecraft thread by the client composition root. */
+    public static void tick() {
+        synchronized (WATCHER_LOCK) {
+            if (!watcherActive) {
+                return;
+            }
+            if (hasSkinBeenApplied() || !isInReplay() || ++watcherTicks > MAX_WATCHER_TICKS) {
+                watcherActive = false;
+                return;
+            }
+        }
+        try {
+            refreshRecordedAppearance();
+        } catch (RuntimeException | LinkageError error) {
+            synchronized (WATCHER_LOCK) {
+                watcherActive = false;
+            }
+            com.quickskin.mod.platform.QuickSkinInfo.LOGGER.debug(
+                    "QuickSkin ReplayMod watcher stopped after a failure", error);
+        }
     }
 
     /**
-     * Applies the saved skin configuration to the specified player UUID.
+     * Pushes the appearance the recording carried for its player to the renderer once its skin has
+     * loaded. The recorded payloads decide that appearance; the viewer's own saved skin and cape
+     * are never applied to a recorded participant.
      */
-    private static void applySavedSkinToPlayer(UUID targetPlayerId) {
-        com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
-        com.quickskin.mod.client.services.LocalAssetManager assetManager =
-                com.quickskin.mod.client.services.LocalAssetManager.getInstance();
+    private static void refreshRecordedAppearance() {
+        UUID target = recordedPlayerWithSkin();
+        if (target == null || getPlayerByUUID(target) == null) {
+            return;
+        }
+        com.quickskin.mod.client.services.PlayerAppearanceService service =
+                com.quickskin.mod.client.services.PlayerAppearanceService.getInstance();
+        if (service.getSkinLocation(target) != null) {
+            service.refreshPlayerRenderer(target);
+            markSkinApplied();
+        }
+    }
 
-        // Check if there's a saved skin
-        if (!config.activeSkinHash.isEmpty()) {
-            com.quickskin.mod.common.data.AssetMetadata metadata = assetManager.getMetadata(config.activeSkinHash);
-
-            if (metadata != null) {
-                String skinId = "local_skin:" + metadata.hash();
-                String modelType = assetManager.getSkinModelPreference(config.activeSkinHash);
-
-                com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
-                        .applySkin(targetPlayerId, skinId, modelType);
+    /** The first recorded player, never the camera, whose recorded appearance carries a skin. */
+    @Nullable
+    private static UUID recordedPlayerWithSkin() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) {
+            return null;
+        }
+        com.quickskin.mod.client.services.PlayerAppearanceService service =
+                com.quickskin.mod.client.services.PlayerAppearanceService.getInstance();
+        for (Player player : mc.level.players()) {
+            if (player == mc.player || player.getClass().getName().equals(CAMERA_ENTITY_CLASS)) {
+                continue;
+            }
+            com.quickskin.mod.common.data.PlayerAppearance appearance =
+                    service.getAppearance(player.getUUID());
+            String skinId = appearance == null ? null : appearance.getSkinId();
+            if (skinId != null && !skinId.isEmpty()) {
+                return player.getUUID();
             }
         }
-
-        // Check if there's a saved cape
-        if (!config.activeCapeHash.isEmpty()) {
-            String capeId = config.activeCapeHash;
-
-            com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
-                    .applyCape(targetPlayerId, capeId);
-        }
+        return null;
     }
 }

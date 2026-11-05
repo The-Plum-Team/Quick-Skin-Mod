@@ -89,6 +89,12 @@ public abstract class PlayerInfoMixin implements com.quickskin.mod.client.compat
     private Identifier quickskin$cachedCapeLocation = null;
 //?}
     @Unique
+//? if <1.21.11 {
+    private ResourceLocation quickskin$cachedElytraLocation = null;
+//?} else {
+    private Identifier quickskin$cachedElytraLocation = null;
+//?}
+    @Unique
     private String quickskin$cachedModelName = null;
 
     /** Replaces the vanilla skin lookup, which still holds a Quick Skin skin that was withdrawn. */
@@ -127,14 +133,16 @@ public abstract class PlayerInfoMixin implements com.quickskin.mod.client.compat
         boolean hasCustomSkin = service.hasActiveSkin(this.profile.getId());
         boolean hasCustomCape = service.hasActiveCape(this.profile.getId());
         boolean hasModelOverride = service.hasModelOverride(this.profile.getId());
+        boolean hasSeparateElytra = service.hasSeparateElytra(this.profile.getId());
 //?} else {
         boolean hasCustomSkin = service.hasActiveSkin(this.profile.id());
         boolean hasCustomCape = service.hasActiveCape(this.profile.id());
         boolean hasModelOverride = service.hasModelOverride(this.profile.id());
+        boolean hasSeparateElytra = service.hasSeparateElytra(this.profile.id());
 //?}
 
         // Only modify if we have custom data
-        if (!hasCustomSkin && !hasCustomCape && !hasModelOverride) {
+        if (!hasCustomSkin && !hasCustomCape && !hasModelOverride && !hasSeparateElytra) {
             // Title screen fallback: when no world is loaded, build skin from config
             if (Minecraft.getInstance().level == null) {
                 PlayerSkin fallback = quickskin$buildTitleScreenFallback(cir.getReturnValue());
@@ -158,14 +166,17 @@ public abstract class PlayerInfoMixin implements com.quickskin.mod.client.compat
         ResourceLocation currentSkinLocation = hasCustomSkin ? service.getSkinLocation(this.profile.getId()) : null;
         ResourceLocation currentCapeLocation = hasCustomCape ? service.getCapeLocation(this.profile.getId()) : null;
         String currentModelName = (hasCustomSkin || hasModelOverride) ? service.getModelName(this.profile.getId()) : null;
+        ResourceLocation currentElytraLocation = hasSeparateElytra ? service.getSeparateElytraLocation(this.profile.getId()) : null;
 //?} else if <1.21.11 {
         ResourceLocation currentSkinLocation = hasCustomSkin ? service.getSkinLocation(this.profile.id()) : null;
         ResourceLocation currentCapeLocation = hasCustomCape ? service.getCapeLocation(this.profile.id()) : null;
         String currentModelName = (hasCustomSkin || hasModelOverride) ? service.getModelName(this.profile.id()) : null;
+        ResourceLocation currentElytraLocation = hasSeparateElytra ? service.getSeparateElytraLocation(this.profile.id()) : null;
 //?} else {
         Identifier currentSkinLocation = hasCustomSkin ? service.getSkinLocation(this.profile.id()) : null;
         Identifier currentCapeLocation = hasCustomCape ? service.getCapeLocation(this.profile.id()) : null;
         String currentModelName = (hasCustomSkin || hasModelOverride) ? service.getModelName(this.profile.id()) : null;
+        Identifier currentElytraLocation = hasSeparateElytra ? service.getSeparateElytraLocation(this.profile.id()) : null;
 //?}
 
         // FAST PATH: Check if we can use cached result
@@ -177,6 +188,7 @@ public abstract class PlayerInfoMixin implements com.quickskin.mod.client.compat
 //?}
             java.util.Objects.equals(quickskin$cachedSkinLocation, currentSkinLocation) &&
             java.util.Objects.equals(quickskin$cachedCapeLocation, currentCapeLocation) &&
+            java.util.Objects.equals(quickskin$cachedElytraLocation, currentElytraLocation) &&
             java.util.Objects.equals(quickskin$cachedModelName, currentModelName)) {
             cir.setReturnValue(quickskin$cachedSkin);
             return;
@@ -233,6 +245,15 @@ public abstract class PlayerInfoMixin implements com.quickskin.mod.client.compat
             }
         }
 
+        // The elytra wear another cape, or vanilla's elytra, instead of the cape
+        if (currentElytraLocation != null) {
+//? if <1.21.9 {
+            elytraTexture = currentElytraLocation;
+//?} else {
+            elytraTexture = new ClientAsset.ResourceTexture(currentElytraLocation, currentElytraLocation);
+//?}
+        }
+
         // Create new PlayerSkin with our custom values
         PlayerSkin customSkin = new PlayerSkin(
 //? if <1.21.9 {
@@ -258,6 +279,7 @@ public abstract class PlayerInfoMixin implements com.quickskin.mod.client.compat
 //?}
         quickskin$cachedSkinLocation = currentSkinLocation;
         quickskin$cachedCapeLocation = currentCapeLocation;
+        quickskin$cachedElytraLocation = currentElytraLocation;
         quickskin$cachedModelName = currentModelName;
 
         cir.setReturnValue(customSkin);
@@ -272,8 +294,13 @@ public abstract class PlayerInfoMixin implements com.quickskin.mod.client.compat
         ClientConfig config = ClientConfig.getInstance();
         boolean hasSkin = !config.activeSkinHash.isEmpty();
         boolean hasCape = !config.activeCapeHash.isEmpty();
+//? if <1.21.11 {
+        ResourceLocation configuredElytra = PlayerAppearanceService.getInstance().getConfiguredElytraLocation();
+//?} else {
+        Identifier configuredElytra = PlayerAppearanceService.getInstance().getConfiguredElytraLocation();
+//?}
 
-        if (!hasSkin && !hasCape) {
+        if (!hasSkin && !hasCape && configuredElytra == null) {
             return null;
         }
 
@@ -323,7 +350,15 @@ public abstract class PlayerInfoMixin implements com.quickskin.mod.client.compat
             }
         }
 
-        if (skinTexture == null && capeTexture == null) {
+        if (configuredElytra != null) {
+//? if <1.21.9 {
+            elytraTexture = configuredElytra;
+//?} else {
+            elytraTexture = new ClientAsset.ResourceTexture(configuredElytra, configuredElytra);
+//?}
+        }
+
+        if (skinTexture == null && capeTexture == null && configuredElytra == null) {
             return null;
         }
 
@@ -337,11 +372,11 @@ public abstract class PlayerInfoMixin implements com.quickskin.mod.client.compat
                 skinTexture != null ? skinTexture : original.texture(),
                 original.textureUrl(),
                 capeTexture != null ? capeTexture : original.capeTexture(),
-                capeTexture != null ? elytraTexture : original.elytraTexture(),
+                capeTexture != null || configuredElytra != null ? elytraTexture : original.elytraTexture(),
 //?} else {
                 skinAsset,
                 capeAsset,
-                capeTexture != null ? elytraTexture : original.elytra(),
+                capeTexture != null || configuredElytra != null ? elytraTexture : original.elytra(),
 //?}
                 skinModel,
                 original.secure()

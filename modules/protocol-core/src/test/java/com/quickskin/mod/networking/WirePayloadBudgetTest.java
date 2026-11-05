@@ -65,6 +65,7 @@ class WirePayloadBudgetTest {
     @Test
     void controlPacketsFitTheirDirection() {
         assertTrue(WirePayloadBudget.appearance() <= VANILLA_SERVERBOUND_PAYLOAD_BYTES);
+        assertTrue(WirePayloadBudget.appearanceWithElytra() <= VANILLA_SERVERBOUND_PAYLOAD_BYTES);
         assertTrue(WirePayloadBudget.serverConfig() <= VANILLA_CLIENTBOUND_PAYLOAD_BYTES);
     }
 

@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Öppna skinmeny",
+  "key.quickskin.favourites_fan": "Favoritskins (snabbyte)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Snabbt Skin",
@@ -160,6 +161,18 @@
   "quickskin.tooltip.static_cape": "Statisk mantel",
   "quickskin.tooltip.resolution": "Upplösning: %s",
   "quickskin.tooltip.click_preview": "Klicka för att förhandsgranska",
+  "quickskin.cape.tab.cape": "Mantel",
+  "quickskin.cape.tab.elytra": "Täckvingar",
+  "quickskin.cape.tab.cape_tip": "Välj manteln du bär",
+  "quickskin.cape.tab.elytra_tip": "Välj vad dina täckvingar bär: din mantel, Minecrafts täckvingar eller en annan mantel",
+  "quickskin.cape.option.same_as_cape": "Som manteln",
+  "quickskin.cape.option.same_as_cape.tip": "Dina täckvingar bär din mantel",
+  "quickskin.cape.option.vanilla_elytra": "Vanilla",
+  "quickskin.cape.option.vanilla_elytra.tip": "Minecrafts egna täckvingar, vilken mantel du än bär",
+  "quickskin.context.wear_on_elytra": "Bär på täckvingarna",
+  "quickskin.context.elytra_same_as_cape": "Täckvingar: som manteln",
+  "quickskin.tooltip.on_elytra": "På dina täckvingar",
+  "quickskin.tooltip.click_elytra": "Klicka för att bära på täckvingarna",
   "quickskin.cape.animation_speed": "Animationshastighet: %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -404,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[Snabbt Skin] Ditt skin (%s) är större än den här serverns uppladdningsgräns (%s). Det syns bara på din skärm; andra spelare ser det inte.",
   "quickskin.network.upload_too_large.cape": "[Snabbt Skin] Din mantel (%s) är större än den här serverns uppladdningsgräns (%s). Den syns bara på din skärm; andra spelare ser den inte.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Den här servern använder Quick Skin för egna skins och mantlar. Installera modden för att se dem och bära dina egna."
+  "quickskin.server.missing_mod_notice": "Den här servern använder Quick Skin för egna skins och mantlar. Installera modden för att se dem och bära dina egna.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Markera skins med ★ i skinmenyn för att se dem här",
+  "quickskin.fan.cooldown": "Du kan byta skin igen om %s s"
 }

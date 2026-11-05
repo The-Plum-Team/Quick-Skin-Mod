@@ -372,6 +372,7 @@ public final class MenuIntegration {
                 // Set context based on screen type
                 if ("title".equals(screenType)) {
                     playerWidget.setContext(com.quickskin.mod.client.gui.widget.PlayerWidget.WidgetContext.TITLE_SCREEN);
+                    keepDefaultPreviewClearOfSplash(playerWidget, screen.width);
                 } else if ("pause".equals(screenType)) {
                     playerWidget.setContext(com.quickskin.mod.client.gui.widget.PlayerWidget.WidgetContext.PAUSE_MENU);
                 }
@@ -442,9 +443,9 @@ public final class MenuIntegration {
                         Button animButton = Button.builder(
                                 Component.literal(String.valueOf(index + 1)),
                                 button -> {
-                                    // Set the animation on the player widget
+                                    // A pick, with the move that leads into it (the jump onto the block for Sitting)
                                     if (playerWidget != null) {
-                                        playerWidget.setAnimation(animName);
+                                        playerWidget.pickAnimation(animName);
                                         // Save animation state for persistence across all screens
                                         PreviewAnimationState.set(animName);
                                     }
@@ -580,6 +581,33 @@ public final class MenuIntegration {
         if (widget != null) {
             widget.visible = shown;
             widget.active = shown;
+        }
+    }
+
+    /**
+     * Shrinks the title preview, as far as needed, so that at its default size and place it stays
+     * below the logo and the splash text whatever the window and GUI scale. A size or position the
+     * player chose is theirs: once either is set, the preview draws exactly as configured, over the
+     * splash if that is where they put it.
+     */
+    private static void keepDefaultPreviewClearOfSplash(PlayerWidget playerWidget, int screenWidth) {
+        com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
+        if (config.sizeModelPreviewPercentageTitleScreen != 0
+                || config.positionOffsetXTitleScreen != 0
+                || config.positionOffsetYTitleScreen != 0) {
+            return;
+        }
+        //? if >=1.21 {
+        boolean splashShown = !Minecraft.getInstance().options.hideSplashTexts().get();
+        //?} else {
+        boolean splashShown = true;
+        //?}
+        float preferred = playerWidget.getEffectiveScale();
+        // 20 is the smallest size the preview can be configured to.
+        float scale = TitleSplashClearance.clearScale(screenWidth, playerWidget.getLayoutCenterX(),
+                playerWidget.getLayoutFeetY(), preferred, Math.min(preferred, 20.0f), splashShown);
+        if (scale < preferred) {
+            playerWidget.setScaleCap(scale);
         }
     }
 

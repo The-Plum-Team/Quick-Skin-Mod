@@ -145,12 +145,26 @@ public final class ServerUploadCoordinator {
             String missingSkinHash,
             String missingCapeHash
     ) {
+        return deferAppearance(playerId, connection, appearance, missingSkinHash, missingCapeHash, null);
+    }
+
+    /** The same, with the cape the elytra wear, which is uploaded as a cape too. */
+    public synchronized boolean deferAppearance(
+            UUID playerId,
+            Object connection,
+            PendingAppearance appearance,
+            String missingSkinHash,
+            String missingCapeHash,
+            String missingElytraHash
+    ) {
         if (playerId == null || connection == null || appearance == null
-                || (missingSkinHash == null && missingCapeHash == null)
+                || (missingSkinHash == null && missingCapeHash == null && missingElytraHash == null)
                 || (missingSkinHash != null
                         && !NetworkSecurity.isValidContentId(missingSkinHash))
                 || (missingCapeHash != null
-                        && !NetworkSecurity.isValidContentId(missingCapeHash))) return false;
+                        && !NetworkSecurity.isValidContentId(missingCapeHash))
+                || (missingElytraHash != null
+                        && !NetworkSecurity.isValidContentId(missingElytraHash))) return false;
         long now = clock.getAsLong();
         purgeExpired(now);
         SessionKey key = new SessionKey(playerId, connection);
@@ -159,7 +173,9 @@ public final class ServerUploadCoordinator {
                 || (missingSkinHash != null
                         && !hasUpload(state, "skin", missingSkinHash))
                 || (missingCapeHash != null
-                        && !hasUpload(state, "cape", missingCapeHash))) return false;
+                        && !hasUpload(state, "cape", missingCapeHash))
+                || (missingElytraHash != null
+                        && !hasUpload(state, "cape", missingElytraHash))) return false;
 
         state.pendingAppearance = new ExpiringAppearance(
                 appearance, now + PENDING_TTL_MILLIS);
@@ -309,7 +325,16 @@ public final class ServerUploadCoordinator {
         }
     }
 
-    public record PendingAppearance(String skinId, String capeId, String model) {
+    /** An appearance waiting for its uploads; {@code elytraId} is what the elytra wear ("": the cape). */
+    public record PendingAppearance(String skinId, String capeId, String elytraId, String model) {
+        public PendingAppearance {
+            elytraId = elytraId != null ? elytraId : "";
+        }
+
+        /** From a session that cannot tell the elytra apart: they wear the cape. */
+        public PendingAppearance(String skinId, String capeId, String model) {
+            this(skinId, capeId, "", model);
+        }
     }
 
     public record PendingMetadata(String hash, String metadataJson) {

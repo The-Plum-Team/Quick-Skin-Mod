@@ -20,6 +20,11 @@ import net.neoforged.neoforge.event.GameShuttingDownEvent;
 //?}
 public class QuickSkinForgeClient {
 
+    /** Registers Quick Skin's keys while the mod is built, before the controls are read. */
+    static void registerKeys() {
+        com.quickskin.mod.client.input.KeybindRegistry.registerKeys();
+    }
+
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
         // Initialize client code on the main thread

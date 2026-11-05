@@ -20,6 +20,10 @@ MIXIN_MARKER = re.compile(r"@Mixin\s*\(")
 INJECTOR_MARKER = re.compile(r"@(Inject|ModifyArg|ModifyVariable|Redirect)\s*\(")
 HANDLER_MARKER = re.compile(r"\b(quickskin\$[A-Za-z0-9_$]+)\s*\(")
 JAVA_COMMENT = re.compile(r"//[^\n]*|/\*.*?\*/", re.DOTALL)
+# A RETURN hook takes every return of its target, and another mod's transformer may add returns
+# (CustomSkinLoader adds one to SkinManager.getInsecureSkinInformation on 1.20.1), so it declares
+# no upper bound, which would stop the game in production; its expect still counts vanilla's.
+RETURN_POINT = re.compile(r'@At\(\s*(?:value\s*=\s*)?"RETURN"')
 
 
 def relative(path: Path) -> str:
@@ -67,15 +71,25 @@ DEGRADABLE_MIXINS = {
     "main:com/quickskin/mod/mixin/armor/LocalHeadLayerMixin.java",
     "main:com/quickskin/mod/mixin/armor/PreviewArmorPoseMixin.java",
     "main:com/quickskin/mod/mixin/armor/ServerEquipmentFilterMixin.java",
+    # Forge 1.20.1 only: a hook that fails leaves other players seeing a hidden cosmetic piece.
+    "overlay:com/quickskin/mod/mixin/armor/ConnectionCosmeticArmorFilterMixin.java",
     "main:com/quickskin/mod/mixin/PreviewEquipmentMixin.java",
     "main:com/quickskin/mod/mixin/PreviewSkinSwapPoseMixin.java",
     # 1.20.1 only: without it the notice for players without Quick Skin is in English.
     "main:com/quickskin/mod/mixin/ServerPlayerLanguageMixin.java",
+    # The favourites fan: a hook that fails leaves the camera turning while the fan is open, or
+    # Esc opening the pause menu over it.
+    "main:com/quickskin/mod/mixin/input/MouseTurnMixin.java",
+    "main:com/quickskin/mod/mixin/input/PauseGameMixin.java",
 }
 
 # Like the nickname mixins, NeoForge loads the hidden-armour mixins from their own config.
 ARMOR_MIXIN_PACKAGE = "com.quickskin.mod.mixin.armor"
 NEOFORGE_ARMOR_CONFIG = ROOT / "neoforge" / "src" / "main" / "resources" / "quickskin-armor.mixins.json"
+
+# And the favourites fan's input hooks from their own.
+INPUT_MIXIN_PACKAGE = "com.quickskin.mod.mixin.input"
+NEOFORGE_INPUT_CONFIG = ROOT / "neoforge" / "src" / "main" / "resources" / "quickskin-input.mixins.json"
 
 # NeoForge never reads quickskin.mixins.json, so it loads the nickname mixins from their own config.
 NICKNAME_MIXIN_PACKAGE = "com.quickskin.mod.mixin.nickname"
@@ -101,6 +115,7 @@ OPTIONAL_MIXINS = {
     "main:com/quickskin/mod/mixin/compat/RealCameraTextureIdMixin.java",
     "main:com/quickskin/mod/mixin/compat/JourneyMapIgnSkinMixin.java",
     "main:com/quickskin/mod/mixin/compat/JourneyMapTextureCacheMixin.java",
+    "main:com/quickskin/mod/mixin/compat/CosmeticArmorRenderMixin.java",
     "overlay:com/quickskin/mod/mixin/MixinSkinManager.java",
     "overlay:com/quickskin/mod/mixin/compat/ReplayModCompatMixin.java",
 }
@@ -140,6 +155,16 @@ ALTERNATIVE_HOOKS = {
     (
         "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
         "quickskin$skipStaleExtractedModel",
+    ),
+    # Cosmetic Armor Reworked's original and its NeoForge fork read the slot with Mojang names,
+    # its Fabric fork with intermediary ones; a runtime takes exactly one of the two.
+    (
+        "main:com/quickskin/mod/mixin/compat/CosmeticArmorRenderMixin.java",
+        "quickskin$cosmeticUnlessHidden",
+    ),
+    (
+        "main:com/quickskin/mod/mixin/compat/CosmeticArmorRenderMixin.java",
+        "quickskin$cosmeticUnlessHiddenIntermediary",
     ),
 }
 
@@ -190,14 +215,16 @@ INJECTION_COUNT_OVERRIDES = {
 }
 
 ALLOW_COUNT_OVERRIDES = {
+    # Audited builds: the original reads a slot three times (1.20.1, 1.21.1) or once (from 1.21.3),
+    # its fork four times, twice in handlePreRenderPlayer.
     (
-        "main:com/quickskin/mod/mixin/compat/EarsLayerRendererMixin.java",
-        "quickskin$getEarsFeatures",
-    ): {2},
+        "main:com/quickskin/mod/mixin/compat/CosmeticArmorRenderMixin.java",
+        "quickskin$cosmeticUnlessHidden",
+    ): {4},
     (
-        "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
-        "quickskin$getEarsFeatures",
-    ): {2},
+        "main:com/quickskin/mod/mixin/compat/CosmeticArmorRenderMixin.java",
+        "quickskin$cosmeticUnlessHiddenIntermediary",
+    ): {4},
     (
         "main:com/quickskin/mod/mixin/compat/CpmSubmitCollectorMixin.java",
         "quickskin$skipStaleExtractedModel",
@@ -264,10 +291,13 @@ class MixinPolicyTest(unittest.TestCase):
                 )
                 with self.subTest(source=source_name, handler=handler_name):
                     self.assertEqual(assignment_values(context, "require"), {expected_require})
-                    self.assertEqual(
-                        assignment_values(context, "allow"),
-                        ALLOW_COUNT_OVERRIDES.get((source_name, handler_name), expected_counts),
-                    )
+                    if RETURN_POINT.search(JAVA_COMMENT.sub("", context)):
+                        self.assertEqual(assignment_values(context, "allow"), set())
+                    else:
+                        self.assertEqual(
+                            assignment_values(context, "allow"),
+                            ALLOW_COUNT_OVERRIDES.get((source_name, handler_name), expected_counts),
+                        )
                     if (source_name, handler_name) in ALTERNATIVE_HOOKS:
                         self.assertEqual(assignment_values(context, "expect"), {0})
                     else:
@@ -385,11 +415,14 @@ class MixinPolicyTest(unittest.TestCase):
                 )
 
     def test_every_loader_loads_the_armor_mixins(self) -> None:
-        armor_sources = {
-            path.stem
-            for path in (CANONICAL_JAVA / "com/quickskin/mod/mixin/armor").glob("*.java")
-            if MIXIN_MARKER.search(path.read_text(encoding="utf-8"))
-        }
+        def armor_mixins(java_root: Path) -> set[str]:
+            return {
+                path.stem
+                for path in (java_root / "com/quickskin/mod/mixin/armor").glob("*.java")
+                if MIXIN_MARKER.search(path.read_text(encoding="utf-8"))
+            }
+
+        armor_sources = armor_mixins(CANONICAL_JAVA)
         self.assertTrue(armor_sources)
         for path in self.configs_named("quickskin.mixins.json"):
             with self.subTest(config=relative(path)):
@@ -399,7 +432,12 @@ class MixinPolicyTest(unittest.TestCase):
                     for name in config["mixins"] + config["client"]
                     if name.startswith("armor.")
                 }
-                self.assertEqual(listed, armor_sources)
+                # An overlay's config also lists the armour mixins only that overlay has
+                overlay_java = path.parent.parent / "java"
+                expected = armor_sources | (
+                    armor_mixins(overlay_java) if overlay_java in OVERLAY_JAVA else set()
+                )
+                self.assertEqual(listed, expected)
                 self.assertIn("armor.ServerEquipmentFilterMixin", config["mixins"])
         neoforge = json.loads(NEOFORGE_ARMOR_CONFIG.read_text(encoding="utf-8"))
         self.assertEqual(neoforge["package"], ARMOR_MIXIN_PACKAGE)
@@ -424,6 +462,83 @@ class MixinPolicyTest(unittest.TestCase):
         common = ROOT / "common/src/main/java/com/quickskin/mod/mixin/GuiSkinRendererMixin.java"
         neoforge = ROOT / "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/GuiSkinRendererMixin.java"
         self.assertEqual(body(common), body(neoforge))
+
+    def test_every_loader_loads_the_input_mixins(self) -> None:
+        input_sources = {
+            path.stem
+            for path in (CANONICAL_JAVA / "com/quickskin/mod/mixin/input").glob("*.java")
+            if MIXIN_MARKER.search(path.read_text(encoding="utf-8"))
+        }
+        self.assertTrue(input_sources)
+        for path in self.configs_named("quickskin.mixins.json"):
+            with self.subTest(config=relative(path)):
+                config = json.loads(path.read_text(encoding="utf-8"))
+                listed = {name.split(".", 1)[1] for name in config["client"] if name.startswith("input.")}
+                self.assertEqual(listed, input_sources)
+        neoforge = json.loads(NEOFORGE_INPUT_CONFIG.read_text(encoding="utf-8"))
+        self.assertEqual(neoforge["package"], INPUT_MIXIN_PACKAGE)
+        self.assertEqual(set(neoforge["client"]), input_sources)
+        self.assertNotIn("mixins", neoforge)
+        for toml in NEOFORGE_MOD_TOMLS:
+            with self.subTest(toml=relative(toml)):
+                self.assertIn('config = "quickskin-input.mixins.json"', toml.read_text(encoding="utf-8"))
+
+    def test_neoforge_loads_every_server_mixin_of_its_targets(self) -> None:
+        # NeoForge never reads quickskin.mixins.json, so each server mixin its targets' common
+        # config lists must come from a config a NeoForge mods.toml declares; otherwise a cast to
+        # an accessor (ADR 0012's ChunkMapAccessor, for one) throws on every NeoForge server.
+        neoforge_versions = {
+            artifact["artifact_version"]
+            for artifact in MATRIX["artifacts"]
+            if artifact["loader"] == "neoforge"
+        }
+        self.assertTrue(neoforge_versions)
+        routes = MATRIX["source_overlays"]["common"]
+        expected: set[str] = set()
+        for version in neoforge_versions:
+            overlay = routes.get(version)
+            root = ROOT / "common" / "src" / (overlay or "main") / "resources"
+            path = root / "quickskin.mixins.json"
+            if not path.is_file():
+                path = ROOT / "common" / "src" / "main" / "resources" / "quickskin.mixins.json"
+            config = json.loads(path.read_text(encoding="utf-8"))
+            expected |= {f"{config['package']}.{name}" for name in config["mixins"]}
+        self.assertIn("com.quickskin.mod.mixin.ChunkMapAccessor", expected)
+        resources = ROOT / "neoforge" / "src" / "main" / "resources"
+        for toml in NEOFORGE_MOD_TOMLS:
+            with self.subTest(toml=relative(toml)):
+                declared = re.findall(r'^config = "([^"]+)"$', toml.read_text(encoding="utf-8"), re.M)
+                loaded: set[str] = set()
+                for name in declared:
+                    candidates = (
+                        toml.parents[1] / name,
+                        resources / name,
+                        ROOT / "common" / "src" / "main" / "resources" / name,
+                    )
+                    path = next((c for c in candidates if c.is_file()), candidates[-1])
+                    self.assertTrue(path.is_file(), name)
+                    config = json.loads(path.read_text(encoding="utf-8"))
+                    loaded |= {
+                        f"{config['package']}.{mixin}" for mixin in config.get("mixins", [])
+                    }
+                self.assertEqual(expected - loaded, set())
+
+    def test_saved_cape_stands_in_only_on_the_title_screen(self) -> None:
+        # In a world the session's appearance decides the local player's cape: a session that
+        # adopted a saved record without a cape must not show the config's cape locally.
+        for path in (
+            CANONICAL_JAVA / "com/quickskin/mod/mixin/CapeLayerMixin.java",
+            ROOT / "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/CapeLayerMixin.java",
+        ):
+            with self.subTest(path=relative(path)):
+                source = JAVA_COMMENT.sub("", path.read_text(encoding="utf-8"))
+                gates = re.findall(
+                    r"boolean (?:hasConfigCape = !previewing|useConfigCape =)[^;]*;", source
+                )
+                self.assertTrue(gates)
+                for gate in gates:
+                    self.assertIn("level == null", gate)
+                self.assertNotRegex(source, r"&&\s*isLocalPlayer\s*\)")
 
     def test_ears_five_lookup_selects_every_overload(self) -> None:
         source = (

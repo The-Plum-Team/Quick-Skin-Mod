@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Ouvrir le menu des skins",
+  "key.quickskin.favourites_fan": "Skins favoris (changement rapide)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Skin rapide",
@@ -160,6 +161,18 @@
   "quickskin.tooltip.static_cape": "Cape statique",
   "quickskin.tooltip.resolution": "Résolution : %s",
   "quickskin.tooltip.click_preview": "Clique pour prévisualiser",
+  "quickskin.cape.tab.cape": "Cape",
+  "quickskin.cape.tab.elytra": "Élytres",
+  "quickskin.cape.tab.cape_tip": "Choisis la cape que tu portes",
+  "quickskin.cape.tab.elytra_tip": "Choisis ce que portent tes élytres : ta cape, les élytres de Minecraft ou une autre cape",
+  "quickskin.cape.option.same_as_cape": "Comme la cape",
+  "quickskin.cape.option.same_as_cape.tip": "Tes élytres portent ta cape",
+  "quickskin.cape.option.vanilla_elytra": "Vanilla",
+  "quickskin.cape.option.vanilla_elytra.tip": "Les élytres de Minecraft, quelle que soit ta cape",
+  "quickskin.context.wear_on_elytra": "Porter sur les élytres",
+  "quickskin.context.elytra_same_as_cape": "Élytres : comme la cape",
+  "quickskin.tooltip.on_elytra": "Sur tes élytres",
+  "quickskin.tooltip.click_elytra": "Clique pour la porter sur tes élytres",
   "quickskin.cape.animation_speed": "Vitesse d'animation : %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -404,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[Skin rapide] Ton skin (%s) dépasse la limite de téléversement de ce serveur (%s). Il n'est visible que sur ton écran ; les autres joueurs ne le voient pas.",
   "quickskin.network.upload_too_large.cape": "[Skin rapide] Ta cape (%s) dépasse la limite de téléversement de ce serveur (%s). Elle n'est visible que sur ton écran ; les autres joueurs ne la voient pas.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Ce serveur utilise Quick Skin pour des skins et des capes personnalisés. Installe le mod pour les voir et porter les tiens."
+  "quickskin.server.missing_mod_notice": "Ce serveur utilise Quick Skin pour des skins et des capes personnalisés. Installe le mod pour les voir et porter les tiens.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Marque des skins avec ★ dans le menu des skins pour les voir ici",
+  "quickskin.fan.cooldown": "Tu pourras changer de skin dans %s s"
 }

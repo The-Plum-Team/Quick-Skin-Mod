@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "스킨 메뉴 열기",
+  "key.quickskin.favourites_fan": "즐겨찾는 스킨 (빠른 변경)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "빠른 스킨",
@@ -160,6 +161,18 @@
   "quickskin.tooltip.static_cape": "정적 망토",
   "quickskin.tooltip.resolution": "해상도: %s",
   "quickskin.tooltip.click_preview": "클릭하여 미리보기",
+  "quickskin.cape.tab.cape": "망토",
+  "quickskin.cape.tab.elytra": "겉날개",
+  "quickskin.cape.tab.cape_tip": "착용할 망토를 고르세요",
+  "quickskin.cape.tab.elytra_tip": "겉날개에 입힐 것을 고르세요: 내 망토, 기본 겉날개 또는 다른 망토",
+  "quickskin.cape.option.same_as_cape": "망토와 같게",
+  "quickskin.cape.option.same_as_cape.tip": "겉날개에 착용 중인 망토가 입혀집니다",
+  "quickskin.cape.option.vanilla_elytra": "바닐라",
+  "quickskin.cape.option.vanilla_elytra.tip": "어떤 망토를 입어도 Minecraft 기본 겉날개",
+  "quickskin.context.wear_on_elytra": "겉날개에 입히기",
+  "quickskin.context.elytra_same_as_cape": "겉날개: 망토와 같게",
+  "quickskin.tooltip.on_elytra": "겉날개에 입힘",
+  "quickskin.tooltip.click_elytra": "클릭하면 겉날개에 입힙니다",
   "quickskin.cape.animation_speed": "애니메이션 속도: %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -404,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[빠른 스킨] 스킨(%s)이 이 서버의 업로드 제한(%s)을 넘습니다. 내 화면에만 표시되며 다른 플레이어에게는 보이지 않습니다.",
   "quickskin.network.upload_too_large.cape": "[빠른 스킨] 망토(%s)가 이 서버의 업로드 제한(%s)을 넘습니다. 내 화면에만 표시되며 다른 플레이어에게는 보이지 않습니다.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "이 서버는 사용자 지정 스킨과 망토에 Quick Skin을 사용합니다. 이를 보고 자신의 것을 착용하려면 모드를 설치하세요."
+  "quickskin.server.missing_mod_notice": "이 서버는 사용자 지정 스킨과 망토에 Quick Skin을 사용합니다. 이를 보고 자신의 것을 착용하려면 모드를 설치하세요.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "스킨 메뉴에서 스킨에 ★를 표시하면 여기에 나타납니다",
+  "quickskin.fan.cooldown": "%s초 후에 스킨을 다시 바꿀 수 있습니다"
 }

@@ -113,6 +113,8 @@ the actual import owner and exercise the same composed saved-appearance path.
 hands it over and sends the service's `accountSkinVisibility` with the server configuration. `ServerRuntime` binds the service to the running server through
 `AccountSkinProfileTarget`, the `common` bridge that owns the `ChunkMap`, tracked-entity and
 `Player.gameProfile` accessors and the player-info and entity-pairing packets (ADR 0012).
+NeoForge, which never reads `quickskin.mixins.json`, loads those accessors from its own
+`quickskin-account-skin.mixins.json`.
 `skin-upload` reports a successful upload through `ClientNetworkActions`.
 
 Nicknames (ADR 0015) follow the same split. `Nickname` (content-core) owns the rules;
@@ -164,9 +166,18 @@ Settings reconstruct their parent through `RestylableScreen`; key handling recei
 callback from bootstrap. Neither mechanism introduces a settings-to-skin-menu compile dependency.
 `menu-integration` owns injected title/pause controls, preview rotation/animation state and deferred
 menu rendering. Its skin-menu action is another bootstrap callback, covered by
-`vanilla-menu-navigation`; it does not compile against the skin menu. `hud-preview` owns its overlay,
+`vanilla-menu-navigation`; it does not compile against the skin menu.
+At its default size and place the title preview shrinks only as far as the window and GUI
+scale need to keep it below the logo and the splash text (`TitleSplashClearance`); a size or
+position the player set is drawn as configured. `hud-preview` owns its overlay,
 mouse/tick/render callbacks and drag state independently of menu widgets. Bootstrap keeps CPM's
 frame-boundary callback after HUD extraction, including when the HUD is hidden.
+`favourites-fan` owns the favourites fan: its key (registered through `KeybindRegistry`), its HUD
+layer, the mouse buttons, wheel and Esc it takes while open, and the arithmetic of its cards
+(`FanMotion`, pure Java with its own tests). It puts a favourite on along the skin menu's own path
+without compiling against the skin menu (`FavouriteSkins`). Its cards' pictures come from
+`SkinBustTextures` in `player-preview`, which also draws the skin list's busts. Its two mixins,
+`MouseTurnMixin` and `PauseGameMixin`, are in `common`. `ClientEvents` initialises the fan and resets it with the session.
 The harness's `TitleMenuSteps` and `HudPreviewSteps` prepare their own reference appearance from
 `local_skin_apply`. HUD evidence compares a dedicated disabled control with the enabled overlay;
 it must not reuse the full-suite baseline and inherit unrelated image-comparison dependencies.

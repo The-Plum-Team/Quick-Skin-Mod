@@ -36,8 +36,21 @@ class AccountHiddenArmorTest {
         assertTrue(hidden.set(STEVE, 0));
         assertEquals(0, hidden.hidden(STEVE));
         assertFalse(hidden.set(STEVE, 0), "there was nothing left to forget");
-        assertTrue(hidden.set(STEVE, 0xF0 | 2));
+        assertTrue(hidden.set(STEVE, 0x100 | 2));
         assertEquals(2, hidden.hidden(STEVE));
         assertFalse(hidden.set("not a key", 1));
+    }
+
+    @Test
+    void cosmeticPiecesAreKeptBesideTheArmourPieces() {
+        AccountHiddenArmor hidden = new AccountHiddenArmor();
+
+        assertTrue(hidden.set(STEVE, 8 | 8 << 4));
+        assertEquals(8 | 8 << 4, hidden.hidden(STEVE));
+        assertTrue(hidden.set(STEVE, 8 << 4), "showing the armour piece alone is a change");
+        assertEquals(8 << 4, hidden.hidden(STEVE));
+        assertFalse(hidden.set(STEVE, 8 << 4));
+        assertTrue(hidden.set(STEVE, 0));
+        assertEquals(0, hidden.hidden(STEVE));
     }
 }

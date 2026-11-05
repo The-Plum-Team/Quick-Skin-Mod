@@ -211,7 +211,13 @@ selectors as usual:
 
 Only the player and the operators hear about a name an admin gives, so a round of a game can hand
 out names without announcing who is who; the operators still see the account names in the tab
-list. Names an admin gives follow the same rules, without the 10-second wait. The server writes
+list. For a game where admins play too, put `silent` after `/quickskin`, for example
+`/quickskin silent nickname random @a`: only the players themselves learn their names. Nothing
+is said to whoever runs the command, to other operators or in a command block's output (its
+result count still drives a comparator), and the names it gives show no account name beside
+them anywhere, in the operators' tab list or in join and leave messages, until they are taken
+back. `silent` works before every `nickname` and `skin` command but the pool's. Names an admin
+gives follow the same rules, without the 10-second wait. The server writes
 `config/quickskin-nicknames.txt` with about ninety given names that suit anyone the first time it
 starts; edit it freely (one name per line, `#` starts a comment), for example with the NATO
 alphabet for code names. To clear a player's nickname for good, run `clear` and then `lock`.

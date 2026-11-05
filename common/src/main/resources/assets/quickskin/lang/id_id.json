@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Buka Menu Skin",
+  "key.quickskin.favourites_fan": "Skin Favorit (Ganti Cepat)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Skin Cepat",
@@ -160,6 +161,18 @@
   "quickskin.tooltip.static_cape": "Jubah statis",
   "quickskin.tooltip.resolution": "Resolusi: %s",
   "quickskin.tooltip.click_preview": "Klik untuk pratinjau",
+  "quickskin.cape.tab.cape": "Jubah",
+  "quickskin.cape.tab.elytra": "Elitron",
+  "quickskin.cape.tab.cape_tip": "Pilih jubah yang kamu pakai",
+  "quickskin.cape.tab.elytra_tip": "Pilih yang dipakai elitronmu: jubahmu, elitron bawaan, atau jubah lain",
+  "quickskin.cape.option.same_as_cape": "Sama dengan jubah",
+  "quickskin.cape.option.same_as_cape.tip": "Elitronmu memakai jubahmu",
+  "quickskin.cape.option.vanilla_elytra": "Vanilla",
+  "quickskin.cape.option.vanilla_elytra.tip": "Elitron bawaan Minecraft, apa pun jubahmu",
+  "quickskin.context.wear_on_elytra": "Pakai di elitron",
+  "quickskin.context.elytra_same_as_cape": "Elitron: sama dengan jubah",
+  "quickskin.tooltip.on_elytra": "Di elitronmu",
+  "quickskin.tooltip.click_elytra": "Klik untuk dipakai di elitron",
   "quickskin.cape.animation_speed": "Kecepatan Animasi: %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -404,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[Skin Cepat] Skin Anda (%s) melebihi batas unggah server ini, yaitu %s. Skin ini hanya terlihat di layar Anda; pemain lain tidak melihatnya.",
   "quickskin.network.upload_too_large.cape": "[Skin Cepat] Jubah Anda (%s) melebihi batas unggah server ini, yaitu %s. Jubah ini hanya terlihat di layar Anda; pemain lain tidak melihatnya.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Server ini menggunakan Quick Skin untuk skin dan jubah kustom. Pasang mod-nya untuk melihatnya dan memakai milik Anda sendiri."
+  "quickskin.server.missing_mod_notice": "Server ini menggunakan Quick Skin untuk skin dan jubah kustom. Pasang mod-nya untuk melihatnya dan memakai milik Anda sendiri.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Tandai skin dengan ★ di menu skin untuk melihatnya di sini",
+  "quickskin.fan.cooldown": "Kamu bisa mengganti skin lagi dalam %s dtk"
 }

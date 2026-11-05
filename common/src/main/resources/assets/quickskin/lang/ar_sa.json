@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "فتح قائمة المظاهر",
+  "key.quickskin.favourites_fan": "المظاهر المفضلة (تغيير سريع)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "المظهر السريع",
@@ -160,6 +161,18 @@
   "quickskin.tooltip.static_cape": "عباءة ثابتة",
   "quickskin.tooltip.resolution": "الدقة: %s",
   "quickskin.tooltip.click_preview": "انقر للمعاينة",
+  "quickskin.cape.tab.cape": "العباءة",
+  "quickskin.cape.tab.elytra": "إليترا",
+  "quickskin.cape.tab.cape_tip": "اختر العباءة التي ترتديها",
+  "quickskin.cape.tab.elytra_tip": "اختر ما ترتديه الإليترا: عباءتك أو إليترا ماينكرافت أو عباءة أخرى",
+  "quickskin.cape.option.same_as_cape": "مثل العباءة",
+  "quickskin.cape.option.same_as_cape.tip": "ترتدي الإليترا عباءتك",
+  "quickskin.cape.option.vanilla_elytra": "Vanilla",
+  "quickskin.cape.option.vanilla_elytra.tip": "إليترا ماينكرافت الأصلية مهما كانت عباءتك",
+  "quickskin.context.wear_on_elytra": "ارتدِها على الإليترا",
+  "quickskin.context.elytra_same_as_cape": "الإليترا: مثل العباءة",
+  "quickskin.tooltip.on_elytra": "على الإليترا",
+  "quickskin.tooltip.click_elytra": "انقر لارتدائها على الإليترا",
   "quickskin.cape.animation_speed": "سرعة الرسوم المتحركة: %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -404,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[المظهر السريع] مظهرك (%s) يتجاوز حد الرفع لهذا الخادم البالغ %s. يظهر على شاشتك فقط؛ ولا يراه اللاعبون الآخرون.",
   "quickskin.network.upload_too_large.cape": "[المظهر السريع] عباءتك (%s) تتجاوز حد الرفع لهذا الخادم البالغ %s. تظهر على شاشتك فقط؛ ولا يراها اللاعبون الآخرون.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "يستخدم هذا الخادم Quick Skin للأشكال والعباءات المخصصة. ثبّت التعديل لتراها ولترتدي ما يخصك."
+  "quickskin.server.missing_mod_notice": "يستخدم هذا الخادم Quick Skin للأشكال والعباءات المخصصة. ثبّت التعديل لتراها ولترتدي ما يخصك.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "ضع علامة ★ على المظاهر في قائمة المظاهر لتراها هنا",
+  "quickskin.fan.cooldown": "يمكنك تغيير مظهرك مجددًا بعد %s ث"
 }

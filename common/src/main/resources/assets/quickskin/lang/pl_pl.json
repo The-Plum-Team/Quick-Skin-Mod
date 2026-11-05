@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Otwórz menu skórek",
+  "key.quickskin.favourites_fan": "Ulubione skórki (szybka zmiana)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Szybka Skórka",
@@ -160,6 +161,18 @@
   "quickskin.tooltip.static_cape": "Statyczna peleryna",
   "quickskin.tooltip.resolution": "Rozdzielczość: %s",
   "quickskin.tooltip.click_preview": "Kliknij, aby zobaczyć podgląd",
+  "quickskin.cape.tab.cape": "Peleryna",
+  "quickskin.cape.tab.elytra": "Elytra",
+  "quickskin.cape.tab.cape_tip": "Wybierz pelerynę, którą nosisz",
+  "quickskin.cape.tab.elytra_tip": "Wybierz, co noszą twoje elytra: twoją pelerynę, zwykłe elytra lub inną pelerynę",
+  "quickskin.cape.option.same_as_cape": "Jak peleryna",
+  "quickskin.cape.option.same_as_cape.tip": "Twoje elytra noszą twoją pelerynę",
+  "quickskin.cape.option.vanilla_elytra": "Vanilla",
+  "quickskin.cape.option.vanilla_elytra.tip": "Elytra z Minecrafta, jakąkolwiek pelerynę nosisz",
+  "quickskin.context.wear_on_elytra": "Noś na elytrach",
+  "quickskin.context.elytra_same_as_cape": "Elytra: jak peleryna",
+  "quickskin.tooltip.on_elytra": "Na twoich elytrach",
+  "quickskin.tooltip.click_elytra": "Kliknij, aby nosić na elytrach",
   "quickskin.cape.animation_speed": "Prędkość animacji: %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -404,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[Szybka Skórka] Twoja skórka (%s) przekracza limit przesyłania tego serwera (%s). Widzisz ją tylko na swoim ekranie; inni gracze jej nie widzą.",
   "quickskin.network.upload_too_large.cape": "[Szybka Skórka] Twoja peleryna (%s) przekracza limit przesyłania tego serwera (%s). Widzisz ją tylko na swoim ekranie; inni gracze jej nie widzą.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Ten serwer używa Quick Skin do własnych skórek i peleryn. Zainstaluj moda, aby je widzieć i nosić własne."
+  "quickskin.server.missing_mod_notice": "Ten serwer używa Quick Skin do własnych skórek i peleryn. Zainstaluj moda, aby je widzieć i nosić własne.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Oznacz skórki gwiazdką ★ w menu skórek, aby zobaczyć je tutaj",
+  "quickskin.fan.cooldown": "Skórkę możesz znów zmienić za %s s"
 }

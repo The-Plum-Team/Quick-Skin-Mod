@@ -70,6 +70,23 @@ public class PacketHelper {
         return buf;
     }
 
+    //? if <1.21 {
+    /**
+     * An appearance with the elytra's own cape, for a session that negotiated elytra-texture.
+     * Format: UUID (player) + String (skinId) + String (capeId) + String (elytraId) + String (model)
+     */
+    public static FriendlyByteBuf createAppearanceWithElytraPacket(
+            UUID playerId, String skinId, String capeId, String elytraId, String model) {
+        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
+        buf.writeUUID(playerId);
+        buf.writeUtf(skinId != null ? skinId : "");
+        buf.writeUtf(capeId != null ? capeId : "");
+        buf.writeUtf(elytraId != null ? elytraId : "");
+        buf.writeUtf(model != null ? model : "classic");
+        return buf;
+    }
+    //?}
+
     /**
      * Creates a packet for requesting a texture from server
      * Format: UUID (player) + String (textureType) + String (hash)

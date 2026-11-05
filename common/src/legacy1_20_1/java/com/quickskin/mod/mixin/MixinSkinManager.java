@@ -214,9 +214,9 @@ public class MixinSkinManager {
             at = @At("RETURN"),
             cancellable = true,
             require = 0,
-            // 1.20.1 has two bytecode RETURN sites in this one target method.
-            expect = 2,
-            allow = 2
+            // 1.20.1 has two bytecode RETURN sites in this one target method. No upper bound:
+            // CustomSkinLoader rewrites this method with a third one, which takes the same hook.
+            expect = 2
     )
     private void quickskin$overrideSkinInfo(
             GameProfile profile,

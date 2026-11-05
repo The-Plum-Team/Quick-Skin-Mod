@@ -3,10 +3,12 @@ package com.quickskin.mod.forge;
 import com.quickskin.mod.QuickSkin;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import dev.architectury.platform.forge.EventBuses;
+import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 
 /**
  * Forge entry point for QuickSkin
@@ -22,6 +24,10 @@ public class QuickSkinForge {
             QuickSkinInfo.MOD_ID,
             FMLJavaModLoadingContext.get().getModEventBus()
         );
+        // Quick Skin's keys must exist before Forge registers the controls and reads their bindings
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            QuickSkinForgeClient.registerKeys();
+        }
     }
 
     /**

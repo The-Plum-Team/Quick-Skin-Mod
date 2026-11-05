@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Відкрити меню скінів",
+  "key.quickskin.favourites_fan": "Обрані скіни (швидка зміна)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Швидкий скін",
@@ -160,6 +161,18 @@
   "quickskin.tooltip.static_cape": "Статичний плащ",
   "quickskin.tooltip.resolution": "Роздільна здатність: %s",
   "quickskin.tooltip.click_preview": "Натисніть для попереднього перегляду",
+  "quickskin.cape.tab.cape": "Плащ",
+  "quickskin.cape.tab.elytra": "Елітри",
+  "quickskin.cape.tab.cape_tip": "Обери плащ, який носиш",
+  "quickskin.cape.tab.elytra_tip": "Обери, що носять твої елітри: твій плащ, звичайні елітри чи інший плащ",
+  "quickskin.cape.option.same_as_cape": "Як плащ",
+  "quickskin.cape.option.same_as_cape.tip": "Твої елітри носять твій плащ",
+  "quickskin.cape.option.vanilla_elytra": "Vanilla",
+  "quickskin.cape.option.vanilla_elytra.tip": "Звичайні елітри Minecraft, який би плащ ти не носив",
+  "quickskin.context.wear_on_elytra": "Носити на елітрах",
+  "quickskin.context.elytra_same_as_cape": "Елітри: як плащ",
+  "quickskin.tooltip.on_elytra": "На твоїх елітрах",
+  "quickskin.tooltip.click_elytra": "Натисни, щоб носити на елітрах",
   "quickskin.cape.animation_speed": "Швидкість анімації: %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -404,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[Швидкий скін] Ваш скін (%s) перевищує ліміт завантаження цього сервера (%s). Його видно лише на вашому екрані; інші гравці його не бачать.",
   "quickskin.network.upload_too_large.cape": "[Швидкий скін] Ваш плащ (%s) перевищує ліміт завантаження цього сервера (%s). Його видно лише на вашому екрані; інші гравці його не бачать.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Цей сервер використовує Quick Skin для власних скінів і плащів. Встановіть мод, щоб бачити їх і носити свої."
+  "quickskin.server.missing_mod_notice": "Цей сервер використовує Quick Skin для власних скінів і плащів. Встановіть мод, щоб бачити їх і носити свої.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Позначте скіни зірочкою ★ у меню скінів, щоб бачити їх тут",
+  "quickskin.fan.cooldown": "Змінити скін знову можна через %s с"
 }

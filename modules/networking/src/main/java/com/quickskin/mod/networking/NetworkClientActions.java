@@ -110,6 +110,11 @@ public final class NetworkClientActions implements ClientNetworkActions {
     }
 
     @Override
+    public boolean hidesCosmeticArmor() {
+        return HiddenArmorSyncService.getInstance().hidesCosmetics();
+    }
+
+    @Override
     public SkinAdminView skinAdminView() {
         return SkinAdminClient.getInstance().view();
     }

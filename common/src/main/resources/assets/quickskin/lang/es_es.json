@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Abrir menú de aspecto",
+  "key.quickskin.favourites_fan": "Aspectos favoritos (cambio rápido)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Aspecto rápido",
@@ -164,6 +165,18 @@
   "quickskin.tooltip.static_cape": "Capa estática",
   "quickskin.tooltip.resolution": "Resolución: %s",
   "quickskin.tooltip.click_preview": "Haz clic para previsualizar",
+  "quickskin.cape.tab.cape": "Capa",
+  "quickskin.cape.tab.elytra": "Élitros",
+  "quickskin.cape.tab.cape_tip": "Elige la capa que llevas",
+  "quickskin.cape.tab.elytra_tip": "Elige qué llevan tus élitros: tu capa, los élitros de siempre u otra capa",
+  "quickskin.cape.option.same_as_cape": "Igual que la capa",
+  "quickskin.cape.option.same_as_cape.tip": "Tus élitros llevan la capa que llevas",
+  "quickskin.cape.option.vanilla_elytra": "Vanilla",
+  "quickskin.cape.option.vanilla_elytra.tip": "Los élitros de Minecraft, lleves la capa que lleves",
+  "quickskin.context.wear_on_elytra": "Llevar en los élitros",
+  "quickskin.context.elytra_same_as_cape": "Élitros: igual que la capa",
+  "quickskin.tooltip.on_elytra": "En tus élitros",
+  "quickskin.tooltip.click_elytra": "Haz clic para llevarla en los élitros",
   "quickskin.cape.animation_speed": "Velocidad de animación: %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -416,5 +429,8 @@
   "quickskin.network.upload_too_large.skin": "[Aspecto rápido] Tu aspecto (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no lo ven.",
   "quickskin.network.upload_too_large.cape": "[Aspecto rápido] Tu capa (%s) supera el límite de subida de este servidor, %s. Solo se ve en tu pantalla; los demás jugadores no la ven.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Este servidor usa Quick Skin para aspectos y capas personalizados. Instala el mod para verlos y llevar los tuyos."
+  "quickskin.server.missing_mod_notice": "Este servidor usa Quick Skin para aspectos y capas personalizados. Instala el mod para verlos y llevar los tuyos.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Marca aspectos con ★ en el menú de aspecto para verlos aquí",
+  "quickskin.fan.cooldown": "Podrás cambiar de aspecto otra vez en %s s"
 }

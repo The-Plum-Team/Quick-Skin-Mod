@@ -206,13 +206,42 @@ public final class ProtocolNetwork {
         return translated == null ? null : prefix + translated;
     }
 
+    /** Whether a session tells the elytra's own cape apart (it negotiated elytra-texture). */
+    public static boolean acceptsElytraTexture(ProtocolProfile profile) {
+        return acceptsV2(profile) && profile.supports(ProtocolCapability.ELYTRA_TEXTURE);
+    }
+
     public static boolean sendAppearance(
             ServerPlayer recipient, UUID playerId,
             String skinId, String capeId, String model) {
+        return sendAppearance(recipient, playerId, skinId, capeId, "", model);
+    }
+
+    /**
+     * Sends an appearance; a recipient that negotiated elytra-texture also learns what the elytra
+     * wear instead of the cape, and any other sees them wear the cape.
+     */
+    public static boolean sendAppearance(
+            ServerPlayer recipient, UUID playerId,
+            String skinId, String capeId, String elytraId, String model) {
         if (!canReceive(recipient)) return false;
         String wireSkin = translateAppearanceId(recipient, skinId, "local_skin:");
         String wireCape = translateAppearanceId(recipient, capeId, "local_cape:");
         if (wireSkin == null || wireCape == null) return false;
+        if (acceptsElytraTexture(profile(recipient))) {
+            // An elytra cape the cache cannot name for this peer goes as the cape's, not lost
+            String wireElytra = translateAppearanceId(recipient, elytraId != null ? elytraId : "", "local_cape:");
+            if (wireElytra == null) wireElytra = "";
+            //? if <1.21 {
+            NetworkTransport.INSTANCE.sendAppearanceWithElytraToPlayer(
+                    recipient, playerId, wireSkin, wireCape, wireElytra, model);
+            //?} else {
+            NetworkTransport.INSTANCE.sendToPlayer(
+                    recipient,
+                    new SyncAppearanceElytraPayload(playerId, wireSkin, wireCape, wireElytra, model));
+            //?}
+            return true;
+        }
         if (acceptsV2(recipient)) {
             //? if <1.21 {
             NetworkTransport.INSTANCE.sendAppearanceV2ToPlayer(

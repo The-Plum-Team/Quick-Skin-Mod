@@ -20,7 +20,9 @@ import java.util.UUID;
 /**
  * Tells the connected server which armour pieces the player hides from everyone (ADR 0017): once
  * per session as soon as it negotiates {@code hidden-armor}, and again whenever the player changes
- * it. The pieces are the joining launcher account's. Nothing is sent while a replay plays.
+ * it. The pieces are the joining launcher account's. Its Cosmetic Armor Reworked pieces go only to
+ * a server that also negotiated {@code hidden-cosmetic-armor}; an older one would refuse the
+ * whole update. Nothing is sent while a replay plays.
  */
 @Environment(EnvType.CLIENT)
 public final class HiddenArmorSyncService {
@@ -53,14 +55,14 @@ public final class HiddenArmorSyncService {
     synchronized void onProtocolAcknowledged(Object negotiatedConnection) {
         if (negotiatedConnection == null || negotiatedConnection != connection || negotiated) return;
         negotiated = true;
-        if (desired > HiddenArmor.NONE && supportsHiddenArmor()) send(desired);
+        if ((desired & told()) > HiddenArmor.NONE && supportsHiddenArmor()) send(desired & told());
     }
 
     /** The player chose which pieces to hide. */
     public synchronized void update(int hidden) {
         if (desired < 0 || currentConnection() != connection) return;
-        desired = hidden & HiddenArmor.ALL;
-        if (negotiated && supportsHiddenArmor()) send(desired);
+        desired = hidden & (HiddenArmor.ALL | HiddenArmor.COSMETICS);
+        if (negotiated && supportsHiddenArmor()) send(desired & told());
     }
 
     /** Whether hiding armour works where the player is now, and if not, why. */
@@ -74,7 +76,12 @@ public final class HiddenArmorSyncService {
 
     /** The pieces nobody sees now: those the player hides, where the server hides them. */
     public synchronized int inEffect() {
-        return desired > HiddenArmor.NONE && hiding() == ArmorHiding.ACTIVE ? desired : HiddenArmor.NONE;
+        return desired > HiddenArmor.NONE && hiding() == ArmorHiding.ACTIVE ? desired & told() : HiddenArmor.NONE;
+    }
+
+    /** Whether the server hides Cosmetic Armor Reworked pieces too, where hiding armour works. */
+    public synchronized boolean hidesCosmetics() {
+        return hiding() == ArmorHiding.ACTIVE && supports(ProtocolCapability.HIDDEN_COSMETIC_ARMOR);
     }
 
     public synchronized void clearSession() {
@@ -85,9 +92,18 @@ public final class HiddenArmorSyncService {
     }
 
     private boolean supportsHiddenArmor() {
+        return supports(ProtocolCapability.HIDDEN_ARMOR);
+    }
+
+    /** The pieces the server may be told: the armour pieces, and the cosmetic ones if it hides those. */
+    private int told() {
+        return HiddenArmor.ALL | (supports(ProtocolCapability.HIDDEN_COSMETIC_ARMOR) ? HiddenArmor.COSMETICS : 0);
+    }
+
+    private boolean supports(ProtocolCapability capability) {
         if (connection == null) return false;
         ProtocolProfile profile = ProtocolSessions.getInstance().clientProfile(connection);
-        return profile.negotiated() && profile.supports(ProtocolCapability.HIDDEN_ARMOR);
+        return profile.negotiated() && profile.supports(capability);
     }
 
     private void send(int hidden) {

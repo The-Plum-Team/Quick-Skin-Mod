@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class SkinManagerReturnCountTest {
@@ -49,9 +50,17 @@ class SkinManagerReturnCountTest {
                     if (instruction.getOpcode() == Opcodes.ARETURN) returns++;
                 }
                 assertEquals(returns, value(inject, "expect"), "debug validation must match vanilla bytecode");
-                assertEquals(returns, value(inject, "allow"), "the upper bound must match vanilla bytecode");
+                // No upper bound: another mod's transformer may add returns, which take the hook too
+                assertFalse(has(inject, "allow"), "a RETURN hook must not stop the game over an extra return");
             }
         }
+    }
+
+    private static boolean has(AnnotationNode annotation, String name) {
+        for (int index = 0; index < annotation.values.size(); index += 2) {
+            if (annotation.values.get(index).equals(name)) return true;
+        }
+        return false;
     }
 
     private static Object value(AnnotationNode annotation, String name) {

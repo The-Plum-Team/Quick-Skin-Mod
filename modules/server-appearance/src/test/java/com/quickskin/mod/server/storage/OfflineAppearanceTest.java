@@ -173,6 +173,51 @@ class OfflineAppearanceTest {
     }
 
     /** Stores a skin owned by the player and returns its appearance id. */
+    @Test
+    void theElytraCapeIsPinnedSavedAndLoadedWithTheAppearance() throws IOException {
+        String capeId = storeCape(player, 3);
+        String elytraId = storeCape(player, 4);
+        assertTrue(players.tryUpdateAppearance(player, "", capeId, elytraId, "classic"));
+        assertTrue(textures.isPinned(hashOf(elytraId)));
+        appearances.savePlayerAppearance(player);
+
+        players.playerLeft(player);
+        assertFalse(textures.isPinned(hashOf(elytraId)));
+        assertEquals(elytraId, players.getAppearanceToShare(player).getElytraId());
+
+        players.clear();
+        PlayerAppearance loaded = appearances.loadPlayerAppearance(player);
+        assertEquals(capeId, loaded.getCapeId());
+        assertEquals(elytraId, loaded.getElytraId());
+        assertTrue(textures.isPinned(hashOf(elytraId)));
+    }
+
+    @Test
+    void anAppearanceSavedBeforeElytraCapesHasTheElytraWearTheCape() throws IOException {
+        String capeId = storeCape(player, 5);
+        save(new PlayerAppearance(player, "", capeId, "classic"));
+
+        PlayerAppearance loaded = appearances.loadPlayerAppearance(player);
+
+        assertEquals(capeId, loaded.getCapeId());
+        assertEquals("", loaded.getElytraId());
+        assertFalse(loaded.hasSeparateElytra());
+    }
+
+    @Test
+    void anElytraCapeOfSomeoneElseRefusesTheAppearance() throws IOException {
+        String elytraId = storeCape(UUID.randomUUID(), 6);
+        assertFalse(players.tryUpdateAppearance(player, "", "", elytraId, "classic"));
+        assertNull(players.getAppearance(player));
+    }
+
+    private String storeCape(UUID owner, long seed) throws IOException {
+        byte[] cape = noise(64, 32, seed);
+        ContentAliases aliases = ContentAliases.forBytes(cape);
+        assertTrue(textures.storeTexture(aliases.sha1(), owner, "cape", cape));
+        return "local_cape:" + aliases.sha256();
+    }
+
     private String storeSkin(UUID owner, long seed) throws IOException {
         byte[] skin = noise(64, 64, seed);
         ContentAliases aliases = ContentAliases.forBytes(skin);

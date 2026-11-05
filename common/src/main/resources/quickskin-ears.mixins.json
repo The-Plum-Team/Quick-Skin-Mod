@@ -12,6 +12,7 @@
     "EarsFiveBuzzMixin",
     "CpmModelDefinitionLoaderMixin",
     "TaczPreviewAnimationMixin",
+    "CosmeticArmorRenderMixin",
     "CpmRenderDepthMixin",
     "CpmSubmitCollectorMixin",
     "RealCameraTextureIdMixin",

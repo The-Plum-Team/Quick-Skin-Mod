@@ -45,7 +45,8 @@ public final class NicknameDisplay {
 
     /**
      * The name in a join or leave message: the display name, followed by the account name in
-     * grey when it shows a nickname, so everyone knows who it is.
+     * grey when it shows a nickname, so everyone knows who it is; not when an admin gave that
+     * nickname secretly, for a game where nobody may know.
      */
     public static Component withAccountName(ServerPlayer player) {
         // Only a display name that really shows the nickname gets the account name after it
@@ -53,12 +54,14 @@ public final class NicknameDisplay {
         Component displayName = player.getDisplayName();
         boolean showedNickname = SHOWED_NICKNAME.get();
         SHOWED_NICKNAME.set(false);
-        return showedNickname ? displayName.copy().append(accountName(player)) : displayName;
+        return showedNickname && !ServerNicknames.isSecret(player.getUUID())
+                ? displayName.copy().append(accountName(player)) : displayName;
     }
 
     /**
      * The player's tab-list name: the nickname in the team's colours, and for an operator the
-     * account name after it. A name another mod set is kept.
+     * account name after it, unless an admin gave that nickname secretly. A name another mod set
+     * is kept.
      */
     @Nullable
     public static Component tabListName(ServerPlayer player, @Nullable Component current) {
@@ -66,7 +69,7 @@ public final class NicknameDisplay {
         String nickname = ServerNicknames.displayedNickname(player.getUUID());
         if (nickname.isEmpty()) return null;
         MutableComponent name = PlayerTeam.formatNameForTeam(player.getTeam(), Component.literal(nickname));
-        if (!ServerNicknames.buildingOperatorView()) return name;
+        if (!ServerNicknames.buildingOperatorView() || ServerNicknames.isSecret(player.getUUID())) return name;
         return Component.empty().append(name).append(accountName(player));
     }
 

@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Mở menu skin",
+  "key.quickskin.favourites_fan": "Skin yêu thích (đổi nhanh)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Skin Nhanh",
@@ -160,6 +161,18 @@
   "quickskin.tooltip.static_cape": "Áo choàng tĩnh",
   "quickskin.tooltip.resolution": "Độ phân giải: %s",
   "quickskin.tooltip.click_preview": "Nhấp để xem trước",
+  "quickskin.cape.tab.cape": "Áo choàng",
+  "quickskin.cape.tab.elytra": "Cánh cứng",
+  "quickskin.cape.tab.cape_tip": "Chọn áo choàng bạn mặc",
+  "quickskin.cape.tab.elytra_tip": "Chọn thứ cánh cứng mang: áo choàng của bạn, cánh cứng gốc hoặc một áo choàng khác",
+  "quickskin.cape.option.same_as_cape": "Giống áo choàng",
+  "quickskin.cape.option.same_as_cape.tip": "Cánh cứng mang áo choàng bạn mặc",
+  "quickskin.cape.option.vanilla_elytra": "Vanilla",
+  "quickskin.cape.option.vanilla_elytra.tip": "Cánh cứng gốc của Minecraft, dù bạn mặc áo choàng nào",
+  "quickskin.context.wear_on_elytra": "Mang trên cánh cứng",
+  "quickskin.context.elytra_same_as_cape": "Cánh cứng: giống áo choàng",
+  "quickskin.tooltip.on_elytra": "Trên cánh cứng của bạn",
+  "quickskin.tooltip.click_elytra": "Nhấp để mang trên cánh cứng",
   "quickskin.cape.animation_speed": "Tốc độ hoạt hình: %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -404,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[Skin Nhanh] Skin của bạn (%s) vượt quá giới hạn tải lên của máy chủ này (%s). Nó chỉ hiển thị trên màn hình của bạn; người chơi khác không nhìn thấy.",
   "quickskin.network.upload_too_large.cape": "[Skin Nhanh] Áo choàng của bạn (%s) vượt quá giới hạn tải lên của máy chủ này (%s). Nó chỉ hiển thị trên màn hình của bạn; người chơi khác không nhìn thấy.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Máy chủ này dùng Quick Skin cho skin và áo choàng tùy chỉnh. Hãy cài mod để thấy chúng và mặc của riêng bạn."
+  "quickskin.server.missing_mod_notice": "Máy chủ này dùng Quick Skin cho skin và áo choàng tùy chỉnh. Hãy cài mod để thấy chúng và mặc của riêng bạn.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Đánh dấu ★ cho skin trong menu skin để thấy chúng ở đây",
+  "quickskin.fan.cooldown": "Bạn có thể đổi skin lại sau %s giây"
 }

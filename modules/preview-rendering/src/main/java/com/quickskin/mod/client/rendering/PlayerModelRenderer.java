@@ -81,6 +81,17 @@ import java.util.Set;
 @Environment(EnvType.CLIENT)
 public class PlayerModelRenderer {
 
+    /**
+     * How far forward the model is drawn in the depth-tested GUI before 1.21.6. Vanilla's
+     * inventory draws at z 50, enough for its small model; the previews are four times as large,
+     * so the elytra, spread back when the player sneaks or glides, reached behind the menu's
+     * background at z 0, which hid their lower part. The model reaches about 1.4 blocks back and
+     * 0.6 forward, so it stays between z 0 and about 300, under the menus drawn at z 350.
+     */
+    static double modelDepth(double scale) {
+        return 50.0 + 1.2 * (int) scale;
+    }
+
     private static final boolean DETERMINISTIC_E2E_RENDER =
             Boolean.getBoolean("quickskin.e2e.enabled");
     private static final int E2E_FIXED_PREVIEW_TICK = 120;
@@ -520,7 +531,7 @@ public class PlayerModelRenderer {
             Player player, PreviewPlayerData playerData) {
         if (showsEquipment(player, playerData)) {
             // As the world shows the player: without the armour pieces they hide from everyone
-            return slotsShownWithout(com.quickskin.mod.client.services.LocalHiddenArmor.inEffect());
+            return slotsShownWithout(ownHiddenPieces());
         }
         if (!playerData.isHeldGunVisible() || player != Minecraft.getInstance().player) {
             return NO_VISIBLE_SLOTS;
@@ -558,7 +569,7 @@ public class PlayerModelRenderer {
             // The skin menu draws it see-through once the preview is drawn
             return true;
         }
-        int hidden = com.quickskin.mod.client.services.LocalHiddenArmor.inEffect();
+        int hidden = ownHiddenPieces();
         if (hidden == 0) {
             return false;
         }
@@ -567,6 +578,16 @@ public class PlayerModelRenderer {
         if (slot == EquipmentSlot.LEGS) return (hidden & 2) != 0;
         if (slot == EquipmentSlot.FEET) return (hidden & 1) != 0;
         return false;
+    }
+
+    /**
+     * The local player's armour pieces nobody sees now ({@code HiddenArmor} bits): those hidden
+     * where the server hides them, but for a slot that shows its Cosmetic Armor Reworked piece
+     * over the hidden one, which everyone still sees (ADR 0017).
+     */
+    static int ownHiddenPieces() {
+        int hidden = com.quickskin.mod.client.services.LocalHiddenArmor.inEffect() & 15;
+        return hidden == 0 ? 0 : hidden & ~CosmeticArmorPreview.cosmeticsShown(Minecraft.getInstance().player);
     }
 
     /**
@@ -654,7 +675,7 @@ public class PlayerModelRenderer {
         if (entity == null || entity != Minecraft.getInstance().player || PreviewEquipment.isCapturing()) {
             return;
         }
-        blankPieces(state, com.quickskin.mod.client.services.LocalHiddenArmor.inEffect());
+        blankPieces(state, ownHiddenPieces());
     }
 
     /** Leaves the armour pieces {@code pieces} names ({@code HiddenArmor} bits) out of a render state. */
@@ -991,7 +1012,11 @@ public class PlayerModelRenderer {
 
                 poseStack.pushPose();
                 // Match the transformations from InventoryScreen
+//? if <1.21.6 {
+                poseStack.translate(x, y, modelDepth(scale));
+//?} else {
                 poseStack.translate(x, y, 50.0);
+//?}
                 float scaleCasted = (float)(int)scale;
                 Matrix4f scaleMatrix = (new Matrix4f()).scaling(scaleCasted, scaleCasted, -scaleCasted);
 //? if <1.21 {
@@ -1321,7 +1346,7 @@ public class PlayerModelRenderer {
         poseStack.pushPose();
 
         // Match InventoryScreen.renderEntityInInventory() transformations
-        poseStack.translate((double)x, (double)y, 50.0);
+        poseStack.translate((double)x, (double)y, modelDepth(scale));
 
         // Apply scale (negative Z flips the model to face forward)
         // Cast to int to match InventoryScreen.renderEntityInInventory() behavior
@@ -1354,7 +1379,7 @@ public class PlayerModelRenderer {
         poseStack.pushPose();
 
         // Match InventoryScreen.renderEntityInInventory() transformations
-        poseStack.translate((double)x, (double)y, 50.0);
+        poseStack.translate((double)x, (double)y, modelDepth(scale));
 
         // Apply scale (negative Z flips the model to face forward)
         // Cast to int to match InventoryScreen.renderEntityInInventory() behavior

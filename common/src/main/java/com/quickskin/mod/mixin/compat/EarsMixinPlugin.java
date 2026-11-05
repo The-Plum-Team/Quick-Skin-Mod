@@ -31,6 +31,9 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
     );
     private static final String JOURNEYMAP_IGN_SKIN = "journeymap/client/texture/IgnSkin.class";
 
+    private static final String COSMETIC_ARMOR_RENDER_MIXIN = "CosmeticArmorRenderMixin";
+    private static final String COSMETIC_ARMOR_RENDER_HANDLER = "lain/mods/cos/impl/client/PlayerRenderHandler.class";
+
     private static final String TACZ_PREVIEW_ANIMATION_MIXIN = "TaczPreviewAnimationMixin";
     private static final String TACZ_ANIMATION_MANAGER =
             "com/tacz/guns/compat/playeranimator/animation/AnimationManager.class";
@@ -54,6 +57,11 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
         // loads that class only when Player Animator is installed.
         if (mixinNamed(mixinClassName, TACZ_PREVIEW_ANIMATION_MIXIN)) {
             return classFileExists(TACZ_ANIMATION_MANAGER);
+        }
+        // Cosmetic Armor Reworked's render handler is @Pseudo and resource-gated like TaCZ's, so a
+        // client without that mod or its fork logs nothing for it.
+        if (mixinNamed(mixinClassName, COSMETIC_ARMOR_RENDER_MIXIN)) {
+            return classFileExists(COSMETIC_ARMOR_RENDER_HANDLER);
         }
         if (mixinClassName.contains("EarsLayerRendererMixin")) {
             return classFileExists("com/unascribed/ears/EarsLayerRenderer.class");

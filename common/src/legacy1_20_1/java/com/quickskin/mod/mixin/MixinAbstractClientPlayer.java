@@ -184,6 +184,11 @@ public class MixinAbstractClientPlayer {
 
         AbstractClientPlayer self = (AbstractClientPlayer) (Object) this;
         PlayerAppearanceService service = PlayerAppearanceService.getInstance();
+        // The elytra wear another cape, or vanilla's elytra, instead of the cape
+        if (service.hasSeparateElytra(self.getUUID())) {
+            cir.setReturnValue(service.getSeparateElytraLocation(self.getUUID()));
+            return;
+        }
         if (service.hasActiveCape(self.getUUID())) {
             cir.setReturnValue(service.getCapeLocation(self.getUUID()));
             return;
@@ -191,6 +196,11 @@ public class MixinAbstractClientPlayer {
 
         if (Minecraft.getInstance().level == null) {
             ClientConfig config = ClientConfig.getInstance();
+            ResourceLocation configuredElytra = service.getConfiguredElytraLocation();
+            if (configuredElytra != null) {
+                cir.setReturnValue(configuredElytra);
+                return;
+            }
             if (!config.activeCapeHash.isEmpty()) {
                 ResourceLocation capeLoc = com.quickskin.mod.client.services.CapeService.getInstance()
                         .getCapeLocation(null, config.activeCapeHash);

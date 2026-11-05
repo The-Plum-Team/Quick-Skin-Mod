@@ -70,6 +70,8 @@ public interface NetworkTransport {
     void sendAccountSkinChangedToServer(UUID playerId);
     void sendNicknameToServer(UUID playerId, int requestId, String nickname);
     void sendArmorVisibilityToServer(UUID playerId, int hidden);
+    void sendAppearanceWithElytraToServer(
+            UUID playerId, String skinId, String capeId, String elytraId, String model);
     void sendSkinAdminToServer(
             int requestId, int action, List<UUID> players, String skinId, String model, String name);
     //?} else {
@@ -102,6 +104,8 @@ public interface NetworkTransport {
             int chunkIndex, int totalChunks, byte[] chunkData);
     void sendAppearanceV2ToPlayer(
             ServerPlayer player, UUID playerId, String skinId, String capeId, String model);
+    void sendAppearanceWithElytraToPlayer(
+            ServerPlayer player, UUID playerId, String skinId, String capeId, String elytraId, String model);
     void sendAnimationMetadataV2ToPlayer(
             ServerPlayer player, String contentId, String metadataJson);
     //?} else {

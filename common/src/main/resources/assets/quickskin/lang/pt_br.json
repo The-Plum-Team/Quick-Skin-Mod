@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Abrir menu de skin",
+  "key.quickskin.favourites_fan": "Skins favoritas (troca rápida)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Skin Rápida",
@@ -160,6 +161,18 @@
   "quickskin.tooltip.static_cape": "Capa estática",
   "quickskin.tooltip.resolution": "Resolução: %s",
   "quickskin.tooltip.click_preview": "Clique para visualizar",
+  "quickskin.cape.tab.cape": "Capa",
+  "quickskin.cape.tab.elytra": "Élitros",
+  "quickskin.cape.tab.cape_tip": "Escolha a capa que você usa",
+  "quickskin.cape.tab.elytra_tip": "Escolha o que seus élitros usam: sua capa, os élitros do Minecraft ou outra capa",
+  "quickskin.cape.option.same_as_cape": "Igual à capa",
+  "quickskin.cape.option.same_as_cape.tip": "Seus élitros usam a sua capa",
+  "quickskin.cape.option.vanilla_elytra": "Vanilla",
+  "quickskin.cape.option.vanilla_elytra.tip": "Os élitros do Minecraft, seja qual for a sua capa",
+  "quickskin.context.wear_on_elytra": "Usar nos élitros",
+  "quickskin.context.elytra_same_as_cape": "Élitros: igual à capa",
+  "quickskin.tooltip.on_elytra": "Nos seus élitros",
+  "quickskin.tooltip.click_elytra": "Clique para usar nos élitros",
   "quickskin.cape.animation_speed": "Velocidade da Animação: %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -404,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[Skin Rápida] Sua skin (%s) excede o limite de envio deste servidor, %s. Ela aparece só na sua tela; os outros jogadores não a veem.",
   "quickskin.network.upload_too_large.cape": "[Skin Rápida] Sua capa (%s) excede o limite de envio deste servidor, %s. Ela aparece só na sua tela; os outros jogadores não a veem.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Este servidor usa o Quick Skin para skins e capas personalizadas. Instale o mod para vê-las e usar as suas."
+  "quickskin.server.missing_mod_notice": "Este servidor usa o Quick Skin para skins e capas personalizadas. Instale o mod para vê-las e usar as suas.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Marque skins com ★ no menu de skin para vê-las aqui",
+  "quickskin.fan.cooldown": "Você poderá trocar de skin novamente em %s s"
 }

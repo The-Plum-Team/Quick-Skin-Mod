@@ -100,26 +100,32 @@ public final class ServerNicknameStore {
 
     /**
      * A player the world knows: the nickname they chose and the one an admin gave them
-     * ({@code ""}: none), their account name, and how all three read ({@link Nickname#reading}),
-     * kept so a request compares strings only.
+     * ({@code ""}: none), whether that one is secret (given silently: nobody, operators
+     * included, sees the account name beside it), their account name, and how all three read
+     * ({@link Nickname#reading}), kept so a request compares strings only.
      */
     private record Entry(String nickname, String assigned, String name, long lastSeen, boolean locked,
-                         String nicknameReading, String assignedReading, String nameReading) {
+                         boolean secret, String nicknameReading, String assignedReading, String nameReading) {
         Entry(String nickname, String assigned, String name, long lastSeen, boolean locked) {
-            this(nickname, assigned, name, lastSeen, locked,
+            this(nickname, assigned, name, lastSeen, locked, false);
+        }
+
+        Entry(String nickname, String assigned, String name, long lastSeen, boolean locked, boolean secret) {
+            this(nickname, assigned, name, lastSeen, locked, secret && !assigned.isEmpty(),
                     Nickname.reading(nickname), Nickname.reading(assigned), Nickname.reading(name));
         }
 
         Entry withNickname(String newNickname) {
-            return new Entry(newNickname, assigned, name, lastSeen, locked);
+            return new Entry(newNickname, assigned, name, lastSeen, locked, secret);
         }
 
+        /** Another admin's nickname, or none: a secret ends with the nickname it kept secret. */
         Entry withAssigned(String newAssigned) {
-            return new Entry(nickname, newAssigned, name, lastSeen, locked);
+            return new Entry(nickname, newAssigned, name, lastSeen, locked, false);
         }
 
         Entry withLocked(boolean newLocked) {
-            return new Entry(nickname, assigned, name, lastSeen, newLocked);
+            return new Entry(nickname, assigned, name, lastSeen, newLocked, secret);
         }
 
         /** The nickname the player shows: an admin's, or else their own. */
@@ -193,6 +199,12 @@ public final class ServerNicknameStore {
     }
 
     /** The nickname an admin gave the player for now, or {@code ""} when none. */
+    /** Whether the nickname an admin gave the player is secret: no one sees their account name beside it. */
+    public synchronized boolean isSecret(UUID playerId) {
+        Entry entry = playerId != null ? entries.get(playerId) : null;
+        return entry != null && entry.secret();
+    }
+
     public synchronized String assignedNickname(UUID playerId) {
         Entry entry = playerId != null ? entries.get(playerId) : null;
         return entry != null ? entry.assigned() : "";
@@ -227,7 +239,7 @@ public final class ServerNicknameStore {
         entries.put(playerId, entry == null
                 ? new Entry("", "", accountName, now, false)
                 : new Entry(entry.nickname(), entry.assigned(),
-                        accountName.isEmpty() ? entry.name() : accountName, now, entry.locked()));
+                        accountName.isEmpty() ? entry.name() : accountName, now, entry.locked(), entry.secret()));
         evictEldest();
         String accountReading = Nickname.reading(accountName);
         if (!accountReading.isEmpty()) {
@@ -282,7 +294,7 @@ public final class ServerNicknameStore {
         entries.put(playerId, entry == null
                 ? new Entry(requested, "", validName(name, ""), now, false)
                 : new Entry(requested, entry.assigned(), entry.name().isEmpty() ? validName(name, "") : entry.name(),
-                        Math.max(entry.lastSeen(), now), entry.locked()));
+                        Math.max(entry.lastSeen(), now), entry.locked(), entry.secret()));
         evictEldest();
         lastChanges.remove(playerId);
         lastChanges.put(playerId, now);
@@ -306,19 +318,36 @@ public final class ServerNicknameStore {
      */
     public synchronized Result assign(UUID playerId, String name, String typed,
                                       Collection<String> otherNames, long now) {
+        return assign(playerId, name, typed, otherNames, now, false);
+    }
+
+    /**
+     * The same; a {@code secret} nickname shows without the account name beside it to anyone,
+     * operators included, until it is taken back.
+     */
+    public synchronized Result assign(UUID playerId, String name, String typed,
+                                      Collection<String> otherNames, long now, boolean secret) {
         Entry entry = playerId != null ? entries.get(playerId) : null;
         String shown = entry != null ? entry.shown() : "";
         String requested = Nickname.normalize(typed);
         if (requested == null || requested.isEmpty() || playerId == null || requested.equals(name)) {
             return new Result(Status.INVALID, shown, shown, 0L);
         }
-        if (entry != null && requested.equals(entry.assigned())) return new Result(Status.UNCHANGED, shown, shown, 0L);
+        if (entry != null && requested.equals(entry.assigned())) {
+            if (entry.secret() != secret) {
+                // The same name, now kept secret or no longer: only who sees the account changes
+                entries.put(playerId, new Entry(entry.nickname(), entry.assigned(), entry.name(),
+                        entry.lastSeen(), entry.locked(), secret));
+                scheduleSave();
+            }
+            return new Result(Status.UNCHANGED, shown, shown, 0L);
+        }
         if (!isAvailable(playerId, name, requested, otherNames)) return new Result(Status.TAKEN, shown, shown, 0L);
         entries.remove(playerId);
         entries.put(playerId, entry == null
-                ? new Entry("", requested, validName(name, ""), now, false)
+                ? new Entry("", requested, validName(name, ""), now, false, secret)
                 : new Entry(entry.nickname(), requested, entry.name().isEmpty() ? validName(name, "") : entry.name(),
-                        Math.max(entry.lastSeen(), now), entry.locked()));
+                        Math.max(entry.lastSeen(), now), entry.locked(), secret));
         evictEldest();
         scheduleSave();
         return new Result(Status.ACCEPTED, requested, shown, 0L);
@@ -464,6 +493,7 @@ public final class ServerNicknameStore {
             json.addProperty("name", entry.name());
             json.addProperty("lastSeen", entry.lastSeen());
             if (entry.locked()) json.addProperty("locked", true);
+            if (entry.secret()) json.addProperty("secret", true);
             players.add(playerId.toString(), json);
         });
         JsonObject document = new JsonObject();
@@ -510,7 +540,10 @@ public final class ServerNicknameStore {
             JsonElement locked = json.get("locked");
             boolean isLocked = locked != null && locked.isJsonPrimitive()
                     && locked.getAsJsonPrimitive().isBoolean() && locked.getAsBoolean();
-            return Map.entry(playerId, new Entry(nickname, assigned, name, seen, isLocked));
+            JsonElement secret = json.get("secret");
+            boolean isSecret = secret != null && secret.isJsonPrimitive()
+                    && secret.getAsJsonPrimitive().isBoolean() && secret.getAsBoolean();
+            return Map.entry(playerId, new Entry(nickname, assigned, name, seen, isLocked, isSecret));
         } catch (RuntimeException invalid) {
             return null;
         }

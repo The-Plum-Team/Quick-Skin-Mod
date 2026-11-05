@@ -4,7 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Draws a skin's head and shoulders as a small 3D picture, for the rows of the skin menu's list.
+ * Draws a skin's head and shoulders as a small 3D picture, for the rows of the skin menu's list,
+ * or the whole player standing, for the cards of the favourites fan.
  *
  * <p>The player's head, body and arms are boxes with the skin's own UV layout, inner and outer
  * layer, turned a little toward the right and seen from slightly above, in parallel projection.
@@ -24,10 +25,15 @@ public final class SkinBustRasterizer {
     /** How far the bust is turned toward the right, and how far the camera looks down, in degrees. */
     private static final double YAW = 28.0;
     private static final double PITCH = 7.0;
+    /** The turn, in degrees, every picture is drawn at unless asked for another. */
+    public static final double DEFAULT_YAW = YAW;
     /** Model pixels shown per picture pixel, for a picture this many pixels tall... */
     private static final double ZOOM_PER_HEIGHT = 6.4 / 99.0;
     /** ...with its bottom edge this high on the model, in model pixels above the feet: mid-chest. */
     private static final double CUT = 17.5;
+    /** The whole player: a picture this many model pixels tall, its bottom edge just under the feet. */
+    private static final double BODY_HEIGHT = 34.0;
+    private static final double BODY_CUT = -0.8;
     /** Faces in full light keep all their colour; faces turned away keep this share of it. */
     private static final double AMBIENT = 0.42;
     private static final double DIFFUSE = 0.68;
@@ -45,6 +51,34 @@ public final class SkinBustRasterizer {
      * @return the picture's pixels as non-premultiplied ARGB, row by row; transparent around the bust
      */
     public static int[] render(int[] skin, int skinWidth, int skinHeight, boolean slim, int width, int height) {
+        return draw(skin, skinWidth, skinHeight, slim, width, height, CUT, ZOOM_PER_HEIGHT * height, false);
+    }
+
+    /**
+     * The whole player standing, its feet at the picture's bottom edge, the same 3D view as the bust.
+     *
+     * @see #render
+     */
+    public static int[] renderBody(int[] skin, int skinWidth, int skinHeight, boolean slim, int width, int height) {
+        return renderBody(skin, skinWidth, skinHeight, slim, width, height, YAW);
+    }
+
+    /**
+     * The whole player standing, turned {@code yaw} degrees about its upright axis; at
+     * {@link #DEFAULT_YAW} it is {@link #renderBody(int[], int, int, boolean, int, int)}.
+     */
+    public static int[] renderBody(int[] skin, int skinWidth, int skinHeight, boolean slim, int width, int height,
+                                   double yaw) {
+        return draw(skin, skinWidth, skinHeight, slim, width, height, BODY_CUT, height / BODY_HEIGHT, true, yaw);
+    }
+
+    private static int[] draw(int[] skin, int skinWidth, int skinHeight, boolean slim, int width, int height,
+                              double cut, double zoom, boolean legs) {
+        return draw(skin, skinWidth, skinHeight, slim, width, height, cut, zoom, legs, YAW);
+    }
+
+    private static int[] draw(int[] skin, int skinWidth, int skinHeight, boolean slim, int width, int height,
+                              double cut, double zoom, boolean legs, double yawDegrees) {
         if (width < 1 || height < 1 || width > MAX_SIZE || height > MAX_SIZE) {
             throw new IllegalArgumentException("bust size out of range: " + width + "x" + height);
         }
@@ -57,11 +91,10 @@ public final class SkinBustRasterizer {
         int texelSize = skinWidth / 64;
         Texture texture = new Texture(skin, skinWidth, skinHeight, texelSize);
 
-        double yaw = Math.toRadians(YAW);
+        double yaw = Math.toRadians(yawDegrees);
         double pitch = Math.toRadians(PITCH);
         double[][] view = multiply(rotateX(pitch), rotateY(yaw));
-        double zoom = ZOOM_PER_HEIGHT * height;
-        double[] base = apply(view, new double[] {0, CUT, 0});
+        double[] base = apply(view, new double[] {0, cut, 0});
 
         List<Face> faces = new ArrayList<>();
         int armWidth = slim ? 3 : 4;
@@ -71,6 +104,12 @@ public final class SkinBustRasterizer {
         // The legacy layout has one arm, which vanilla mirrors; the bust shows that arm's front
         addPart(faces, view, base, zoom, width, height, 4, 12, -2, 4 + armWidth, 24, 2,
                 legacy ? 40 : 32, legacy ? 16 : 48, 48, 48, 0.25, legacy);
+        if (legs) {
+            addPart(faces, view, base, zoom, width, height, -4, 0, -2, 0, 12, 2, 0, 16, 0, 32, 0.25, legacy);
+            // As with the arm, the legacy layout's one leg serves both
+            addPart(faces, view, base, zoom, width, height, 0, 0, -2, 4, 12, 2,
+                    legacy ? 0 : 16, legacy ? 16 : 48, 0, 48, 0.25, legacy);
+        }
         faces.sort((a, b) -> Double.compare(a.depth, b.depth));
 
         int[] out = new int[width * height];

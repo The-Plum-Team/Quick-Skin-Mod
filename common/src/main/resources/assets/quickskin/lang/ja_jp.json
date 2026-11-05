@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "スキンメニューを開く",
+  "key.quickskin.favourites_fan": "お気に入りスキン（クイック変更）",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "クイックスキン",
@@ -160,6 +161,18 @@
   "quickskin.tooltip.static_cape": "静止マント",
   "quickskin.tooltip.resolution": "解像度: %s",
   "quickskin.tooltip.click_preview": "クリックでプレビュー",
+  "quickskin.cape.tab.cape": "マント",
+  "quickskin.cape.tab.elytra": "エリトラ",
+  "quickskin.cape.tab.cape_tip": "着るマントを選ぶ",
+  "quickskin.cape.tab.elytra_tip": "エリトラに付けるものを選ぶ：マント、通常のエリトラ、または別のマント",
+  "quickskin.cape.option.same_as_cape": "マントと同じ",
+  "quickskin.cape.option.same_as_cape.tip": "エリトラにはいま着ているマントが付きます",
+  "quickskin.cape.option.vanilla_elytra": "バニラ",
+  "quickskin.cape.option.vanilla_elytra.tip": "どのマントを着ていても Minecraft のエリトラ",
+  "quickskin.context.wear_on_elytra": "エリトラに付ける",
+  "quickskin.context.elytra_same_as_cape": "エリトラ：マントと同じ",
+  "quickskin.tooltip.on_elytra": "エリトラに付けています",
+  "quickskin.tooltip.click_elytra": "クリックでエリトラに付ける",
   "quickskin.cape.animation_speed": "アニメーション速度: %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -404,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[クイックスキン] スキン(%s)がこのサーバーのアップロード上限(%s)を超えています。あなたの画面にのみ表示され、他のプレイヤーには見えません。",
   "quickskin.network.upload_too_large.cape": "[クイックスキン] マント(%s)がこのサーバーのアップロード上限(%s)を超えています。あなたの画面にのみ表示され、他のプレイヤーには見えません。",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "このサーバーはカスタムスキンとマントにQuick Skinを使用しています。それらを見たり自分のものを着たりするには、このModを導入してください。"
+  "quickskin.server.missing_mod_notice": "このサーバーはカスタムスキンとマントにQuick Skinを使用しています。それらを見たり自分のものを着たりするには、このModを導入してください。",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "スキンメニューでスキンに★を付けると、ここに表示されます",
+  "quickskin.fan.cooldown": "あと%s秒でスキンを変更できます"
 }

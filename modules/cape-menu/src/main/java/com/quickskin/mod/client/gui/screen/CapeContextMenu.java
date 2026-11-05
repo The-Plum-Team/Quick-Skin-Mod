@@ -25,9 +25,10 @@ import java.util.List;
 
 /**
  * The menu a right click on a cape opens beside the mouse, in the skin menu's card style: mark or
- * unmark it as a favourite, and for a cape of the player's own, edit it in the cape editor (when
- * the editor kept its source) or delete it (through the usual confirmation). A click anywhere
- * else, Escape or the mouse wheel closes it.
+ * unmark it as a favourite, wear it on the elytra (or, on the cape the elytra wear, have them wear
+ * the cape again), and for a cape of the player's own, edit it in the cape editor (when the editor
+ * kept its source) or delete it (through the usual confirmation). A click anywhere else, Escape or
+ * the mouse wheel closes it.
  */
 @Environment(EnvType.CLIENT)
 class CapeContextMenu extends AbstractWidget {
@@ -46,6 +47,9 @@ class CapeContextMenu extends AbstractWidget {
     static final String[] ICON_STAR = {"...#...", "..###..", "#######", ".#####.", "..###..", ".##.##.", "##...##"};
     private static final String[] ICON_PEN = {".....##", "....###", "...###.", "..###..", ".###...", "###....", "##....."};
     private static final String[] ICON_TRASH = {"..###..", "#######", ".#.#.#.", ".#.#.#.", ".#.#.#.", ".#.#.#.", ".#####."};
+    static final String[] ICON_LINK = {".##....", "#..#...", "#..#...", ".####..", "...#..#", "...#..#", "....##."};
+    /** The elytra's purple, as the Elytra tab marks what they wear. */
+    static final int ELYTRA_TEXT = 0xFFD9B8FF;
 
     /** What the menu does with the cape it was opened on. */
     interface Actions {
@@ -54,9 +58,12 @@ class CapeContextMenu extends AbstractWidget {
         void edit(CapeEntry cape);
 
         void delete(CapeEntry cape);
+
+        /** The elytra wear this cape, or the worn cape again when they already wear this one. */
+        void toggleElytra(CapeEntry cape);
     }
 
-    private enum Item { FAVORITE, EDIT, DELETE }
+    private enum Item { FAVORITE, ELYTRA, EDIT, DELETE }
 
     private final Actions actions;
     private final Minecraft mc = Minecraft.getInstance();
@@ -64,6 +71,7 @@ class CapeContextMenu extends AbstractWidget {
     @Nullable
     private CapeEntry target;
     private boolean favorite;
+    private boolean onElytra;
 
     CapeContextMenu(Actions actions) {
         super(0, 0, 0, 0, Component.empty());
@@ -75,12 +83,21 @@ class CapeContextMenu extends AbstractWidget {
         return visible && target != null;
     }
 
-    /** Opens the menu for a cape with its corner at the mouse, moved left or up to stay on screen. */
-    void open(CapeEntry cape, boolean favorite, int mouseX, int mouseY, int screenWidth, int screenHeight) {
+    /**
+     * Opens the menu for a cape with its corner at the mouse, moved left or up to stay on screen.
+     * {@code elytra} offers to wear the cape on the elytra; {@code onElytra} says the elytra already
+     * wear it, so the item gives them back the cape.
+     */
+    void open(CapeEntry cape, boolean favorite, boolean elytra, boolean onElytra,
+              int mouseX, int mouseY, int screenWidth, int screenHeight) {
         this.target = cape;
         this.favorite = favorite;
+        this.onElytra = onElytra;
         items.clear();
         items.add(Item.FAVORITE);
+        if (elytra) {
+            items.add(Item.ELYTRA);
+        }
         if (cape.isLocal() && !cape.isKnown()) {
             if (cape.isEditable()) {
                 items.add(Item.EDIT);
@@ -109,14 +126,16 @@ class CapeContextMenu extends AbstractWidget {
     private Component label(Item item) {
         return Component.translatable(switch (item) {
             case FAVORITE -> favorite ? "quickskin.context.unfavorite" : "quickskin.context.favorite";
+            case ELYTRA -> onElytra ? "quickskin.context.elytra_same_as_cape" : "quickskin.context.wear_on_elytra";
             case EDIT -> "quickskin.context.edit_cape";
             case DELETE -> "quickskin.context.delete";
         });
     }
 
-    private static String[] icon(Item item) {
+    private String[] icon(Item item) {
         return switch (item) {
             case FAVORITE -> ICON_STAR;
+            case ELYTRA -> onElytra ? ICON_LINK : CapeEditorStyle.ICON_WINGS;
             case EDIT -> ICON_PEN;
             case DELETE -> ICON_TRASH;
         };
@@ -126,7 +145,7 @@ class CapeContextMenu extends AbstractWidget {
     //? if <26.1 {
     void drawOnTop(GuiGraphics graphics, int mouseX, int mouseY) {
         //? if <1.21.6 {
-        // Up to 1.21.5 the GUI is depth tested and the model reaches forward to z 250 at most
+        // Up to 1.21.5 the GUI is depth tested and the model reaches forward to about z 300
         graphics.pose().pushPose();
         graphics.pose().translate(0.0F, 0.0F, 350.0F);
         renderWidget(graphics, mouseX, mouseY, 0);
@@ -174,7 +193,7 @@ class CapeContextMenu extends AbstractWidget {
             if (lit) {
                 graphics.fill(x + 2, top, x + width - 2, top + ITEM_HEIGHT, danger ? DANGER_FACE : FACE_HOVER);
             }
-            int color = danger ? (lit ? WHITE : DANGER_TEXT) : TEXT;
+            int color = danger ? (lit ? WHITE : DANGER_TEXT) : item == Item.ELYTRA ? (lit ? WHITE : ELYTRA_TEXT) : TEXT;
             CapeEditorStyle.icon(graphics, icon(item), x + 4, top + 3, color);
             UiText.draw(graphics, mc.font, label(item), x + TEXT_LEFT, top + 3, color);
         }
@@ -212,6 +231,7 @@ class CapeContextMenu extends AbstractWidget {
         close();
         switch (items.get(index)) {
             case FAVORITE -> actions.toggleFavorite(cape);
+            case ELYTRA -> actions.toggleElytra(cape);
             case EDIT -> actions.edit(cape);
             case DELETE -> actions.delete(cape);
         }

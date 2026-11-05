@@ -51,8 +51,7 @@ public abstract class MixinAbstractClientPlayer {
             at = @At("RETURN"),
             cancellable = true,
             require = 1,
-            expect = 1,
-            allow = 1
+            expect = 1
     )
     private void quickskin$modifySkin(CallbackInfoReturnable<PlayerSkin> cir) {
         if (CPMCompatIntegration.shouldDeferToCPM()) return;
@@ -67,9 +66,10 @@ public abstract class MixinAbstractClientPlayer {
         boolean hasCustomSkin = service.hasActiveSkin(self.getUUID());
         boolean hasCustomCape = service.hasActiveCape(self.getUUID());
         boolean hasModelOverride = service.hasModelOverride(self.getUUID());
+        boolean hasSeparateElytra = service.hasSeparateElytra(self.getUUID());
 
         // Service-based overrides
-        if (hasCustomSkin || hasCustomCape || hasModelOverride) {
+        if (hasCustomSkin || hasCustomCape || hasModelOverride || hasSeparateElytra) {
 //? if <1.21.9 {
             ResourceLocation skinTexture = originalSkin.texture();
             PlayerSkin.Model skinModel = originalSkin.model();
@@ -136,6 +136,21 @@ public abstract class MixinAbstractClientPlayer {
                 }
             }
 
+            if (hasSeparateElytra) {
+                // The elytra wear another cape, or vanilla's elytra, instead of this cape
+//? if <1.21.11 {
+                ResourceLocation separateElytra = service.getSeparateElytraLocation(self.getUUID());
+//?} else {
+                Identifier separateElytra = service.getSeparateElytraLocation(self.getUUID());
+//?}
+//? if <1.21.9 {
+                elytraTexture = separateElytra;
+//?} else {
+                elytraTexture = new ClientAsset.ResourceTexture(separateElytra, separateElytra);
+//?}
+                anyOverride = true;
+            }
+
             if (anyOverride) {
                 cir.setReturnValue(new PlayerSkin(
 //? if <1.21.9 {
@@ -160,8 +175,13 @@ public abstract class MixinAbstractClientPlayer {
             ClientConfig config = ClientConfig.getInstance();
             boolean hasSkin = !config.activeSkinHash.isEmpty();
             boolean hasCape = !config.activeCapeHash.isEmpty();
+//? if <1.21.11 {
+            ResourceLocation configuredElytra = service.getConfiguredElytraLocation();
+//?} else {
+            Identifier configuredElytra = service.getConfiguredElytraLocation();
+//?}
 
-            if (hasSkin || hasCape) {
+            if (hasSkin || hasCape || configuredElytra != null) {
 //? if <1.21.9 {
                 ResourceLocation skinTexture = originalSkin.texture();
                 PlayerSkin.Model skinModel = originalSkin.model();
@@ -221,6 +241,15 @@ public abstract class MixinAbstractClientPlayer {
 //?}
                         anyOverride = true;
                     }
+                }
+
+                if (configuredElytra != null) {
+//? if <1.21.9 {
+                    elytraTexture = configuredElytra;
+//?} else {
+                    elytraTexture = new ClientAsset.ResourceTexture(configuredElytra, configuredElytra);
+//?}
+                    anyOverride = true;
                 }
 
                 if (anyOverride) {

@@ -1023,7 +1023,7 @@ class ScenarioContractTest(unittest.TestCase):
                 (
                     "cape_menu_screen",
                     "cape menu title",
-                    (55, 25, 190, 55),
+                    (55, 75, 190, 105),
                     159,
                     400,
                 ),

@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Apri menu skin",
+  "key.quickskin.favourites_fan": "Skin preferite (cambio rapido)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Skin Veloce",
@@ -160,6 +161,18 @@
   "quickskin.tooltip.static_cape": "Mantello statico",
   "quickskin.tooltip.resolution": "Risoluzione: %s",
   "quickskin.tooltip.click_preview": "Clicca per anteprima",
+  "quickskin.cape.tab.cape": "Mantello",
+  "quickskin.cape.tab.elytra": "Elitre",
+  "quickskin.cape.tab.cape_tip": "Scegli il mantello che indossi",
+  "quickskin.cape.tab.elytra_tip": "Scegli cosa indossano le tue elitre: il tuo mantello, le elitre di Minecraft o un altro mantello",
+  "quickskin.cape.option.same_as_cape": "Come il mantello",
+  "quickskin.cape.option.same_as_cape.tip": "Le tue elitre indossano il tuo mantello",
+  "quickskin.cape.option.vanilla_elytra": "Vanilla",
+  "quickskin.cape.option.vanilla_elytra.tip": "Le elitre di Minecraft, qualunque mantello indossi",
+  "quickskin.context.wear_on_elytra": "Indossa sulle elitre",
+  "quickskin.context.elytra_same_as_cape": "Elitre: come il mantello",
+  "quickskin.tooltip.on_elytra": "Sulle tue elitre",
+  "quickskin.tooltip.click_elytra": "Clicca per indossarlo sulle elitre",
   "quickskin.cape.animation_speed": "Velocità animazione: %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -404,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[Skin Veloce] La tua skin (%s) supera il limite di caricamento di questo server, %s. È visibile solo sul tuo schermo; gli altri giocatori non la vedono.",
   "quickskin.network.upload_too_large.cape": "[Skin Veloce] Il tuo mantello (%s) supera il limite di caricamento di questo server, %s. È visibile solo sul tuo schermo; gli altri giocatori non lo vedono.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Questo server usa Quick Skin per skin e mantelli personalizzati. Installa la mod per vederli e indossare i tuoi."
+  "quickskin.server.missing_mod_notice": "Questo server usa Quick Skin per skin e mantelli personalizzati. Installa la mod per vederli e indossare i tuoi.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Segna le skin con ★ nel menu skin per vederle qui",
+  "quickskin.fan.cooldown": "Potrai cambiare skin di nuovo tra %s s"
 }

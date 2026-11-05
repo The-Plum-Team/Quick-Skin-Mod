@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Skin-Menü öffnen",
+  "key.quickskin.favourites_fan": "Lieblingsskins (Schnellwechsel)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Schneller Skin",
@@ -160,6 +161,18 @@
   "quickskin.tooltip.static_cape": "Statischer Umhang",
   "quickskin.tooltip.resolution": "Auflösung: %s",
   "quickskin.tooltip.click_preview": "Klicken für Vorschau",
+  "quickskin.cape.tab.cape": "Umhang",
+  "quickskin.cape.tab.elytra": "Elytren",
+  "quickskin.cape.tab.cape_tip": "Wähle den Umhang, den du trägst",
+  "quickskin.cape.tab.elytra_tip": "Wähle, was deine Elytren tragen: deinen Umhang, die normalen Elytren oder einen anderen Umhang",
+  "quickskin.cape.option.same_as_cape": "Wie der Umhang",
+  "quickskin.cape.option.same_as_cape.tip": "Deine Elytren tragen deinen Umhang",
+  "quickskin.cape.option.vanilla_elytra": "Vanilla",
+  "quickskin.cape.option.vanilla_elytra.tip": "Die Elytren von Minecraft, egal welchen Umhang du trägst",
+  "quickskin.context.wear_on_elytra": "Auf den Elytren tragen",
+  "quickskin.context.elytra_same_as_cape": "Elytren: wie der Umhang",
+  "quickskin.tooltip.on_elytra": "Auf deinen Elytren",
+  "quickskin.tooltip.click_elytra": "Klicken, um ihn auf den Elytren zu tragen",
   "quickskin.cape.animation_speed": "Animationsgeschwindigkeit: %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -404,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[Schneller Skin] Dein Skin (%s) überschreitet das Upload-Limit dieses Servers von %s. Er ist nur auf deinem Bildschirm zu sehen; andere Spieler sehen ihn nicht.",
   "quickskin.network.upload_too_large.cape": "[Schneller Skin] Dein Umhang (%s) überschreitet das Upload-Limit dieses Servers von %s. Er ist nur auf deinem Bildschirm zu sehen; andere Spieler sehen ihn nicht.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "Dieser Server verwendet Quick Skin für eigene Skins und Umhänge. Installiere die Mod, um sie zu sehen und deine eigenen zu tragen."
+  "quickskin.server.missing_mod_notice": "Dieser Server verwendet Quick Skin für eigene Skins und Umhänge. Installiere die Mod, um sie zu sehen und deine eigenen zu tragen.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Markiere Skins im Skin-Menü mit ★, um sie hier zu sehen",
+  "quickskin.fan.cooldown": "Du kannst deinen Skin in %s s wieder ändern"
 }

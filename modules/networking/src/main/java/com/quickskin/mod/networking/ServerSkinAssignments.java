@@ -106,7 +106,8 @@ public final class ServerSkinAssignments {
     public static PlayerAppearance shownToOthers(UUID playerId, @Nullable PlayerAppearance own) {
         ServerSkinAssignmentStore.AssignedSkin skin = store().assigned(playerId);
         if (skin == null || !textures().isSkin(skin.hash())) return own;
-        return new PlayerAppearance(playerId, skin.skinId(), own != null ? own.getCapeId() : "", skin.model());
+        return new PlayerAppearance(playerId, skin.skinId(), own != null ? own.getCapeId() : "",
+                own != null ? own.getElytraId() : "", skin.model());
     }
 
     /**

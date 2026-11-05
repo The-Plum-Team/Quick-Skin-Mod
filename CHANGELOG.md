@@ -1,5 +1,50 @@
 # Changelog
 
+## 4.1.0 (2026-11-05)
+
+### Added
+
+- **A favourites fan**
+> Bind the new Favourites Fan key in Controls › Quick Skin, and one press fans your favourite skins and CPM models out as cards over the hotbar, in the skin menu's order. You keep walking while it is open: the mouse points at the cards instead of turning the camera, a click wears the card you point at, and the key again, Esc or a right click puts it away. The mouse wheel turns the page when you have more favourites than fit, and on a server with a skin-change cooldown the fan tells you how long is left.
+
+- **Elytra with a cape of their own**
+> The cape menu has Cape and Elytra tabs: in the Elytra tab, pick any cape for your elytra, keep them the same as your cape, or give them vanilla's elytra texture. In the Cape tab, right-click a cape to put it on your elytra. Other players with Quick Skin 4.1.0 see your elytra's own cape; players on older versions see your elytra wear your cape as before.
+
+- **Hide Cosmetic Armor pieces from everyone**
+> With Cosmetic Armor Reworked, a cosmetic piece over your armour is now a piece of its own on the skin menu's model: hide it and every other player sees the armour under it instead, like any hidden piece. The server needs this update for others to see it.
+
+- **Silent admin commands**
+> Put `silent` after `/quickskin` (for example `/quickskin silent nickname random @a`) and only the players themselves learn their new names or skins: nothing is said to whoever runs the command, to other operators or in a command block's output, and the names it gives show no account name beside them in the operators' tab list or in join and leave messages. Made for games where the admins play too.
+
+### Fixes
+
+- **No more crash at launch with CustomSkinLoader**
+> Quick Skin and CustomSkinLoader can now be installed together: the game no longer stops at startup when another mod adds its own way out of the skin lookups Quick Skin uses.
+
+- **The skin menu's player stays where you turn it**
+> After you drag the skin menu's player round, it keeps facing the way you left it, so you can turn it round and click the pieces on its back. The title and pause menus' players still turn back.
+
+- **The title screen's player no longer covers the splash text**
+> At its usual size and place, the title screen's player now shrinks as much as the window and GUI Scale need to stay under the Minecraft logo and the yellow splash text. Once you move or resize it yourself, it stays exactly as you set it.
+
+- **Poses picked on the title screen play their moves**
+> Picking Sitting on the title screen now jumps onto the block as it does in the skin menu, and the other poses ease in and out instead of snapping.
+
+- **Elytra are no longer cut off in the menus (up to 1.21.5)**
+> A sneaking or gliding player's elytra are drawn whole in the skin and cape menus instead of losing their lower part behind the menu, and the buttons around the model stay in front of it.
+
+- **The skin menu's player no longer flickers when you switch views**
+> Switching the skin column between the list and the grid inside a world no longer shows the player in another pose and size for a frame.
+
+- **Sharing your account skin with vanilla players now works on NeoForge**
+> On NeoForge servers, `shareAccountSkinWithVanillaClients` showed nothing to players without Quick Skin. It now works as on Fabric and Forge.
+
+- **Settings that were not saved**
+> A key bound in Quick Skin's settings is now written to the game's options, so it survives a restart, and a Quick Skin config file that cannot be read is no longer replaced with the defaults.
+
+- **More fixes from a review of the whole mod**
+> Animated capes no longer bleed their neighbouring frames, the "Latest last" sort sorts by date, deleting the skin you wore while a CPM model was your look no longer resets CPM, greyscale skins with transparency keep their colours when imported, the Import tile lists a deleted own skin again, the menus no longer appear on the F3+Esc pause screen, a broken Curios renderer no longer crashes the skin menu, Ears versions that fail to link only turn the Ears bridge off, ReplayMod's 1.20.1 watcher runs from the client tick, and servers keep animated capes' metadata when the upload limit is lowered.
+
 ## 4.0.0 (2026-10-31)
 
 ### Added

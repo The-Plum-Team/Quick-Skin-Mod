@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "速易膚",
   "key.quickskin.open_menu": "啟膚選單",
+  "key.quickskin.favourites_fan": "所好之膚（速易）",
 
   "_comment_screens": "=== 畫面名 ===",
   "quickskin.screen.skin_menu.title": "速易膚",
@@ -160,6 +161,18 @@
   "quickskin.tooltip.static_cape": "靜態披風",
   "quickskin.tooltip.resolution": "解析度：%s",
   "quickskin.tooltip.click_preview": "點以觀",
+  "quickskin.cape.tab.cape": "披風",
+  "quickskin.cape.tab.elytra": "鞘翅",
+  "quickskin.cape.tab.cape_tip": "擇所披之風",
+  "quickskin.cape.tab.elytra_tip": "擇鞘翅之飾：己之披風、原鞘翅，或他披風",
+  "quickskin.cape.option.same_as_cape": "同於披風",
+  "quickskin.cape.option.same_as_cape.tip": "鞘翅從所披之風",
+  "quickskin.cape.option.vanilla_elytra": "原版",
+  "quickskin.cape.option.vanilla_elytra.tip": "無論何披風，皆現 Minecraft 原鞘翅",
+  "quickskin.context.wear_on_elytra": "飾於鞘翅",
+  "quickskin.context.elytra_same_as_cape": "鞘翅：同於披風",
+  "quickskin.tooltip.on_elytra": "飾於鞘翅矣",
+  "quickskin.tooltip.click_elytra": "擊之以飾鞘翅",
   "quickskin.cape.animation_speed": "動畫速：%s%%",
 
   "_comment_cape_adjust": "=== 調披風之畫面 ===",
@@ -404,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[速易膚] 汝之膚（%s）逾此伺服器之呈遞限（%s），唯現於汝屏，他人不得見",
   "quickskin.network.upload_too_large.cape": "[速易膚] 汝之披風（%s）逾此伺服器之呈遞限（%s），唯現於汝屏，他人不得見",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "此服以 Quick Skin 設自製之膚與披風。裝此模組，則可見之，亦可自衣。"
+  "quickskin.server.missing_mod_notice": "此服以 Quick Skin 設自製之膚與披風。裝此模組，則可見之，亦可自衣。",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "於膚之選單以★識之，則見於此",
+  "quickskin.fan.cooldown": "俟%s秒，乃可復易其膚"
 }

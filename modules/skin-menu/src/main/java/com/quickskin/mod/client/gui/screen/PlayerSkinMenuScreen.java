@@ -150,10 +150,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     // Whether the turntable ring has played its appearing animation for this menu
     private boolean ringIntroPlayed;
 
-    // Dragging the model turns it (from 1.21; before, the model widget turns itself)
+    // Dragging the model turns it (from 1.21; before, the model widget turns itself), and it stays
+    // turned when the drag lets go, so its back can be reached
     private boolean rotatingModel;
-    /** The model eases back to face the viewer once a drag lets go of it. */
-    private boolean modelReturningToFront;
     /** The armour piece a left click pressed on the model, which a release in place toggles. */
     private int armorPressPiece;
     private double armorPressX;
@@ -752,7 +751,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             if (widget != null) {
                 widget.setRotationState(savedBodyYaw, savedTargetRotation);
                 // Unlike the title and pause menus, whose model rests turned aside, it faces the viewer
+                // and stays where a drag turns it
                 widget.setRestingYRotation(0.0f);
+                widget.setReturnsToRest(false);
             }
         }
     }
@@ -857,7 +858,6 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         // Render the animated background
         this.renderBackgroundEffects(graphics, partialTick);
 
-        returnModelToFront();
 
         // The turntable ring goes behind the model, which stands inside it
         if (playerPreviewPanel != null && playerPreviewPanel.getRotationArc() != null) {
@@ -900,9 +900,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
         renderSkinHeader(graphics);
 
-        // Foreground controls and error toasts go above the player preview. Up to 1.21.5 the GUI
-        // is depth tested: the model sits at z 50 and reaches forward by its scale (200 at most),
-        // tooltips are at z 400. From 1.21.6 a later stratum is drawn on top.
+        // Foreground controls (the buttons round the model among them) and error toasts go above
+        // the player preview. Up to 1.21.5 the GUI is depth tested: the model sits between z 0 and
+        // about 300 (PlayerModelRenderer.modelDepth), tooltips are at z 400. From 1.21.6 a later
+        // stratum is drawn on top.
 //? if <1.21.6 {
         graphics.pose().pushPose();
         // Stay flat behind a dialog that draws this screen as its backdrop
@@ -1011,7 +1012,16 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             piece = LocalHiddenArmor.FEET;
             halfWidth = 0.15;
         }
-        return sideways <= halfWidth && !armorItem(piece).isEmpty() && onModel(piece) ? piece : 0;
+        if (sideways > halfWidth) {
+            return 0;
+        }
+        // The armour piece, or the Cosmetic Armor Reworked piece drawn over it
+        for (int candidate : new int[]{piece, LocalHiddenArmor.cosmetic(piece)}) {
+            if (!armorItem(candidate).isEmpty() && onModel(candidate)) {
+                return candidate;
+            }
+        }
+        return 0;
     }
 
     /** The piece under the mouse: one lying on the floor, or else one the model wears. */
@@ -1027,7 +1037,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     /**
      * The worn pieces nobody sees, which lie on the floor round the turntable ring: the armour
-     * from head to feet, hidden or covered ({@link #covered}), then the accessories.
+     * from head to feet, hidden or covered ({@link #covered}), each Cosmetic Armor Reworked piece
+     * before the armour piece under it, then the accessories.
      */
     private int[] pedestalPieces() {
         if (this.minecraft == null || this.minecraft.player == null || playerPreviewPanel == null
@@ -1035,11 +1046,14 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             return new int[0];
         }
         int[] accessories = com.quickskin.mod.client.rendering.CuriosPreview.pieces(this.minecraft.player);
-        int[] lying = new int[ARMOR_PIECES_ON_FLOOR.length + accessories.length];
+        int[] lying = new int[ARMOR_PIECES_ON_FLOOR.length * 2 + accessories.length];
         int count = 0;
-        for (int piece : ARMOR_PIECES_ON_FLOOR) {
-            if (!onModel(piece) && !armorItem(piece).isEmpty()) {
-                lying[count++] = piece;
+        for (int slot : ARMOR_PIECES_ON_FLOOR) {
+            // A Cosmetic Armor Reworked piece lies beside the armour piece under it
+            for (int piece : new int[]{LocalHiddenArmor.cosmetic(slot), slot}) {
+                if (!onModel(piece) && !armorItem(piece).isEmpty()) {
+                    lying[count++] = piece;
+                }
             }
         }
         for (int piece : accessories) {
@@ -1189,7 +1203,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     /** The outline of a worn piece on the model, one convex polygon per box it covers. */
     private java.util.List<float[]> armorOutline(int piece) {
-        boolean elytra = piece == LocalHiddenArmor.CHEST
+        boolean elytra = LocalHiddenArmor.slot(piece) == LocalHiddenArmor.CHEST
                 && armorItem(piece).is(net.minecraft.world.item.Items.ELYTRA);
         return com.quickskin.mod.client.rendering.PreviewEquipment.outline(piece, elytra);
     }
@@ -1225,13 +1239,19 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     /**
-     * The pieces the model can wear: the four armour slots, then the Curios accessories the
-     * player wears ({@code CuriosPreview}), which hide with Curios' own render toggle.
+     * The pieces the model can wear: the four armour slots, each with the Cosmetic Armor Reworked
+     * piece over it before it, then the Curios accessories the player wears ({@code
+     * CuriosPreview}), which hide with Curios' own render toggle.
      */
     private int[] wornPieces() {
         int[] accessories = com.quickskin.mod.client.rendering.CuriosPreview.pieces(this.minecraft == null ? null : this.minecraft.player);
-        int[] pieces = java.util.Arrays.copyOf(ARMOR_PIECES_BY_PRIORITY, ARMOR_PIECES_BY_PRIORITY.length + accessories.length);
-        System.arraycopy(accessories, 0, pieces, ARMOR_PIECES_BY_PRIORITY.length, accessories.length);
+        int[] pieces = new int[ARMOR_PIECES_BY_PRIORITY.length * 2 + accessories.length];
+        int count = 0;
+        for (int slot : ARMOR_PIECES_BY_PRIORITY) {
+            pieces[count++] = LocalHiddenArmor.cosmetic(slot);
+            pieces[count++] = slot;
+        }
+        System.arraycopy(accessories, 0, pieces, count, accessories.length);
         return pieces;
     }
 
@@ -1247,8 +1267,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     /**
-     * What the player has on in a piece's slot, the Cosmetic Armor Reworked piece in it where there
-     * is one ({@code CosmeticArmorPreview.stack}): nothing outside a world, as on the title screen.
+     * What the player has on as a piece: the worn armour piece, the Cosmetic Armor Reworked piece
+     * over it ({@code CosmeticArmorPreview.cosmeticStack}) or an accessory; nothing outside a
+     * world, as on the title screen.
      */
     private net.minecraft.world.item.ItemStack armorItem(int piece) {
         if (this.minecraft == null || this.minecraft.player == null) {
@@ -1257,21 +1278,27 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         if (com.quickskin.mod.client.rendering.CuriosPreview.isAccessory(piece)) {
             return com.quickskin.mod.client.rendering.CuriosPreview.stack(this.minecraft.player, piece);
         }
+        if (LocalHiddenArmor.isCosmetic(piece)) {
+            return com.quickskin.mod.client.rendering.CosmeticArmorPreview.cosmeticStack(this.minecraft.player, piece);
+        }
         net.minecraft.world.entity.EquipmentSlot slot = switch (piece) {
             case LocalHiddenArmor.HEAD -> net.minecraft.world.entity.EquipmentSlot.HEAD;
             case LocalHiddenArmor.CHEST -> net.minecraft.world.entity.EquipmentSlot.CHEST;
             case LocalHiddenArmor.LEGS -> net.minecraft.world.entity.EquipmentSlot.LEGS;
             default -> net.minecraft.world.entity.EquipmentSlot.FEET;
         };
-        return com.quickskin.mod.client.rendering.CosmeticArmorPreview.stack(
-                this.minecraft.player, piece, this.minecraft.player.getItemBySlot(slot));
+        // The worn piece, not Cosmetic Armor Reworked's swap left over from its last draw
+        com.quickskin.mod.client.rendering.CosmeticArmorPreview.showWorn(this.minecraft.player);
+        return this.minecraft.player.getItemBySlot(slot);
     }
 
     /**
      * Hides a shown piece from everyone, or shows a hidden one, where the server can; for a
-     * covered piece, hides the accessory covering it, so it shows. With Cosmetic Armor Reworked an
-     * armour piece the player does not hide here hides and shows through that mod's own toggle,
-     * which hides its cosmetic piece as well.
+     * covered piece, hides the accessory or Cosmetic Armor Reworked piece covering it, so it shows.
+     * A Cosmetic Armor piece and the armour piece under it hide on their own, a state that mod
+     * lacks: its own toggle hides both, so putting one of them back on turns that toggle off and
+     * keeps the other one hidden here. Where the server does not hide cosmetic pieces, a cosmetic
+     * piece hides and shows through that toggle.
      */
     private void toggleArmorPiece(int piece) {
         if (covered(piece)) {
@@ -1286,12 +1313,28 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             com.quickskin.mod.client.rendering.CuriosPreview.toggle(this.minecraft == null ? null : this.minecraft.player, piece);
             return;
         }
-        if ((LocalHiddenArmor.inEffect() & piece) == 0
-                && com.quickskin.mod.client.rendering.CosmeticArmorPreview.toggle(
-                        this.minecraft == null ? null : this.minecraft.player, piece)) {
+        net.minecraft.world.entity.player.Player player = this.minecraft == null ? null : this.minecraft.player;
+        ClientNetworkActions.ArmorHiding hiding = LocalHiddenArmor.hiding();
+        boolean cosmetics = hiding == ClientNetworkActions.ArmorHiding.ACTIVE && LocalHiddenArmor.hidesCosmetics();
+        if (com.quickskin.mod.client.rendering.CosmeticArmorPreview.hides(player, piece)) {
+            if (!cosmetics) {
+                com.quickskin.mod.client.rendering.CosmeticArmorPreview.toggle(player, piece);
+                return;
+            }
+            // Hidden for the skin through Cosmetic Armor: this piece goes back on, the other stays down
+            int slot = LocalHiddenArmor.slot(piece);
+            int other = LocalHiddenArmor.isCosmetic(piece) ? slot : LocalHiddenArmor.cosmetic(slot);
+            int hidden = LocalHiddenArmor.hidden() & ~piece;
+            if (!armorItem(other).isEmpty()) {
+                hidden |= other;
+            }
+            LocalHiddenArmor.set(hidden);
+            com.quickskin.mod.client.rendering.CosmeticArmorPreview.setHidden(player, piece, false);
             return;
         }
-        ClientNetworkActions.ArmorHiding hiding = LocalHiddenArmor.hiding();
+        if (LocalHiddenArmor.isCosmetic(piece) && !cosmetics && com.quickskin.mod.client.rendering.CosmeticArmorPreview.toggle(player, piece)) {
+            return;
+        }
         if (hiding == ClientNetworkActions.ArmorHiding.ACTIVE) {
             LocalHiddenArmor.toggle(piece);
         } else if (hiding == ClientNetworkActions.ArmorHiding.NOT_ALLOWED) {
@@ -1448,7 +1491,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     /**
      * How opaque a piece is drawn when not shown for the mouse: hidden from everyone, here or
-     * through Cosmetic Armor Reworked, it is not drawn at all.
+     * through Cosmetic Armor Reworked (which hides a slot's two pieces together), it is not drawn
+     * at all.
      */
     private static float restingAlpha(int piece) {
         net.minecraft.world.entity.player.Player player = net.minecraft.client.Minecraft.getInstance().player;
@@ -1462,19 +1506,28 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     /**
      * Whether an armour piece the player shows is covered: another mod takes it off while the
      * player is drawn, in the world as in the preview, as Relics does with the boots under its
-     * own ({@code PreviewEquipment.coveredPieces}). It lies on the floor until what covers it is
-     * hidden.
+     * own ({@code PreviewEquipment.coveredPieces}), or Cosmetic Armor Reworked shows its piece
+     * over it. It lies on the floor until what covers it is hidden.
      */
     private static boolean covered(int piece) {
-        return !com.quickskin.mod.client.rendering.CuriosPreview.isAccessory(piece)
-                && (com.quickskin.mod.client.rendering.PreviewEquipment.coveredPieces() & piece) != 0
-                && restingAlpha(piece) > 0.0f;
+        if (com.quickskin.mod.client.rendering.CuriosPreview.isAccessory(piece) || LocalHiddenArmor.isCosmetic(piece)
+                || restingAlpha(piece) <= 0.0f) {
+            return false;
+        }
+        return (com.quickskin.mod.client.rendering.PreviewEquipment.coveredPieces() & piece) != 0
+                || com.quickskin.mod.client.rendering.CosmeticArmorPreview.cosmeticShown(net.minecraft.client.Minecraft.getInstance().player, piece);
     }
 
-    /** The accessory most likely covering a covered piece ({@code CuriosPreview.covering}), or 0. */
+    /**
+     * What most likely covers a covered piece: the Cosmetic Armor Reworked piece over it, or an
+     * accessory ({@code CuriosPreview.covering}); 0 when nothing is known to.
+     */
     private int coverer(int piece) {
-        return com.quickskin.mod.client.rendering.CuriosPreview.covering(
-                this.minecraft == null ? null : this.minecraft.player, piece);
+        net.minecraft.world.entity.player.Player player = this.minecraft == null ? null : this.minecraft.player;
+        if (!LocalHiddenArmor.isCosmetic(piece) && com.quickskin.mod.client.rendering.CosmeticArmorPreview.cosmeticShown(player, piece)) {
+            return LocalHiddenArmor.cosmetic(piece);
+        }
+        return com.quickskin.mod.client.rendering.CuriosPreview.covering(player, piece);
     }
 
     /** Whether a piece is drawn on the model: neither hidden nor covered. */
@@ -1855,30 +1908,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             return false;
         }
         rotatingModel = true;
-        modelReturningToFront = false;
         rotationDragStartX = mouseX;
         rotationDragStartYaw = widget.getTargetYRotation();
         return true;
-    }
-
-    /**
-     * Eases a model the player let go of back to face the viewer, by the shortest way, as the model
-     * widget eases back to its resting yaw when a drag of the model itself lets go before 1.21.
-     */
-    private void returnModelToFront() {
-        if (!modelReturningToFront || rotatingModel || playerPreviewPanel == null
-                || playerPreviewPanel.getPlayerWidget() == null) {
-            return;
-        }
-        com.quickskin.mod.client.gui.widget.PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
-        float target = widget.getTargetYRotation();
-        float front = 360.0f * Math.round(target / 360.0f);
-        if (Math.abs(front - target) > 0.1f) {
-            widget.setTargetYRotation(target + (front - target) * 0.08f);
-        } else {
-            widget.setTargetYRotation(front);
-            modelReturningToFront = false;
-        }
     }
 
     /**
@@ -1965,7 +1997,6 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         }
         if (rotatingModel && button == InputConstants.MOUSE_BUTTON_LEFT) {
             rotatingModel = false;
-            modelReturningToFront = true;
             return true;
         }
 //? if <1.21 {

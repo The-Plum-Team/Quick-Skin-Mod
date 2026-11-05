@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "स्किन मेनू खोलें",
+  "key.quickskin.favourites_fan": "पसंदीदा स्किन (तुरंत बदलें)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "त्वरित स्किन",
@@ -160,6 +161,18 @@
   "quickskin.tooltip.static_cape": "स्थिर केप",
   "quickskin.tooltip.resolution": "रेज़ोल्यूशन: %s",
   "quickskin.tooltip.click_preview": "पूर्वावलोकन के लिए क्लिक करें",
+  "quickskin.cape.tab.cape": "लबादा",
+  "quickskin.cape.tab.elytra": "पक्षवर्म",
+  "quickskin.cape.tab.cape_tip": "अपना पहना लबादा चुनें",
+  "quickskin.cape.tab.elytra_tip": "चुनें कि पक्षवर्म पर क्या दिखे: आपका लबादा, सामान्य पक्षवर्म या कोई और लबादा",
+  "quickskin.cape.option.same_as_cape": "लबादे जैसा",
+  "quickskin.cape.option.same_as_cape.tip": "पक्षवर्म पर आपका लबादा दिखता है",
+  "quickskin.cape.option.vanilla_elytra": "Vanilla",
+  "quickskin.cape.option.vanilla_elytra.tip": "Minecraft के अपने पक्षवर्म, आप कोई भी लबादा पहनें",
+  "quickskin.context.wear_on_elytra": "पक्षवर्म पर पहनें",
+  "quickskin.context.elytra_same_as_cape": "पक्षवर्म: लबादे जैसा",
+  "quickskin.tooltip.on_elytra": "आपके पक्षवर्म पर",
+  "quickskin.tooltip.click_elytra": "पक्षवर्म पर पहनने के लिए क्लिक करें",
   "quickskin.cape.animation_speed": "एनिमेशन गति: %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -404,5 +417,8 @@
   "quickskin.network.upload_too_large.skin": "[त्वरित स्किन] आपकी स्किन (%s) इस सर्वर की %s अपलोड सीमा से बड़ी है। यह केवल आपकी स्क्रीन पर दिखती है; अन्य खिलाड़ी इसे नहीं देखते।",
   "quickskin.network.upload_too_large.cape": "[त्वरित स्किन] आपका केप (%s) इस सर्वर की %s अपलोड सीमा से बड़ा है। यह केवल आपकी स्क्रीन पर दिखता है; अन्य खिलाड़ी इसे नहीं देखते।",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "यह सर्वर कस्टम स्किन और केप के लिए Quick Skin का उपयोग करता है। उन्हें देखने और अपनी पहनने के लिए मॉड इंस्टॉल करें।"
+  "quickskin.server.missing_mod_notice": "यह सर्वर कस्टम स्किन और केप के लिए Quick Skin का उपयोग करता है। उन्हें देखने और अपनी पहनने के लिए मॉड इंस्टॉल करें।",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "स्किन मेनू में स्किन पर ★ लगाएँ, तो वे यहाँ दिखेंगी",
+  "quickskin.fan.cooldown": "आप %s सेकंड बाद फिर से स्किन बदल सकते हैं"
 }

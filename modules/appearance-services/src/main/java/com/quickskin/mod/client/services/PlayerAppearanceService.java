@@ -205,21 +205,7 @@ public class PlayerAppearanceService implements IPlayerAppearanceService, Remote
                 // Trigger async transparency analysis for the cape texture
                 com.quickskin.mod.common.util.TextureAlphaDetector.analyzeTextureAsync(capeLocation);
 
-                // If animated, ensure the animation is registered
-                if (capeService.isAnimated(capeId)) {
-                    String hash = CapeAnimationIds.localHash(capeId);
-
-                    if (hash != null) {
-                        String animationId = CapeAnimationIds.deriveAnimationId(capeId);
-
-                        AnimatedTextureManager.getInstance().registerAnimationAsync(
-                                animationId, capeId, capeLocation, hash);
-                    } else if (capeId.startsWith("known:")) {
-                        // Register known cape animation
-                        String knownId = capeId.substring("known:".length());
-                        capeService.loadKnownCape(knownId);
-                    }
-                }
+                registerCapeAnimation(capeId, capeLocation);
             }
         }
 
@@ -241,7 +227,11 @@ public class PlayerAppearanceService implements IPlayerAppearanceService, Remote
 
         eventBus.post(new PlayerAppearanceUpdateEvent(playerId, appearance, updateType));
 
-        // Sync to server if this is the local player
+        syncIfLocal(playerId);
+    }
+
+    /** Sends the local player's own appearance to the server, unless this change came from it. */
+    private void syncIfLocal(UUID playerId) {
         Minecraft mc = Minecraft.getInstance();
         if (!reloadingTransparency && !applyingNetworkUpdate && mc.player != null
                 && playerId.equals(mc.player.getUUID())) {
@@ -254,6 +244,157 @@ public class PlayerAppearanceService implements IPlayerAppearanceService, Remote
             );
         }
     }
+
+    /** Makes sure an animated cape's animation runs, wherever its texture is worn. */
+    //? if <1.21.11 {
+    private void registerCapeAnimation(String capeId, ResourceLocation capeLocation) {
+    //?} else {
+    private void registerCapeAnimation(String capeId, Identifier capeLocation) {
+    //?}
+        if (!capeService.isAnimated(capeId)) return;
+        String hash = CapeAnimationIds.localHash(capeId);
+        if (hash != null) {
+            String animationId = CapeAnimationIds.deriveAnimationId(capeId);
+            AnimatedTextureManager.getInstance().registerAnimationAsync(
+                    animationId, capeId, capeLocation, hash);
+        } else if (capeId.startsWith("known:")) {
+            // Register known cape animation
+            capeService.loadKnownCape(capeId.substring("known:".length()));
+        }
+    }
+
+    /**
+     * The player's elytra wear this cape's texture instead of the cape's: a cape id,
+     * {@link PlayerAppearance#VANILLA_ELYTRA} for vanilla's elytra, or {@code ""} for the cape.
+     * The local player's choice is synced to the server like the rest of their appearance.
+     */
+    @Override
+    public void applyElytra(UUID playerId, String elytraId) {
+        if (playerId == null) return;
+        PlayerAppearance appearance = repository.getAppearance(playerId);
+        if (appearance == null) {
+            appearance = new PlayerAppearance(playerId, "", "", "classic");
+            repository.setAppearance(appearance);
+        }
+        String safeId = elytraId != null ? elytraId : "";
+        if (safeId.equals(appearance.getElytraId()) && (safeId.isEmpty()
+                || PlayerAppearance.VANILLA_ELYTRA.equals(safeId) || appearance.getElytraLocation() != null)) {
+            return;
+        }
+        appearance.setElytraId(safeId);
+        resolveElytraLocation(playerId, appearance);
+        refreshPlayerRenderer(playerId);
+        eventBus.post(new PlayerAppearanceUpdateEvent(
+                playerId, appearance, PlayerAppearanceUpdateEvent.UpdateType.CAPE));
+        syncIfLocal(playerId);
+    }
+
+    /** Applies the elytra of an authoritative S2C update without reflecting it back. */
+    @Override
+    public void applyElytraFromNetwork(UUID playerId, String elytraId) {
+        boolean previous = applyingNetworkUpdate;
+        applyingNetworkUpdate = true;
+        try {
+            applyElytra(playerId, elytraId);
+        } finally {
+            applyingNetworkUpdate = previous;
+        }
+    }
+
+    //? if <1.21.11 {
+    @Nullable
+    private ResourceLocation resolveElytraLocation(UUID playerId, PlayerAppearance appearance) {
+        ResourceLocation location = null;
+    //?} else {
+    @Nullable
+    private Identifier resolveElytraLocation(UUID playerId, PlayerAppearance appearance) {
+        Identifier location = null;
+    //?}
+        String elytraId = appearance.getElytraId();
+        if (appearance.hasSeparateElytra() && !PlayerAppearance.VANILLA_ELYTRA.equals(elytraId)) {
+            location = capeService.getCapeLocation(playerId, elytraId);
+            if (location != null) {
+                appearance.setElytraLocation(MinecraftTextures.reference(location));
+                com.quickskin.mod.common.util.TextureAlphaDetector.analyzeTextureAsync(location);
+                registerCapeAnimation(elytraId, location);
+            }
+        }
+        return location;
+    }
+
+    /** Whether the player's elytra wear something other than their cape. */
+    public boolean hasSeparateElytra(UUID playerId) {
+        PlayerAppearance appearance = repository.getAppearance(playerId);
+        return appearance != null && appearance.hasSeparateElytra();
+    }
+
+    /** The elytra id of a player, or {@code ""} when their elytra wear the cape. */
+    public String getElytraId(UUID playerId) {
+        PlayerAppearance appearance = repository.getAppearance(playerId);
+        return appearance != null ? appearance.getElytraId() : "";
+    }
+
+    /**
+     * The texture a player's elytra wear when it is not their cape's (see
+     * {@link #hasSeparateElytra}): that cape's current frame, or vanilla's elytra when they chose
+     * it or while that cape's texture has not arrived. Never the cape's own texture.
+     */
+    //? if <1.21.11 {
+    public ResourceLocation getSeparateElytraLocation(UUID playerId) {
+        ResourceLocation location = null;
+    //?} else {
+    public Identifier getSeparateElytraLocation(UUID playerId) {
+        Identifier location = null;
+    //?}
+        PlayerAppearance appearance = repository.getAppearance(playerId);
+        if (appearance == null || !appearance.hasSeparateElytra()) return VANILLA_ELYTRA_TEXTURE;
+        if (PlayerAppearance.VANILLA_ELYTRA.equals(appearance.getElytraId())) return VANILLA_ELYTRA_TEXTURE;
+        if (appearance.getElytraLocation() != null) {
+            location = MinecraftTextures.location(appearance.getElytraLocation());
+        } else {
+            location = resolveElytraLocation(playerId, appearance);
+        }
+        return location != null
+                ? CapeAnimationHelper.resolveCurrentFrame(location, appearance.getElytraId())
+                : VANILLA_ELYTRA_TEXTURE;
+    }
+
+    /**
+     * Before a world: the texture the elytra wear by the saved choice when it is not the saved
+     * cape, or null when they wear the cape.
+     */
+    @Nullable
+    //? if <1.21.11 {
+    public ResourceLocation getConfiguredElytraLocation() {
+        ResourceLocation location;
+    //?} else {
+    public Identifier getConfiguredElytraLocation() {
+        Identifier location;
+    //?}
+        com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
+        String elytraId = config.activeElytraId;
+        if (elytraId.isEmpty() || elytraId.equals(config.activeCapeHash)) return null;
+        if (PlayerAppearance.VANILLA_ELYTRA.equals(elytraId)) return VANILLA_ELYTRA_TEXTURE;
+        location = capeService.getCapeLocation(null, elytraId);
+        return location != null
+                ? CapeAnimationHelper.resolveCurrentFrame(location, elytraId)
+                : VANILLA_ELYTRA_TEXTURE;
+    }
+
+    /** Vanilla's elytra texture, which the elytra wear under a cape when the player chose it. */
+    //? if <1.21 {
+    public static final ResourceLocation VANILLA_ELYTRA_TEXTURE =
+            new ResourceLocation("minecraft", "textures/entity/elytra.png");
+    //?} else if <1.21.2 {
+    public static final ResourceLocation VANILLA_ELYTRA_TEXTURE =
+            ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/elytra.png");
+    //?} else if <1.21.11 {
+    public static final ResourceLocation VANILLA_ELYTRA_TEXTURE =
+            ResourceLocation.fromNamespaceAndPath("minecraft", "textures/entity/equipment/wings/elytra.png");
+    //?} else {
+    public static final Identifier VANILLA_ELYTRA_TEXTURE =
+            Identifier.fromNamespaceAndPath("minecraft", "textures/entity/equipment/wings/elytra.png");
+    //?}
 
     @Override
     public void applyAssignedSkin(UUID localPlayerId, String skinId, String model) {
@@ -294,6 +435,7 @@ public class PlayerAppearanceService implements IPlayerAppearanceService, Remote
         if (own == null || !own.playerId().equals(localPlayerId)) return shown;
         return new PlayerAppearance(localPlayerId, own.skinId(),
                 shown != null ? shown.getCapeId() : "",
+                shown != null ? shown.getElytraId() : "",
                 modelService.getModelType(localPlayerId, own.skinId(), own.model()));
     }
 

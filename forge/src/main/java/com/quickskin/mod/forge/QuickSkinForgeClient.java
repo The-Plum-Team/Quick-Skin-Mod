@@ -15,6 +15,11 @@ import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 @Mod.EventBusSubscriber(modid = QuickSkinInfo.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class QuickSkinForgeClient {
 
+    /** Registers Quick Skin's keys while the mod is built, before the controls are read. */
+    static void registerKeys() {
+        com.quickskin.mod.client.input.KeybindRegistry.registerKeys();
+    }
+
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
         // Initialize client code on the main thread

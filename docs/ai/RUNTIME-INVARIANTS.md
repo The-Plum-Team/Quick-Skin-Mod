@@ -148,7 +148,17 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   copy of the equipment packet, alone or in a bundle, for every client, Quick Skin or not. The item
   stays worn; nothing is written to the player. `allowHiddenArmor` (default on) turns it off. The
   player's own client hides the pieces only where the server does. On NeoForge these mixins load
-  from `quickskin-armor.mixins.json`.
+  from `quickskin-armor.mixins.json`. A Cosmetic Armor Reworked piece over an armour piece is a
+  piece of its own, four bits up in the same mask, sent only on a session that also negotiated
+  `hidden-cosmetic-armor` (an older server refuses the whole update otherwise) and kept per account
+  in a map apart, so an older client reading the configuration keeps the armour pieces. The server
+  leaves a hidden cosmetic piece out of every other player's copy of that mod's slot sync
+  (`CosmeticArmorSync`: the Forge 1.20.1 bytes `CosmeticArmorSyncMessage` reads, the payload record
+  from 1.20.5, reached by reflection), also on the Forge 1.20.1 paths that send to one player past
+  the listener (`ConnectionCosmeticArmorFilterMixin`), and asks the mod to send the player's slots
+  again when the mask changes. Their Cosmetic Armor then draws the armour piece, which the
+  equipment filter hides in turn if the player hides it too. A slot showing its cosmetic piece is
+  never hidden on the player's own client for its armour piece, which everyone else sees covered.
 - A cosmetic nickname (ADR 0015) is text, not an appearance, and reaches every client through
   display names; account names keep every other role. `Nickname` (content-core) is the only rule
   set, applied by the client's text box, the wire check (`NetworkSecurity.isValidNickname`, 32
@@ -193,6 +203,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   on each run and gives each player a different free name, after taking back their earlier
   admin names; players it cannot name are reported, never given a repeat. An absent player's
   admin name stays theirs, and blocks it, until a `reset` without players takes back everyone's.
+  `/quickskin silent nickname|skin ...` runs the same commands (the pool's excepted) through
+  `withSuppressedOutput`, so no feedback reaches whoever runs them, a command block included, or
+  other operators, while the result count still does; the nicknames it gives are `secret` in the
+  store, so neither join and leave messages nor the operators' tab list show the account name
+  beside them, and the server log does not pair them. The secret ends with the name it kept.
 - An assigned skin (ADR 0016) never replaces a player's own appearance: the repository keeps the
   record the player's client uploaded and acknowledges, and `ServerSkinAssignments.shownToOthers`
   swaps in the assigned skin and model only for recipients other than that player, so echoes,
@@ -360,6 +375,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   and shrunk evenly into an atlas of at most 1024 per side and 64 MB. Such an atlas, like any GIF
   over 256 frames, always goes through the editor; only a GIF the catalogue loads as it is is
   copied unchanged.
+- The elytra may wear a cape of their own (ADR 0018): `PlayerAppearance.elytraId` is a cape id,
+  `minecraft:elytra` for vanilla's elytra, or `""` for the cape. Where it differs from the cape the
+  renderer hooks put that cape's current frame, or vanilla's elytra texture (also while that cape
+  is pending), on the elytra input, never an empty one, which vanilla fills with the cape. It
+  travels only as `update_appearance_elytra`/`sync_appearance_elytra` on a session that negotiated
+  `elytra-texture` (bit 9); the v1 and v2 appearance packets keep their schemas, and their peers
+  see the elytra wear the cape. Its texture is uploaded, deferred, pinned, saved and acknowledged
+  exactly as the cape's.
 - An active Quick Skin cape is authoritative for both the renderer's cape and profile-Elytra
   texture inputs. Never retain an unrelated Mojang/profile Elytra beside a custom cape: vanilla
   gives that dedicated field priority and would otherwise replace only the worn wings when the
@@ -466,14 +489,20 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   behind it: it lies on the floor round the turntable ring as its item (`PedestalDrops`), and a
   click there puts it back on. Cosmetic Armor Reworked's armour shows on that model as it does in the world
   (`CosmeticArmorPreview`, reflection only through its API, no compatibility lane): for the length
-  of each of the preview's own equipment draws its cosmetic pieces fill the armour slots, a piece
-  hidden for the skin empties its slot, and the worn armour is put back after, as the mod itself
-  does around each draw of the player in the world. The skin menu treats each such slot as one
-  piece, its cosmetic piece where it has one: a slot hidden for the skin lies on the floor and is
-  never covered, and a click on a piece the player does not hide through Quick Skin flips the
-  mod's own hidden-for-the-skin toggle on this client and its server (the packet its slot toggle
-  sends, through the original's network or the fork's platform helper), so the mod stores and
-  syncs it. The cape editor's Elytra view
+  of each of the preview's own equipment draws its cosmetic pieces fill the armour slots, a slot
+  hidden for the skin is emptied, a cosmetic piece the player hides through Quick Skin leaves the
+  worn piece, and the worn armour is put back after, as the mod itself does around each draw of
+  the player in the world. Before 1.21.2 that mod also swaps for the first-person hand and puts the
+  worn pieces back only at its next draw, so every read and draw here first puts them back. The
+  skin menu treats each such slot as two pieces, the cosmetic one and the armour piece under it,
+  which the cosmetic one covers while it shows; each hides on its own through Quick Skin, a state
+  the mod itself lacks, and lies on the floor when hidden. The mod's own hidden-for-the-skin toggle
+  hides both: putting one back on turns it off and keeps the other one hidden through Quick Skin.
+  In the world a fail-open `@Pseudo` hook on the mod's render handler
+  (`CosmeticArmorRenderMixin`, gated on its class file) keeps the local player's hidden cosmetic
+  piece out of the slot. Where the server does not hide cosmetic pieces, a click on one flips the
+  mod's own toggle on this client and its server (the packet its slot toggle sends, through the
+  original's network or the fork's platform helper), so the mod stores and syncs it. The cape editor's Elytra view
   is no exception: it draws its own model with vanilla's folded wings wearing the edited cape's
   texture (`PreviewPlayerData.isElytraPreview`), never the elytra the player has equipped. The
   one exception is the HUD preview keeping a held TaCZ (Timeless and Classics Zero) gun readable, so TaCZ poses and draws
@@ -496,6 +525,43 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   because the 1.20.1 overlay replaces the canonical file on the only lane official TaCZ exists
   for. The animation plays on the real local player, so other first-person draws of that
   player's model show it too; it never reaches the first-person arms.
+- The favourites fan (`favourites-fan`) is a HUD layer, never a screen, so the player keeps
+  walking while it is open. Its key is unbound until the player binds it. One press opens it on
+  the skins and CPM models marked as favourites, in the skin menu's order, at most
+  `FanMotion.PAGE_SIZE` per page; the mouse wheel turns the page. With no favourites it only shows a
+  notice. While it is open:
+  - `MouseTurnMixin` hands the mouse movement gathered for the camera to the fan, so the view
+    holds still;
+  - Architectury's raw input events give it the mouse buttons and the wheel; a left click wears
+    the pointed card, while a right click, the key again or a click with the pointer by the hotbar
+    closes it;
+  - Esc closes it too. Forge reports keys only after the game has handled them, so
+    `PauseGameMixin` closes the fan in `Minecraft.pauseGame` instead, before the game opens the
+    pause menu or pauses its sounds; a window that loses focus pauses on the next tick. Should
+    that hook not apply, the fan cancels the pause screen Esc opens (`ClientGuiEvent.SET_SCREEN`);
+  - these inputs never reach the game, so the click never attacks and the wheel never changes the
+    hotbar slot.
+
+  The fan takes input only while it is open in the world with no screen, and a screen that opens
+  or the end of the session puts it away at once. `MouseTurnMixin` and `PauseGameMixin` are
+  degradable (`require = 0`). Fabric and Forge load them from `quickskin.mixins.json`; NeoForge
+  loads them from `quickskin-input.mixins.json`. A card is put on along the skin menu's path: CPM's own workflow and
+  `PlayerAppearanceService`. On a server with a skin-change cooldown the fan shows the seconds left
+  and changes nothing, counting from its own last change until the server reports its cooldown.
+  Every card shows a picture of the whole player, drawn off the render thread
+  (`SkinBustTextures.getBody`, in `player-preview`) once per size and turn, so it leans, fades,
+  dims and turns over with its card on every version; the pointed card's skin sways through
+  pictures 3 degrees apart. No card draws a live GUI model: from 1.21.6 Minecraft renders each
+  kind of GUI model through one picture-in-picture texture per frame, which several cards would
+  share and which cannot turn with its card. A card has no card stock: its face is only the skin's
+  floor shadow and, when pointed at, a soft light, and a chosen skin turns over showing its own
+  back (its picture turned 180 degrees); that face and the screen vignette behind the fan are
+  painted at their exact pixel size (`FanTextures`). Every card is drawn at the same depth, so
+  before 1.21.6, where the GUI tests depth, the order of drawing alone puts the pointed card in
+  front. A CPM model shows its icon.
+- Quick Skin's keys are registered while the mod is built on Forge and NeoForge
+  (`KeybindRegistry.registerKeys`), before Minecraft registers the controls and reads their
+  saved bindings; a key registered later works but forgets its binding at every restart.
 
 ## Public E2E evidence
 

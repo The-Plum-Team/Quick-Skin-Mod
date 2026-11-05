@@ -1,6 +1,7 @@
 {
   "key.categories.quickskin": "QuickSkin",
   "key.quickskin.open_menu": "Open Skin Menu",
+  "key.quickskin.favourites_fan": "Favourite Skins (Quick Change)",
 
   "_comment_screens": "=== Screen Titles ===",
   "quickskin.screen.skin_menu.title": "Quick Skin",
@@ -164,6 +165,18 @@
   "quickskin.tooltip.static_cape": "Static cape",
   "quickskin.tooltip.resolution": "Resolution: %s",
   "quickskin.tooltip.click_preview": "Click to preview",
+  "quickskin.cape.tab.cape": "Cape",
+  "quickskin.cape.tab.elytra": "Elytra",
+  "quickskin.cape.tab.cape_tip": "Choose the cape you wear",
+  "quickskin.cape.tab.elytra_tip": "Choose what your elytra wear: your cape, vanilla's elytra or another cape",
+  "quickskin.cape.option.same_as_cape": "Same as cape",
+  "quickskin.cape.option.same_as_cape.tip": "Your elytra wear the cape you wear",
+  "quickskin.cape.option.vanilla_elytra": "Vanilla",
+  "quickskin.cape.option.vanilla_elytra.tip": "Minecraft's own elytra, whatever cape you wear",
+  "quickskin.context.wear_on_elytra": "Wear on elytra",
+  "quickskin.context.elytra_same_as_cape": "Elytra: same as cape",
+  "quickskin.tooltip.on_elytra": "On your elytra",
+  "quickskin.tooltip.click_elytra": "Click to wear on your elytra",
   "quickskin.cape.animation_speed": "Animation Speed: %s%%",
 
   "_comment_cape_adjust": "=== Cape Adjust Screen ===",
@@ -416,5 +429,8 @@
   "quickskin.network.upload_too_large.skin": "[Quick Skin] Your skin (%s) is over this server's %s upload limit. It stays on your screen only; other players do not see it.",
   "quickskin.network.upload_too_large.cape": "[Quick Skin] Your cape (%s) is over this server's %s upload limit. It stays on your screen only; other players do not see it.",
   "_comment_missing_mod_notice": "=== Players Without Quick Skin ===",
-  "quickskin.server.missing_mod_notice": "This server uses Quick Skin for custom skins and capes. Install the mod to see them and to wear your own."
+  "quickskin.server.missing_mod_notice": "This server uses Quick Skin for custom skins and capes. Install the mod to see them and to wear your own.",
+  "_comment_favourites_fan": "=== Favourites Fan ===",
+  "quickskin.fan.no_favourites": "Mark skins with ★ in the skin menu to see them here",
+  "quickskin.fan.cooldown": "You can change your skin again in %s s"
 }
