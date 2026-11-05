@@ -106,7 +106,7 @@ public final class LocalContentIdMigration {
         return new java.util.ArrayList<>(migrated);
     }
 
-    private static Map<String, Float> migrateCapeSpeeds(
+    static Map<String, Float> migrateCapeSpeeds(
             Map<String, Float> speeds, Map<String, String> aliases) {
         if (speeds == null || speeds.isEmpty()) {
             return speeds == null ? new HashMap<>() : speeds;
@@ -115,6 +115,10 @@ public final class LocalContentIdMigration {
         for (Map.Entry<String, Float> entry : speeds.entrySet()) {
             String newKey = migrateCapeReference(entry.getKey(), aliases);
             if (!newKey.equals(entry.getKey())) {
+                // A different speed already stored under the strong id keeps the legacy one: a
+                // migration never discards a preference it cannot carry over.
+                Float existing = migrated.get(newKey);
+                if (existing != null && !existing.equals(entry.getValue())) continue;
                 migrated.putIfAbsent(newKey, entry.getValue());
                 migrated.remove(entry.getKey());
             }

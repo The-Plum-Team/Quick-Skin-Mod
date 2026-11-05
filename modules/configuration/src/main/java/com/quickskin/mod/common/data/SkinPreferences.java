@@ -41,6 +41,17 @@ public class SkinPreferences {
             // Default constructor for Gson
         }
 
+        private SkinPreference copy() {
+            SkinPreference copy = new SkinPreference();
+            copy.modelType = modelType;
+            copy.favorite = favorite;
+            return copy;
+        }
+
+        private boolean sameAs(SkinPreference other) {
+            return other != null && favorite == other.favorite
+                    && java.util.Objects.equals(modelType, other.modelType);
+        }
     }
 
     /**
@@ -49,11 +60,7 @@ public class SkinPreferences {
      * @return Model type ("auto", "classic", or "slim"), defaults to "auto"
      */
     public synchronized String getModelType(String hash) {
-        SkinPreference pref = preferences.get(hash);
-        if (pref == null) {
-            String legacy = aliasFallbacks().get(hash);
-            if (legacy != null) pref = preferences.get(legacy);
-        }
+        SkinPreference pref = readable(hash);
         return pref != null && isModel(pref.modelType) ? pref.modelType : "auto";
     }
 
@@ -67,16 +74,12 @@ public class SkinPreferences {
                 || (!preferences.containsKey(hash) && preferences.size() >= MAX_PREFERENCES)) {
             return;
         }
-        preferences.computeIfAbsent(hash, k -> new SkinPreference()).modelType = modelType;
+        writable(hash).modelType = modelType;
     }
 
     /** Whether the player marked this skin as a favorite. */
     public synchronized boolean isFavorite(String hash) {
-        SkinPreference pref = preferences.get(hash);
-        if (pref == null) {
-            String legacy = aliasFallbacks().get(hash);
-            if (legacy != null) pref = preferences.get(legacy);
-        }
+        SkinPreference pref = readable(hash);
         return pref != null && pref.favorite;
     }
 
@@ -85,10 +88,33 @@ public class SkinPreferences {
         if (!isHash(hash) || (!preferences.containsKey(hash) && preferences.size() >= MAX_PREFERENCES)) {
             return;
         }
-        if (!favorite && !preferences.containsKey(hash)) {
+        if (!favorite && readable(hash) == null) {
             return;
         }
-        preferences.computeIfAbsent(hash, k -> new SkinPreference()).favorite = favorite;
+        writable(hash).favorite = favorite;
+    }
+
+    /** The skin's preference, through the legacy alias it is still stored under if need be. */
+    private SkinPreference readable(String hash) {
+        SkinPreference pref = preferences.get(hash);
+        if (pref == null) {
+            String legacy = aliasFallbacks().get(hash);
+            if (legacy != null) pref = preferences.get(legacy);
+        }
+        return pref;
+    }
+
+    /**
+     * The skin's own preference to change, created from the legacy alias's when the migration of
+     * that alias has not been written yet, so a change keeps the settings it does not touch.
+     */
+    private SkinPreference writable(String hash) {
+        SkinPreference existing = preferences.get(hash);
+        if (existing != null) return existing;
+        SkinPreference inherited = readable(hash);
+        SkinPreference created = inherited != null ? inherited.copy() : new SkinPreference();
+        preferences.put(hash, created);
+        return created;
     }
 
     /**
@@ -165,6 +191,12 @@ public class SkinPreferences {
             }
             SkinPreference oldPreference = migrated.get(alias.getKey());
             if (oldPreference == null) continue;
+            SkinPreference existing = migrated.get(alias.getValue());
+            // The legacy entry goes only when the strong one is new, equal, or was created from
+            // it after a failed migration (and so holds the player's later choice); a strong
+            // entry that differs on its own keeps the legacy one, which is never discarded.
+            boolean derived = alias.getKey().equals(aliasFallbacks().get(alias.getValue()));
+            if (existing != null && !existing.sameAs(oldPreference) && !derived) continue;
             migrated.putIfAbsent(alias.getValue(), oldPreference);
             migrated.remove(alias.getKey());
             changed = true;
