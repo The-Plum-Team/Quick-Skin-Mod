@@ -138,7 +138,7 @@ public class PlayerPreviewPanel extends AbstractWidget {
                                 int x, int y, int size, int screenWidth) {
         poseButton = new IconButton(x, y, size, "poses", Component.empty(),
                 button -> setPoseListOpen(poseList != null && !poseList.visible));
-        screen.registerWidget(poseButton);
+        screen.registerForegroundControl(poseButton);
         addPriorityControl(poseButton);
 
         java.util.List<String> poses = getAvailableAnimations();
@@ -155,13 +155,13 @@ public class PlayerPreviewPanel extends AbstractWidget {
         }
         int listY = y + size / 2 - listHeight / 2;
         poseList = new PoseList(listX, listY, listWidth, poses.size());
-        screen.registerWidget(poseList);
+        screen.registerForegroundControl(poseList);
         for (int i = 0; i < poses.size(); i++) {
             String pose = poses.get(i);
             PoseList.Row row = new PoseList.Row(listX + PoseList.FRAME, listY + PoseList.FRAME + i * PoseList.ROW_HEIGHT,
                     listWidth - 2 * PoseList.FRAME, poseName(pose), button -> selectPose(pose));
             poseRows.add(row);
-            screen.registerWidget(row);
+            screen.registerForegroundControl(row);
             addPriorityControl(row);
         }
         setPoseListOpen(false);

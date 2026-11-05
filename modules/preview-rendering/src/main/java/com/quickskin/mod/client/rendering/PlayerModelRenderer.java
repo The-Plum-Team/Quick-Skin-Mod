@@ -81,6 +81,17 @@ import java.util.Set;
 @Environment(EnvType.CLIENT)
 public class PlayerModelRenderer {
 
+    /**
+     * How far forward the model is drawn in the depth-tested GUI before 1.21.6. Vanilla's
+     * inventory draws at z 50, enough for its small model; the previews are four times as large,
+     * so the elytra, spread back when the player sneaks or glides, reached behind the menu's
+     * background at z 0, which hid their lower part. The model reaches about 1.4 blocks back and
+     * 0.6 forward, so it stays between z 0 and about 300, under the menus drawn at z 350.
+     */
+    static double modelDepth(double scale) {
+        return 50.0 + 1.2 * (int) scale;
+    }
+
     private static final boolean DETERMINISTIC_E2E_RENDER =
             Boolean.getBoolean("quickskin.e2e.enabled");
     private static final int E2E_FIXED_PREVIEW_TICK = 120;
@@ -1001,7 +1012,11 @@ public class PlayerModelRenderer {
 
                 poseStack.pushPose();
                 // Match the transformations from InventoryScreen
+//? if <1.21.6 {
+                poseStack.translate(x, y, modelDepth(scale));
+//?} else {
                 poseStack.translate(x, y, 50.0);
+//?}
                 float scaleCasted = (float)(int)scale;
                 Matrix4f scaleMatrix = (new Matrix4f()).scaling(scaleCasted, scaleCasted, -scaleCasted);
 //? if <1.21 {
@@ -1331,7 +1346,7 @@ public class PlayerModelRenderer {
         poseStack.pushPose();
 
         // Match InventoryScreen.renderEntityInInventory() transformations
-        poseStack.translate((double)x, (double)y, 50.0);
+        poseStack.translate((double)x, (double)y, modelDepth(scale));
 
         // Apply scale (negative Z flips the model to face forward)
         // Cast to int to match InventoryScreen.renderEntityInInventory() behavior
@@ -1364,7 +1379,7 @@ public class PlayerModelRenderer {
         poseStack.pushPose();
 
         // Match InventoryScreen.renderEntityInInventory() transformations
-        poseStack.translate((double)x, (double)y, 50.0);
+        poseStack.translate((double)x, (double)y, modelDepth(scale));
 
         // Apply scale (negative Z flips the model to face forward)
         // Cast to int to match InventoryScreen.renderEntityInInventory() behavior

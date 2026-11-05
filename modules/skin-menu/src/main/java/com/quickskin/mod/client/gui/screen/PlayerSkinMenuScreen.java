@@ -900,9 +900,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
         renderSkinHeader(graphics);
 
-        // Foreground controls and error toasts go above the player preview. Up to 1.21.5 the GUI
-        // is depth tested: the model sits at z 50 and reaches forward by its scale (200 at most),
-        // tooltips are at z 400. From 1.21.6 a later stratum is drawn on top.
+        // Foreground controls (the buttons round the model among them) and error toasts go above
+        // the player preview. Up to 1.21.5 the GUI is depth tested: the model sits between z 0 and
+        // about 300 (PlayerModelRenderer.modelDepth), tooltips are at z 400. From 1.21.6 a later
+        // stratum is drawn on top.
 //? if <1.21.6 {
         graphics.pose().pushPose();
         // Stay flat behind a dialog that draws this screen as its backdrop

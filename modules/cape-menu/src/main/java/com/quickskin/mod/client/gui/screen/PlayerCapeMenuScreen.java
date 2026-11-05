@@ -1357,7 +1357,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             return;
         }
 //? if <1.21.6 {
-        // Up to 1.21.5 the GUI is depth tested: the model reaches forward to z 250 at most
+        // Up to 1.21.5 the GUI is depth tested: the model reaches forward to about z 300
         graphics.pose().pushPose();
         graphics.pose().translate(0.0F, 0.0F, 350.0F);
 //?} else {

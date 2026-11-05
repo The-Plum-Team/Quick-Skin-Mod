@@ -102,7 +102,7 @@ public class ActionButtonsPanel extends AbstractWidget {
             iconX, layout.shoulderY(), ICON_BUTTON_SIZE, "body_wide", Component.empty(),
             button -> callbacks.onBodyWidth().run()
         );
-        screen.registerWidget(bodyWidthButton);
+        screen.registerForegroundControl(bodyWidthButton);
 
         uploadButton = new IconButton(
             layout.rightX(), layout.shoulderY(), ICON_BUTTON_SIZE, "upload_skin",
@@ -110,7 +110,7 @@ public class ActionButtonsPanel extends AbstractWidget {
             button -> callbacks.onUpload().run()
         );
         uploadButton.setTooltip(Tooltip.create(Component.translatable("quickskin.screen.upload.title")));
-        screen.registerWidget(uploadButton);
+        screen.registerForegroundControl(uploadButton);
 
         websitesButton = new IconButton(
             websitesX, layout.waistY(), ICON_BUTTON_SIZE, "skin_websites",
@@ -118,7 +118,7 @@ public class ActionButtonsPanel extends AbstractWidget {
             button -> setWebsitesOpen(!websitesOpen)
         );
         websitesButton.setTooltipOnLeft(Component.translatable("quickskin.button.skin_websites"));
-        screen.registerWidget(websitesButton);
+        screen.registerForegroundControl(websitesButton);
 
         // The bubble is registered first, so that its choices are drawn over it
         int choiceHeight = ConfirmButton.heightForLabel(CHOICE_LABEL_SCALE);
@@ -129,7 +129,7 @@ public class ActionButtonsPanel extends AbstractWidget {
         int bubbleX = websitesX - POINTER_GAP - bubbleWidth;
         int bubbleY = pointerY - bubbleHeight / 2 + 1;
         websitesBubble = new ChoiceBubble(bubbleX, bubbleY, bubbleWidth, bubbleHeight, pointerY);
-        screen.registerWidget(websitesBubble);
+        screen.registerForegroundControl(websitesBubble);
 
         int choiceX = bubbleX + BUBBLE_PADDING;
         int choiceY = bubbleY + BUBBLE_PADDING;
@@ -142,7 +142,7 @@ public class ActionButtonsPanel extends AbstractWidget {
             }
         );
         normalWebsiteButton.setTooltip(Tooltip.create(Component.translatable("quickskin.button.skin_website")));
-        screen.registerWidget(normalWebsiteButton);
+        screen.registerForegroundControl(normalWebsiteButton);
 
         hdWebsiteButton = new ConfirmButton(
             choiceX, choiceY + choiceHeight + SPACING, choiceWidth, choiceHeight,
@@ -153,7 +153,7 @@ public class ActionButtonsPanel extends AbstractWidget {
             }
         );
         hdWebsiteButton.setTooltip(Tooltip.create(Component.translatable("quickskin.button.hd_skin_website")));
-        screen.registerWidget(hdWebsiteButton);
+        screen.registerForegroundControl(hdWebsiteButton);
 
         capeButton = new IconButton(
             layout.rightX() + rightBulge, layout.waistY(), ICON_BUTTON_SIZE, "cape",
@@ -161,7 +161,7 @@ public class ActionButtonsPanel extends AbstractWidget {
             button -> callbacks.onCape().run()
         );
         capeButton.setTooltip(Tooltip.create(Component.translatable("quickskin.button.cape")));
-        screen.registerWidget(capeButton);
+        screen.registerForegroundControl(capeButton);
 
         // A feature still to come: greyed out, it only names itself
         comingSoonButton = new IconButton(
@@ -171,7 +171,7 @@ public class ActionButtonsPanel extends AbstractWidget {
         );
         comingSoonButton.active = false;
         comingSoonButton.setTooltipOnLeft(Component.translatable("quickskin.button.coming_soon"));
-        screen.registerWidget(comingSoonButton);
+        screen.registerForegroundControl(comingSoonButton);
 
         confirmButton = new ConfirmButton(
             layout.confirmX(), layout.confirmY(), layout.confirmWidth(), layout.confirmHeight(),
