@@ -345,5 +345,20 @@ class PackagedRuntimeTransientConnectRetryTest(unittest.TestCase):
             packaged_runtime.scan_runtime_logs([log], require_client_pass=False)
 
 
+class HarnessReportJsonTest(unittest.TestCase):
+    """The harness writes report.json by hand, so its string quoting must stay valid JSON."""
+
+    def test_report_escapes_every_c0_control_character(self) -> None:
+        source = (
+            ROOT / "common/src/e2e/java/com/quickskin/mod/e2e/E2EReport.java"
+        ).read_text(encoding="utf-8")
+        quote = source.split("private static String q(String s)", 1)[1]
+        # A raw control character from an exception message once made the report unreadable,
+        # losing its diagnostics and the bounded connect-timeout retry that reads them.
+        self.assertIn("if (c < 0x20)", quote)
+        self.assertIn('String.format(java.util.Locale.ROOT, "\\\\u%04x", (int) c)', quote)
+        self.assertLess(quote.index("if (c < 0x20)"), quote.index("b.append(c);"))
+
+
 if __name__ == "__main__":
     unittest.main()
