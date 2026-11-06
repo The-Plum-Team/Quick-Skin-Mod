@@ -46,7 +46,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    uses: The-Plum-Team/mod-base/.github/workflows/release.yml@32c13301907f77811f2d25ff835e08d9aa224017 # v1.8.2
+    uses: The-Plum-Team/mod-base/.github/workflows/release.yml@02eea71a9e1d7bbee12e688ee37828f30b46ec59 # v1.8.3
     with:
       kit-sha: ${{ needs.guard.outputs.kit-sha }}
 
