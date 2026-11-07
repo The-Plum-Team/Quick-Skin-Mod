@@ -31,7 +31,10 @@
 > At its usual size and place, the title screen's player now shrinks as much as the window and GUI Scale need to stay under the Minecraft logo and the yellow splash text. Once you move or resize it yourself, it stays exactly as you set it.
 
 - **Poses picked on the title screen play their moves**
-> Picking Sitting on the title screen now jumps onto the block as it does in the skin menu, and the other poses ease in and out instead of snapping.
+> Picking Sitting on the title screen now jumps onto the block as it does in the skin menu, also after you come back from a world, and the other poses ease in and out instead of snapping. From Minecraft 1.21.6 the previews draw the block under a sitting player and the jump onto it and off it again, and picking Walking walks.
+
+- **No more neck stretch while idle**
+> The previews no longer pick the idle that tilted the player's head over to each shoulder; the other five idles stay.
 
 - **Elytra are no longer cut off in the menus (up to 1.21.5)**
 > A sneaking or gliding player's elytra are drawn whole in the skin and cape menus instead of losing their lower part behind the menu, and the buttons around the model stay in front of it.

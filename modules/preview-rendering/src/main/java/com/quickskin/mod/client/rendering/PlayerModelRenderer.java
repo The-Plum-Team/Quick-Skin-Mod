@@ -271,6 +271,96 @@ public class PlayerModelRenderer {
     }
 //?}
 
+//? if >=1.21.6 {
+    /**
+     * The sitting pose's block and the jump onto it or off it for one picture-in-picture draw, as
+     * the inline draw before 1.21.6 shows them: the jump lifts and squashes the model, its cape and
+     * what it wears about its feet ({@link #applyPendingSitJump}), while the block stays on the
+     * floor with its own pop ({@link #renderPendingSitBlock}). {@code jump} is null when none plays.
+     */
+    public record PreviewSit(SitJump.Pose jump, boolean block) {
+    }
+
+    // Keyed by the exact model object the draw submits, as the pending capes are
+    private static final java.util.Map<Object, PreviewSit> PENDING_SITS = new java.util.IdentityHashMap<>();
+    private static final int MAX_PENDING_SITS = 16;
+    // The feet below the model root, in blocks (the 24-pixel legs)
+    private static final float SIT_FEET = 1.5f;
+    // Where the picture-in-picture pass puts the model root: vanilla's GuiSkinRenderer translate
+    private static final float PIP_MODEL_ROOT = 1.6010001f;
+
+    private static void registerPendingSit(Object key, PreviewPlayerData playerData) {
+        SitJump.Pose jump = playerData.getSitJumpPose();
+        boolean sitting = "sit".equalsIgnoreCase(playerData.getCurrentAnimation());
+        Minecraft mc = Minecraft.getInstance();
+        boolean block = (mc.level == null || playerData.isOwnPose())
+                && (jump != null ? jump.blockShown() : sitting);
+        synchronized (PENDING_SITS) {
+            if (jump == null && !block) {
+                PENDING_SITS.remove(key);
+                return;
+            }
+            if (PENDING_SITS.size() >= MAX_PENDING_SITS) {
+                PENDING_SITS.clear();
+            }
+            PENDING_SITS.put(key, new PreviewSit(jump, block));
+        }
+    }
+
+    /**
+     * Lifts and squashes everything the picture-in-picture pass draws for {@code key} about the
+     * model's feet, before the pass places the model. Does nothing without a jump.
+     */
+    public static void applyPendingSitJump(Object key, PoseStack poseStack) {
+        PreviewSit sit;
+        synchronized (PENDING_SITS) {
+            sit = PENDING_SITS.get(key);
+        }
+        if (sit == null || sit.jump() == null) {
+            return;
+        }
+        SitJump.Pose jump = sit.jump();
+        float feet = SIT_FEET - PIP_MODEL_ROOT;
+        poseStack.translate(0.0f, -jump.lift() + feet, 0.0f);
+        poseStack.scale(jump.scaleX(), jump.scaleY(), jump.scaleX());
+        poseStack.translate(0.0f, -feet, 0.0f);
+    }
+
+    public static PreviewSit consumePendingSit(Object key) {
+        synchronized (PENDING_SITS) {
+            return PENDING_SITS.remove(key);
+        }
+    }
+
+    /**
+     * Draws the sitting pose's block in the picture-in-picture pass, in the model root's space
+     * where the pass drew the model. The jump the pass applied is undone first, so the block stays
+     * on the floor.
+     */
+//? if <26.2 {
+    public static void renderPendingSitBlock(PreviewSit sit, PoseStack poseStack, MultiBufferSource.BufferSource bufferSource) {
+//?} else {
+    public static void renderPendingSitBlock(PreviewSit sit, PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector collector) {
+//?}
+        if (sit == null || !sit.block()) {
+            return;
+        }
+        poseStack.pushPose();
+        SitJump.Pose jump = sit.jump();
+        if (jump != null) {
+            poseStack.translate(0.0f, SIT_FEET, 0.0f);
+            poseStack.scale(1.0f / jump.scaleX(), 1.0f / jump.scaleY(), 1.0f / jump.scaleX());
+            poseStack.translate(0.0f, -SIT_FEET + jump.lift(), 0.0f);
+        }
+//? if <26.2 {
+        renderGrassBlock(poseStack, bufferSource, jump);
+//?} else {
+        renderGrassBlock(poseStack, collector, jump);
+//?}
+        poseStack.popPose();
+    }
+//?}
+
     /**
      * Initialize models (lazy initialization).
      *
@@ -867,7 +957,9 @@ public class PlayerModelRenderer {
             guiPose.popPose();
         }
 //?} else {
+        // The blend into the walk or out of it and the jump's limbs, which the posed model reads.
         // The picture-in-picture draws below take the lift and scale from the preview data.
+        playerData.advancePoseMoves(System.nanoTime());
         renderPosedPlayerModel(graphics, x, y, scale, turnedRotation, playerData, mouseX, mouseY, followMouse);
 //?}
     }
@@ -1645,6 +1737,7 @@ public class PlayerModelRenderer {
                 x + boxHalfWidth,
                 y
         );
+        registerPendingSit(model, playerData);
         registerPendingCape(model, playerData.getSkinLocation(), rotationXNudge,
                 submittedRotationY, -1.0625f, x - boxHalfWidth, y - boxHeight,
                 x + boxHalfWidth, y, submittedScale, worn != null && worn.wings() ? null : capeTexture, capeModel,
@@ -1664,6 +1757,7 @@ public class PlayerModelRenderer {
                 x + boxHalfWidth,
                 y
         );
+        registerPendingSit(model, playerData);
         registerPendingCape(model, playerData.getSkinLocation(), rotationXNudge,
                 submittedRotationY, -1.0625f, x - boxHalfWidth, y - boxHeight,
                 x + boxHalfWidth, y, submittedScale, worn != null && worn.wings() ? null : capeTexture, capeModel,
@@ -1683,6 +1777,7 @@ public class PlayerModelRenderer {
                 x + boxHalfWidth,
                 y
         );
+        registerPendingSit(renderModel, playerData);
         registerPendingCape(renderModel, worn != null && worn.wings() ? null : capeTexture, model, capeModel,
                 playerData.isElytraPreview() ? elytraModel : null, worn);
 //?}
@@ -2501,6 +2596,11 @@ public class PlayerModelRenderer {
     private static void renderGrassBlock(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, SitJump.Pose sitJump) {
 //?} else {
     private static void renderGrassBlock(PoseStack poseStack) {
+        // Only the live player's draw on a world-less screen reaches this; it has no collector
+    }
+
+    private static void renderGrassBlock(PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector collector,
+                                         SitJump.Pose sitJump) {
 //?}
         poseStack.pushPose();
 
@@ -2524,14 +2624,12 @@ public class PlayerModelRenderer {
 
         // Scale the block
         poseStack.scale((float)scale, (float)scale, (float)scale);
-//? if <26.2 {
         if (sitJump != null) {
             // The jump's pop and squash, about the middle of the block's bottom face
             poseStack.translate(0.5f, 0.0f, 0.5f);
             poseStack.scale(sitJump.blockScaleX(), sitJump.blockScaleY(), sitJump.blockScaleX());
             poseStack.translate(-0.5f, 0.0f, -0.5f);
         }
-//?}
 
 //? if <1.21 {
         // Build cache on first render
@@ -2567,10 +2665,28 @@ public class PlayerModelRenderer {
             net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY
         );
 
+//?} else if <26.2 {
+        // From 26.1 a lone block is a block model's render state, submitted like the preview's
+        // equipment and drawn at once
+        var features = Minecraft.getInstance().gameRenderer.getFeatureRenderDispatcher();
+        submitGrassBlockModel(poseStack, features.getSubmitNodeStorage());
+        features.renderAllFeatures();
 //?} else {
+        submitGrassBlockModel(poseStack, collector);
 //?}
         poseStack.popPose();
     }
+
+//? if >=26.1 {
+    private static void submitGrassBlockModel(PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector collector) {
+        Minecraft mc = Minecraft.getInstance();
+        var state = new net.minecraft.client.renderer.block.BlockModelRenderState();
+        new net.minecraft.client.renderer.block.BlockModelResolver(mc.getModelManager()).update(
+                state, net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(),
+                net.minecraft.client.renderer.block.model.BlockDisplayContext.create());
+        state.submit(poseStack, collector, 15728880, OverlayTexture.NO_OVERLAY, 0);
+    }
+//?}
 
 //? if <1.21.11 {
     /**

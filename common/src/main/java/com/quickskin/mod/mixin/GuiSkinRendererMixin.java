@@ -68,6 +68,8 @@ public class GuiSkinRendererMixin {
     )
     private void quickskin$prepareSkinLayersMeshes(
             GuiSkinRenderState state, PoseStack poseStack, CallbackInfo ci) {
+        // The jump onto the sitting pose's block or off it, for everything this pass draws
+        PlayerModelRenderer.applyPendingSitJump(state.playerModel(), poseStack);
         Boolean thinArms = PlayerModelRenderer.getQuickSkinPreviewThinArms(state.playerModel());
         if (thinArms != null) {
             SkinLayers3DIntegration.prepareInjectedPreview(
@@ -104,6 +106,8 @@ public class GuiSkinRendererMixin {
 //?} else {
     private void quickskin$attachSkinLayersMeshes(GuiSkinRenderState state, PoseStack poseStack,
                                                    SubmitNodeCollector collector, CallbackInfo ci) {
+        // The jump onto the sitting pose's block or off it, for everything this pass draws
+        PlayerModelRenderer.applyPendingSitJump(state.playerModel(), poseStack);
         var root = state.playerModel().root();
         Boolean thinArms = PlayerModelRenderer.getQuickSkinPreviewThinArms(root);
 //?}
@@ -125,6 +129,14 @@ public class GuiSkinRendererMixin {
             allow = 1
     )
     private void quickskin$renderCapeInPiP(GuiSkinRenderState state, PoseStack poseStack, SubmitNodeCollector collector, CallbackInfo ci) {
+//?}
+        // The sitting pose's block, where the inline draw before 1.21.6 puts it
+//? if <26.2 {
+        PlayerModelRenderer.renderPendingSitBlock(
+                PlayerModelRenderer.consumePendingSit(state.playerModel()), poseStack, bufferSource);
+//?} else {
+        PlayerModelRenderer.renderPendingSitBlock(
+                PlayerModelRenderer.consumePendingSit(state.playerModel()), poseStack, collector);
 //?}
         PlayerModelRenderer.PreviewCapeState cape =
 //? if <26.2 {

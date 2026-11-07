@@ -372,6 +372,9 @@ public final class MenuIntegration {
                 // Set context based on screen type
                 if ("title".equals(screenType)) {
                     playerWidget.setContext(com.quickskin.mod.client.gui.widget.PlayerWidget.WidgetContext.TITLE_SCREEN);
+                    // No world, so no live player: the preview poses its own model, as the skin menu
+                    // does, with the moves between poses, never the player cached from a world left
+                    playerWidget.setOwnPose(true);
                     keepDefaultPreviewClearOfSplash(playerWidget, screen.width);
                 } else if ("pause".equals(screenType)) {
                     playerWidget.setContext(com.quickskin.mod.client.gui.widget.PlayerWidget.WidgetContext.PAUSE_MENU);
