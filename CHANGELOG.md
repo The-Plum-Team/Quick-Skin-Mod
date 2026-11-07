@@ -18,6 +18,9 @@
 
 ### Fixes
 
+- **Skins show up in ReplayMod replays on every version**
+> Replays recorded with ReplayMod now show the Quick Skin skins, capes and models players wore, and every change they made while recording, on every Minecraft version ReplayMod exists for. Before, only 1.20.1 did; newer versions showed everyone's Mojang skin.
+
 - **No more crash at launch with CustomSkinLoader**
 > Quick Skin and CustomSkinLoader can now be installed together: the game no longer stops at startup when another mod adds its own way out of the skin lookups Quick Skin uses.
 

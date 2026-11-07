@@ -262,12 +262,10 @@ public class ClientEvents {
 
     /** Restores only a live game subject; the Replay integration owns replay subjects. */
     private static void restoreSavedAppearance(LocalPlayer player) {
-        //? if <1.21 {
         if (com.quickskin.mod.client.compat.ReplayModHelper.isInReplay()) {
             com.quickskin.mod.client.compat.ReplayModHelper.startReplayPlayerWatcher();
             return;
         }
-        //?}
         restoreSavedAppearanceToPlayer(player.getUUID());
     }
 

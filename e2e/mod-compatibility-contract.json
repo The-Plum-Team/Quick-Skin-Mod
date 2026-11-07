@@ -1,6 +1,6 @@
 {
   "schema_version": 8,
-  "lock_revision": "2026-10-04",
+  "lock_revision": "2026-11-06",
   "artifact_source": {
     "kind": "modrinth-v2",
     "api_base": "https://api.modrinth.com/v2",
@@ -2328,9 +2328,7 @@
       "additional_execution_profiles": [],
       "multiplayer": null,
       "excluded_lanes": [],
-      "supported_game_versions": [
-        "1.20.1"
-      ],
+      "supported_game_versions": null,
       "artifacts": [
         {
           "version_id": "ReB0T2tK",
@@ -2348,6 +2346,231 @@
               "size": 14739015,
               "sha256": "a46491d73456187ac888d31f6cc1160e42304427a63da88874c84abeb4d14033",
               "sha512": "dc255bf916acca75c4bbf1df0ad45a944bbbf014c0246082c31df56d4fa8425d6ddecf1f6c4cf81c4588c494a6da36436e639b989def9c02d1a80d58a39db66f"
+            }
+          ],
+          "dependencies": []
+        },
+        {
+          "version_id": "DKvQ3lQq",
+          "version_number": "1.21-2.6.28",
+          "version_type": "release",
+          "published_at": "2026-10-18T15:39:03.574729Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.1"
+          ],
+          "files": [
+            {
+              "filename": "replaymod-1.21-2.6.28.jar",
+              "url": "https://cdn.modrinth.com/data/Nv2fQJo5/versions/DKvQ3lQq/replaymod-1.21-2.6.28.jar",
+              "size": 15710248,
+              "sha256": "b6ac7feb7f8eeefcbfb90ad3f1a45d8cda8df35005d8a308748adbe4e1652ada",
+              "sha512": "04b05bf704286f4ab3e974ca3c71ce218a5e05b89632c9c309a4d90769e1161b0fc335f8eb457327172a335792579ff43f13bcecd2e164a776115d2acd5cdb46"
+            }
+          ],
+          "dependencies": []
+        },
+        {
+          "version_id": "kRKLQ6SQ",
+          "version_number": "1.21.2-2.6.23",
+          "version_type": "release",
+          "published_at": "2025-07-05T08:01:52.003784Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.2",
+            "1.21.3"
+          ],
+          "files": [
+            {
+              "filename": "replaymod-1.21.2-2.6.23.jar",
+              "url": "https://cdn.modrinth.com/data/Nv2fQJo5/versions/kRKLQ6SQ/replaymod-1.21.2-2.6.23.jar",
+              "size": 14829538,
+              "sha256": "1e623b919a6e2de746719f242f51d54bfab9e7d1ce096df8d18b530d5d3142df",
+              "sha512": "2876fed8bddb87d7d43d93e101fb9afd7c792d5314472b4df044053e99db29bf4d796702fd69b01fe73d852dc5c45d998107e15dc71730dec12a3675ffe11b34"
+            }
+          ],
+          "dependencies": []
+        },
+        {
+          "version_id": "Ax2S4lln",
+          "version_number": "1.21.4-2.6.23",
+          "version_type": "release",
+          "published_at": "2025-07-05T08:02:01.581523Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.4"
+          ],
+          "files": [
+            {
+              "filename": "replaymod-1.21.4-2.6.23.jar",
+              "url": "https://cdn.modrinth.com/data/Nv2fQJo5/versions/Ax2S4lln/replaymod-1.21.4-2.6.23.jar",
+              "size": 14830255,
+              "sha256": "edf9a4477a73f407bc3c265185f4462638ab06c69ae8e15a3c4e531698fa8ed5",
+              "sha512": "cbe84f25a9d809918e8a8ba7363e2a684ebb26029190ae15178ef4267482f7f6302570967df96108b61483c64e78d0df99a54eddab541fc66f49a9e58f0cb2ac"
+            }
+          ],
+          "dependencies": []
+        },
+        {
+          "version_id": "60TwgrA2",
+          "version_number": "1.21.5-2.6.28",
+          "version_type": "release",
+          "published_at": "2026-10-18T15:39:11.975399Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.5"
+          ],
+          "files": [
+            {
+              "filename": "replaymod-1.21.5-2.6.28.jar",
+              "url": "https://cdn.modrinth.com/data/Nv2fQJo5/versions/60TwgrA2/replaymod-1.21.5-2.6.28.jar",
+              "size": 15727998,
+              "sha256": "deb756b56224135524a6923d4648b2f1189f341c08ec4c636df09c1ac167cd0d",
+              "sha512": "870aa94fc572fa4c274b8c2a234dbec8b3e441e6908f9c1c8b1ebe97524262c7ff70ec41ef85386d617e1dee3299f30a378aa3ef2ccef6596b69850cdcf71c89"
+            }
+          ],
+          "dependencies": []
+        },
+        {
+          "version_id": "3x8Xv6Bi",
+          "version_number": "1.21.7-2.6.28",
+          "version_type": "release",
+          "published_at": "2026-10-18T15:39:20.642443Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.6",
+            "1.21.7"
+          ],
+          "files": [
+            {
+              "filename": "replaymod-1.21.7-2.6.28.jar",
+              "url": "https://cdn.modrinth.com/data/Nv2fQJo5/versions/3x8Xv6Bi/replaymod-1.21.7-2.6.28.jar",
+              "size": 15730964,
+              "sha256": "bdecf1dad938b2aa6597cc7a9b55fd029d0c174459809875770761434eed7284",
+              "sha512": "89a7698da52348519f374a456d5a00e53bb44758288ffc9c9f9c483be8b399bbe45c73dd30d68f043d0c6e6f88214cfd8b0c1093968ab82bcf10ef0c3ed633c4"
+            }
+          ],
+          "dependencies": []
+        },
+        {
+          "version_id": "TUHG3lET",
+          "version_number": "1.21.7-2.6.23",
+          "version_type": "release",
+          "published_at": "2025-07-05T08:02:21.170568Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.8"
+          ],
+          "files": [
+            {
+              "filename": "replaymod-1.21.7-2.6.23.jar",
+              "url": "https://cdn.modrinth.com/data/Nv2fQJo5/versions/TUHG3lET/replaymod-1.21.7-2.6.23.jar",
+              "size": 14845750,
+              "sha256": "8af03eadc6d3781593c6d37fde004c6434c2ab8e527085daac71f01c0861171f",
+              "sha512": "79842bb3fd75a245584aec226fc8e9a205d9eeb9c51f9a65c0d8f6d83afdae2247dc512d6f23d18ea7175d72ee62cb98295a6e2bcc7a936063690854105f9ded"
+            }
+          ],
+          "dependencies": []
+        },
+        {
+          "version_id": "PU61grpB",
+          "version_number": "1.21.10-2.6.28",
+          "version_type": "release",
+          "published_at": "2026-10-18T15:39:29.226037Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.9",
+            "1.21.10"
+          ],
+          "files": [
+            {
+              "filename": "replaymod-1.21.10-2.6.28.jar",
+              "url": "https://cdn.modrinth.com/data/Nv2fQJo5/versions/PU61grpB/replaymod-1.21.10-2.6.28.jar",
+              "size": 15767782,
+              "sha256": "8206dc9dcfb324fb3c5ce6e13aa818462dd2843c609bbc66737dd876ab5a085f",
+              "sha512": "2775ebae6b6e182d49703ba5d20c5e9db5cd82c33633cbb8487617d0d54e350e548bd9caf05016f2149603760fceaf5bad55ea6a3a4c4fe10cddd38dc9f3205b"
+            }
+          ],
+          "dependencies": []
+        },
+        {
+          "version_id": "KJkQjrpd",
+          "version_number": "1.21.11-2.6.28",
+          "version_type": "release",
+          "published_at": "2026-10-18T15:39:37.479059Z",
+          "loader": "fabric",
+          "game_versions": [
+            "1.21.11"
+          ],
+          "files": [
+            {
+              "filename": "replaymod-1.21.11-2.6.28.jar",
+              "url": "https://cdn.modrinth.com/data/Nv2fQJo5/versions/KJkQjrpd/replaymod-1.21.11-2.6.28.jar",
+              "size": 15799987,
+              "sha256": "73acfab115168545236fe1044fcc9477772fd9b73ffbe8f911f1c0ae068b91cf",
+              "sha512": "a11abf7ca1d98db6194ffdf203677bf061e236af5f6dff56c62da28ed1b822b9c2ecf81dcaef65fcff7444a10047c9c749b63edcaeca53c4abc1e185d35e1465"
+            }
+          ],
+          "dependencies": []
+        },
+        {
+          "version_id": "5LxshONI",
+          "version_number": "26.1-2.6.28",
+          "version_type": "release",
+          "published_at": "2026-10-18T15:39:45.712288Z",
+          "loader": "fabric",
+          "game_versions": [
+            "26.1",
+            "26.1.1",
+            "26.1.2"
+          ],
+          "files": [
+            {
+              "filename": "replaymod-26.1-2.6.28.jar",
+              "url": "https://cdn.modrinth.com/data/Nv2fQJo5/versions/5LxshONI/replaymod-26.1-2.6.28.jar",
+              "size": 15759946,
+              "sha256": "70e074ea1325e01737dccc33d8bb7637cfdc35e377ecb48d0940259db1be607c",
+              "sha512": "4ad55c41c7eb0ff8358dcc15f16c3ec5ce777bb50e0e5ff825a9ed7b73b2ce7c9f2df8ceac9ed26d6e3f2de6450d09fae602be438c6efd82e34e34ac9705ba22"
+            }
+          ],
+          "dependencies": []
+        },
+        {
+          "version_id": "eHbYuA7P",
+          "version_number": "26.2-2.6.28",
+          "version_type": "release",
+          "published_at": "2026-10-18T15:39:54.202415Z",
+          "loader": "fabric",
+          "game_versions": [
+            "26.2"
+          ],
+          "files": [
+            {
+              "filename": "replaymod-26.2-2.6.28.jar",
+              "url": "https://cdn.modrinth.com/data/Nv2fQJo5/versions/eHbYuA7P/replaymod-26.2-2.6.28.jar",
+              "size": 15764380,
+              "sha256": "ec260e2452b7413b5b04f5fac20eee20b3c8101b3b40af5704abe6a04ee6506a",
+              "sha512": "30141ee0eb65d2f12db46047a586d870df91bf7f732ff8d1d138c759067e6ada5a6c2003b974bbaadcfe0f3489f4652d3d24c994ba435925a3d889c1aa561b8f"
+            }
+          ],
+          "dependencies": []
+        },
+        {
+          "version_id": "7c5mnPyr",
+          "version_number": "26.3-2.6.28",
+          "version_type": "release",
+          "published_at": "2026-10-18T15:40:02.854244Z",
+          "loader": "fabric",
+          "game_versions": [
+            "26.3"
+          ],
+          "files": [
+            {
+              "filename": "replaymod-26.3-2.6.28.jar",
+              "url": "https://cdn.modrinth.com/data/Nv2fQJo5/versions/7c5mnPyr/replaymod-26.3-2.6.28.jar",
+              "size": 15762969,
+              "sha256": "13af4ea72fb63c07859f00b716307dc74328e884fe95220580451dad4c52d9c6",
+              "sha512": "e2b3455a138b6b1a866422906e417a5f98dd4a78edaf86d50c109c067309ac34eddac9e714604d3cbc52a9273e240f0a7bb6efe51ca4310d13dc235883659e93"
             }
           ],
           "dependencies": []

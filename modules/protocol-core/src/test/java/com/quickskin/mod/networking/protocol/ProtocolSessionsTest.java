@@ -317,4 +317,21 @@ class ProtocolSessionsTest {
 
         sessions.clearClientSession(playerId, replayConnection);
     }
+
+    @Test
+    void replayEvidenceReplacesTheUnansweredSessionOfTheReplaysOwnJoin() {
+        UUID cameraId = UUID.randomUUID();
+        Object replayConnection = new Object();
+        sessions.beginClientSession(cameraId, replayConnection, true, false);
+        assertEquals(ProtocolProfile.Mode.LOCAL_ONLY,
+                sessions.clientProfile(replayConnection).mode());
+
+        assertTrue(sessions.admitReplayClientSession(
+                cameraId, replayConnection, true).negotiated());
+        assertTrue(sessions.clientProfile(replayConnection).negotiated());
+        assertEquals(ProtocolProfile.Mode.INCOMPATIBLE,
+                sessions.admitReplayClientSession(cameraId, replayConnection, false).mode());
+
+        sessions.clearClientSession(cameraId, replayConnection);
+    }
 }

@@ -465,6 +465,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   load its players again once it is stored, so a model embedded in it loads. That one coalesced
   reload (`CpmMissedSkinFiles`, at most 256 misses, `onMissedNetworkSkinStored`) is the only
   CPM refresh on a network skin's arrival; a skin CPM never missed needs none.
+- ReplayMod (Fabric, every matrix target it is published for) plays a recording back through a
+  client connection of its own that recorded only the server's half of the protocol handshake.
+  The first recorded Quick Skin packet on that exact connection (named by class, never a ReplayMod
+  dependency) sets its schema through `ProtocolSessions.admitReplayClientSession`, replacing only
+  the unanswered local-only session the replay's own join opened; a classified connection never
+  switches schema. Nothing is uploaded on that connection, and `ReplayModHelper` re-applies the
+  recorded player's look. The 1.20.1 overlay additionally routes recorded payloads through
+  `ReplayModCompatMixin`.
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.
