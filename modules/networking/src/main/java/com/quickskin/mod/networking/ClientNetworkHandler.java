@@ -1120,6 +1120,7 @@ public class ClientNetworkHandler {
     }
 
     private static boolean acceptsWireMode(Object connection, boolean v2) {
+        admitRecordedReplay(connection, v2);
         ProtocolProfile profile = ProtocolSessions.getInstance().clientProfile(connection);
         if (v2) {
             return profile.negotiated()
@@ -1127,6 +1128,31 @@ public class ClientNetworkHandler {
                     && profile.supports(ProtocolCapability.SHA256_CONTENT_IDS);
         }
         return profile.mode() == ProtocolProfile.Mode.LEGACY_V1;
+    }
+
+    /**
+     * ReplayMod plays a recording back through a client connection of its own, which recorded only
+     * the server's half of the handshake, so no hello is ever answered there. The first recorded
+     * Quick Skin packet then sets that exact connection's schema (see
+     * {@link ProtocolSessions#admitReplayClientSession}); every other connection is unaffected.
+     */
+    private static void admitRecordedReplay(Object connection, boolean v2) {
+        if (!isReplayPlaybackConnection(connection)) return;
+        ProtocolProfile.Mode mode = ProtocolSessions.getInstance().clientProfile(connection).mode();
+        if (mode == ProtocolProfile.Mode.NEGOTIATED || mode == ProtocolProfile.Mode.LEGACY_V1) return;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || minecraft.player == null) return;
+        ProtocolSessions.getInstance().admitReplayClientSession(
+                minecraft.player.getUUID(), connection, v2);
+    }
+
+    /** Whether this client connection is ReplayMod's playback connection, named by class only. */
+    static boolean isReplayPlaybackConnection(Object connection) {
+        if (!(connection instanceof net.minecraft.client.multiplayer.ClientPacketListener listener)) {
+            return false;
+        }
+        Object network = listener.getConnection();
+        return network != null && network.getClass().getName().startsWith("com.replaymod.replay.");
     }
 
     private static boolean acceptsReadyMode(Object connection) {

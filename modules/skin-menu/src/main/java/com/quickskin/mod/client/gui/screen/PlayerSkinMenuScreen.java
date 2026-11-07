@@ -221,6 +221,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 showToast(Component.translatable("quickskin.skin.assigned_hint"), ErrorToast.Kind.INFO);
             }
         }
+        // Once ever, after the first sync of the library with the account's cloud library
+        if (com.quickskin.mod.client.sync.CloudSkinSync.takeNotice()) {
+            showToast(Component.translatable("quickskin.cloud_sync.notice"), ErrorToast.Kind.INFO);
+        }
     }
 
     /**
@@ -586,6 +590,16 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                     }
 
                     @Override
+                    public void assignCape(AssetMetadata metadata) {
+                        assignSkinCape(metadata);
+                    }
+
+                    @Override
+                    public void removeCape(AssetMetadata metadata) {
+                        removeSkinCape(metadata);
+                    }
+
+                    @Override
                     public void delete(AssetMetadata metadata) {
                         deleteSkin(metadata);
                     }
@@ -730,19 +744,8 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         }
 
         // Restore active cape selection
-        if (!config.activeCapeHash.isEmpty() && playerPreviewPanel != null) {
-            String capeId = config.activeCapeHash;
-//? if <1.21.11 {
-            ResourceLocation capeLocation = getCapeLocationFromId(capeId);
-//?} else {
-            Identifier capeLocation = getCapeLocationFromId(capeId);
-//?}
-            if (capeLocation != null) {
-                // Register animation if this is an animated cape
-                registerCapeAnimationIfNeeded(capeId, capeLocation);
-
-                playerPreviewPanel.updateCape(capeLocation, capeId);
-            }
+        if (!config.activeCapeHash.isEmpty()) {
+            previewCape(config.activeCapeHash);
         }
 
         // Restore rotation state
@@ -755,6 +758,24 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 widget.setRestingYRotation(0.0f);
                 widget.setReturnsToRest(false);
             }
+        }
+    }
+
+    /** Shows the cape {@code capeId} on the menu's model. */
+    private void previewCape(String capeId) {
+        if (playerPreviewPanel == null) {
+            return;
+        }
+//? if <1.21.11 {
+        ResourceLocation capeLocation = getCapeLocationFromId(capeId);
+//?} else {
+        Identifier capeLocation = getCapeLocationFromId(capeId);
+//?}
+        if (capeLocation != null) {
+            // Register animation if this is an animated cape
+            registerCapeAnimationIfNeeded(capeId, capeLocation);
+
+            playerPreviewPanel.updateCape(capeLocation, capeId);
         }
     }
 
@@ -2446,6 +2467,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         }
         if (!isSkinAlreadyActive) {
             com.quickskin.mod.client.compat.CpmModelWorkflow.activateSkin(metadata.hash());
+            wearSkinCape(metadata);
         }
         // The skin is saved to config even outside a world, so the selection persists on the
         // title screen. In a world it is also applied to the player entity.
@@ -2474,15 +2496,57 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     /**
-     * Opens the menu of a skin the player right-clicked in the skin column: favorite, rename and
-     * delete. Not in the delete mode, where clicks mark skins.
+     * Opens the menu of a skin the player right-clicked in the skin column: favorite, rename, its
+     * own cape and delete. Not in the delete mode, where clicks mark skins.
      */
     public void openSkinContextMenu(AssetMetadata metadata, int mouseX, int mouseY) {
         if (skinContextMenu == null || deleteMode) {
             return;
         }
         skinContextMenu.open(metadata, isPlayerOwnSkin(metadata),
-                LocalAssetManager.getInstance().isFavorite(metadata.hash()), mouseX, mouseY, width, height);
+                LocalAssetManager.getInstance().isFavorite(metadata.hash()),
+                com.quickskin.mod.client.services.SkinCapes.hasOwnLook(metadata.hash()),
+                mouseX, mouseY, width, height);
+    }
+
+    /**
+     * Puts on the cape the chosen skin has, if any, on the player in a world and on the model the
+     * title screen draws, as the cape menu does.
+     */
+    private void wearSkinCape(AssetMetadata metadata) {
+        java.util.UUID target;
+        if (this.minecraft != null && this.minecraft.player != null) {
+//? if <1.21 {
+            target = com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
+//?} else {
+            target = this.minecraft.player.getUUID();
+//?}
+        } else {
+            target = com.quickskin.mod.client.rendering.PlayerModelRenderer.getCachedPlayerUUID();
+        }
+        if (com.quickskin.mod.client.services.SkinCapes.wear(metadata.hash(), target)) {
+            previewCape(com.quickskin.mod.config.ClientConfig.getInstance().activeCapeHash);
+        }
+    }
+
+    /** Opens the cape menu to pick the cape {@code metadata} puts on when it is worn. */
+    private void assignSkinCape(AssetMetadata metadata) {
+        if (minecraft == null) {
+            return;
+        }
+        PlayerCapeMenuScreen capes = PlayerCapeMenuScreen.forSkin(this, metadata);
+//? if <26.2 {
+        minecraft.setScreen(capes);
+//?} else {
+        minecraft.gui.setScreen(capes);
+//?}
+    }
+
+    /** Takes {@code metadata}'s own cape and elytra away; what is worn now stays on. */
+    private void removeSkinCape(AssetMetadata metadata) {
+        com.quickskin.mod.client.services.SkinCapes.assign(metadata.hash(), null);
+        com.quickskin.mod.client.services.SkinCapes.assignElytra(metadata.hash(), null);
+        refreshSkinList();
     }
 
     /** Closes the skin menu, as the column scrolls under it. */

@@ -5,10 +5,16 @@
 ### Added
 
 - **A favourites fan**
-> Bind the new Favourites Fan key in Controls › Quick Skin, and one press fans your favourite skins and CPM models out as cards over the hotbar, in the skin menu's order. You keep walking while it is open: the mouse points at the cards instead of turning the camera, a click wears the card you point at, and the key again, Esc or a right click puts it away. The mouse wheel turns the page when you have more favourites than fit, and on a server with a skin-change cooldown the fan tells you how long is left.
+> Bind the new Favourites Fan key in Quick Skin's settings (Client tab) or in Controls › Quick Skin, and one press fans your favourite skins and CPM models out as cards over the hotbar, in the skin menu's order. You keep walking while it is open: the mouse points at the cards instead of turning the camera, a click wears the card you point at, and the key again, Esc or a right click puts it away. The mouse wheel turns the page when you have more favourites than fit, and on a server with a skin-change cooldown the fan tells you how long is left.
 
 - **Elytra with a cape of their own**
 > The cape menu has Cape and Elytra tabs: in the Elytra tab, pick any cape for your elytra, keep them the same as your cape, or give them vanilla's elytra texture. In the Cape tab, right-click a cape to put it on your elytra. Other players with Quick Skin 4.1.0 see your elytra's own cape; players on older versions see your elytra wear your cape as before.
+
+- **A cape for each skin**
+> Right-click a skin in the skin menu and pick Assign a cape...: the cape menu opens for that skin, and the cape you click is put on whenever you wear the skin, from the skin menu or the favourites fan. The menu's Elytra tab picks what the elytra wear with that skin too (its cape, vanilla's elytra or another cape). A skin with a cape of its own has it hanging from its card as a ribbon, edged purple when it also has its own elytra; Change cape... and Remove cape are in the same menu. A skin without one keeps the cape and elytra you are wearing.
+
+- **Your skins in every modpack, and on every computer**
+> Skins and capes you import are kept in one library outside the Minecraft instance (`%APPDATA%\QuickSkin` on Windows, `~/Library/Application Support/QuickSkin` on macOS, `~/.local/share/quickskin` on Linux), so every modpack on your computer lists the same skins with the same favourites and models. Each modpack's own `quickskin/uploads` folders are still read. With a premium Minecraft account the library also syncs with your account through the Quick Skin website, so another computer or launcher lists it too: Quick Skin proves the account through Mojang's own session server and never sends your Minecraft login anywhere else. Offline accounts never sync. Static skins and capes up to 2 MB travel with their name, model and favourite mark; animated capes and CPM models stay on the computer. Turn the sync off in Settings › Modpack.
 
 - **Hide Cosmetic Armor pieces from everyone**
 > With Cosmetic Armor Reworked, a cosmetic piece over your armour is now a piece of its own on the skin menu's model: hide it and every other player sees the armour under it instead, like any hidden piece. The server needs this update for others to see it.
@@ -17,6 +23,9 @@
 > Put `silent` after `/quickskin` (for example `/quickskin silent nickname random @a`) and only the players themselves learn their new names or skins: nothing is said to whoever runs the command, to other operators or in a command block's output, and the names it gives show no account name beside them in the operators' tab list or in join and leave messages. Made for games where the admins play too.
 
 ### Fixes
+
+- **Skins show up in ReplayMod replays on every version**
+> Replays recorded with ReplayMod now show the Quick Skin skins, capes and models players wore, and every change they made while recording, on every Minecraft version ReplayMod exists for. Before, only 1.20.1 did; newer versions showed everyone's Mojang skin.
 
 - **No more crash at launch with CustomSkinLoader**
 > Quick Skin and CustomSkinLoader can now be installed together: the game no longer stops at startup when another mod adds its own way out of the skin lookups Quick Skin uses.
@@ -28,7 +37,10 @@
 > At its usual size and place, the title screen's player now shrinks as much as the window and GUI Scale need to stay under the Minecraft logo and the yellow splash text. Once you move or resize it yourself, it stays exactly as you set it.
 
 - **Poses picked on the title screen play their moves**
-> Picking Sitting on the title screen now jumps onto the block as it does in the skin menu, and the other poses ease in and out instead of snapping.
+> Picking Sitting on the title screen now jumps onto the block as it does in the skin menu, also after you come back from a world, and the other poses ease in and out instead of snapping. From Minecraft 1.21.6 the previews draw the block under a sitting player and the jump onto it and off it again, and picking Walking walks.
+
+- **No more neck stretch while idle**
+> The previews no longer pick the idle that tilted the player's head over to each shoulder; the other five idles stay.
 
 - **Elytra are no longer cut off in the menus (up to 1.21.5)**
 > A sneaking or gliding player's elytra are drawn whole in the skin and cape menus instead of losing their lower part behind the menu, and the buttons around the model stay in front of it.

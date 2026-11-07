@@ -41,6 +41,11 @@ public class SkinPreferences {
     public static class SkinPreference {
         public String modelType = "auto"; // "auto", "classic", or "slim"
         public boolean favorite; // listed first, after the player's own skin, and drawn in gold
+        // The cape wearing this skin puts on ("local_cape:<id>" or "known:<id>"), or null for none
+        public String cape;
+        // What the elytra wear with this skin: "" the cape, "minecraft:elytra" vanilla's, a cape
+        // ID, or null to keep what they wear
+        public String elytra;
 
         public SkinPreference() {
             // Default constructor for Gson
@@ -50,12 +55,16 @@ public class SkinPreferences {
             SkinPreference copy = new SkinPreference();
             copy.modelType = modelType;
             copy.favorite = favorite;
+            copy.cape = cape;
+            copy.elytra = elytra;
             return copy;
         }
 
         private boolean sameAs(SkinPreference other) {
             return other != null && favorite == other.favorite
-                    && java.util.Objects.equals(modelType, other.modelType);
+                    && java.util.Objects.equals(modelType, other.modelType)
+                    && java.util.Objects.equals(cape, other.cape)
+                    && java.util.Objects.equals(elytra, other.elytra);
         }
     }
 
@@ -99,6 +108,45 @@ public class SkinPreferences {
         writable(hash).favorite = favorite;
     }
 
+    /** The cape this skin puts on when it is worn, or null when it keeps the cape worn. */
+    public synchronized String getCape(String hash) {
+        SkinPreference pref = readable(hash);
+        return pref != null && isCapeId(pref.cape) ? pref.cape : null;
+    }
+
+    /** Gives a skin a cape of its own, or takes it away with null. An invalid cape ID is ignored. */
+    public synchronized void setCape(String hash, String capeId) {
+        if (!isHash(hash) || (capeId != null && !isCapeId(capeId))
+                || (!preferences.containsKey(hash) && preferences.size() >= MAX_PREFERENCES)) {
+            return;
+        }
+        if (capeId == null && readable(hash) == null) {
+            return;
+        }
+        writable(hash).cape = capeId;
+    }
+
+    /**
+     * What the elytra wear when this skin is worn: "" the cape, {@link #VANILLA_ELYTRA} vanilla's
+     * elytra, a cape ID, or null when they keep what they wear.
+     */
+    public synchronized String getElytra(String hash) {
+        SkinPreference pref = readable(hash);
+        return pref != null && isElytraId(pref.elytra) ? pref.elytra : null;
+    }
+
+    /** Gives a skin elytra of its own (see {@link #getElytra}), or takes them away with null. */
+    public synchronized void setElytra(String hash, String elytraId) {
+        if (!isHash(hash) || (elytraId != null && !isElytraId(elytraId))
+                || (!preferences.containsKey(hash) && preferences.size() >= MAX_PREFERENCES)) {
+            return;
+        }
+        if (elytraId == null && readable(hash) == null) {
+            return;
+        }
+        writable(hash).elytra = elytraId;
+    }
+
     /** The skin's preference, through the legacy alias it is still stored under if need be. */
     private SkinPreference readable(String hash) {
         SkinPreference pref = preferences.get(hash);
@@ -134,6 +182,29 @@ public class SkinPreferences {
         if (kept != null) preferences.remove(kept);
         aliasFallbacks().entrySet().removeIf(entry -> hash != null
                 && hash.equals(entry.getValue()));
+    }
+
+    /**
+     * Adds every preference of {@code other} for a skin these preferences say nothing about, so
+     * an instance's choices join the shared library without overriding the shared ones.
+     *
+     * @return how many preferences were added
+     */
+    public synchronized int addMissingFrom(SkinPreferences other) {
+        if (other == null || other == this) return 0;
+        Map<String, SkinPreference> incoming;
+        synchronized (other) {
+            other.normalize();
+            incoming = new HashMap<>();
+            other.preferences.forEach((hash, preference) -> incoming.put(hash, preference.copy()));
+        }
+        normalize();
+        int added = 0;
+        for (Map.Entry<String, SkinPreference> entry : incoming.entrySet()) {
+            if (preferences.size() >= MAX_PREFERENCES) break;
+            if (preferences.putIfAbsent(entry.getKey(), entry.getValue()) == null) added++;
+        }
+        return added;
     }
 
     /**
@@ -263,6 +334,11 @@ public class SkinPreferences {
         if (preferences == null) preferences = new HashMap<>();
         preferences.entrySet().removeIf(entry -> !isHash(entry.getKey())
                 || entry.getValue() == null || !isModel(entry.getValue().modelType));
+        // A cape that is not a valid cape ID is dropped alone; the entry's other choices stay
+        for (SkinPreference preference : preferences.values()) {
+            if (preference.cape != null && !isCapeId(preference.cape)) preference.cape = null;
+            if (preference.elytra != null && !isElytraId(preference.elytra)) preference.elytra = null;
+        }
         var iterator = preferences.keySet().iterator();
         while (preferences.size() > MAX_PREFERENCES && iterator.hasNext()) {
             iterator.next();
@@ -282,6 +358,29 @@ public class SkinPreferences {
 
     private static boolean isHash(String hash) {
         return ContentId.parse(hash) != null;
+    }
+
+    /**
+     * A catalogued cape ({@code local_cape:} and a content ID) or a built-in one ({@code known:}
+     * and a short lower-case name), the two kinds of cape the cape menu can pick.
+     */
+    static boolean isCapeId(String capeId) {
+        if (capeId == null || capeId.length() > 128) return false;
+        if (capeId.startsWith("local_cape:")) {
+            return ContentId.parse(capeId.substring("local_cape:".length())) != null;
+        }
+        if (capeId.startsWith("known:")) {
+            return capeId.substring("known:".length()).matches("[a-z0-9_]{1,64}");
+        }
+        return false;
+    }
+
+    /** The elytra's own vanilla texture, as {@code PlayerAppearance} names it. */
+    public static final String VANILLA_ELYTRA = "minecraft:elytra";
+
+    /** What a skin's elytra may wear: the cape (""), vanilla's elytra, or a cape. */
+    static boolean isElytraId(String elytraId) {
+        return elytraId != null && (elytraId.isEmpty() || VANILLA_ELYTRA.equals(elytraId) || isCapeId(elytraId));
     }
 
     private static boolean isModel(String model) {

@@ -155,11 +155,9 @@ public class NetworkSyncService {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
-        //? if <1.21 {
-        if (mc.player != null && mc.player.getClass().getName().equals("com.replaymod.replay.camera.CameraEntity")) {
-        //?} else {
-        if (mc.getConnection() == null) {
-        //?}
+        // A replay has no server to upload to: its connection is ReplayMod's playback
+        if (mc.getConnection() == null
+                || ClientNetworkHandler.isReplayPlaybackConnection(mc.getConnection())) {
             return;
         }
 

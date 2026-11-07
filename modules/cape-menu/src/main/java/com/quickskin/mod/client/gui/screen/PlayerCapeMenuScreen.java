@@ -205,6 +205,18 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
     @Nullable
     private final Screen parent;
+    /**
+     * The skin whose own cape the menu picks, opened from the skin menu's context menu, or null
+     * for the usual menu. Then a click gives that skin the cape (or, on the Elytra tab, what its
+     * elytra wear) and goes back, the second button takes the tab's choice away and the third goes
+     * back without a change; the skin's name stands over the model.
+     */
+    @Nullable
+    private final AssetMetadata skinTarget;
+    /** Whether the skin target chooses nothing for its elytra, which then keep what they wear. */
+    private boolean skinElytraUnset;
+    /** The second button under the list, whose label follows the tab when picking a skin's look. */
+    private net.minecraft.client.gui.components.Button clearButton;
 
     /** The player, wearing the cape under the mouse, or the worn one. */
     private PlayerWidget playerWidget;
@@ -278,8 +290,18 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     private boolean capeEditBusy;
 
     public PlayerCapeMenuScreen(@Nullable Screen parent) {
+        this(parent, null);
+    }
+
+    private PlayerCapeMenuScreen(@Nullable Screen parent, @Nullable AssetMetadata skinTarget) {
         super(Component.empty());
         this.parent = parent;
+        this.skinTarget = skinTarget;
+    }
+
+    /** The menu that picks the cape {@code skin} puts on whenever it is worn. */
+    public static PlayerCapeMenuScreen forSkin(@Nullable Screen parent, AssetMetadata skin) {
+        return new PlayerCapeMenuScreen(parent, skin);
     }
 
     @Override
@@ -329,6 +351,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
         // The Cape and Elytra tabs over the list, as the cape editor's buttons choose its preview
         int tabsLeft = this.gridX - 6;
+        {
         int tabsWidth = this.gridWidth + 12;
         int half = tabsWidth / 2;
         Component capeTab = Component.translatable("quickskin.cape.tab.cape");
@@ -346,6 +369,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         this.elytraTabButton.setTooltip(net.minecraft.client.gui.components.Tooltip.create(
                 Component.translatable("quickskin.cape.tab.elytra_tip")));
         updateTabButtons();
+        }
 
         // Import, Remove and Done under the list
         int buttonsRight = this.gridX + this.gridWidth + SCROLLBAR_ROOM;
@@ -355,15 +379,23 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                 Component.translatable("quickskin.button.import_cape"),
                 button -> importCape()
         ));
-        this.addRenderableWidget(com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
+        this.clearButton = this.addRenderableWidget(com.quickskin.mod.client.gui.util.ButtonFactory.createStyled(
                 MARGIN + buttonWidth + BUTTON_SPACING, bottomY, buttonWidth, CONTROL_HEIGHT,
-                Component.translatable("quickskin.button.remove_cape"),
-                button -> removeCape()
+                clearButtonLabel(),
+                button -> {
+                    if (this.skinTarget != null && this.elytraTab) {
+                        assignElytraToSkin(null);
+                    } else if (this.skinTarget != null) {
+                        assignToSkin(null);
+                    } else {
+                        removeCape();
+                    }
+                }
         ));
         this.addRenderableWidget(com.quickskin.mod.client.gui.util.ButtonFactory.createPrimary(
                 MARGIN + (buttonWidth + BUTTON_SPACING) * 2, bottomY,
                 buttonsRight - MARGIN - (buttonWidth + BUTTON_SPACING) * 2, CONTROL_HEIGHT,
-                Component.translatable("quickskin.button.done"),
+                Component.translatable(this.skinTarget != null ? "quickskin.button.cancel" : "quickskin.button.done"),
                 button -> this.onClose()
         ));
 
@@ -380,7 +412,8 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         this.animationSpeedSlider.active = false;
 
         // The player, as large as the space right of the list allows, centred in it
-        int stageTop = MARGIN;
+        // Under the skin's name when picking a skin's look
+        int stageTop = this.skinTarget != null ? MARGIN + TAB_HEIGHT + 4 : MARGIN;
         int stageBottom = bottomY - 6;
         float modelScale = Math.min(MAX_MODEL_SCALE, Math.min(
                 (stageBottom - stageTop) / MODEL_HEIGHT_PER_SCALE, this.stageWidth / MODEL_WIDTH_PER_SCALE));
@@ -399,7 +432,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         ClientConfig config = ClientConfig.getInstance();
         // The saved skin, unless a CPM model is the latest look choice: then the player's own
         // skin (the live one in a world, the imported one on the title screen).
-        String previewSkinHash = LocalLookPreview.skinHash(player != null);
+        String previewSkinHash = this.skinTarget != null ? this.skinTarget.hash() : LocalLookPreview.skinHash(player != null);
 
         // First priority: Use that skin from the catalog (works on title screen when player is null)
         if (!previewSkinHash.isEmpty()) {
@@ -731,12 +764,15 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
         // First priority: Check config (works on title screen)
         ClientConfig config = ClientConfig.getInstance();
-        if (!config.activeCapeHash.isEmpty()) {
+        if (this.skinTarget != null) {
+            // The skin's own cape, or none
+            activeCapeId = com.quickskin.mod.client.services.SkinCapes.assigned(this.skinTarget.hash());
+        } else if (!config.activeCapeHash.isEmpty()) {
             activeCapeId = config.activeCapeHash;
         }
 
         // Second priority: Check PlayerAppearanceService (in-game only)
-        if (activeCapeId == null && minecraft != null && minecraft.player != null) {
+        if (this.skinTarget == null && activeCapeId == null && minecraft != null && minecraft.player != null) {
             java.util.UUID playerId = minecraft.player.getUUID();
             com.quickskin.mod.common.data.PlayerAppearance appearance =
                     PlayerAppearanceService.getInstance().getAppearance(playerId);
@@ -756,9 +792,17 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             this.selectedCape = findCape(activeCapeId);
         }
 
-        // What the elytra wear: the saved choice, else what the player's appearance says in a world
+        // What the elytra wear: the saved choice, else what the player's appearance says in a world;
+        // the skin's own choice when picking a skin's look
         String elytraId = config.activeElytraId;
-        if (elytraId.isEmpty() && minecraft != null && minecraft.player != null) {
+        this.skinElytraUnset = false;
+        if (this.skinTarget != null) {
+            elytraId = com.quickskin.mod.client.services.SkinCapes.assignedElytra(this.skinTarget.hash());
+            this.skinElytraUnset = elytraId == null;
+            if (elytraId == null) {
+                elytraId = "";
+            }
+        } else if (elytraId.isEmpty() && minecraft != null && minecraft.player != null) {
             elytraId = PlayerAppearanceService.getInstance().getElytraId(minecraft.player.getUUID());
         }
         this.selectedElytra = elytraId.isEmpty() ? null : findCape(
@@ -792,10 +836,24 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             this.capeTabButton.setSelected(!this.elytraTab);
             this.elytraTabButton.setSelected(this.elytraTab);
         }
+        if (this.clearButton != null) {
+            this.clearButton.setMessage(clearButtonLabel());
+        }
+    }
+
+    /** Remove Cape, or what takes the tab's choice away from the skin whose look the menu picks. */
+    private Component clearButtonLabel() {
+        if (this.skinTarget == null) {
+            return Component.translatable("quickskin.button.remove_cape");
+        }
+        return Component.translatable(this.elytraTab ? "quickskin.cape.assign.no_elytra" : "quickskin.cape.assign.none");
     }
 
     /** Whether the elytra wear this entry: Same as Cape (None) when they wear the cape. */
     private boolean isElytraChoice(CapeEntry cape) {
+        if (this.skinTarget != null && this.skinElytraUnset) {
+            return false;
+        }
         if (this.selectedElytra == null) {
             return cape.isNone();
         }
@@ -1427,6 +1485,9 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         renderCapeGrid(graphics, hoverX, hoverY);
         graphics.disableScissor();
         renderStickyHeading(graphics);
+        if (this.skinTarget != null) {
+            renderSkinTargetBanner(graphics);
+        }
 
         this.renderScrollbar(graphics);
 //? if <1.21 {
@@ -2070,7 +2131,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                 boolean worn = this.selectedCape != null
                         && clickedCape.getCapeId().equals(this.selectedCape.getCapeId());
                 this.contextMenu.open(clickedCape, ClientConfig.getInstance().isFavoriteCape(clickedCape.getCapeId()),
-                        !this.elytraTab && (!worn || this.selectedElytra != null),
+                        this.skinTarget == null && !this.elytraTab && (!worn || this.selectedElytra != null),
                         this.selectedElytra != null && isElytraChoice(clickedCape),
                         (int) mouseX, (int) mouseY, this.width, this.height);
             }
@@ -2099,6 +2160,19 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             return true;
         }
 
+        if (this.skinTarget != null && this.elytraTab) {
+            // The skin's elytra wear it (Same as Cape: the cape) and the menu goes back
+            playClick(0.25f);
+            assignElytraToSkin(clickedCape);
+            return true;
+        }
+        if (this.skinTarget != null) {
+            // The skin gets it (None takes its cape away) and the menu goes back
+            playClick(0.25f);
+            assignToSkin(clickedCape.isNone() ? null : clickedCape);
+            return true;
+        }
+
         if (this.elytraTab) {
             // The elytra wear it at once (Same as Cape gives them the cape again)
             playClick(0.25f);
@@ -2117,6 +2191,60 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             applyCape(clickedCape);
         }
         return true;
+    }
+
+    /**
+     * Gives the skin the menu was opened for {@code cape}, or no cape of its own with null, and
+     * goes back. When that skin is the one worn, the cape is put on at once.
+     */
+    private void assignToSkin(@Nullable CapeEntry cape) {
+        if (this.skinTarget == null) {
+            return;
+        }
+        com.quickskin.mod.client.services.SkinCapes.assign(this.skinTarget.hash(), cape != null ? cape.getCapeId() : null);
+        ClientConfig config = ClientConfig.getInstance();
+        if (cape != null && this.skinTarget.hash().equals(config.activeSkinHash) && config.activeCpmModelHash.isEmpty()) {
+            applyCape(cape);
+        }
+        onClose();
+    }
+
+    /**
+     * Gives the skin the menu was opened for what its elytra wear: {@code choice} (None: the cape),
+     * or no choice of its own with null, and goes back. When that skin is the one worn, the elytra
+     * wear it at once.
+     */
+    private void assignElytraToSkin(@Nullable CapeEntry choice) {
+        if (this.skinTarget == null) {
+            return;
+        }
+        String elytraId = choice == null ? null : choice.isNone() ? "" : choice.getCapeId();
+        com.quickskin.mod.client.services.SkinCapes.assignElytra(this.skinTarget.hash(), elytraId);
+        ClientConfig config = ClientConfig.getInstance();
+        if (choice != null && this.skinTarget.hash().equals(config.activeSkinHash) && config.activeCpmModelHash.isEmpty()) {
+            applyElytra(choice);
+        }
+        onClose();
+    }
+
+    /** Over the model: whose look the menu picks, in the selected tab's blue. */
+    private void renderSkinTargetBanner(
+//? if <26.1 {
+            GuiGraphics graphics
+//?} else {
+            GuiGraphicsExtractor graphics
+//?}
+    ) {
+        int left = this.stageX;
+        int width = this.stageWidth;
+        CapeTileArt.card(graphics, left, MARGIN, width, TAB_HEIGHT, 0xFF6FA0FF, 0xFF1C1D1F);
+        String name = this.skinTarget.friendlyName();
+        int room = width - 12 - this.font.width(Component.translatable("quickskin.cape.assign.title", ""));
+        if (this.font.width(name) > room) {
+            name = this.font.plainSubstrByWidth(name, Math.max(0, room - this.font.width("..."))) + "...";
+        }
+        UiText.draw(graphics, this.font, Component.translatable("quickskin.cape.assign.title", name),
+                left + 6, MARGIN + (TAB_HEIGHT - 8) / 2, 0xFFFFFFFF);
     }
 
     private void playClick(float volume) {

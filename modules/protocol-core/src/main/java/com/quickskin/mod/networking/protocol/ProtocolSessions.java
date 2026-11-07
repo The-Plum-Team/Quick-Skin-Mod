@@ -130,7 +130,8 @@ public final class ProtocolSessions {
      * <p>Replay files contain only the server-bound half of the exchange, so the original client
      * hello is unavailable during playback. The first recorded Quick Skin data packet is explicit
      * schema evidence. It may establish one locally bounded profile, but it cannot switch schemas
-     * on an already classified replay connection.</p>
+     * on an already classified replay connection. The local-only session the replay's own join
+     * opened (its hello goes nowhere) is not a classification and gives way.</p>
     */
     public synchronized ProtocolProfile admitReplayClientSession(
             UUID playerId, Object connection, boolean v2) {
@@ -142,7 +143,8 @@ public final class ProtocolSessions {
                         QuickSkinProtocol.POLICY, QuickSkinProtocol.POLICY.offer())
                 : ProtocolProfile.legacy("recorded-legacy-packet");
         ClientSession existing = clientSession;
-        if (existing != null && existing.connection == connection) {
+        if (existing != null && existing.connection == connection
+                && existing.profile.mode() != ProtocolProfile.Mode.LOCAL_ONLY) {
             if (!existing.playerId.equals(playerId)) {
                 return ProtocolProfile.incompatible("replay-player-switch");
             }

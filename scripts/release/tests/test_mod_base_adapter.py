@@ -829,13 +829,14 @@ class FamilyValidateTest(Scratch):
                                  canonical_json(image["pixel"]))
                 self.assertIsInstance(pair[side]["source"]["pixel"]["dark_fraction"], float)
 
-    def test_an_image_free_key_projects_its_not_applicable_rows(self) -> None:
+    def test_the_newest_key_projects_its_single_lane_and_its_not_applicable_rows(self) -> None:
         native = self.native(coverage=HEAD, key=NEWEST)
         result, output = self.hook(self.handoff(native, commit=HEAD, key=NEWEST), HEAD, key=NEWEST)
         self.assertEqual("available", result["status"])
         projection = json.loads((output / "paired.json").read_bytes())
-        self.assertEqual([], projection["lanes"])
-        self.assertEqual(14, len(projection["not_applicable"]))
+        self.assertEqual([("fabric-26.3", "replaymod")],
+                         [(lane["artifact_node"], lane["variant"]["id"]) for lane in projection["lanes"]])
+        self.assertEqual(13, len(projection["not_applicable"]))
 
     def test_carry_forward_names_the_envelope_coverage(self) -> None:
         coverage, expected = "c" * 40, HEAD

@@ -77,7 +77,7 @@ class ModCompatibilityContractTest(unittest.TestCase):
             {item.id for item in contract.mods},
         )
         self.assertNotIn("player-armor-stands", {item.id for item in contract.mods})
-        self.assertEqual(127, sum(len(item.artifacts) for item in contract.mods))
+        self.assertEqual(138, sum(len(item.artifacts) for item in contract.mods))
         cpm = contract.mod("cpm")
         self.assertIsNotNone(cpm.multiplayer)
         self.assertEqual(("compatibility-cpm",), cpm.additional_execution_profiles)

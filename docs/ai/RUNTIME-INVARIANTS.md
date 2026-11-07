@@ -342,6 +342,32 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Opaque-fill, import fallback, local/network presentation, and animation processing must share
   the same structural mask; content-addressed source bytes remain immutable when only presentation
   requires normalization.
+- Skins and capes live in a library every Minecraft instance of the computer shares
+  (`SharedLibrary`: `%APPDATA%\QuickSkin`, `~/Library/Application Support/QuickSkin`, or
+  `$XDG_DATA_HOME/quickskin` / `~/.local/share/quickskin`), with its own `skin-preferences.json`.
+  Imports, the own skin and cloud downloads are written there; the instance's
+  `quickskin/uploads` folders are still read behind it, an asset both hold keeping the library's
+  file, and deleting an asset deletes every copy, or the one left would bring it back. The first
+  time an instance uses the library, its own `skin-preferences.json` fills in the skins the
+  library has no choice for (`sharedLibraryPreferencesMerged`); the instance's file is never
+  changed. A folder that cannot be created or written leaves the instance on its own folders, as
+  before, and `-Dquickskin.sharedLibrary=false` or the packaged E2E harness never use it.
+  Capes' animation atlases, CPM models and the cape editor's sources stay per instance.
+- `CloudSkinSync` (cloud-sync) keeps a premium account's library in the Quick Skin website's
+  cloud (`/api/sync/v1`, keyed by the account UUID), on by default (`cloudSkinSync`, in the
+  Modpack tab) and told once in the skin menu (`cloudSyncNoticeShown`). The client proves the
+  account by Mojang's session join on a challenge the website hands out, which the website checks
+  with `hasJoined`: the access token goes only to Mojang, and an account Mojang refuses (offline)
+  is never synced. Rounds run one at a time on their own daemon thread, at most every 20 seconds
+  for local changes and 5 minutes for the cloud's, spaced 600 ms per request; the library is read
+  and changed only on the client thread. `SyncPlanner` compares both sides with what they last
+  agreed on (`cloud-sync/<uuid>.json` beside the library): new entries travel both ways,
+  deletions too, and a change made on both sides keeps this computer's. A cloud `reset` (pruned
+  tombstones, a recreated account) merges both sides and deletes nothing. Only static PNG skins
+  and capes up to 2 MiB travel, with name, model and favourite; a download is kept only when its
+  bytes hash to the id the cloud named and decode as a PNG. A deletion made elsewhere never
+  deletes the worn skin or cape, the own skin or the last listed skin; such an entry and one the
+  cloud refuses (quota) stay local for the session.
 - The skin menu's list always keeps at least one skin or CPM model: marking or deleting the last
   listed entry, the own skin or a custom one, is refused with a toast
   (`LocalAssetManager.keepsAListedSkin`), and a deletion that would empty the list is refused
@@ -465,6 +491,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   load its players again once it is stored, so a model embedded in it loads. That one coalesced
   reload (`CpmMissedSkinFiles`, at most 256 misses, `onMissedNetworkSkinStored`) is the only
   CPM refresh on a network skin's arrival; a skin CPM never missed needs none.
+- ReplayMod (Fabric, every matrix target it is published for) plays a recording back through a
+  client connection of its own that recorded only the server's half of the protocol handshake.
+  The first recorded Quick Skin packet on that exact connection (named by class, never a ReplayMod
+  dependency) sets its schema through `ProtocolSessions.admitReplayClientSession`, replacing only
+  the unanswered local-only session the replay's own join opened; a classified connection never
+  switches schema. Nothing is uploaded on that connection, and `ReplayModHelper` re-applies the
+  recorded player's look. The 1.20.1 overlay additionally routes recorded payloads through
+  `ReplayModCompatMixin`.
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.
@@ -525,6 +559,16 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   because the 1.20.1 overlay replaces the canonical file on the only lane official TaCZ exists
   for. The animation plays on the real local player, so other first-person draws of that
   player's model show it too; it never reaches the first-person arms.
+- A skin may have a cape of its own (`SkinCapes`, appearance-services), kept as the skin's `cape`
+  in its preferences (`SkinPreferences`): a `local_cape:` content ID or a `known:` built-in name,
+  nothing else. It is picked from the skin menu's context menu through the cape menu opened for
+  that skin (`PlayerCapeMenuScreen.forSkin`). Its Elytra tab picks the skin's `elytra`: "" (the
+  cape), `minecraft:elytra` or a cape ID, null keeping what the elytra wear. Choosing the skin in
+  the skin menu or the favourites fan puts both on like clicks in the cape menu (the active cape
+  and `activeElytraId`, applied to the player); a skin without a choice, a CPM model, or a skin
+  whose cape was deleted keeps what is worn. The skin list shows it as a ribbon on the card or
+  tile, edged purple when the skin chooses its elytra; Remove cape takes both choices away. It is a local choice: nothing new
+  travels on the wire, and a deleted cape is not forgotten, so importing it again brings it back.
 - The favourites fan (`favourites-fan`) is a HUD layer, never a screen, so the player keeps
   walking while it is open. Its key is unbound until the player binds it. One press opens it on
   the skins and CPM models marked as favourites, in the skin menu's order, at most

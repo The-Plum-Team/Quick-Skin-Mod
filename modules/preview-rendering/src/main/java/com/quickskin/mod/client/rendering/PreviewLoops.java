@@ -59,8 +59,6 @@ public final class PreviewLoops {
         LOOK_AROUND,
         /** Sways from the ankles as if to music, nodding along. */
         SWAY,
-        /** Tilts the head to one shoulder and the other, then rolls the shoulders. */
-        NECK_STRETCH,
         /** Bounces lightly on the knees. */
         BOUNCE
     }
@@ -74,7 +72,6 @@ public final class PreviewLoops {
             case WEIGHT_SHIFT -> weightShift(pose, seconds);
             case LOOK_AROUND -> lookAround(pose, seconds);
             case SWAY -> sway(pose, seconds);
-            case NECK_STRETCH -> neckStretch(pose, seconds);
             case BOUNCE -> bounce(pose, seconds);
         }
         return pose.build();
@@ -184,40 +181,6 @@ public final class PreviewLoops {
                 .add(Bone.HEAD, Axis.ROT_X, (float) (3.0 * nod))
                 .add(Bone.RIGHT_ARM, Axis.ROT_Z, (float) arms)
                 .add(Bone.LEFT_ARM, Axis.ROT_Z, (float) arms);
-    }
-
-    /**
-     * Over nine seconds: tilts the head to the right shoulder and holds it, then to the left, comes
-     * back up, and rolls both shoulders twice.
-     */
-    private static void neckStretch(Pose.Builder pose, double seconds) {
-        double t = fraction(seconds / 9.0) * 9.0;
-        // -1 towards the right shoulder, +1 towards the left.
-        double tilt;
-        if (t < 1.2) {
-            tilt = -smootherstep(t / 1.2);
-        } else if (t < 2.5) {
-            tilt = -1.0;
-        } else if (t < 3.7) {
-            tilt = -1.0 + 2.0 * smootherstep((t - 2.5) / 1.2);
-        } else if (t < 5.0) {
-            tilt = 1.0;
-        } else if (t < 6.0) {
-            tilt = 1.0 - smootherstep(t - 5.0);
-        } else {
-            tilt = 0.0;
-        }
-        // Two shoulder rolls between 6 and 8 seconds: up, back, down and forward.
-        double roll = t >= 6.0 && t < 8.0 ? 2.0 * Math.PI * (t - 6.0) : 0.0;
-        float up = (float) (-0.7 * (0.5 - 0.5 * Math.cos(roll)));
-        float back = (float) (0.6 * Math.sin(roll));
-        pose.add(Bone.HEAD, Axis.ROT_Z, (float) (14.0 * tilt))
-                .add(Bone.HEAD, Axis.ROT_X, (float) (4.0 * Math.abs(tilt)))
-                .add(Bone.BODY, Axis.ROT_Z, (float) (-1.5 * tilt))
-                .add(Bone.RIGHT_ARM, Axis.POS_Y, up)
-                .add(Bone.RIGHT_ARM, Axis.POS_Z, back)
-                .add(Bone.LEFT_ARM, Axis.POS_Y, up)
-                .add(Bone.LEFT_ARM, Axis.POS_Z, back);
     }
 
     /**

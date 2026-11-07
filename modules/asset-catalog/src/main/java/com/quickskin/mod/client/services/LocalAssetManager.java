@@ -17,6 +17,7 @@ import com.quickskin.mod.common.util.RawArgbImages;
 import com.quickskin.mod.common.util.SkinModelDetector;
 import com.quickskin.mod.common.util.SafeImageReader;
 import com.quickskin.mod.config.ClientConfig;
+import com.quickskin.mod.config.SharedLibrary;
 import com.quickskin.mod.networking.NetworkSecurity;
 import com.quickskin.mod.platform.PlatformHelper;
 import com.quickskin.mod.platform.MinecraftCompat;
@@ -90,6 +91,11 @@ public class LocalAssetManager {
     // Directory paths
     private Path skinsDirectory;
     private Path capesDirectory;
+    // This instance's own upload folders while the shared library holds the imports, else null.
+    private Path instanceSkinsDirectory;
+    private Path instanceCapesDirectory;
+    // Further files of a catalogued asset found in another library (primary -> paths), deleted with it.
+    private volatile Map<String, List<Path>> otherCopies = Map.of();
     private Path cacheDirectory;
 
     // Folder fingerprint as of the last completed scan; drives token-checked refreshes.
@@ -247,8 +253,17 @@ public class LocalAssetManager {
                 MAX_SCAN_CANDIDATES * 3, MAX_LEGACY_ALIASES_PER_ASSET);
         private final LegacyContentAliasIndex capePreflightAliases = new LegacyContentAliasIndex(
                 MAX_SCAN_CANDIDATES, 2);
+        private final Map<String, List<Path>> otherCopies = new HashMap<>();
+        // While scanning the instance's folders behind the shared library: an asset the library
+        // already holds keeps the library's file, and the instance's copy is only remembered.
+        private boolean secondary;
 
         private void put(AssetMetadata assetMetadata, Path sourcePath) {
+            if (secondary && metadata.containsKey(assetMetadata.hash())) {
+                otherCopies.computeIfAbsent(assetMetadata.hash(), ignored -> new ArrayList<>())
+                        .add(sourcePath);
+                return;
+            }
             if (!aliases.register(assetMetadata.hash(), List.of())) return;
             metadata.put(assetMetadata.hash(), assetMetadata);
             sourcePaths.put(assetMetadata.hash(), sourcePath);
@@ -278,6 +293,42 @@ public class LocalAssetManager {
         // Private constructor for singleton
     }
 
+    /** The shared library folder with its skin and cape folders created, or null to stay local. */
+    private static @Nullable Path usableSharedLibrary() {
+        Path root = SharedLibrary.root();
+        if (root == null) return null;
+        try {
+            Files.createDirectories(SharedLibrary.skinsDirectory(root));
+            Files.createDirectories(SharedLibrary.capesDirectory(root));
+            if (!Files.isWritable(SharedLibrary.skinsDirectory(root))
+                    || !Files.isWritable(SharedLibrary.capesDirectory(root))) {
+                QuickSkinInfo.LOGGER.warn("The shared skin library {} is not writable; using this instance's folders", root);
+                return null;
+            }
+            return root;
+        } catch (IOException | SecurityException e) {
+            QuickSkinInfo.LOGGER.warn("Unable to create the shared skin library {}; using this instance's folders", root, e);
+            return null;
+        }
+    }
+
+    /**
+     * Adds this instance's skin choices (model, favourite) to the shared library the first time
+     * the instance uses it, never overriding a choice the library already holds. The instance's
+     * file is left as it is, so an older Quick Skin in this instance still finds it.
+     */
+    private void addInstancePreferencesOnce(Path instancePreferences) {
+        ClientConfig config = ClientConfig.getInstance();
+        if (config.sharedLibraryPreferencesMerged) return;
+        if (Files.exists(instancePreferences)) {
+            SkinPreferences own = SkinPreferences.load(instancePreferences);
+            if (!own.isPersistable() || !skinPreferences.isPersistable()) return; // retried next start
+            if (skinPreferences.addMissingFrom(own) > 0) skinPreferences.save(preferencesFile);
+        }
+        config.sharedLibraryPreferencesMerged = true;
+        config.save();
+    }
+
     public static LocalAssetManager getInstance() {
         if (instance == null) {
             instance = new LocalAssetManager();
@@ -290,22 +341,39 @@ public class LocalAssetManager {
      */
     public synchronized void init() {
         // Get directories from platform helper
-        skinsDirectory = PlatformHelper.getSkinsDirectory();
-        capesDirectory = PlatformHelper.getCapesDirectory();
+        Path ownSkins = PlatformHelper.getSkinsDirectory();
+        Path ownCapes = PlatformHelper.getCapesDirectory();
+        Path ownPreferences = PlatformHelper.getConfigDirectory().resolve("skin-preferences.json");
         cacheDirectory = PlatformHelper.getCacheDirectory();
 
         // Create directories if they don't exist
         try {
-            Files.createDirectories(skinsDirectory);
-            Files.createDirectories(capesDirectory);
+            Files.createDirectories(ownSkins);
+            Files.createDirectories(ownCapes);
             Files.createDirectories(cacheDirectory);
         } catch (IOException e) {
             QuickSkinInfo.LOGGER.error("Unable to create QuickSkin local asset directories", e);
         }
 
-        // Load skin preferences
-        preferencesFile = PlatformHelper.getConfigDirectory().resolve("skin-preferences.json");
-        skinPreferences = SkinPreferences.load(preferencesFile);
+        // Imports go to the library every instance of this computer shares; this instance's own
+        // folders are still read behind it. Without a usable shared folder nothing changes.
+        Path shared = usableSharedLibrary();
+        if (shared != null) {
+            skinsDirectory = SharedLibrary.skinsDirectory(shared);
+            capesDirectory = SharedLibrary.capesDirectory(shared);
+            instanceSkinsDirectory = ownSkins;
+            instanceCapesDirectory = ownCapes;
+            preferencesFile = SharedLibrary.preferencesFile(shared);
+            skinPreferences = SkinPreferences.load(preferencesFile);
+            addInstancePreferencesOnce(ownPreferences);
+        } else {
+            skinsDirectory = ownSkins;
+            capesDirectory = ownCapes;
+            instanceSkinsDirectory = null;
+            instanceCapesDirectory = null;
+            preferencesFile = ownPreferences;
+            skinPreferences = SkinPreferences.load(preferencesFile);
+        }
 
         // Discover assets
         discoverLocalAssets();
@@ -327,6 +395,12 @@ public class LocalAssetManager {
         // Scan capes directory
         scanDirectory(capesDirectory, "cape", scanned);
 
+        // Then this instance's own folders, behind the shared library
+        scanned.secondary = true;
+        if (instanceSkinsDirectory != null) scanDirectory(instanceSkinsDirectory, "skin", scanned);
+        if (instanceCapesDirectory != null) scanDirectory(instanceCapesDirectory, "cape", scanned);
+        scanned.secondary = false;
+
         // CPM is optional: do not even expose model files when the mod is absent.
         if (com.quickskin.mod.client.compat.CPMCompatIntegration.isAvailable()) {
             com.quickskin.mod.client.compat.CpmModelWorkflow.reconcilePendingSkinModeReset();
@@ -338,6 +412,11 @@ public class LocalAssetManager {
         // Publish both indexes together. Readers keep seeing the previous complete catalog until
         // this single volatile write, even if the disk scan is slow or skips an invalid entry.
         CatalogSnapshot completed = scanned.freeze();
+        Map<String, List<Path>> copies = new HashMap<>();
+        scanned.otherCopies.forEach((primary, paths) -> {
+            if (completed.metadata().containsKey(primary)) copies.put(primary, List.copyOf(paths));
+        });
+        otherCopies = Map.copyOf(copies);
         catalog = completed;
         com.quickskin.mod.client.compat.CpmModelWorkflow.sanitizeMissingActiveModel();
         migrateLegacyCacheFiles(completed);
@@ -1507,6 +1586,20 @@ public class LocalAssetManager {
 
         try {
             Files.delete(path);
+            // Every copy goes, or the one left in another library would bring the asset back
+            List<Path> copies = otherCopies.get(primary);
+            if (copies != null) {
+                for (Path copy : copies) {
+                    try {
+                        Files.deleteIfExists(copy);
+                    } catch (IOException copyError) {
+                        QuickSkinInfo.LOGGER.warn("Unable to delete the copy {} of a deleted asset", copy, copyError);
+                    }
+                }
+                Map<String, List<Path>> remaining = new HashMap<>(otherCopies);
+                remaining.remove(primary);
+                otherCopies = Map.copyOf(remaining);
+            }
             if (metadata.isSkin()) {
                 com.quickskin.mod.client.compat.CPMCompatIntegration.evictHttpTextureCache(primary);
             }
@@ -1710,9 +1803,11 @@ public class LocalAssetManager {
             return List.of();
         }
 
-        List<Path> directories = new ArrayList<>(3);
+        List<Path> directories = new ArrayList<>(5);
         directories.add(skinsDirectory);
         if (capesDirectory != null) directories.add(capesDirectory);
+        if (instanceSkinsDirectory != null) directories.add(instanceSkinsDirectory);
+        if (instanceCapesDirectory != null) directories.add(instanceCapesDirectory);
         if (com.quickskin.mod.client.compat.CPMCompatIntegration.isAvailable()) {
             Path modelsDirectory =
                     com.quickskin.mod.client.compat.CPMCompatIntegration.getCPMModelsDirectory();
@@ -2164,6 +2259,38 @@ public class LocalAssetManager {
         String primary = catalog.resolve(hash);
         if (primary == null || skinPreferences == null) return;
         skinPreferences.setFavorite(primary, favorite);
+        savePreferences();
+    }
+
+    /** The cape this skin puts on when it is worn, or null; the cape itself may have been deleted. */
+    public String getSkinCape(String hash) {
+        if (!NetworkSecurity.isValidContentId(hash)) return null;
+        String primary = catalog.resolve(hash);
+        return primary != null && skinPreferences != null ? skinPreferences.getCape(primary) : null;
+    }
+
+    /** Gives a skin a cape of its own, put on whenever the skin is, or takes it away with null. */
+    public void setSkinCape(String hash, String capeId) {
+        if (!NetworkSecurity.isValidContentId(hash)) return;
+        String primary = catalog.resolve(hash);
+        if (primary == null || skinPreferences == null) return;
+        skinPreferences.setCape(primary, capeId);
+        savePreferences();
+    }
+
+    /** What the elytra wear with this skin ("" the cape), or null when they keep what they wear. */
+    public String getSkinElytra(String hash) {
+        if (!NetworkSecurity.isValidContentId(hash)) return null;
+        String primary = catalog.resolve(hash);
+        return primary != null && skinPreferences != null ? skinPreferences.getElytra(primary) : null;
+    }
+
+    /** Gives a skin elytra of its own, put on whenever the skin is, or takes them away with null. */
+    public void setSkinElytra(String hash, String elytraId) {
+        if (!NetworkSecurity.isValidContentId(hash)) return;
+        String primary = catalog.resolve(hash);
+        if (primary == null || skinPreferences == null) return;
+        skinPreferences.setElytra(primary, elytraId);
         savePreferences();
     }
 

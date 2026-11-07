@@ -30,7 +30,8 @@ import net.minecraft.resources.Identifier;
 /**
  * One skin in the skin column: a square tile showing its face in the grid, or a card with its 3D
  * bust, name and details in the list. A hovered tile or card shows a favorite star, except on the
- * player's own skin. In the skin menu's delete mode a skin marked for deletion turns red and grey.
+ * player's own skin. A skin with a cape of its own has that cape hanging from the top of its tile
+ * or card as a ribbon. In the skin menu's delete mode a skin marked for deletion turns red and grey.
  * A deleted skin is drawn the same way while it falls out of the column, from grey copies taken
  * before its files and texture went away.
  */
@@ -52,6 +53,11 @@ public class SkinEntry {
     private boolean isFavoriteHovered;
     /** Whether the player marked this skin as a favorite; the list is rebuilt when that changes. */
     private final boolean favorite;
+    /** The cape this skin puts on, shown as its ribbon, or null; the list is rebuilt when it changes. */
+    @org.jetbrains.annotations.Nullable
+    private final String capeId;
+    /** Whether this skin also chooses what the elytra wear: its ribbon then has a purple edge. */
+    private final boolean ownElytra;
     /** Whether this skin was deleted and is only drawn while it leaves the column. */
     private boolean departing;
     /** The grey face a deleted tile shows, taken while its texture was still loaded. */
@@ -73,6 +79,15 @@ public class SkinEntry {
         this.metadata = metadata;
         this.mc = Minecraft.getInstance();
         this.favorite = LocalAssetManager.getInstance().isFavorite(metadata.hash());
+        String elytraId = metadata.isCpmModel() ? null
+                : com.quickskin.mod.client.services.SkinCapes.assignedElytra(metadata.hash());
+        this.ownElytra = elytraId != null;
+        String capeId = metadata.isCpmModel() ? null : com.quickskin.mod.client.services.SkinCapes.assigned(metadata.hash());
+        // Elytra of its own alone: the ribbon shows the cape they wear, if they wear one
+        if (capeId == null && elytraId != null && (elytraId.startsWith("local_cape:") || elytraId.startsWith("known:"))) {
+            capeId = elytraId;
+        }
+        this.capeId = capeId;
 
         // Get texture location from LocalAssetManager
         this.textureLocation = LocalAssetManager.getInstance()
@@ -223,6 +238,13 @@ public class SkinEntry {
             UiText.drawCentered(graphics, mc.font, "?", faceX + faceSize / 2, faceY + faceSize / 2 - 4, 0xFFFFFFFF);
         }
 
+        // The skin's own cape hangs from the top-right corner
+        if ((capeId != null || ownElytra) && !departing) {
+            int ribbonWidth = Math.max(6, Math.min(10, tileSize / 4));
+            drawCapeRibbon(graphics, tileRight - 3 - ribbonWidth, tileTop + 1, ribbonWidth,
+                    Math.round(ribbonWidth * 1.6f));
+        }
+
         // The favorite star in the top-left corner: a button on hover, outside the delete mode, and
         // kept on a favorite
         this.isFavoriteHovered = false;
@@ -244,6 +266,7 @@ public class SkinEntry {
     // The list rows are cards in the Confirm button's style: a charcoal face in a thin border and a
     // black outline, on a darker lip
     private static final int CARD_OUTLINE = 0xFF0E0E0F;
+    private static final int ELYTRA_EDGE = 0xFFBE78FF;
     private static final int CARD_FACE = 0xFF3A3B3E;
     private static final int CARD_FACE_HOVER = 0xFF4A4B4F;
     private static final int CARD_BORDER = 0xFF6E6F73;
@@ -369,11 +392,22 @@ public class SkinEntry {
             drawStar(graphics, ICON_STAR, favoriteLeft + 3, favoriteTop + 2, FAVORITE_COLOR);
         }
 
+        // The skin's own cape hangs from the card's top edge, left of the favourite star
+        int ribbonLeft = right - 3 - ROW_BUTTON_SIZE - 4 - RIBBON_WIDTH;
+        boolean ribbon = (capeId != null || ownElytra) && !departing;
+        if (ribbon) {
+            drawCapeRibbon(graphics, ribbonLeft, top + 1, RIBBON_WIDTH, RIBBON_HEIGHT);
+        }
+
         // The name, a hairline, then the arm width and the resolution
         int textLeft = left + 3 + bustWidth + TEXT_GAP;
         int textRight = right - 6;
         int middle = (top + faceBottom) / 2;
-        String name = fit(getSortName(), (showFavorite ? favoriteLeft - 3 : textRight) - textLeft);
+        int nameRight = showFavorite ? favoriteLeft - 3 : textRight;
+        if (ribbon) {
+            nameRight = Math.min(nameRight, ribbonLeft - 3);
+        }
+        String name = fit(getSortName(), nameRight - textLeft);
         drawText(graphics, name, textLeft, middle - 11, marked ? MARKED_NAME_COLOR : 0xFFFFFFFF);
         graphics.fill(textLeft, middle, textRight, middle + 1, 0x38FFFFFF);
 
@@ -551,6 +585,93 @@ public class SkinEntry {
      * Draws an outline immediately using fill calls instead of submitOutline,
      * which defers rendering and can cause z-order issues with modals.
      */
+    private static final int RIBBON_WIDTH = 10;
+    private static final int RIBBON_HEIGHT = 16;
+
+    /**
+     * The skin's cape as a ribbon {@code width} by {@code height} with its top-left corner at
+     * {@code (x, y)}: the cape's outer face, its lower edge cut into a V, on a dark outline. It is
+     * drawn a column at a time so each column can end at the notch.
+     */
+    private void drawCapeRibbon(
+            //? if <26.1 {
+            GuiGraphics graphics,
+            //?} else {
+            GuiGraphicsExtractor graphics,
+            //?}
+            int x, int y, int width, int height) {
+        //? if <1.21.11 {
+        ResourceLocation texture = capeTexture();
+        //?} else {
+        Identifier texture = capeTexture();
+        //?}
+        int notch = Math.max(2, height / 5);
+        int[] lengths = new int[width];
+        for (int i = 0; i < width; i++) {
+            float fromMiddle = Math.abs(i + 0.5f - width / 2f) / (width / 2f);
+            lengths[i] = height - Math.round(notch * (1f - fromMiddle));
+        }
+        // The outline: a column wider each side and a pixel longer below, purple when the skin
+        // also chooses what the elytra wear (the cape menu's elytra colour)
+        int outline = ownElytra ? ELYTRA_EDGE : CARD_OUTLINE;
+        graphics.fill(x - 1, y, x, y + lengths[0], outline);
+        graphics.fill(x + width, y, x + width + 1, y + lengths[width - 1], outline);
+        for (int i = 0; i < width; i++) {
+            graphics.fill(x + i, y, x + i + 1, y + lengths[i] + 1, outline);
+        }
+        if (texture == null) {
+            for (int i = 0; i < width; i++) {
+                graphics.fill(x + i, y, x + i + 1, y + lengths[i], CARD_BORDER_HOVER);
+            }
+            return;
+        }
+        // The outer face spans texels (1, 1) to (11, 17) of the 64x32 layout at any resolution:
+        // the coordinates are scaled up 16 times so a column can sample a fraction of a texel
+        final int scale = 16;
+        int regionWidth = Math.max(1, Math.round(10f * scale / width));
+        //? if <1.21.2 {
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        com.mojang.blaze3d.systems.RenderSystem.defaultBlendFunc();
+        //?}
+        for (int i = 0; i < width; i++) {
+            float u = (1f + 10f * i / width) * scale;
+            int regionHeight = Math.max(1, Math.round(16f * lengths[i] / height * scale));
+            GuiCompat.blit(graphics, texture, x + i, y, 1, lengths[i], u, scale,
+                    regionWidth, regionHeight, 64 * scale, 32 * scale);
+        }
+        //? if <1.21.2 {
+        com.mojang.blaze3d.systems.RenderSystem.disableBlend();
+        //?}
+    }
+
+    /** The texture of this skin's cape, one frame of it if it is animated, or null while it has none. */
+    @org.jetbrains.annotations.Nullable
+    //? if <1.21.11 {
+    private ResourceLocation capeTexture() {
+    //?} else {
+    private Identifier capeTexture() {
+    //?}
+        if (capeId == null) {
+            return null;
+        }
+        if (capeId.startsWith("local_cape:")) {
+            // An animated catalogue cape's texture is its first frame alone
+            return LocalAssetManager.getInstance()
+                    .getTextureLocation(capeId.substring("local_cape:".length()), TextureQuality.FULL);
+        }
+        com.quickskin.mod.common.data.KnownCapes known =
+                com.quickskin.mod.common.data.KnownCapes.getById(capeId.substring("known:".length()));
+        if (known == null) {
+            return null;
+        }
+        if (known.isAnimated()) {
+            // A built-in animated cape's texture is its whole atlas: only a running animation's frame will do
+            return com.quickskin.mod.client.services.AnimatedTextureManager.getInstance()
+                    .getAnimationFrame(known.getTextureLocation()).orElse(null);
+        }
+        return known.getTextureLocation();
+    }
+
     private static void drawOutline(
             //? if <26.1 {
             GuiGraphics graphics,
