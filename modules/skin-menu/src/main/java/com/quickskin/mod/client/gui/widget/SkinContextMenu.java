@@ -30,7 +30,8 @@ import java.util.List;
 
 /**
  * The menu a right click on a skin opens beside the mouse: mark or unmark it as a favorite (not
- * the player's own skin, which is pinned first anyway), rename it, or delete it. Deleting takes
+ * the player's own skin, which is pinned first anyway), rename it, give it a cape of its own
+ * (change it, or take it away), or delete it. Deleting takes
  * a second click on the same item, which first turns red and asks; there is no dialog. A click
  * anywhere else, Escape or the mouse wheel closes the menu. It pops out of its corner at the
  * mouse when it opens and shrinks back into it when it closes.
@@ -57,6 +58,8 @@ public class SkinContextMenu extends AbstractWidget {
     private static final String[] ICON_STAR = {"...#...", "..###..", "#######", ".#####.", "..###..", ".##.##.", "##...##"};
     private static final String[] ICON_PEN = {".....##", "....###", "...###.", "..###..", ".###...", "###....", "##....."};
     private static final String[] ICON_TRASH = {"..###..", "#######", ".#.#.#.", ".#.#.#.", ".#.#.#.", ".#.#.#.", ".#####."};
+    private static final String[] ICON_CAPE = {".#####.", "#######", "#######", "#######", "#######", "#######", "#.#.#.#"};
+    private static final String[] ICON_NO_CAPE = {"##...##", ".##.##.", "..###..", "..###..", ".##.##.", "##...##", "......."};
 
     /** What the menu does with the skin it was opened on. */
     public interface Actions {
@@ -64,10 +67,16 @@ public class SkinContextMenu extends AbstractWidget {
 
         void rename(AssetMetadata metadata);
 
+        /** Opens the cape menu to pick the cape this skin puts on. */
+        void assignCape(AssetMetadata metadata);
+
+        /** Takes this skin's own cape away; wearing it then keeps whatever cape is worn. */
+        void removeCape(AssetMetadata metadata);
+
         void delete(AssetMetadata metadata);
     }
 
-    private enum Item { FAVORITE, RENAME, DELETE }
+    private enum Item { FAVORITE, RENAME, ASSIGN_CAPE, REMOVE_CAPE, DELETE }
 
     private final Actions actions;
     private final Minecraft mc = Minecraft.getInstance();
@@ -75,6 +84,8 @@ public class SkinContextMenu extends AbstractWidget {
     @Nullable
     private AssetMetadata target;
     private boolean favorite;
+    /** Whether the skin has a cape of its own, which turns Assign into Change. */
+    private boolean capeAssigned;
     /** Whether Delete was clicked once and now asks to be clicked again. */
     private boolean armed;
     private long openedAt;
@@ -94,22 +105,30 @@ public class SkinContextMenu extends AbstractWidget {
 
     /**
      * Opens the menu for a skin with its top-left corner at the mouse, moved left or up to stay
-     * on the screen.
+     * on the screen. A CPM model has no cape items: wearing one keeps the cape worn.
      */
-    public void open(AssetMetadata metadata, boolean ownSkin, boolean favorite, int mouseX, int mouseY,
-                     int screenWidth, int screenHeight) {
+    public void open(AssetMetadata metadata, boolean ownSkin, boolean favorite, boolean capeAssigned,
+                     int mouseX, int mouseY, int screenWidth, int screenHeight) {
         this.target = metadata;
         this.favorite = favorite;
+        this.capeAssigned = capeAssigned;
         this.armed = false;
         items.clear();
         if (!ownSkin) {
             items.add(Item.FAVORITE);
         }
         items.add(Item.RENAME);
+        if (!metadata.isCpmModel()) {
+            items.add(Item.ASSIGN_CAPE);
+            if (capeAssigned) {
+                items.add(Item.REMOVE_CAPE);
+            }
+        }
         items.add(Item.DELETE);
         int textWidth = 0;
         for (String key : new String[] {"quickskin.context.favorite", "quickskin.context.unfavorite",
-                "quickskin.context.rename", "quickskin.context.delete", "quickskin.context.delete_confirm"}) {
+                "quickskin.context.rename", "quickskin.context.assign_cape", "quickskin.context.change_cape",
+                "quickskin.context.remove_cape", "quickskin.context.delete", "quickskin.context.delete_confirm"}) {
             textWidth = Math.max(textWidth, mc.font.width(Component.translatable(key)));
         }
         this.width = TEXT_LEFT + textWidth + 6;
@@ -146,6 +165,8 @@ public class SkinContextMenu extends AbstractWidget {
         return Component.translatable(switch (item) {
             case FAVORITE -> favorite ? "quickskin.context.unfavorite" : "quickskin.context.favorite";
             case RENAME -> "quickskin.context.rename";
+            case ASSIGN_CAPE -> capeAssigned ? "quickskin.context.change_cape" : "quickskin.context.assign_cape";
+            case REMOVE_CAPE -> "quickskin.context.remove_cape";
             case DELETE -> armed ? "quickskin.context.delete_confirm" : "quickskin.context.delete";
         });
     }
@@ -154,6 +175,8 @@ public class SkinContextMenu extends AbstractWidget {
         return switch (item) {
             case FAVORITE -> ICON_STAR;
             case RENAME -> ICON_PEN;
+            case ASSIGN_CAPE -> ICON_CAPE;
+            case REMOVE_CAPE -> ICON_NO_CAPE;
             case DELETE -> ICON_TRASH;
         };
     }
@@ -251,6 +274,16 @@ public class SkinContextMenu extends AbstractWidget {
                 playClick();
                 close();
                 actions.rename(metadata);
+            }
+            case ASSIGN_CAPE -> {
+                playClick();
+                close();
+                actions.assignCape(metadata);
+            }
+            case REMOVE_CAPE -> {
+                playClick();
+                close();
+                actions.removeCape(metadata);
             }
             case DELETE -> {
                 if (!armed) {

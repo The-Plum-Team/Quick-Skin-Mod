@@ -10,6 +10,9 @@
 - **Elytra with a cape of their own**
 > The cape menu has Cape and Elytra tabs: in the Elytra tab, pick any cape for your elytra, keep them the same as your cape, or give them vanilla's elytra texture. In the Cape tab, right-click a cape to put it on your elytra. Other players with Quick Skin 4.1.0 see your elytra's own cape; players on older versions see your elytra wear your cape as before.
 
+- **A cape for each skin**
+> Right-click a skin in the skin menu and pick Assign a cape...: the cape menu opens for that skin, and the cape you click is put on whenever you wear the skin, from the skin menu or the favourites fan. The menu's Elytra tab picks what the elytra wear with that skin too (its cape, vanilla's elytra or another cape). A skin with a cape of its own has it hanging from its card as a ribbon, edged purple when it also has its own elytra; Change cape... and Remove cape are in the same menu. A skin without one keeps the cape and elytra you are wearing.
+
 - **Hide Cosmetic Armor pieces from everyone**
 > With Cosmetic Armor Reworked, a cosmetic piece over your armour is now a piece of its own on the skin menu's model: hide it and every other player sees the armour under it instead, like any hidden piece. The server needs this update for others to see it.
 

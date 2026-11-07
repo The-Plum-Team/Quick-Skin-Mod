@@ -2167,6 +2167,38 @@ public class LocalAssetManager {
         savePreferences();
     }
 
+    /** The cape this skin puts on when it is worn, or null; the cape itself may have been deleted. */
+    public String getSkinCape(String hash) {
+        if (!NetworkSecurity.isValidContentId(hash)) return null;
+        String primary = catalog.resolve(hash);
+        return primary != null && skinPreferences != null ? skinPreferences.getCape(primary) : null;
+    }
+
+    /** Gives a skin a cape of its own, put on whenever the skin is, or takes it away with null. */
+    public void setSkinCape(String hash, String capeId) {
+        if (!NetworkSecurity.isValidContentId(hash)) return;
+        String primary = catalog.resolve(hash);
+        if (primary == null || skinPreferences == null) return;
+        skinPreferences.setCape(primary, capeId);
+        savePreferences();
+    }
+
+    /** What the elytra wear with this skin ("" the cape), or null when they keep what they wear. */
+    public String getSkinElytra(String hash) {
+        if (!NetworkSecurity.isValidContentId(hash)) return null;
+        String primary = catalog.resolve(hash);
+        return primary != null && skinPreferences != null ? skinPreferences.getElytra(primary) : null;
+    }
+
+    /** Gives a skin elytra of its own, put on whenever the skin is, or takes them away with null. */
+    public void setSkinElytra(String hash, String elytraId) {
+        if (!NetworkSecurity.isValidContentId(hash)) return;
+        String primary = catalog.resolve(hash);
+        if (primary == null || skinPreferences == null) return;
+        skinPreferences.setElytra(primary, elytraId);
+        savePreferences();
+    }
+
     /**
      * Save skin preferences to disk
      */

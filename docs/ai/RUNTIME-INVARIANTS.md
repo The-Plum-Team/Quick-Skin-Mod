@@ -533,6 +533,16 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   because the 1.20.1 overlay replaces the canonical file on the only lane official TaCZ exists
   for. The animation plays on the real local player, so other first-person draws of that
   player's model show it too; it never reaches the first-person arms.
+- A skin may have a cape of its own (`SkinCapes`, appearance-services), kept as the skin's `cape`
+  in its preferences (`SkinPreferences`): a `local_cape:` content ID or a `known:` built-in name,
+  nothing else. It is picked from the skin menu's context menu through the cape menu opened for
+  that skin (`PlayerCapeMenuScreen.forSkin`). Its Elytra tab picks the skin's `elytra`: "" (the
+  cape), `minecraft:elytra` or a cape ID, null keeping what the elytra wear. Choosing the skin in
+  the skin menu or the favourites fan puts both on like clicks in the cape menu (the active cape
+  and `activeElytraId`, applied to the player); a skin without a choice, a CPM model, or a skin
+  whose cape was deleted keeps what is worn. The skin list shows it as a ribbon on the card or
+  tile, edged purple when the skin chooses its elytra; Remove cape takes both choices away. It is a local choice: nothing new
+  travels on the wire, and a deleted cape is not forgotten, so importing it again brings it back.
 - The favourites fan (`favourites-fan`) is a HUD layer, never a screen, so the player keeps
   walking while it is open. Its key is unbound until the player binds it. One press opens it on
   the skins and CPM models marked as favourites, in the skin menu's order, at most

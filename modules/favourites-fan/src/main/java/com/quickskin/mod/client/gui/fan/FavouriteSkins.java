@@ -113,6 +113,8 @@ final class FavouriteSkins {
         } else {
             CpmModelWorkflow.activateSkin(metadata.hash());
             appearances.applySkin(player, "local_skin:" + metadata.hash(), modelType(metadata));
+            // A skin with a cape of its own puts it on too
+            com.quickskin.mod.client.services.SkinCapes.wear(metadata.hash(), player);
         }
         lastChangeMillis = System.currentTimeMillis();
         return Result.WORN;
