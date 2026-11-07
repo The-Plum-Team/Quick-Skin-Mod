@@ -271,6 +271,9 @@
   "quickskin.settings.player_skins.open": "Відкрити",
   "quickskin.settings.enable_own_skin": "Автоматично імпортувати скін акаунта",
   "quickskin.settings.own_skin_tooltip": "Під час запуску завантажує скін вашого акаунта Minecraft і додає його до списку.",
+  "quickskin.settings.cloud_sync": "Синхронізувати скіни з обліковим записом Minecraft",
+  "quickskin.settings.cloud_sync_tooltip": "Лише ліцензійні облікові записи. Зберігає ваші скіни та плащі в хмарі Quick Skin, щоб вони були в кожній збірці й на кожному комп'ютері.",
+  "quickskin.cloud_sync.notice": "Ваші скіни тепер синхронізуються з обліковим записом Minecraft. Це можна вимкнути в налаштуваннях.",
   "quickskin.settings.server_notice": "Лише адміністратори можуть змінювати ці налаштування",
 
   "_comment_preview": "=== Player Preview ===",

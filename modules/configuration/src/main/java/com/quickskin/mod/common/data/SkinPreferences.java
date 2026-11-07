@@ -185,6 +185,29 @@ public class SkinPreferences {
     }
 
     /**
+     * Adds every preference of {@code other} for a skin these preferences say nothing about, so
+     * an instance's choices join the shared library without overriding the shared ones.
+     *
+     * @return how many preferences were added
+     */
+    public synchronized int addMissingFrom(SkinPreferences other) {
+        if (other == null || other == this) return 0;
+        Map<String, SkinPreference> incoming;
+        synchronized (other) {
+            other.normalize();
+            incoming = new HashMap<>();
+            other.preferences.forEach((hash, preference) -> incoming.put(hash, preference.copy()));
+        }
+        normalize();
+        int added = 0;
+        for (Map.Entry<String, SkinPreference> entry : incoming.entrySet()) {
+            if (preferences.size() >= MAX_PREFERENCES) break;
+            if (preferences.putIfAbsent(entry.getKey(), entry.getValue()) == null) added++;
+        }
+        return added;
+    }
+
+    /**
      * Clear all preferences
      */
     public synchronized void clear() {

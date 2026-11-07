@@ -271,6 +271,9 @@
   "quickskin.settings.player_skins.open": "เปิด",
   "quickskin.settings.enable_own_skin": "นำเข้าสกินของบัญชีโดยอัตโนมัติ",
   "quickskin.settings.own_skin_tooltip": "เมื่อเริ่มเกม จะดาวน์โหลดสกินบัญชี Minecraft ของคุณและเพิ่มลงในรายการ",
+  "quickskin.settings.cloud_sync": "ซิงค์สกินกับบัญชี Minecraft ของคุณ",
+  "quickskin.settings.cloud_sync_tooltip": "เฉพาะบัญชีพรีเมียม เก็บสกินและผ้าคลุมของคุณไว้บนคลาวด์ Quick Skin เพื่อให้ทุกม็อดแพ็กและทุกคอมพิวเตอร์มีเหมือนกัน",
+  "quickskin.cloud_sync.notice": "สกินของคุณซิงค์กับบัญชี Minecraft แล้ว ปิดได้ในการตั้งค่า",
   "quickskin.settings.server_notice": "เฉพาะผู้ดูแลเท่านั้นที่เปลี่ยนการตั้งค่าเหล่านี้ได้",
 
   "_comment_preview": "=== Player Preview ===",

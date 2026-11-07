@@ -271,6 +271,9 @@
   "quickskin.settings.player_skins.open": "Aç",
   "quickskin.settings.enable_own_skin": "Hesabının skinini otomatik içe aktar",
   "quickskin.settings.own_skin_tooltip": "Başlangıçta Minecraft hesabının skinini indirir ve listene ekler.",
+  "quickskin.settings.cloud_sync": "Skinlerini Minecraft hesabınla eşitle",
+  "quickskin.settings.cloud_sync_tooltip": "Yalnızca premium hesaplar. Skinlerini ve pelerinlerini Quick Skin bulutunda tutar; böylece her mod paketinde ve bilgisayarda görünürler.",
+  "quickskin.cloud_sync.notice": "Skinlerin artık Minecraft hesabınla eşitleniyor. Bunu Ayarlar'dan kapatabilirsin.",
   "quickskin.settings.server_notice": "Bu ayarları yalnızca yöneticiler değiştirebilir",
 
   "_comment_preview": "=== Player Preview ===",

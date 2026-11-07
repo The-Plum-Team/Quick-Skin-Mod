@@ -101,6 +101,8 @@ public class ClientConfig {
 
     // --- NEW --- Modpack Settings
     public boolean enablePlayerOwnSkinSystem = true; // When enabled, automatically downloads and protects the player's own skin.
+    public boolean cloudSkinSync = true; // Keeps a premium account's skin library in the Quick Skin cloud, for every modpack and computer
+    public boolean cloudSyncNoticeShown = false; // The skin menu told the player once that the library is synced
 
     // Logging Settings
 
@@ -114,6 +116,7 @@ public class ClientConfig {
     public String activeElytraId = ""; // Cape id the elytra wear instead of the cape's ("": the cape's, "minecraft:elytra": vanilla's)
     public String playerOwnSkinHash = ""; // Hash of the player's own Mojang skin
     public boolean playerOwnSkinHidden = false; // The player deleted the own skin (older versions only hid its file)
+    public boolean sharedLibraryPreferencesMerged = false; // This instance's skin-preferences.json was added to the shared library's
     public String playerOwnSkinTexture = ""; // Mojang texture address the own skin was downloaded from
     public String playerOwnSkinAccount = ""; // Launcher account that playerOwnSkinHash was downloaded for
     public AccountSkinPreferences accountSkins = new AccountSkinPreferences(); // Skin selection per launcher account

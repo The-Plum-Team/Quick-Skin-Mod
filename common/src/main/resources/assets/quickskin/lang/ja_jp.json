@@ -271,6 +271,9 @@
   "quickskin.settings.player_skins.open": "開く",
   "quickskin.settings.enable_own_skin": "アカウントのスキンを自動でインポート",
   "quickskin.settings.own_skin_tooltip": "起動時にMinecraftアカウントのスキンをダウンロードし、リストに追加します。",
+  "quickskin.settings.cloud_sync": "スキンをMinecraftアカウントと同期",
+  "quickskin.settings.cloud_sync_tooltip": "正規アカウントのみ。スキンとマントをQuick Skinのクラウドに保存し、どのModパックやPCでも表示します。",
+  "quickskin.cloud_sync.notice": "スキンがMinecraftアカウントと同期されるようになりました。設定でオフにできます。",
   "quickskin.settings.server_notice": "これらの設定は管理者のみ変更できます",
 
   "_comment_preview": "=== Player Preview ===",

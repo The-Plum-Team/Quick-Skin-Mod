@@ -221,6 +221,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 showToast(Component.translatable("quickskin.skin.assigned_hint"), ErrorToast.Kind.INFO);
             }
         }
+        // Once ever, after the first sync of the library with the account's cloud library
+        if (com.quickskin.mod.client.sync.CloudSkinSync.takeNotice()) {
+            showToast(Component.translatable("quickskin.cloud_sync.notice"), ErrorToast.Kind.INFO);
+        }
     }
 
     /**
