@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "Vanilla-vervaging",
   "quickskin.settings.keybind_assign": "Toets toewijzen om het skinmenu te openen",
   "quickskin.settings.keybind_change": "Toets voor het skinmenu wijzigen",
+  "quickskin.settings.fan_keybind_assign": "Toets toewijzen om favoriete skins te openen",
+  "quickskin.settings.fan_keybind_change": "Toets voor favoriete skins wijzigen",
   "quickskin.settings.disable_transparency": "Transparante delen van skins dekkend tonen",
   "quickskin.settings.disable_transparency.tooltip": "Handig als je gaten ziet in slecht gemaakte skins.",
   "quickskin.settings.show_title_preview": "Toon je personage op het titelscherm",

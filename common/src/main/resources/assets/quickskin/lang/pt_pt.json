@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "Desfoque Vanilla",
   "quickskin.settings.keybind_assign": "Atribuir tecla para abrir o menu de peles",
   "quickskin.settings.keybind_change": "Mudar a tecla que abre o menu de peles",
+  "quickskin.settings.fan_keybind_assign": "Atribuir tecla para abrir as peles favoritas",
+  "quickskin.settings.fan_keybind_change": "Mudar a tecla que abre as peles favoritas",
   "quickskin.settings.disable_transparency": "Mostrar as partes transparentes das peles como opacas",
   "quickskin.settings.disable_transparency.tooltip": "Útil se vires buracos em peles mal feitas.",
   "quickskin.settings.show_title_preview": "Mostrar a tua personagem no ecrã de título",

@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "Vanilla-Unschärfe",
   "quickskin.settings.keybind_assign": "Taste zum Öffnen des Skin-Menüs zuweisen",
   "quickskin.settings.keybind_change": "Taste zum Öffnen des Skin-Menüs ändern",
+  "quickskin.settings.fan_keybind_assign": "Taste zum Öffnen der Lieblingsskins zuweisen",
+  "quickskin.settings.fan_keybind_change": "Taste zum Öffnen der Lieblingsskins ändern",
   "quickskin.settings.disable_transparency": "Transparente Teile von Skins deckend zeigen",
   "quickskin.settings.disable_transparency.tooltip": "Nützlich, wenn du Löcher in schlecht gemachten Skins siehst.",
   "quickskin.settings.show_title_preview": "Deine Figur im Titelbildschirm zeigen",

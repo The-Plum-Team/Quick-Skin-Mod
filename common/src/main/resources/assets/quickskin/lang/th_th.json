@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "เบลอวานิลลา",
   "quickskin.settings.keybind_assign": "กำหนดปุ่มเปิดเมนูสกิน",
   "quickskin.settings.keybind_change": "เปลี่ยนปุ่มเปิดเมนูสกิน",
+  "quickskin.settings.fan_keybind_assign": "กำหนดปุ่มเปิดสกินโปรด",
+  "quickskin.settings.fan_keybind_change": "เปลี่ยนปุ่มเปิดสกินโปรด",
   "quickskin.settings.disable_transparency": "แสดงส่วนโปร่งใสของสกินเป็นแบบทึบ",
   "quickskin.settings.disable_transparency.tooltip": "มีประโยชน์ถ้าคุณเห็นรูบนสกินที่ทำมาไม่ดี",
   "quickskin.settings.show_title_preview": "แสดงตัวละครในหน้าจอหลัก",

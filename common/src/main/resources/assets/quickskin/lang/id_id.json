@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "Blur Vanilla",
   "quickskin.settings.keybind_assign": "Atur tombol untuk membuka menu skin",
   "quickskin.settings.keybind_change": "Ubah tombol untuk membuka menu skin",
+  "quickskin.settings.fan_keybind_assign": "Atur tombol untuk membuka skin favorit",
+  "quickskin.settings.fan_keybind_change": "Ubah tombol untuk membuka skin favorit",
   "quickskin.settings.disable_transparency": "Tampilkan bagian transparan skin sebagai buram",
   "quickskin.settings.disable_transparency.tooltip": "Berguna jika kamu melihat lubang pada skin yang dibuat asal-asalan.",
   "quickskin.settings.show_title_preview": "Tampilkan karaktermu di layar judul",

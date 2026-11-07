@@ -5,7 +5,7 @@
 ### Added
 
 - **A favourites fan**
-> Bind the new Favourites Fan key in Controls › Quick Skin, and one press fans your favourite skins and CPM models out as cards over the hotbar, in the skin menu's order. You keep walking while it is open: the mouse points at the cards instead of turning the camera, a click wears the card you point at, and the key again, Esc or a right click puts it away. The mouse wheel turns the page when you have more favourites than fit, and on a server with a skin-change cooldown the fan tells you how long is left.
+> Bind the new Favourites Fan key in Quick Skin's settings (Client tab) or in Controls › Quick Skin, and one press fans your favourite skins and CPM models out as cards over the hotbar, in the skin menu's order. You keep walking while it is open: the mouse points at the cards instead of turning the camera, a click wears the card you point at, and the key again, Esc or a right click puts it away. The mouse wheel turns the page when you have more favourites than fit, and on a server with a skin-change cooldown the fan tells you how long is left.
 
 - **Elytra with a cape of their own**
 > The cape menu has Cape and Elytra tabs: in the Elytra tab, pick any cape for your elytra, keep them the same as your cape, or give them vanilla's elytra texture. In the Cape tab, right-click a cape to put it on your elytra. Other players with Quick Skin 4.1.0 see your elytra's own cape; players on older versions see your elytra wear your cape as before.

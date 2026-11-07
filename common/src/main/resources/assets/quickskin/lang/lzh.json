@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "原版模糊",
   "quickskin.settings.keybind_assign": "設鍵以啟膚選單",
   "quickskin.settings.keybind_change": "改啟膚選單之鍵",
+  "quickskin.settings.fan_keybind_assign": "設鍵以啟所好之膚",
+  "quickskin.settings.fan_keybind_change": "改啟所好之膚之鍵",
   "quickskin.settings.disable_transparency": "膚之透處示為不透",
   "quickskin.settings.disable_transparency.tooltip": "膚製粗劣而見孔隙者，用之有益。",
   "quickskin.settings.show_title_preview": "於題屏示己身",

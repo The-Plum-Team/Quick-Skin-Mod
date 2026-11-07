@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "Vanilla-oskärpa",
   "quickskin.settings.keybind_assign": "Tilldela en tangent för att öppna skinmenyn",
   "quickskin.settings.keybind_change": "Ändra tangenten som öppnar skinmenyn",
+  "quickskin.settings.fan_keybind_assign": "Tilldela en tangent för att öppna favoritskins",
+  "quickskin.settings.fan_keybind_change": "Ändra tangenten som öppnar favoritskins",
   "quickskin.settings.disable_transparency": "Visa genomskinliga delar av skins som ogenomskinliga",
   "quickskin.settings.disable_transparency.tooltip": "Användbart om du ser hål i dåligt gjorda skins.",
   "quickskin.settings.show_title_preview": "Visa din figur på titelskärmen",

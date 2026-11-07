@@ -259,6 +259,8 @@
   "quickskin.background.vanilla_blur": "Vanilla Blur",
   "quickskin.settings.keybind_assign": "Assign a key to open the skin menu",
   "quickskin.settings.keybind_change": "Change the key that opens the skin menu",
+  "quickskin.settings.fan_keybind_assign": "Assign a key to open your favourite skins",
+  "quickskin.settings.fan_keybind_change": "Change the key that opens your favourite skins",
   "quickskin.settings.disable_transparency_server": "Turn off Quick Skin's transparency system for every player",
   "quickskin.settings.disable_transparency_server.tooltip": "Every skin on this server is shown without transparency. Useful if someone uses invisible or see-through skins to troll.",
   "quickskin.settings.cooldown_label": "Wait between skin changes",

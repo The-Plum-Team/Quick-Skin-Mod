@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "ضبابية فانيلا",
   "quickskin.settings.keybind_assign": "تعيين مفتاح لفتح قائمة المظاهر",
   "quickskin.settings.keybind_change": "تغيير مفتاح فتح قائمة المظاهر",
+  "quickskin.settings.fan_keybind_assign": "تعيين مفتاح لفتح المظاهر المفضلة",
+  "quickskin.settings.fan_keybind_change": "تغيير مفتاح فتح المظاهر المفضلة",
   "quickskin.settings.disable_transparency": "إظهار الأجزاء الشفافة من المظاهر كأجزاء معتمة",
   "quickskin.settings.disable_transparency.tooltip": "مفيد إذا رأيت ثقوبًا في مظاهر سيئة الصنع.",
   "quickskin.settings.show_title_preview": "إظهار شخصيتك في شاشة العنوان",

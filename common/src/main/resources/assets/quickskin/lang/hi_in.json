@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "वेनिला ब्लर",
   "quickskin.settings.keybind_assign": "स्किन मेनू खोलने के लिए कुंजी तय करें",
   "quickskin.settings.keybind_change": "स्किन मेनू खोलने वाली कुंजी बदलें",
+  "quickskin.settings.fan_keybind_assign": "पसंदीदा स्किन खोलने के लिए कुंजी तय करें",
+  "quickskin.settings.fan_keybind_change": "पसंदीदा स्किन खोलने वाली कुंजी बदलें",
   "quickskin.settings.disable_transparency": "स्किन के पारदर्शी हिस्सों को अपारदर्शी दिखाएँ",
   "quickskin.settings.disable_transparency.tooltip": "खराब बनी स्किन में छेद दिखें तो उपयोगी।",
   "quickskin.settings.show_title_preview": "टाइटल स्क्रीन पर अपना कैरेक्टर दिखाएँ",

@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "Làm mờ Vanilla",
   "quickskin.settings.keybind_assign": "Gán phím để mở menu skin",
   "quickskin.settings.keybind_change": "Đổi phím mở menu skin",
+  "quickskin.settings.fan_keybind_assign": "Gán phím để mở skin yêu thích",
+  "quickskin.settings.fan_keybind_change": "Đổi phím mở skin yêu thích",
   "quickskin.settings.disable_transparency": "Hiện phần trong suốt của skin thành không trong suốt",
   "quickskin.settings.disable_transparency.tooltip": "Hữu ích nếu bạn thấy lỗ thủng trên skin làm ẩu.",
   "quickskin.settings.show_title_preview": "Hiện nhân vật ở màn hình chính",

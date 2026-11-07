@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "Flou Vanilla",
   "quickskin.settings.keybind_assign": "Assigner une touche pour ouvrir le menu des skins",
   "quickskin.settings.keybind_change": "Changer la touche qui ouvre le menu des skins",
+  "quickskin.settings.fan_keybind_assign": "Assigner une touche pour ouvrir les skins favoris",
+  "quickskin.settings.fan_keybind_change": "Changer la touche qui ouvre les skins favoris",
   "quickskin.settings.disable_transparency": "Afficher les parties transparentes des skins en opaque",
   "quickskin.settings.disable_transparency.tooltip": "Utile si tu vois des trous dans des skins mal faits.",
   "quickskin.settings.show_title_preview": "Afficher ton personnage sur l'écran titre",

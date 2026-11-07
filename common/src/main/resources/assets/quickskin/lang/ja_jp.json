@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "バニラぼかし",
   "quickskin.settings.keybind_assign": "スキンメニューを開くキーを割り当て",
   "quickskin.settings.keybind_change": "スキンメニューを開くキーを変更",
+  "quickskin.settings.fan_keybind_assign": "お気に入りスキンを開くキーを割り当て",
+  "quickskin.settings.fan_keybind_change": "お気に入りスキンを開くキーを変更",
   "quickskin.settings.disable_transparency": "スキンの透明部分を不透明で表示",
   "quickskin.settings.disable_transparency.tooltip": "作りの粗いスキンに穴が見える場合に便利です。",
   "quickskin.settings.show_title_preview": "タイトル画面にキャラクターを表示",

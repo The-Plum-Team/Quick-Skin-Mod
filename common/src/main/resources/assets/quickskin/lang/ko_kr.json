@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "바닐라 블러",
   "quickskin.settings.keybind_assign": "스킨 메뉴를 열 키 지정",
   "quickskin.settings.keybind_change": "스킨 메뉴를 여는 키 변경",
+  "quickskin.settings.fan_keybind_assign": "즐겨찾는 스킨을 열 키 지정",
+  "quickskin.settings.fan_keybind_change": "즐겨찾는 스킨을 여는 키 변경",
   "quickskin.settings.disable_transparency": "스킨의 투명한 부분을 불투명하게 표시",
   "quickskin.settings.disable_transparency.tooltip": "잘못 만든 스킨에 구멍이 보일 때 유용합니다.",
   "quickskin.settings.show_title_preview": "타이틀 화면에 캐릭터 표시",

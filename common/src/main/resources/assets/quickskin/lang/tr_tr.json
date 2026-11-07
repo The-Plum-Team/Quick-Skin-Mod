@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "Vanilla bulanıklığı",
   "quickskin.settings.keybind_assign": "Skin menüsünü açmak için tuş ata",
   "quickskin.settings.keybind_change": "Skin menüsünü açan tuşu değiştir",
+  "quickskin.settings.fan_keybind_assign": "Favori skinleri açmak için tuş ata",
+  "quickskin.settings.fan_keybind_change": "Favori skinleri açan tuşu değiştir",
   "quickskin.settings.disable_transparency": "Skinlerin şeffaf kısımlarını opak göster",
   "quickskin.settings.disable_transparency.tooltip": "Kötü yapılmış skinlerde delik görüyorsan işe yarar.",
   "quickskin.settings.show_title_preview": "Karakterini başlık ekranında göster",

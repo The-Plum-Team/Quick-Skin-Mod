@@ -251,6 +251,8 @@
   "quickskin.background.vanilla_blur": "Difuminado Vanilla",
   "quickskin.settings.keybind_assign": "Asignar tecla para abrir el menú de skins",
   "quickskin.settings.keybind_change": "Cambiar tecla para abrir el menú de skins",
+  "quickskin.settings.fan_keybind_assign": "Asignar tecla para abrir los aspectos favoritos",
+  "quickskin.settings.fan_keybind_change": "Cambiar tecla para abrir los aspectos favoritos",
   "quickskin.settings.disable_transparency": "Mostrar las partes transparentes de las skins como opacas",
   "quickskin.settings.disable_transparency.tooltip": "Útil si ves agujeros en skins mal hechas.",
   "quickskin.settings.show_title_preview": "Mostrar a tu personaje en la pantalla de título",

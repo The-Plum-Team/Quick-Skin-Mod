@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "Розмиття Vanilla",
   "quickskin.settings.keybind_assign": "Призначити клавішу для меню скінів",
   "quickskin.settings.keybind_change": "Змінити клавішу меню скінів",
+  "quickskin.settings.fan_keybind_assign": "Призначити клавішу для обраних скінів",
+  "quickskin.settings.fan_keybind_change": "Змінити клавішу обраних скінів",
   "quickskin.settings.disable_transparency": "Показувати прозорі частини скінів непрозорими",
   "quickskin.settings.disable_transparency.tooltip": "Корисно, якщо ви бачите дірки в погано зроблених скінах.",
   "quickskin.settings.show_title_preview": "Показувати персонажа на титульному екрані",

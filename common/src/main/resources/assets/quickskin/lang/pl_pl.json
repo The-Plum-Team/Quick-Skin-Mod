@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "Rozmycie Vanilla",
   "quickskin.settings.keybind_assign": "Przypisz klawisz otwierający menu skórek",
   "quickskin.settings.keybind_change": "Zmień klawisz otwierający menu skórek",
+  "quickskin.settings.fan_keybind_assign": "Przypisz klawisz otwierający ulubione skórki",
+  "quickskin.settings.fan_keybind_change": "Zmień klawisz otwierający ulubione skórki",
   "quickskin.settings.disable_transparency": "Pokazuj przezroczyste części skórek jako nieprzezroczyste",
   "quickskin.settings.disable_transparency.tooltip": "Przydatne, gdy widzisz dziury w źle zrobionych skórkach.",
   "quickskin.settings.show_title_preview": "Pokazuj postać na ekranie tytułowym",

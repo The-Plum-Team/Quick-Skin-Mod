@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "原版模糊",
   "quickskin.settings.keybind_assign": "设置打开皮肤菜单的按键",
   "quickskin.settings.keybind_change": "更改打开皮肤菜单的按键",
+  "quickskin.settings.fan_keybind_assign": "设置打开收藏皮肤的按键",
+  "quickskin.settings.fan_keybind_change": "更改打开收藏皮肤的按键",
   "quickskin.settings.disable_transparency": "将皮肤的透明部分显示为不透明",
   "quickskin.settings.disable_transparency.tooltip": "当你在做得不好的皮肤上看到破洞时很有用。",
   "quickskin.settings.show_title_preview": "在标题画面显示你的角色",

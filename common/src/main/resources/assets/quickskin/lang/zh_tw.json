@@ -247,6 +247,8 @@
   "quickskin.background.vanilla_blur": "原版模糊",
   "quickskin.settings.keybind_assign": "設定開啟皮膚選單的按鍵",
   "quickskin.settings.keybind_change": "變更開啟皮膚選單的按鍵",
+  "quickskin.settings.fan_keybind_assign": "設定開啟最愛皮膚的按鍵",
+  "quickskin.settings.fan_keybind_change": "變更開啟最愛皮膚的按鍵",
   "quickskin.settings.disable_transparency": "將皮膚的透明部分顯示為不透明",
   "quickskin.settings.disable_transparency.tooltip": "如果你在做得不好的皮膚上看到破洞，這會很有用。",
   "quickskin.settings.show_title_preview": "在標題畫面顯示你的角色",

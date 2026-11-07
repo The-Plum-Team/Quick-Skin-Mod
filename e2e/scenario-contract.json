@@ -3059,7 +3059,7 @@
               "capture": {
                 "title": "Settings screen",
                 "review_tier": "all",
-                "expectation": "The Quick Skin settings screen is open on its Client tab (tabs Client, Interface, Modpack and Server): Minecraft's own key-binding button reading Not Bound right of the readable label Assign a key to open the skin menu, then four rows with toggles, Show transparent parts of skins as opaque off, Show your character on the title screen and Show your character in the pause menu on, and Compact the Change Skin button to make it smaller off, with a close X in the slate header. Labels too long for one line wrap onto a second line inside their row.",
+                "expectation": "The Quick Skin settings screen is open on its Client tab (tabs Client, Interface, Modpack and Server): Minecraft's own key-binding button reading Not Bound right of the readable label Assign a key to open the skin menu, a second such button reading Not Bound right of Assign a key to open your favourite skins, then four rows with toggles, Show transparent parts of skins as opaque off, Show your character on the title screen and Show your character in the pause menu on, and Compact the Change Skin button to make it smaller off, with a close X in the slate header. Labels too long for one line wrap onto a second line inside their row.",
                 "probes": [
                   {
                     "kind": "required-gui-text",

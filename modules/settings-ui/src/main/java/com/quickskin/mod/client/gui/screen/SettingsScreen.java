@@ -144,6 +144,8 @@ public class SettingsScreen extends Screen {
     private Checkbox compactChangeSkinButtonCheckbox;
     private Button keybindButton;
     private AbstractWidget keybindLabel;
+    private Button fanKeybindButton;
+    private AbstractWidget fanKeybindLabel;
 
     // State for keybind editing
     @Nullable
@@ -347,44 +349,20 @@ public class SettingsScreen extends Screen {
         int rightColumnX = leftColumnX;
         int currentRightY = startY + spacing;
 
-        // Left Column
-        // Keybind button and label
-        int keybindButtonWidth = 75;
-        int keybindButtonSpacing = 5;
-
-        // Minecraft's own button, as in its Controls screen, so it reads as a key binding
-        keybindButton = Button.builder(KeybindRegistry.OPEN_SKIN_MENU.getTranslatedKeyMessage(),
-                        button -> this.selectedKey = KeybindRegistry.OPEN_SKIN_MENU)
-                .bounds(leftColumnX + contentWidth - keybindButtonWidth, currentLeftY, keybindButtonWidth, 20)
-                .build();
+        // The keys, one row each: the skin menu's, then the favourites fan's
+        keybindButton = keybindButton(KeybindRegistry.OPEN_SKIN_MENU, leftColumnX, currentLeftY);
+        keybindLabel = keybindLabel(KeybindRegistry.OPEN_SKIN_MENU, "quickskin.settings.keybind",
+                leftColumnX, currentLeftY);
         clientSettingWidgets.add(keybindButton);
-
-        keybindLabel = new AbstractWidget(leftColumnX, currentLeftY, contentWidth - keybindButtonWidth - keybindButtonSpacing, 20, keybindLabelText()) {
-            @Override
-            //? if <26.1 {
-            public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-            //?} else {
-            public void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
-            //?}
-                drawRowLabel(guiGraphics, this.getMessage().getString(), this.getX(), this.getWidth(),
-                        this.getY() + this.height / 2, ROW_TEXT);
-            }
-
-            @Override
-            public void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput narrationElementOutput) {
-                narrationElementOutput.add(net.minecraft.client.gui.narration.NarratedElementType.TITLE, this.getMessage());
-            }
-
-            @Override
-            //? if <1.21.9 {
-            public boolean mouseClicked(double pMouseX, double pMouseY, int pButton) {
-            //?} else {
-            public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean focused) {
-            //?}
-                return false; // Make the label non-interactive
-            }
-        };
         clientSettingWidgets.add(keybindLabel);
+        currentLeftY += spacing;
+        currentRightY += spacing;
+
+        fanKeybindButton = keybindButton(KeybindRegistry.FAVOURITES_FAN, leftColumnX, currentLeftY);
+        fanKeybindLabel = keybindLabel(KeybindRegistry.FAVOURITES_FAN, "quickskin.settings.fan_keybind",
+                leftColumnX, currentLeftY);
+        clientSettingWidgets.add(fanKeybindButton);
+        clientSettingWidgets.add(fanKeybindLabel);
 
         // Under it, the checkboxes
         disableSkinTransparencyCheckbox = checkbox(rightColumnX, currentRightY,
@@ -413,6 +391,54 @@ public class SettingsScreen extends Screen {
                 config.compactChangeSkinButton,
                 "quickskin.settings.compact_change_skin_button.tooltip", this::applyClientSettings);
         clientSettingWidgets.add(compactChangeSkinButtonCheckbox);
+    }
+
+    private static final int KEYBIND_BUTTON_WIDTH = 75;
+    private static final int KEYBIND_BUTTON_SPACING = 5;
+
+    /** Minecraft's own button, as in its Controls screen, so it reads as a key binding. */
+    private Button keybindButton(KeyMapping key, int x, int y) {
+        return Button.builder(key.getTranslatedKeyMessage(), button -> this.selectedKey = key)
+                .bounds(x + contentWidth - KEYBIND_BUTTON_WIDTH, y, KEYBIND_BUTTON_WIDTH, 20)
+                .build();
+    }
+
+    /** The row's label: "Assign a key…" while the key is unbound, else "Change the key…". */
+    private AbstractWidget keybindLabel(KeyMapping key, String prefix, int x, int y) {
+        return new AbstractWidget(x, y, contentWidth - KEYBIND_BUTTON_WIDTH - KEYBIND_BUTTON_SPACING, 20,
+                keybindLabelText(key, prefix)) {
+            @Override
+            //? if <26.1 {
+            public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+            //?} else {
+            public void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+            //?}
+                this.setMessage(keybindLabelText(key, prefix));
+                drawRowLabel(guiGraphics, this.getMessage().getString(), this.getX(), this.getWidth(),
+                        this.getY() + this.height / 2, ROW_TEXT);
+            }
+
+            @Override
+            public void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput narrationElementOutput) {
+                narrationElementOutput.add(net.minecraft.client.gui.narration.NarratedElementType.TITLE, this.getMessage());
+            }
+
+            @Override
+            //? if <1.21.9 {
+            public boolean mouseClicked(double pMouseX, double pMouseY, int pButton) {
+            //?} else {
+            public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean focused) {
+            //?}
+                return false; // Make the label non-interactive
+            }
+        };
+    }
+
+    /** The key's button text, or the capture prompt while it waits for a key. */
+    private Component keybindButtonText(KeyMapping key) {
+        return this.selectedKey == key
+                ? Component.literal("> ").append(Component.literal("???").withStyle(ChatFormatting.YELLOW)).append(" <")
+                : key.getTranslatedKeyMessage();
     }
 
     private void createServerSettings() {
@@ -596,12 +622,8 @@ public class SettingsScreen extends Screen {
         BlurHandler.renderBlur(graphics);
 
         // Update keybind button text before rendering
-        if (this.selectedKey == KeybindRegistry.OPEN_SKIN_MENU) {
-            this.keybindButton.setMessage(Component.literal("> ").append(Component.literal("???").withStyle(ChatFormatting.YELLOW)).append(" <"));
-        } else {
-            this.keybindButton.setMessage(KeybindRegistry.OPEN_SKIN_MENU.getTranslatedKeyMessage());
-        }
-        this.keybindLabel.setMessage(keybindLabelText());
+        this.keybindButton.setMessage(keybindButtonText(KeybindRegistry.OPEN_SKIN_MENU));
+        this.fanKeybindButton.setMessage(keybindButtonText(KeybindRegistry.FAVOURITES_FAN));
         //? if <1.21.6 {
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 100); // Move modal forward in Z
@@ -625,7 +647,7 @@ public class SettingsScreen extends Screen {
 
         // A line under each row that is not a checkbox: the keybind, the cooldown and player skins
         for (AbstractWidget widget : activeTabWidgets()) {
-            if (widget == keybindButton || widget == skinChangeCooldownEditBox || widget == playerSkinsButton) {
+            if (widget == keybindButton || widget == fanKeybindButton || widget == skinChangeCooldownEditBox || widget == playerSkinsButton) {
                 int lineY = widget.getY() + widget.getHeight() + ROW_PADDING;
                 graphics.fill(contentX - ROW_PADDING * 2, lineY, contentX + contentWidth + ROW_PADDING * 2, lineY + 1, ROW_LINE);
             }
@@ -772,10 +794,9 @@ public class SettingsScreen extends Screen {
         UiText.draw(graphics, this.font, second, x, middle + 1, color);
     }
 
-    /** "Assign a key…" while the skin menu has no key, else "Change the key…". */
-    private static Component keybindLabelText() {
-        return Component.translatable(KeybindRegistry.OPEN_SKIN_MENU.isUnbound()
-                ? "quickskin.settings.keybind_assign" : "quickskin.settings.keybind_change");
+    /** "Assign a key…" while the key is unbound, else "Change the key…". */
+    private static Component keybindLabelText(KeyMapping key, String prefix) {
+        return Component.translatable(prefix + (key.isUnbound() ? "_assign" : "_change"));
     }
 
     /** The settings a menu reads when it is built, so a change can rebuild the menu behind. */
