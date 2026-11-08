@@ -18,7 +18,8 @@ checksum change, never by relaxing the mode: see
   repository also records the wrapper JAR and distribution checksums. The wrapper downloads the
   distribution from GitHub's release mirror (`github.com/gradle/gradle-distributions`), whose zip
   has the same SHA-256 as the `services.gradle.org` one, and retries a failed download three times
-  with a backoff starting at ten seconds.
+  with a backoff starting at ten seconds. Its `networkTimeout` (connect and read) is 60 seconds,
+  because that mirror often stalls longer than the default ten on GitHub-hosted runners.
 - `settings.gradle.kts` routes plugin groups only to their expected Fabric, Architectury, Mojang,
   Forge, NeoForge, Kikugie, Maven Central, or Gradle Plugin Portal repositories. Central and the
   Plugin Portal explicitly reject ecosystem groups owned by the specialist repositories.
