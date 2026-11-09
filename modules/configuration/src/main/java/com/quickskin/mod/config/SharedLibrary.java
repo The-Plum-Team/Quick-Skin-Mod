@@ -77,6 +77,16 @@ public final class SharedLibrary {
         return root.resolve("skin-preferences.json");
     }
 
+    /** The frame timing of the library's animated capes, one JSON file per cape content id. */
+    public static Path animationsDirectory(Path root) {
+        return root.resolve("animations");
+    }
+
+    /** The library's CPM models, mirrored into each instance's {@code player_models}. */
+    public static Path cpmModelsDirectory(Path root) {
+        return root.resolve("cpm-models");
+    }
+
     private static Path absolute(String path) {
         Path resolved = Path.of(path);
         if (!resolved.isAbsolute()) throw new InvalidPathException(path, "not absolute");

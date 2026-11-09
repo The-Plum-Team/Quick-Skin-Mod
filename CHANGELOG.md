@@ -14,7 +14,7 @@
 > Right-click a skin in the skin menu and pick Assign a cape...: the cape menu opens for that skin, and the cape you click is put on whenever you wear the skin, from the skin menu or the favourites fan. The menu's Elytra tab picks what the elytra wear with that skin too (its cape, vanilla's elytra or another cape). A skin with a cape of its own has it hanging from its card as a ribbon, edged purple when it also has its own elytra; Change cape... and Remove cape are in the same menu. A skin without one keeps the cape and elytra you are wearing.
 
 - **Your skins in every modpack**
-> Skins and capes you import are kept in one library outside the Minecraft instance (`%APPDATA%\QuickSkin` on Windows, `~/Library/Application Support/QuickSkin` on macOS, `~/.local/share/quickskin` on Linux), so every modpack on your computer lists the same skins with the same favourites and models. Each modpack's own `quickskin/uploads` folders are still read.
+> Skins, capes (animated ones too) and CPM models you import are kept in one library outside the Minecraft instance (`%APPDATA%\QuickSkin` on Windows, `~/Library/Application Support/QuickSkin` on macOS, `~/.local/share/quickskin` on Linux), so every modpack on your computer lists the same skins with the same favourites, models and the cape each skin puts on. Each modpack's own `quickskin/uploads` and CPM `player_models` folders are still read.
 
 - **Hide Cosmetic Armor pieces from everyone**
 > With Cosmetic Armor Reworked, a cosmetic piece over your armour is now a piece of its own on the skin menu's model: hide it and every other player sees the armour under it instead, like any hidden piece. The server needs this update for others to see it.

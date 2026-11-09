@@ -352,7 +352,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   library has no choice for (`sharedLibraryPreferencesMerged`); the instance's file is never
   changed. A folder that cannot be created or written leaves the instance on its own folders, as
   before, and `-Dquickskin.sharedLibrary=false` or the packaged E2E harness never use it.
-  Capes' animation atlases, CPM models and the cape editor's sources stay per instance.
+  An animated cape's frame timing is kept in the library's `animations` folder, so the cape
+  animates in every instance; timing an older version wrote into the instance's cache is copied
+  there when it is read. CPM selects a model only by its path inside `player_models`, so the
+  library's `cpm-models` folder is mirrored into each instance's `player_models/quickskin-library`
+  before the scan (`CpmLibraryMirror`): a model kept elsewhere in `player_models` joins the
+  library, the library's models are copied in, and a mirrored copy whose model left the library
+  (deleted in another instance) is deleted; nothing outside that subfolder is ever deleted by the
+  mirror. Deleting a model deletes the library's copy too. GIF capes' decoded atlases and the
+  cape editor's sources stay per instance.
 - The skin menu's list always keeps at least one skin or CPM model: marking or deleting the last
   listed entry, the own skin or a custom one, is refused with a toast
   (`LocalAssetManager.keepsAListedSkin`), and a deletion that would empty the list is refused
