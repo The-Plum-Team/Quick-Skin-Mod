@@ -644,8 +644,8 @@ final class CapeMenuSteps {
                     // capture shows only the None selection.
                     return newestToast(screen) == null
                             && isSelected(screen, local.get(0))
-                            && ClientConfig.getInstance().activeCapeHash.isEmpty()
-                            && !svc.hasActiveCape(uuid)
+                            && FullScenario.isNoCape(ClientConfig.getInstance().activeCapeHash)
+                            && FullScenario.wearsNoCape(svc, uuid)
                             && slider != null && !slider.visible
                             && noneHold.incrementAndGet() >= FullScenario.PREVIEW_HOLD_TICKS;
                 })
@@ -663,10 +663,10 @@ final class CapeMenuSteps {
                     if (!isSelected(screen, none))
                         return Step.Result.fail("None tile is not the selected tile; selectedCape="
                                 + (selectedCape(screen) == null ? null : selectedCape(screen).getCapeId()));
-                    if (!ClientConfig.getInstance().activeCapeHash.isEmpty())
+                    if (!FullScenario.isNoCape(ClientConfig.getInstance().activeCapeHash))
                         return Step.Result.fail("persisted cape survived None: "
                                 + ClientConfig.getInstance().activeCapeHash);
-                    if (svc.hasActiveCape(uuid) || svc.getCapeLocation(uuid) != null)
+                    if (!FullScenario.wearsNoCape(svc, uuid) || svc.getCapeLocation(uuid) != null)
                         return Step.Result.fail("cape service still active after None");
                     AbstractSliderButton slider = speedSlider(screen);
                     if (slider == null || slider.visible)
@@ -1130,12 +1130,12 @@ final class CapeMenuSteps {
     private static String noCapeProblem(Minecraft mc, PlayerAppearanceService svc, UUID uuid) {
         if (mc.player == null) return "player is null";
         if (!mc.player.getItemBySlot(EquipmentSlot.CHEST).isEmpty()) return "chest slot is not empty";
-        if (svc.hasActiveCape(uuid)) return "cape service remains active";
+        if (!FullScenario.wearsNoCape(svc, uuid)) return "cape service remains active";
         if (svc.getCapeLocation(uuid) != null) return "cape location=" + svc.getCapeLocation(uuid);
-        if (!ClientConfig.getInstance().activeCapeHash.isEmpty())
+        if (!FullScenario.isNoCape(ClientConfig.getInstance().activeCapeHash))
             return "persisted cape=" + ClientConfig.getInstance().activeCapeHash;
         PlayerAppearance app = svc.getAppearance(uuid);
-        if (app != null && app.getCapeId() != null && !app.getCapeId().isEmpty())
+        if (app != null && !FullScenario.isNoCape(app.getCapeId()))
             return "appearance cape=" + app.getCapeId();
         String cloak = VanillaShim.cloakTexture(mc.player);
         if (cloak != null) return "renderer cloak=" + cloak;

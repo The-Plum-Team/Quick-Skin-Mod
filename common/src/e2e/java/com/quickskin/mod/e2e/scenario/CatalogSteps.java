@@ -805,7 +805,7 @@ final class CatalogSteps {
                         || (mc.player != null
                         && VanillaShim.isExpectedDefaultSkinResolved(mc.player)
                         && !svc.hasActiveSkin(uuid)
-                        && !svc.hasActiveCape(uuid)
+                        && FullScenario.wearsNoCape(svc, uuid)
                         && DefaultSkinEvidenceView.hold(mc, false)))
                 .settleTicks(20) // reject a one-frame generic fallback before the UUID skin lands
                 .timeoutTicks(400)
@@ -829,7 +829,7 @@ final class CatalogSteps {
                             return Step.Result.fail("skin location still resolves: "
                                     + svc.getSkinLocation(uuid));
                         }
-                        if (svc.hasActiveCape(uuid) || svc.getCapeLocation(uuid) != null) {
+                        if (!FullScenario.wearsNoCape(svc, uuid) || svc.getCapeLocation(uuid) != null) {
                             return Step.Result.fail("a cape is still active: "
                                     + svc.getCapeId(uuid) + " / " + svc.getCapeLocation(uuid));
                         }
@@ -842,7 +842,7 @@ final class CatalogSteps {
                             return Step.Result.fail("config.activeSkinHash changed to "
                                     + config.activeSkinHash + " during the fallback");
                         }
-                        if (!config.activeCapeHash.isEmpty()) {
+                        if (!FullScenario.isNoCape(config.activeCapeHash)) {
                             return Step.Result.fail("config.activeCapeHash is " + config.activeCapeHash);
                         }
                         if (LocalAssetManager.getInstance().getMetadata(STALE_SKIN_ID) != null) {

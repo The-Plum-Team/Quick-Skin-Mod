@@ -18,7 +18,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   predates per-account storage goes to the first account that joins, once.
   `CpmModelWorkflow.activateSkin` records one, which includes the skin menu's programmatic
   selections; the own-skin auto-selection of `PlayerOwnSkinBootstrap` / `SavedAppearanceRestorer`
-  and a skin adopted from the server do not. Capes and CPM models stay instance-wide. A
+  and a skin adopted from the server do not. A cape belongs to a skin (below); CPM models stay
+  instance-wide. A
   cosmetic nickname belongs to the launcher account too (`ClientConfig.accountNicknames`, same
   key); only the skin menu's nickname dialog records one.
 - A session whose account has no selection uploads nothing until it has seen the server's record
@@ -552,16 +553,22 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   because the 1.20.1 overlay replaces the canonical file on the only lane official TaCZ exists
   for. The animation plays on the real local player, so other first-person draws of that
   player's model show it too; it never reaches the first-person arms.
-- A skin may have a cape of its own (`SkinCapes`, appearance-services), kept as the skin's `cape`
-  in its preferences (`SkinPreferences`): a `local_cape:` content ID or a `known:` built-in name,
-  nothing else. It is picked from the skin menu's context menu through the cape menu opened for
-  that skin (`PlayerCapeMenuScreen.forSkin`). Its Elytra tab picks the skin's `elytra`: "" (the
-  cape), `minecraft:elytra` or a cape ID, null keeping what the elytra wear. Choosing the skin in
-  the skin menu or the favourites fan puts both on like clicks in the cape menu (the active cape
-  and `activeElytraId`, applied to the player); a skin without a choice, a CPM model, or a skin
-  whose cape was deleted keeps what is worn. The skin list shows it as a ribbon on the card or
-  tile, edged purple when the skin chooses its elytra; Remove cape takes both choices away. It is a local choice: nothing new
-  travels on the wire, and a deleted cape is not forgotten, so importing it again brings it back.
+- Capes belong to skins (`SkinCapes`, appearance-services): every skin wears its own cape or
+  none, kept as the skin's `cape` in its preferences (`SkinPreferences`), a `local_cape:` content
+  ID or a `known:` built-in name, nothing else. Putting a skin on (the skin menu, the favourites
+  fan, a join through `ClientRuntime`) puts its cape on, or `SkinCapes.NO_CAPE`
+  (`known:__NONE__`) when it has none; that id resolves to no texture anywhere, so neither this
+  client nor any other (older versions included) draws a cape or the account's Mojang cape for
+  it, and the elytra fall back to vanilla's. A CPM model wears no Quick Skin cape (an empty cape
+  id, `SkinCapes.wearNone`). The cape menu picks the cape of the skin worn (its clicks and Remove
+  Cape store the choice on that skin) or, opened from a skin's context menu
+  (`PlayerCapeMenuScreen.forSkin`), of that skin; with a CPM model or no Quick Skin skin worn it
+  sets only the worn cape. Its Elytra tab picks the skin's `elytra`: "" (the cape),
+  `minecraft:elytra` or a cape ID; without a choice the elytra wear the cape. The cape worn before
+  capes belonged to skins goes to the skin worn then, once, when the catalog loads
+  (`ClientConfig.capesFollowSkins`); other skins start without a cape. The skin list shows a
+  skin's cape as a ribbon on the card or tile, edged purple when the skin chooses its elytra. A
+  deleted cape is not forgotten: importing it again brings it back.
 - The favourites fan (`favourites-fan`) is a HUD layer, never a screen, so the player keeps
   walking while it is open. Its key is unbound until the player binds it. One press opens it on
   the skins and CPM models marked as favourites, in the skin menu's order, at most
@@ -711,7 +718,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   model interpretation cannot replace the deterministic contract.
 - Cape-removal evidence must begin from a renderer-confirmed custom-cape elytra, activate the real
   Remove Cape control while leaving the elytra equipped, and then hold the same separated-wing pose.
-  Require persisted, service, cloak, and profile-elytra inputs to be empty so the renderer is forced
+  Require persisted, service, cloak, and profile-elytra inputs to be empty (or the no-cape id a skin
+  without a cape wears, `SkinCapes.NO_CAPE`) so the renderer is forced
   onto Minecraft's vanilla elytra texture; compare the bounded player region against the custom
   wings so a stale custom surface cannot pass on state assertions alone.
 - Skin-fidelity evidence derives every variant from the one plaid fixture so exactly one property

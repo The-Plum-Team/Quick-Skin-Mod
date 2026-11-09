@@ -144,6 +144,11 @@ public class SkinManagerMixin {
                         capeTexture = capeLocation;
                         elytraTexture = capeLocation;
                         anyOverride = true;
+                    } else if (com.quickskin.mod.client.services.SkinCapes.isNoCape(config.activeCapeHash)) {
+                        // The skin worn has no cape: none at all, not the account's Mojang cape
+                        capeTexture = null;
+                        elytraTexture = null;
+                        anyOverride = true;
                     }
                 }
 
@@ -513,6 +518,11 @@ public class SkinManagerMixin {
 //?} else {
                         elytraTexture = new ClientAsset.ResourceTexture(capeLoc, capeLoc);
 //?}
+                        anyOverride = true;
+                    } else if (com.quickskin.mod.client.services.SkinCapes.isNoCape(config.activeCapeHash)) {
+                        // The skin worn has no cape: none at all, not the account's Mojang cape
+                        capeTexture = null;
+                        elytraTexture = null;
                         anyOverride = true;
                     }
                 }

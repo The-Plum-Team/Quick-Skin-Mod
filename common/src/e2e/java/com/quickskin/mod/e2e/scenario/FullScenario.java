@@ -1226,9 +1226,10 @@ public final class FullScenario implements Scenario {
                         return Step.Result.fail(
                                 "active Remove Cape button not found in cape menu");
                     }
-                    if (svc.hasActiveCape(uuid)
+                    // Capes belong to skins: the worn skin is left without a cape, which shows none
+                    if (!wearsNoCape(svc, uuid)
                             || svc.getCapeLocation(uuid) != null
-                            || !ClientConfig.getInstance().activeCapeHash.isEmpty()) {
+                            || !isNoCape(ClientConfig.getInstance().activeCapeHash)) {
                         return Step.Result.fail(
                                 "Remove Cape did not synchronously clear config and service state");
                     }
@@ -2380,6 +2381,17 @@ public final class FullScenario implements Scenario {
                 : " with an empty chest slot"));
     }
 
+    /** No cape: none set, or the no-cape id a skin without a cape wears (it shows no cape at all). */
+    static boolean isNoCape(String capeId) {
+        return capeId == null || capeId.isEmpty()
+                || com.quickskin.mod.client.services.SkinCapes.isNoCape(capeId);
+    }
+
+    static boolean wearsNoCape(PlayerAppearanceService service, UUID uuid) {
+        PlayerAppearance appearance = service.getAppearance(uuid);
+        return !service.hasActiveCape(uuid) || appearance == null || isNoCape(appearance.getCapeId());
+    }
+
     static String vanillaElytraFallbackProblem(
             Minecraft mc, PlayerAppearanceService service, UUID uuid) {
         if (mc.player == null) return "player is null";
@@ -2387,15 +2399,15 @@ public final class FullScenario implements Scenario {
             return "CHEST slot is not elytra";
         }
         if (!mc.player.isCrouching()) return "player is not crouching";
-        if (service.hasActiveCape(uuid)) return "cape service remains active";
+        if (!wearsNoCape(service, uuid)) return "cape service remains active";
         Object serviceCape = service.getCapeLocation(uuid);
         if (serviceCape != null) return "cape service location=" + serviceCape;
         String configuredCape = ClientConfig.getInstance().activeCapeHash;
-        if (!configuredCape.isEmpty()) return "persisted cape=" + configuredCape;
+        if (!isNoCape(configuredCape)) return "persisted cape=" + configuredCape;
         PlayerAppearance appearance = service.getAppearance(uuid);
         if (appearance == null) return "appearance is null";
         String capeId = appearance.getCapeId();
-        if (capeId != null && !capeId.isEmpty()) return "appearance cape=" + capeId;
+        if (!isNoCape(capeId)) return "appearance cape=" + capeId;
         String cloak = VanillaShim.cloakTexture(mc.player);
         if (cloak != null) return "renderer cloak=" + cloak;
         String profileElytra = VanillaShim.elytraTexture(mc.player);
@@ -2421,13 +2433,13 @@ public final class FullScenario implements Scenario {
         }
         PlayerAppearance appearance = service.getAppearance(uuid);
         String capeId = appearance == null ? null : appearance.getCapeId();
-        if (capeId != null && !capeId.isEmpty()) {
+        if (!isNoCape(capeId)) {
             return Step.Result.fail("cape id survived Remove Cape: " + capeId);
         }
-        if (service.hasActiveCape(uuid) || service.getCapeLocation(uuid) != null) {
+        if (!wearsNoCape(service, uuid) || service.getCapeLocation(uuid) != null) {
             return Step.Result.fail("cape service still exposes an active cape after removal");
         }
-        if (!ClientConfig.getInstance().activeCapeHash.isEmpty()) {
+        if (!isNoCape(ClientConfig.getInstance().activeCapeHash)) {
             return Step.Result.fail("persisted active cape survived Remove Cape: "
                     + ClientConfig.getInstance().activeCapeHash);
         }

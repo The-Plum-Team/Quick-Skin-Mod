@@ -9,16 +9,26 @@ import org.jetbrains.annotations.Nullable;
 import java.util.UUID;
 
 /**
- * A skin's own cape: picked from the skin menu's context menu, it is put on whenever the skin is,
- * from the skin menu or the favourites fan. A skin without one keeps whatever cape is worn. The
- * choice lives in the skin's preferences ({@link LocalAssetManager#getSkinCape}); a cape that has
- * since been deleted counts as none, and the choice comes back if the cape is imported again.
- * A skin may also choose what the elytra wear (the cape, vanilla's elytra or another cape); one
- * that does not keeps what they wear.
+ * Capes belong to skins: every skin wears its own cape or none, and putting a skin on (from the
+ * skin menu, the favourites fan or a join) puts its cape on. The cape menu picks the cape of the
+ * skin worn, or of the skin it was opened for. A skin without a cape wears {@link #NO_CAPE}, which
+ * shows no cape at all, not even the account's Mojang cape, also to other players. A CPM model
+ * wears no Quick Skin cape ({@link #wearNone}). The choice lives in the skin's preferences
+ * ({@link LocalAssetManager#getSkinCape}); a cape that has since been deleted counts as none, and
+ * the choice comes back if the cape is imported again. A skin also chooses what the elytra wear
+ * (the cape, vanilla's elytra or another cape); without a choice they wear the cape.
  */
 public final class SkinCapes {
 
+    /** The cape a skin without one wears: no cape, the account's Mojang cape included. */
+    public static final String NO_CAPE = "known:" + KnownCapes.NONE.getId();
+
     private SkinCapes() {
+    }
+
+    /** Whether {@code capeId} means no cape at all. */
+    public static boolean isNoCape(@Nullable String capeId) {
+        return NO_CAPE.equals(capeId);
     }
 
     /** The cape {@code skinHash} puts on, or null when it has none or its cape no longer exists. */
@@ -57,27 +67,58 @@ public final class SkinCapes {
     }
 
     /**
-     * Puts on the cape {@code skinHash} has, as a click on it in the cape menu does: saved as the
-     * active cape and, when {@code player} is not null, applied to that player. Returns whether
-     * the skin had a cape; one that is already the active cape is not applied again. The skin's
-     * elytra choice, if it has one, is put on the same way.
+     * Puts on the cape {@code skinHash} has, or {@link #NO_CAPE} when it has none, and what its
+     * elytra wear (the cape without a choice): saved as the active cape and, when {@code player} is
+     * not null, applied to that player. Returns whether anything changed.
      */
     public static boolean wear(String skinHash, @Nullable UUID player) {
-        ClientConfig config = ClientConfig.getInstance();
         String capeId = assigned(skinHash);
-        if (capeId != null && !capeId.equals(config.activeCapeHash)) {
+        String elytraId = assignedElytra(skinHash);
+        return put(capeId != null ? capeId : NO_CAPE, elytraId != null ? elytraId : "", player);
+    }
+
+    /** Takes Quick Skin's cape off, as a CPM model, which wears no Quick Skin cape, does. */
+    public static boolean wearNone(@Nullable UUID player) {
+        return put("", "", player);
+    }
+
+    /**
+     * Gives the skin worn when capes came to belong to skins the cape and elytra worn then, once.
+     * The other skins have no cape until one is picked for them.
+     */
+    public static void migrateWornCapeOnce() {
+        ClientConfig config = ClientConfig.getInstance();
+        if (config.capesFollowSkins) return;
+        String skin = config.activeSkinHash;
+        if (skin.isEmpty() || LocalAssetManager.getInstance().getMetadata(skin) == null) return; // retried later
+        if (assigned(skin) == null && !config.activeCapeHash.isEmpty() && !isNoCape(config.activeCapeHash)
+                && exists(config.activeCapeHash)) {
+            assign(skin, config.activeCapeHash);
+        }
+        if (assignedElytra(skin) == null && !config.activeElytraId.isEmpty()) {
+            assignElytra(skin, config.activeElytraId);
+        }
+        config.capesFollowSkins = true;
+        config.save();
+    }
+
+    private static boolean put(String capeId, String elytraId, @Nullable UUID player) {
+        ClientConfig config = ClientConfig.getInstance();
+        boolean changed = false;
+        if (!capeId.equals(config.activeCapeHash)) {
             config.activeCapeHash = capeId;
-            config.save();
-            // Loads the texture and starts an animated cape's animation before the renderer asks for it
-            CapeService.getInstance().getCapeLocation(null, capeId);
+            changed = true;
+            if (!capeId.isEmpty() && !isNoCape(capeId)) {
+                // Loads the texture and starts an animated cape's animation before the renderer asks for it
+                CapeService.getInstance().getCapeLocation(null, capeId);
+            }
             if (player != null) {
                 PlayerAppearanceService.getInstance().applyCape(player, capeId);
             }
         }
-        String elytraId = assignedElytra(skinHash);
-        if (elytraId != null && !elytraId.equals(config.activeElytraId)) {
+        if (!elytraId.equals(config.activeElytraId)) {
             config.activeElytraId = elytraId;
-            config.save();
+            changed = true;
             if (!elytraId.isEmpty() && !PlayerAppearance.VANILLA_ELYTRA.equals(elytraId)) {
                 CapeService.getInstance().getCapeLocation(null, elytraId);
             }
@@ -85,7 +126,8 @@ public final class SkinCapes {
                 PlayerAppearanceService.getInstance().applyElytra(player, elytraId);
             }
         }
-        return capeId != null;
+        if (changed) config.save();
+        return changed;
     }
 
     private static boolean exists(String capeId) {
