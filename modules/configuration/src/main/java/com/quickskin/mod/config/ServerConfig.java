@@ -58,6 +58,17 @@ public class ServerConfig {
      * can update.</p>
      */
     public int maxTextureUploadKilobytes = MAX_TEXTURE_UPLOAD_KILOBYTES;
+    /**
+     * Widest skin, in pixels, this server accepts, stores and serves: 64 allows no HD skins, 128
+     * allows up to 128x128, and so on; 0 (the default) sets no limit. A value from 1 to 63 is
+     * raised to 64, a negative one or one that is not a number means no limit. Capes are not
+     * limited. Read when the server starts, like {@link #maxTextureUploadKilobytes}.
+     *
+     * <p>Clients that include this setting learn it with the server's settings, keep a wider skin
+     * on their own screen and sync the rest of their appearance. Older clients still send it; the
+     * server refuses it, so other players see them without that skin.</p>
+     */
+    public int maxSkinResolution = 0;
     /** False when the file could not be read; such a file is never overwritten. */
     private transient boolean persistable = true;
 
@@ -173,6 +184,7 @@ public class ServerConfig {
         JsonObject object = root.getAsJsonObject();
         sanitizeInteger(object, "skinChangeCooldownSeconds");
         sanitizeInteger(object, "maxTextureUploadKilobytes");
+        sanitizeInteger(object, "maxSkinResolution");
         return GSON.fromJson(object, ServerConfig.class);
     }
 
@@ -300,6 +312,7 @@ public class ServerConfig {
         skinChangeCooldownSeconds = Math.max(0, Math.min(skinChangeCooldownSeconds, 86_400));
         maxTextureUploadKilobytes = Math.max(MIN_TEXTURE_UPLOAD_KILOBYTES,
                 Math.min(maxTextureUploadKilobytes, MAX_TEXTURE_UPLOAD_KILOBYTES));
+        maxSkinResolution = normalizedSkinResolution(maxSkinResolution);
         accountSkinVisibility = knownVisibility(accountSkinVisibility);
         playersWithoutQuickSkinMessage = boundedText(playersWithoutQuickSkinMessage);
         playersWithoutQuickSkinLink = playersWithoutQuickSkinLink == null
@@ -309,6 +322,18 @@ public class ServerConfig {
     private static String boundedText(String value) {
         if (value == null) return "";
         return value.length() > MAX_NOTICE_TEXT_LENGTH ? value.substring(0, MAX_NOTICE_TEXT_LENGTH) : value;
+    }
+
+    /** The widest skin a server with this setting takes: 0 (no limit) or at least 64. */
+    public static int normalizedSkinResolution(int value) {
+        if (value <= 0) return 0;
+        return Math.max(64, value);
+    }
+
+    /** The configured widest skin in pixels, or 0 for no limit. */
+    public synchronized int maxSkinResolutionPixels() {
+        normalize();
+        return maxSkinResolution;
     }
 
     /** The configured per-texture upload limit in bytes. */

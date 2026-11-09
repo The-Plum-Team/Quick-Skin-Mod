@@ -165,6 +165,30 @@ public final class NetworkSecurity {
         return validDimensions(width, height, textureType) ? (long) width * height : -1;
     }
 
+    /** The width a PNG's header declares, or -1 when the bytes are not a PNG with a header. */
+    public static int pngWidth(byte[] data) {
+        return hasPngHeader(data) ? readInt(data, 16) : -1;
+    }
+
+    /** The height a PNG's header declares, or -1 when the bytes are not a PNG with a header. */
+    public static int pngHeight(byte[] data) {
+        return hasPngHeader(data) ? readInt(data, 20) : -1;
+    }
+
+    /**
+     * Whether a skin is wider than a server's {@code maxSkinResolution}; 0 or less sets no limit.
+     * Bytes that are not a PNG are never over it here: other checks refuse them.
+     */
+    public static boolean isSkinOverResolution(byte[] data, int maxResolution) {
+        if (maxResolution <= 0) return false;
+        return pngWidth(data) > maxResolution;
+    }
+
+    private static boolean hasPngHeader(byte[] data) {
+        return data != null && data.length >= 33 && hasPngSignature(data) && readInt(data, 8) == 13
+                && data[12] == 'I' && data[13] == 'H' && data[14] == 'D' && data[15] == 'R';
+    }
+
     public static boolean isValidAnimationMetadata(String metadataJson) {
         return parseAnimationMetadata(metadataJson) != null;
     }

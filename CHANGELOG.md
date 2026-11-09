@@ -22,6 +22,9 @@
 - **Silent admin commands**
 > Put `silent` after `/quickskin` (for example `/quickskin silent nickname random @a`) and only the players themselves learn their new names or skins: nothing is said to whoever runs the command, to other operators or in a command block's output, and the names it gives show no account name beside them in the operators' tab list or in join and leave messages. Made for games where the admins play too.
 
+- **Servers can turn HD skins off**
+> An operator can untick Allow HD skins in the Server tab of Quick Skin's settings, and the server then takes standard 64x64 skins only, at once and without a restart; ticking it again allows them again. For another limit, set `maxSkinResolution` in `config/quickskin-server.json` to the widest skin allowed (`128` for up to 128x128, `0` for none). Capes are not limited. A player whose skin is wider keeps it on their own screen and gets a chat message, and the rest of their look still syncs.
+
 ### Fixes
 
 - **Skins show up in ReplayMod replays on every version**

@@ -153,6 +153,7 @@ public class SettingsScreen extends Screen {
 
     // Server setting checkboxes
     private Checkbox serverDisableSkinTransparencyCheckbox;
+    private Checkbox serverAllowHdSkinsCheckbox;
     private EditBox skinChangeCooldownEditBox;
     private Button playerSkinsButton;
 
@@ -467,6 +468,18 @@ public class SettingsScreen extends Screen {
         // Only allow admins to change this setting
         serverDisableSkinTransparencyCheckbox.active = isAdmin;
         serverSettingWidgets.add(serverDisableSkinTransparencyCheckbox);
+        currentY += spacing;
+
+        // HD skins: allowed while the server sets no maxSkinResolution; a limit of a given size
+        // is set in its configuration file, and unticking sets the standard 64
+        boolean allowsHdSkins = serverOverride == null
+                || ServerConfig.normalizedSkinResolution(serverOverride.maxSkinResolution) == 0;
+        serverAllowHdSkinsCheckbox = checkbox(leftColumnX, currentY,
+                "quickskin.settings.allow_hd_skins_server",
+                allowsHdSkins,
+                "quickskin.settings.allow_hd_skins_server.tooltip", this::applyServerHdSkins);
+        serverAllowHdSkinsCheckbox.active = isAdmin;
+        serverSettingWidgets.add(serverAllowHdSkinsCheckbox);
         currentY += spacing;
 
         // Skin Change Cooldown Setting
@@ -1008,6 +1021,18 @@ public class SettingsScreen extends Screen {
         }
         com.quickskin.mod.client.api.ClientNetworkApi.actions().updateServerConfig(
                 "disableSkinTransparency", serverDisableSkinTransparencyCheckbox.selected());
+    }
+
+    /**
+     * Sends the server's HD skins checkbox as soon as an admin toggles it; the server applies it at
+     * once and broadcasts its settings, and every client then syncs its own skin again.
+     */
+    private void applyServerHdSkins() {
+        if (!isAdmin()) {
+            return;
+        }
+        com.quickskin.mod.client.api.ClientNetworkApi.actions().updateServerConfig(
+                "allowHdSkins", serverAllowHdSkinsCheckbox.selected());
     }
 
     /** Whether this client hosts the server it plays on (singleplayer or LAN). */

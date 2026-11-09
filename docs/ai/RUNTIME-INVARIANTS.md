@@ -99,6 +99,18 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   server writes its settings back at stop, so it is edited while the server is stopped. A setting
   with an invalid number is clamped or ignored on its own, and a file that cannot be parsed is
   left untouched (defaults apply until it is fixed), never overwritten.
+- `ServerConfig.maxSkinResolution` (0, the default, for no limit; at least 64) is the widest skin
+  a server takes, read from the PNG header; capes are never limited by it. `ServerRuntime` sets it
+  on `ServerTextureCache` before the cache loads: an upload of a wider skin is refused and logged,
+  and a stored square PNG wider than it (only skins are square; capes are 2:1 or taller atlases)
+  is kept on disk but not loaded, like a texture over the size limit, so a larger limit serves it
+  again. It travels to clients in the synchronized server configuration, never in the protocol
+  acknowledgement, so older clients ignore it: a client that reads it keeps a wider skin local (an
+  empty skin id in the synced appearance, a chat message once), and an older client's upload is
+  simply refused. The Server tab's **Allow HD skins** checkbox (operators only) sends
+  `update_server_config` `allowHdSkins`, which sets 0 or 64, applies it to the cache at once and
+  broadcasts the settings; a client whose synced limit changed sends its own look again, so an HD
+  skin is withdrawn or sent. Older servers ignore the key.
 - Every packet must fit the vanilla custom-payload limits of every supported version (32767 bytes
   serverbound, 1 MiB clientbound) without XL Packets or similar mods: anything that can grow with an
   asset travels in bounded chunks, and `WirePayloadBudget` with its test bounds each packet from the
