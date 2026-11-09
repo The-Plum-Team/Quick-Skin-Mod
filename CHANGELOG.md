@@ -27,6 +27,9 @@
 
 ### Fixes
 
+- **The skin menu no longer opens to a blurred screen in big modpacks**
+> In modpacks with many HUD mods, mostly on NeoForge, opening the skin or cape menu in a world showed only the blurred world, with no menu over it. The menus now draw over their blur in any modpack.
+
 - **Skins show up in ReplayMod replays on every version**
 > Replays recorded with ReplayMod now show the Quick Skin skins, capes and models players wore, and every change they made while recording, on every Minecraft version ReplayMod exists for. Before, only 1.20.1 did; newer versions showed everyone's Mojang skin.
 

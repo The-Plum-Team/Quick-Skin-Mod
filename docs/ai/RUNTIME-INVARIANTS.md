@@ -453,6 +453,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Konkrete and Melody JARs beside it; every scenario runs with FancyMenu installed and nothing
   customized, and only the `mod-compatibility` scenario seeds the layouts that hide the title
   preview and move and enlarge the pause preview.
+- `BlurHandler` clears the depth buffer right after its blur up to 1.21.4. NeoForge moves the GUI's
+  depth back by every registered HUD layer (`ClientHooks.getGuiFarPlane`), and the blur leaves
+  its own depth over the whole screen, so in a modpack with many HUD layers everything a menu drew
+  after the blur failed the depth test and only the blur showed. The blur is a flat picture, so
+  nothing after it needs its depth.
 - Quick Skin's screens over the title screen draw the panorama the title screen last drew
   (`PanoramaRendererMixin` hands it to `BackgroundRenderer.rememberTitlePanorama`), so a mod
   that draws its own there, such as Aquamirae, or a resource pack carries over; before the
