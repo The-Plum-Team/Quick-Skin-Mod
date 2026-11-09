@@ -271,9 +271,6 @@
   "quickskin.settings.player_skins.open": "खोलें",
   "quickskin.settings.enable_own_skin": "अपने अकाउंट की स्किन अपने आप इम्पोर्ट करें",
   "quickskin.settings.own_skin_tooltip": "शुरू होने पर आपके Minecraft अकाउंट की स्किन डाउनलोड करके आपकी सूची में जोड़ता है।",
-  "quickskin.settings.cloud_sync": "अपनी स्किन को Minecraft खाते के साथ सिंक करें",
-  "quickskin.settings.cloud_sync_tooltip": "केवल प्रीमियम खाते। आपकी स्किन और केप Quick Skin क्लाउड में रखता है, ताकि हर मॉडपैक और कंप्यूटर पर वे दिखें।",
-  "quickskin.cloud_sync.notice": "आपकी स्किन अब आपके Minecraft खाते के साथ सिंक होती हैं। आप इसे सेटिंग्स में बंद कर सकते हैं।",
   "quickskin.settings.server_notice": "केवल एडमिन ही ये सेटिंग्स बदल सकते हैं",
 
   "_comment_preview": "=== Player Preview ===",

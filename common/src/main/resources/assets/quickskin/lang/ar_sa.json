@@ -271,9 +271,6 @@
   "quickskin.settings.player_skins.open": "فتح",
   "quickskin.settings.enable_own_skin": "استيراد مظهر حسابك تلقائيًا",
   "quickskin.settings.own_skin_tooltip": "عند التشغيل، يُنزِّل مظهر حسابك في ماينكرافت ويضيفه إلى قائمتك.",
-  "quickskin.settings.cloud_sync": "مزامنة أشكالك مع حساب Minecraft",
-  "quickskin.settings.cloud_sync_tooltip": "للحسابات المدفوعة فقط. يحفظ أشكالك وعباءاتك في سحابة Quick Skin لتظهر في كل حزمة تعديلات وعلى كل حاسوب.",
-  "quickskin.cloud_sync.notice": "تتم الآن مزامنة أشكالك مع حساب Minecraft. يمكنك إيقاف ذلك من الإعدادات.",
   "quickskin.settings.server_notice": "يمكن للمشرفين فقط تغيير هذه الإعدادات",
 
   "_comment_preview": "=== Player Preview ===",

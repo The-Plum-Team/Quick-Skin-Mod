@@ -639,23 +639,6 @@
       "libraries": {}
     },
     {
-      "id": "cloud-sync",
-      "path": "modules/cloud-sync",
-      "kind": "minecraft",
-      "environment": "client",
-      "api": [],
-      "implementation": [
-        "appearance-data",
-        "asset-catalog",
-        "configuration",
-        "content-core",
-        "image-core",
-        "platform-api"
-      ],
-      "runtime_only": [],
-      "libraries": {}
-    },
-    {
       "id": "settings-ui",
       "path": "modules/settings-ui",
       "kind": "minecraft",
@@ -715,7 +698,6 @@
         "cape-menu",
         "client-foundation",
         "client-textures",
-        "cloud-sync",
         "configuration",
         "content-core",
         "cpm-integration",
@@ -836,8 +818,7 @@
         "skin-menu",
         "menu-integration",
         "hud-preview",
-        "favourites-fan",
-        "cloud-sync"
+        "favourites-fan"
       ],
       "runtime_only": [],
       "libraries": {}

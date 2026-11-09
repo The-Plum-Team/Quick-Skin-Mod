@@ -271,9 +271,6 @@
   "quickskin.settings.player_skins.open": "열기",
   "quickskin.settings.enable_own_skin": "계정 스킨 자동으로 가져오기",
   "quickskin.settings.own_skin_tooltip": "시작할 때 Minecraft 계정의 스킨을 내려받아 목록에 추가합니다.",
-  "quickskin.settings.cloud_sync": "스킨을 Minecraft 계정과 동기화",
-  "quickskin.settings.cloud_sync_tooltip": "정품 계정 전용. 스킨과 망토를 Quick Skin 클라우드에 보관해 모든 모드팩과 컴퓨터에서 보이게 합니다.",
-  "quickskin.cloud_sync.notice": "이제 스킨이 Minecraft 계정과 동기화됩니다. 설정에서 끌 수 있습니다.",
   "quickskin.settings.server_notice": "관리자만 이 설정을 변경할 수 있습니다",
 
   "_comment_preview": "=== Player Preview ===",

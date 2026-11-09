@@ -271,9 +271,6 @@
   "quickskin.settings.player_skins.open": "Buka",
   "quickskin.settings.enable_own_skin": "Impor skin akunmu secara otomatis",
   "quickskin.settings.own_skin_tooltip": "Saat dimulai, mengunduh skin akun Minecraft-mu dan menambahkannya ke daftarmu.",
-  "quickskin.settings.cloud_sync": "Sinkronkan skin dengan akun Minecraft-mu",
-  "quickskin.settings.cloud_sync_tooltip": "Hanya akun premium. Menyimpan skin dan jubahmu di cloud Quick Skin agar muncul di setiap modpack dan komputer.",
-  "quickskin.cloud_sync.notice": "Skin-mu kini tersinkron dengan akun Minecraft-mu. Kamu bisa mematikannya di Pengaturan.",
   "quickskin.settings.server_notice": "Hanya admin yang dapat mengubah pengaturan ini",
 
   "_comment_preview": "=== Player Preview ===",

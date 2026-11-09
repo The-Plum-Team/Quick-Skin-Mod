@@ -271,9 +271,6 @@
   "quickskin.settings.player_skins.open": "啟",
   "quickskin.settings.enable_own_skin": "自動匯入帳號之膚",
   "quickskin.settings.own_skin_tooltip": "啟時，下載君Minecraft帳號之膚而入君之列。",
-  "quickskin.settings.cloud_sync": "以 Minecraft 之籍同步皮相",
-  "quickskin.settings.cloud_sync_tooltip": "唯正版之籍。藏汝皮相與披風於 Quick Skin 之雲，凡諸模組包與諸機皆可見之。",
-  "quickskin.cloud_sync.notice": "汝之皮相今與 Minecraft 之籍同步矣。可於設置中止之。",
   "quickskin.settings.server_notice": "唯管理者可改此設",
 
   "_comment_preview": "=== 玩家觀 ===",

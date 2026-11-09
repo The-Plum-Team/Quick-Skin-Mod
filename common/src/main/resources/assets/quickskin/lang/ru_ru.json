@@ -271,9 +271,6 @@
   "quickskin.settings.player_skins.open": "Открыть",
   "quickskin.settings.enable_own_skin": "Автоматически импортировать скин аккаунта",
   "quickskin.settings.own_skin_tooltip": "При запуске скачивает скин вашего аккаунта Minecraft и добавляет его в список.",
-  "quickskin.settings.cloud_sync": "Синхронизировать скины с аккаунтом Minecraft",
-  "quickskin.settings.cloud_sync_tooltip": "Только лицензионные аккаунты. Хранит ваши скины и плащи в облаке Quick Skin, чтобы они были в каждой сборке и на каждом компьютере.",
-  "quickskin.cloud_sync.notice": "Ваши скины теперь синхронизируются с аккаунтом Minecraft. Это можно отключить в настройках.",
   "quickskin.settings.server_notice": "Только администраторы могут менять эти настройки",
 
   "_comment_preview": "=== Player Preview ===",

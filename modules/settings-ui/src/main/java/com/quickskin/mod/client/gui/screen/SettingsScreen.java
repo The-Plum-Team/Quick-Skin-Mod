@@ -158,7 +158,6 @@ public class SettingsScreen extends Screen {
 
     // --- NEW --- Modpack setting widgets
     private Checkbox enablePlayerOwnSkinSystemCheckbox;
-    private Checkbox cloudSkinSyncCheckbox;
 
     // The settings a menu reads when it is built, as they were when the dialog opened: a change
     // rebuilds the parent on close
@@ -567,12 +566,6 @@ public class SettingsScreen extends Screen {
                 config.enablePlayerOwnSkinSystem,
                 "quickskin.settings.own_skin_tooltip", this::applyClientSettings);
         modpackSettingWidgets.add(enablePlayerOwnSkinSystemCheckbox);
-
-        cloudSkinSyncCheckbox = checkbox(leftColumnX, startY + 30,
-                "quickskin.settings.cloud_sync",
-                config.cloudSkinSync,
-                "quickskin.settings.cloud_sync_tooltip", this::applyClientSettings);
-        modpackSettingWidgets.add(cloudSkinSyncCheckbox);
     }
 
     private void switchTab(Tab tab) {
@@ -992,7 +985,6 @@ public class SettingsScreen extends Screen {
         config.disableSkinTransparency = disableSkinTransparencyCheckbox.selected();
         config.enablePlayerPreviewCustomization = enablePlayerPreviewCustomizationCheckbox.selected();
         config.enablePlayerOwnSkinSystem = enablePlayerOwnSkinSystemCheckbox.selected();
-        config.cloudSkinSync = cloudSkinSyncCheckbox.selected();
         config.hideBuiltInCapes = hideBuiltInCapesCheckbox.selected();
         config.showTitleScreenPreview = showTitlePreviewCheckbox.selected();
         config.showPauseMenuPreview = showPausePreviewCheckbox.selected();

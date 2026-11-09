@@ -82,8 +82,6 @@ public class ClientEvents {
             // The latest look choice between Quick Skin and CPM decides the local look.
             com.quickskin.mod.client.services.CpmLookArbiter.tick();
             com.quickskin.mod.client.compat.ReplayModHelper.tick();
-            // Starts a round of the cloud library sync when one is due
-            com.quickskin.mod.client.sync.CloudSkinSync.tick();
         });
 
         // Download player's own skin on startup (async, won't block). Platforms whose client entry
@@ -251,7 +249,6 @@ public class ClientEvents {
     /** Unregisters internal service listeners during explicit client shutdown. */
     public static synchronized void close() {
         PlayerOwnSkinBootstrap.close();
-        com.quickskin.mod.client.sync.CloudSkinSync.close();
         for (InternalEventBus.Subscription subscription : INTERNAL_SUBSCRIPTIONS) {
             try {
                 subscription.close();

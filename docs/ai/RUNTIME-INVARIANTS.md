@@ -353,21 +353,6 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   changed. A folder that cannot be created or written leaves the instance on its own folders, as
   before, and `-Dquickskin.sharedLibrary=false` or the packaged E2E harness never use it.
   Capes' animation atlases, CPM models and the cape editor's sources stay per instance.
-- `CloudSkinSync` (cloud-sync) keeps a premium account's library in the Quick Skin website's
-  cloud (`/api/sync/v1`, keyed by the account UUID), on by default (`cloudSkinSync`, in the
-  Modpack tab) and told once in the skin menu (`cloudSyncNoticeShown`). The client proves the
-  account by Mojang's session join on a challenge the website hands out, which the website checks
-  with `hasJoined`: the access token goes only to Mojang, and an account Mojang refuses (offline)
-  is never synced. Rounds run one at a time on their own daemon thread, at most every 20 seconds
-  for local changes and 5 minutes for the cloud's, spaced 600 ms per request; the library is read
-  and changed only on the client thread. `SyncPlanner` compares both sides with what they last
-  agreed on (`cloud-sync/<uuid>.json` beside the library): new entries travel both ways,
-  deletions too, and a change made on both sides keeps this computer's. A cloud `reset` (pruned
-  tombstones, a recreated account) merges both sides and deletes nothing. Only static PNG skins
-  and capes up to 2 MiB travel, with name, model and favourite; a download is kept only when its
-  bytes hash to the id the cloud named and decode as a PNG. A deletion made elsewhere never
-  deletes the worn skin or cape, the own skin or the last listed skin; such an entry and one the
-  cloud refuses (quota) stay local for the session.
 - The skin menu's list always keeps at least one skin or CPM model: marking or deleting the last
   listed entry, the own skin or a custom one, is refused with a toast
   (`LocalAssetManager.keepsAListedSkin`), and a deletion that would empty the list is refused

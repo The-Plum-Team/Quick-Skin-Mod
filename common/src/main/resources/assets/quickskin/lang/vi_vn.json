@@ -271,9 +271,6 @@
   "quickskin.settings.player_skins.open": "Mở",
   "quickskin.settings.enable_own_skin": "Tự động nhập skin của tài khoản",
   "quickskin.settings.own_skin_tooltip": "Khi khởi động, tải skin tài khoản Minecraft của bạn và thêm vào danh sách.",
-  "quickskin.settings.cloud_sync": "Đồng bộ skin với tài khoản Minecraft",
-  "quickskin.settings.cloud_sync_tooltip": "Chỉ tài khoản bản quyền. Lưu skin và áo choàng của bạn trên đám mây Quick Skin để mọi modpack và máy tính đều có.",
-  "quickskin.cloud_sync.notice": "Skin của bạn giờ được đồng bộ với tài khoản Minecraft. Bạn có thể tắt trong Cài đặt.",
   "quickskin.settings.server_notice": "Chỉ quản trị viên mới có thể thay đổi các cài đặt này",
 
   "_comment_preview": "=== Player Preview ===",

@@ -172,12 +172,7 @@ scale need to keep it below the logo and the splash text (`TitleSplashClearance`
 position the player set is drawn as configured. `hud-preview` owns its overlay,
 mouse/tick/render callbacks and drag state independently of menu widgets. Bootstrap keeps CPM's
 frame-boundary callback after HUD extraction, including when the HUD is hidden.
-`cloud-sync` owns the cloud library sync: the website and Mojang session client
-(`SkinSyncApi`), the agreed state per account (`SyncState`), the round planner (`SyncPlanner`,
-pure Java with its own tests) and `CloudSkinSync`, which `ClientEvents` ticks and closes. It reads
-and changes the library only through `LocalAssetManager`; the skin menu shows its one-time notice
-and the settings screen only flips `ClientConfig.cloudSkinSync`. The shared library folder itself
-is `SharedLibrary` in `configuration`.
+The shared library folder is `SharedLibrary` in `configuration`.
 `favourites-fan` owns the favourites fan: its key (registered through `KeybindRegistry`), its HUD
 layer, the mouse buttons, wheel and Esc it takes while open, and the arithmetic of its cards
 (`FanMotion`, pure Java with its own tests). It puts a favourite on along the skin menu's own path

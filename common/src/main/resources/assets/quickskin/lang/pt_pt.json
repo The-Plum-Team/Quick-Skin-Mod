@@ -271,9 +271,6 @@
   "quickskin.settings.player_skins.open": "Abrir",
   "quickskin.settings.enable_own_skin": "Importar automaticamente a pele da tua conta",
   "quickskin.settings.own_skin_tooltip": "Ao iniciar, transfere a pele da tua conta Minecraft e adiciona-a à tua lista.",
-  "quickskin.settings.cloud_sync": "Sincronizar as tuas skins com a tua conta do Minecraft",
-  "quickskin.settings.cloud_sync_tooltip": "Apenas contas premium. Guarda as tuas skins e capas na nuvem do Quick Skin para aparecerem em todos os modpacks e computadores.",
-  "quickskin.cloud_sync.notice": "As tuas skins são agora sincronizadas com a tua conta do Minecraft. Podes desativar isto nas Definições.",
   "quickskin.settings.server_notice": "Só os administradores podem alterar estas definições",
 
   "_comment_preview": "=== Player Preview ===",

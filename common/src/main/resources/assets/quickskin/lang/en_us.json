@@ -275,9 +275,6 @@
   "quickskin.settings.player_skins.open": "Open",
   "quickskin.settings.enable_own_skin": "Automatically import your account's skin",
   "quickskin.settings.own_skin_tooltip": "On startup, downloads your Minecraft account's skin and adds it to your list.",
-  "quickskin.settings.cloud_sync": "Sync your skins with your Minecraft account",
-  "quickskin.settings.cloud_sync_tooltip": "Premium accounts only. Keeps your skins and capes in the Quick Skin cloud, so every modpack and computer you play on lists them.",
-  "quickskin.cloud_sync.notice": "Your skins now sync with your Minecraft account. You can turn it off in Settings.",
   "quickskin.settings.server_notice": "Only admins can change these settings",
 
   "_comment_preview": "=== Player Preview ===",

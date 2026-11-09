@@ -101,8 +101,6 @@ public class ClientConfig {
 
     // --- NEW --- Modpack Settings
     public boolean enablePlayerOwnSkinSystem = true; // When enabled, automatically downloads and protects the player's own skin.
-    public boolean cloudSkinSync = true; // Keeps a premium account's skin library in the Quick Skin cloud, for every modpack and computer
-    public boolean cloudSyncNoticeShown = false; // The skin menu told the player once that the library is synced
 
     // Logging Settings
 

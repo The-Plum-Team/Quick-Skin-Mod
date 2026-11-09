@@ -271,9 +271,6 @@
   "quickskin.settings.player_skins.open": "打开",
   "quickskin.settings.enable_own_skin": "自动导入你账号的皮肤",
   "quickskin.settings.own_skin_tooltip": "启动时下载你 Minecraft 账号的皮肤并添加到列表中。",
-  "quickskin.settings.cloud_sync": "将皮肤与 Minecraft 账户同步",
-  "quickskin.settings.cloud_sync_tooltip": "仅限正版账户。将你的皮肤和披风保存在 Quick Skin 云端，让每个整合包和每台电脑都能看到。",
-  "quickskin.cloud_sync.notice": "你的皮肤现在会与 Minecraft 账户同步。可在设置中关闭。",
   "quickskin.settings.server_notice": "仅管理员可以修改这些设置",
 
   "_comment_preview": "=== 玩家预览 ===",
