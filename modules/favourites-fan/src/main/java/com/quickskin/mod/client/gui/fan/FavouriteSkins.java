@@ -106,14 +106,15 @@ final class FavouriteSkins {
             if (!CpmModelWorkflow.activateModel(metadata)) {
                 return Result.FAILED;
             }
-            // The model replaces the applied Quick Skin skin, here and on the server; the cape stays
+            // A CPM model wears no Quick Skin cape, and replaces the applied Quick Skin skin
+            com.quickskin.mod.client.services.SkinCapes.wearNone(player);
             if (appearances.hasOwnActiveSkin(player)) {
                 appearances.applySkin(player, "", null);
             }
         } else {
             CpmModelWorkflow.activateSkin(metadata.hash());
             appearances.applySkin(player, "local_skin:" + metadata.hash(), modelType(metadata));
-            // A skin with a cape of its own puts it on too
+            // The skin's cape, or no cape when it has none
             com.quickskin.mod.client.services.SkinCapes.wear(metadata.hash(), player);
         }
         lastChangeMillis = System.currentTimeMillis();

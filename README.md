@@ -140,6 +140,13 @@ on Quick Skin 3.1.0 or older are the exception: while one of their textures is o
 their whole appearance (skin, cape and model) does not sync until they update or choose a smaller
 texture, and the server cannot change that. Lower the limit only when those players can update.
 
+To turn HD skins off, set `maxSkinResolution` in the same file to the widest skin the server
+takes: `64` allows only standard skins, `128` skins up to 128x128, and so on; `0`, the default,
+sets no limit. Capes are not limited. An operator can also tick or untick **Allow HD skins**
+in the Server tab of Quick Skin's settings, which sets no limit or `64`, at once. A player whose skin is wider keeps it on their own screen and
+sees a chat message, and the rest of their appearance still syncs; players on older Quick Skin
+versions still send it, the server refuses it, and others see them without that skin.
+
 A server with Quick Skin tells each player who joins without it, once per world, that the server
 uses Quick Skin and where to get it: one chat message in the language of their game, beside a
 little pixel-art Plum, with a link to the Modrinth page. A minute after the join, so a client that does run Quick Skin has time to

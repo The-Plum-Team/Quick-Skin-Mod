@@ -646,6 +646,10 @@ public class ClientNetworkHandler {
                     || !java.util.Objects.equals(oldServerConfig.accountSkinVisibility,
                             serverConfig.accountSkinVisibility)
                     || oldServerConfig.allowNicknames != serverConfig.allowNicknames;
+            boolean skinResolutionChanged = !firstConfig
+                    && com.quickskin.mod.config.ServerConfig.normalizedSkinResolution(oldServerConfig.maxSkinResolution)
+                            != com.quickskin.mod.config.ServerConfig.normalizedSkinResolution(serverConfig.maxSkinResolution);
+            configChanged |= skinResolutionChanged;
             if (configChanged) {
                 clientConfig.applyServerOverride(serverConfig);
             }
@@ -660,6 +664,10 @@ public class ClientNetworkHandler {
             if (policyChanged) {
                 requestTransparencyReload(now);
             }
+            if (skinResolutionChanged) {
+                // An HD skin the server now refuses is withdrawn, or one it now allows is sent
+                resyncOwnAppearance();
+            }
 
             bootstrapLocalAppearance();
         });
@@ -669,6 +677,16 @@ public class ClientNetworkHandler {
      * Sends the local appearance once per connection, as soon as the server can receive it.
      * Config replays must not re-upload assets. Runs on the client thread.
      */
+    /** Sends the player's own look again after the server's skin policy changed. */
+    private static void resyncOwnAppearance() {
+        Minecraft mc = Minecraft.getInstance();
+        if (!appearanceBootstrapSent || mc.player == null) return;
+        UUID playerId = mc.player.getUUID();
+        com.quickskin.mod.common.data.PlayerAppearance own = appearanceTarget().ownAppearance(playerId);
+        if (own == null) return;
+        NetworkSyncService.getInstance().syncAppearance(playerId, own.getSkinId(), own.getCapeId(), own.getModel());
+    }
+
     static void bootstrapLocalAppearance() {
         Minecraft mc = Minecraft.getInstance();
         if (appearanceBootstrapSent || mc.player == null) return;

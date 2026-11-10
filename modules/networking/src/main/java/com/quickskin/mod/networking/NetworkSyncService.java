@@ -405,6 +405,14 @@ public class NetworkSyncService {
             return new PreparedUpload(
                     key, null, textureType, new byte[0][], true, protocolProfile);
         }
+        int skinResolution = serverSkinResolution();
+        if ("skin".equals(textureType) && NetworkSecurity.isSkinOverResolution(textureData, skinResolution)) {
+            reportOverResolution(NetworkSecurity.pngWidth(textureData), NetworkSecurity.pngHeight(textureData),
+                    skinResolution);
+            // Like a texture over the size limit: kept local, and the rest of the look still syncs
+            return new PreparedUpload(
+                    key, null, textureType, new byte[0][], true, protocolProfile);
+        }
         String networkHash = protocolProfile.negotiated()
                 ? HashUtil.computeContentId(textureData)
                 : HashUtil.computeHash(textureData);
@@ -473,6 +481,36 @@ public class NetworkSyncService {
             net.minecraft.network.chat.Component message =
                     net.minecraft.network.chat.Component.translatable(
                             translationKey, sizeText, limitText);
+            //? if <26.1 {
+            minecraft.player.displayClientMessage(message, false);
+            //?} else {
+            minecraft.player.sendSystemMessage(message);
+            //?}
+        });
+    }
+
+    /** The widest skin the connected server takes, from its synced settings; 0 for no limit. */
+    private static int serverSkinResolution() {
+        com.quickskin.mod.config.ServerConfig server =
+                com.quickskin.mod.config.ClientConfig.getInstance().getServerOverride();
+        return server == null ? 0
+                : com.quickskin.mod.config.ServerConfig.normalizedSkinResolution(server.maxSkinResolution);
+    }
+
+    private void reportOverResolution(int width, int height, int limit) {
+        String reportKey = "resolution:" + width + 'x' + height + ':' + limit;
+        if (reportedOversizedUploads.contains(reportKey)) return;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null) return;
+        minecraft.execute(() -> {
+            if (minecraft.player == null
+                    || reportedOversizedUploads.size() >= MAX_REPORTED_OVERSIZED_UPLOADS
+                    || !reportedOversizedUploads.add(reportKey)) return;
+            QuickSkinInfo.LOGGER.warn("The {}x{} skin is wider than this server's {} pixel limit;"
+                    + " it stays local and other players do not see it", width, height, limit);
+            net.minecraft.network.chat.Component message =
+                    net.minecraft.network.chat.Component.translatable(
+                            "quickskin.network.skin_over_resolution", width + "x" + height, limit + "x" + limit);
             //? if <26.1 {
             minecraft.player.displayClientMessage(message, false);
             //?} else {

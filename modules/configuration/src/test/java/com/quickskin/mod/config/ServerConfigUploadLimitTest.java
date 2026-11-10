@@ -125,4 +125,13 @@ class ServerConfigUploadLimitTest {
         Files.writeString(file, json, StandardCharsets.UTF_8);
         return file;
     }
+
+    @Test
+    void theSkinResolutionLimitIsOffUnlessSetAndNeverBelowAStandardSkin() {
+        assertEquals(0, ServerConfig.fromJson("{}").maxSkinResolutionPixels());
+        assertEquals(128, ServerConfig.fromJson("{\"maxSkinResolution\": 128}").maxSkinResolutionPixels());
+        assertEquals(64, ServerConfig.fromJson("{\"maxSkinResolution\": 16}").maxSkinResolutionPixels());
+        assertEquals(0, ServerConfig.fromJson("{\"maxSkinResolution\": -5}").maxSkinResolutionPixels());
+        assertEquals(0, ServerConfig.fromJson("{\"maxSkinResolution\": \"big\"}").maxSkinResolutionPixels());
+    }
 }
