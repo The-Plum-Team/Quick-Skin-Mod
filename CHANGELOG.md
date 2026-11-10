@@ -27,6 +27,9 @@
 
 ### Fixes
 
+- **Your own skin can be a favourite**
+> The skin from your Mojang account, the purple one pinned first in the skin menu, now has the favourite star and the Favourite item in its right-click menu like any other skin, so it can join the favourites fan. It stays pinned first.
+
 - **The skin menu no longer opens to a blurred screen in big modpacks**
 > In modpacks with many HUD mods, mostly on NeoForge, opening the skin or cape menu in a world showed only the blurred world, with no menu over it. The menus now draw over their blur in any modpack.
 

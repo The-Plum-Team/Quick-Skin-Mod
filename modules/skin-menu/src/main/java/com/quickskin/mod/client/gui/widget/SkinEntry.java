@@ -102,9 +102,9 @@ public class SkinEntry {
         return metadata.friendlyName();
     }
 
-    /** Whether this is a favorite: never the player's own skin, which is pinned first anyway. */
+    /** Whether this is a favorite; the player's own skin can be one too, and stays pinned first. */
     public boolean isFavorite() {
-        return favorite && !isPlayerOwnSkin();
+        return favorite;
     }
 
     private boolean isPlayerOwnSkin() {
@@ -249,7 +249,7 @@ public class SkinEntry {
         // kept on a favorite
         this.isFavoriteHovered = false;
         boolean favoriteButton = isHovered && !deleteMode && !departing;
-        if (!isPlayerOwnSkin && (favoriteButton || isFavorite)) {
+        if (favoriteButton || isFavorite) {
             int buttonLeft = tileLeft + 2;
             int buttonTop = tileTop + 2;
             if (favoriteButton) {
@@ -318,7 +318,7 @@ public class SkinEntry {
      * with the skin's 3D bust on the left and, beside it, the name over a hairline and a line with
      * the arm width (or CPM) and the resolution. The selected card has a coloured border and that
      * colour behind its bust, gold for a favorite. A hovered card shows a favorite star near its
-     * top-right corner, which a favorite keeps, except on the player's own skin. In the delete mode
+     * top-right corner, which a favorite keeps. In the delete mode
      * a card marked for deletion has a red border and glow, a red name and its bust in grey.
      */
     public void renderRow(
@@ -366,7 +366,7 @@ public class SkinEntry {
         // The favorite button: shown on hover outside the delete mode, and its star kept on a favorite
         this.isFavoriteHovered = false;
         boolean favoriteButton = isHovered && !deleteMode && !departing;
-        boolean showFavorite = !isPlayerOwnSkin && (favoriteButton || isFavorite);
+        boolean showFavorite = favoriteButton || isFavorite;
         int favoriteLeft = right - 3 - ROW_BUTTON_SIZE;
         int favoriteTop = top + 4;
         if (showFavorite && favoriteButton) {
