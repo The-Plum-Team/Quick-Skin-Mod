@@ -25,7 +25,9 @@ final class FanSounds {
     static final SoundEvent POINT = event("fan.point");
     /** The mouse wheel turns the page. */
     static final SoundEvent PAGE = event("fan.page");
-    /** A click on a card puts its skin on. */
+    /** A click on a card: it comes to the centre and turns over. */
+    static final SoundEvent CHOOSE = event("fan.choose");
+    /** The chosen card's skin is put on, halfway through its turn. */
     static final SoundEvent WEAR = event("fan.wear");
 
     private FanSounds() {

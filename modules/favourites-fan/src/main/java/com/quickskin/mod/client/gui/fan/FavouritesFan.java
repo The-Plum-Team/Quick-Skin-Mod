@@ -104,6 +104,8 @@ public final class FavouritesFan {
         chosen = hovered;
         worn = false;
         setPhase(Phase.CHOOSING);
+        // The card's turn sounds from the click; the skin's own sound follows when it is put on
+        FanSounds.play(FanSounds.CHOOSE, 0.45f);
     }
 
     public static void close() {
