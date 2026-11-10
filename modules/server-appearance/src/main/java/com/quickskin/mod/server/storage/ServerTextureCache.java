@@ -53,6 +53,8 @@ public class ServerTextureCache {
     private long cachedBytes;
     /** The administrator's per-texture limit; nothing larger is staged, loaded or served. */
     private int uploadLimitBytes = TextureTransferLimits.DEFAULT_SERVER_UPLOAD_BYTES;
+    /** The widest skin this server takes (maxSkinResolution), or 0 for no limit. */
+    private int maxSkinResolution = 0;
     /** Stored textures left unloaded only for their size, bounded by the listing's entry cap. */
     private final Set<String> retainedOverLimit = new HashSet<>();
     private Path storageDirectory;
@@ -78,6 +80,20 @@ public class ServerTextureCache {
     public synchronized int configureUploadLimit(long requestedBytes) {
         uploadLimitBytes = TextureTransferLimits.clampServerUploadBytes(requestedBytes);
         return uploadLimitBytes;
+    }
+
+    /**
+     * Sets the widest skin this server accepts, stores and serves (0: no limit). Like the upload
+     * limit it is set before {@link #init}: a stored skin wider than it is kept on disk but not
+     * loaded, so a later, larger limit serves it again.
+     */
+    public synchronized int configureMaxSkinResolution(int pixels) {
+        maxSkinResolution = Math.max(0, pixels);
+        return maxSkinResolution;
+    }
+
+    public synchronized int maxSkinResolution() {
+        return maxSkinResolution;
     }
 
     public synchronized int uploadLimitBytes() {
@@ -138,16 +154,24 @@ public class ServerTextureCache {
         final long preparedGeneration;
         final Path preparedDirectory;
         final int limit;
+        final int skinResolution;
         synchronized (this) {
             if (storageDirectory == null) return null;
             preparedGeneration = generation;
             preparedDirectory = storageDirectory;
             limit = uploadLimitBytes;
+            skinResolution = maxSkinResolution;
         }
         if (textureData.length > limit) {
             LOGGER.warn("Rejected a {} upload from {}: {} bytes is over this server's {} byte"
                             + " upload limit (maxTextureUploadKilobytes)",
                     textureType, ownerId, textureData.length, limit);
+            return null;
+        }
+        if ("skin".equals(textureType) && NetworkSecurity.isSkinOverResolution(textureData, skinResolution)) {
+            LOGGER.warn("Rejected a skin upload from {}: {} pixels wide is over this server's {}"
+                            + " pixel limit (maxSkinResolution)",
+                    ownerId, NetworkSecurity.pngWidth(textureData), skinResolution);
             return null;
         }
 
@@ -593,6 +617,14 @@ public class ServerTextureCache {
                             + " server's {} byte upload limit", hash, size, uploadLimitBytes);
                     continue;
                 }
+                if (maxSkinResolution > 0 && isWideSquare(path, maxSkinResolution)) {
+                    // Only skins are square (capes are 2:1 or taller atlases): an HD skin over the
+                    // limit, kept on disk for a later, larger one.
+                    retainedOverLimit.add(hash);
+                    LOGGER.info("Not loading stored skin {}: it is wider than this server's {}"
+                            + " pixel limit (maxSkinResolution)", hash, maxSkinResolution);
+                    continue;
+                }
                 Ownership ownership = readOwnership(hash);
                 if (ownership == null) {
                     LOGGER.warn("Ignoring unowned legacy texture cache entry {}", hash);
@@ -935,6 +967,17 @@ public class ServerTextureCache {
             this.data = data;
             this.embeddedAnimationMetadata = embeddedAnimationMetadata;
             this.owners = new LinkedHashSet<>(owners);
+        }
+    }
+
+    /** Whether a stored PNG is square and wider than the limit, read from its header alone. */
+    private static boolean isWideSquare(Path path, int maxResolution) {
+        try (java.io.InputStream input = Files.newInputStream(path)) {
+            byte[] header = input.readNBytes(33);
+            int width = NetworkSecurity.pngWidth(header);
+            return width > maxResolution && width == NetworkSecurity.pngHeight(header);
+        } catch (IOException error) {
+            return false;
         }
     }
 

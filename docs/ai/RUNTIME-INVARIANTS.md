@@ -18,7 +18,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   predates per-account storage goes to the first account that joins, once.
   `CpmModelWorkflow.activateSkin` records one, which includes the skin menu's programmatic
   selections; the own-skin auto-selection of `PlayerOwnSkinBootstrap` / `SavedAppearanceRestorer`
-  and a skin adopted from the server do not. Capes and CPM models stay instance-wide. A
+  and a skin adopted from the server do not. A cape belongs to a skin (below); CPM models stay
+  instance-wide. A
   cosmetic nickname belongs to the launcher account too (`ClientConfig.accountNicknames`, same
   key); only the skin menu's nickname dialog records one.
 - A session whose account has no selection uploads nothing until it has seen the server's record
@@ -98,6 +99,18 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   server writes its settings back at stop, so it is edited while the server is stopped. A setting
   with an invalid number is clamped or ignored on its own, and a file that cannot be parsed is
   left untouched (defaults apply until it is fixed), never overwritten.
+- `ServerConfig.maxSkinResolution` (0, the default, for no limit; at least 64) is the widest skin
+  a server takes, read from the PNG header; capes are never limited by it. `ServerRuntime` sets it
+  on `ServerTextureCache` before the cache loads: an upload of a wider skin is refused and logged,
+  and a stored square PNG wider than it (only skins are square; capes are 2:1 or taller atlases)
+  is kept on disk but not loaded, like a texture over the size limit, so a larger limit serves it
+  again. It travels to clients in the synchronized server configuration, never in the protocol
+  acknowledgement, so older clients ignore it: a client that reads it keeps a wider skin local (an
+  empty skin id in the synced appearance, a chat message once), and an older client's upload is
+  simply refused. The Server tab's **Allow HD skins** checkbox (operators only) sends
+  `update_server_config` `allowHdSkins`, which sets 0 or 64, applies it to the cache at once and
+  broadcasts the settings; a client whose synced limit changed sends its own look again, so an HD
+  skin is withdrawn or sent. Older servers ignore the key.
 - Every packet must fit the vanilla custom-payload limits of every supported version (32767 bytes
   serverbound, 1 MiB clientbound) without XL Packets or similar mods: anything that can grow with an
   asset travels in bounded chunks, and `WirePayloadBudget` with its test bounds each packet from the
@@ -352,22 +365,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   library has no choice for (`sharedLibraryPreferencesMerged`); the instance's file is never
   changed. A folder that cannot be created or written leaves the instance on its own folders, as
   before, and `-Dquickskin.sharedLibrary=false` or the packaged E2E harness never use it.
-  Capes' animation atlases, CPM models and the cape editor's sources stay per instance.
-- `CloudSkinSync` (cloud-sync) keeps a premium account's library in the Quick Skin website's
-  cloud (`/api/sync/v1`, keyed by the account UUID), on by default (`cloudSkinSync`, in the
-  Modpack tab) and told once in the skin menu (`cloudSyncNoticeShown`). The client proves the
-  account by Mojang's session join on a challenge the website hands out, which the website checks
-  with `hasJoined`: the access token goes only to Mojang, and an account Mojang refuses (offline)
-  is never synced. Rounds run one at a time on their own daemon thread, at most every 20 seconds
-  for local changes and 5 minutes for the cloud's, spaced 600 ms per request; the library is read
-  and changed only on the client thread. `SyncPlanner` compares both sides with what they last
-  agreed on (`cloud-sync/<uuid>.json` beside the library): new entries travel both ways,
-  deletions too, and a change made on both sides keeps this computer's. A cloud `reset` (pruned
-  tombstones, a recreated account) merges both sides and deletes nothing. Only static PNG skins
-  and capes up to 2 MiB travel, with name, model and favourite; a download is kept only when its
-  bytes hash to the id the cloud named and decode as a PNG. A deletion made elsewhere never
-  deletes the worn skin or cape, the own skin or the last listed skin; such an entry and one the
-  cloud refuses (quota) stay local for the session.
+  An animated cape's frame timing is kept in the library's `animations` folder, so the cape
+  animates in every instance; timing an older version wrote into the instance's cache is copied
+  there when it is read. CPM selects a model only by its path inside `player_models`, so the
+  library's `cpm-models` folder is mirrored into each instance's `player_models/quickskin-library`
+  before the scan (`CpmLibraryMirror`): a model kept elsewhere in `player_models` joins the
+  library, the library's models are copied in, and a mirrored copy whose model left the library
+  (deleted in another instance) is deleted; nothing outside that subfolder is ever deleted by the
+  mirror. Deleting a model deletes the library's copy too. GIF capes' decoded atlases and the
+  cape editor's sources stay per instance.
 - The skin menu's list always keeps at least one skin or CPM model: marking or deleting the last
   listed entry, the own skin or a custom one, is refused with a toast
   (`LocalAssetManager.keepsAListedSkin`), and a deletion that would empty the list is refused
@@ -447,6 +453,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Konkrete and Melody JARs beside it; every scenario runs with FancyMenu installed and nothing
   customized, and only the `mod-compatibility` scenario seeds the layouts that hide the title
   preview and move and enlarge the pause preview.
+- `BlurHandler` clears the depth buffer right after its blur up to 1.21.4. NeoForge moves the GUI's
+  depth back by every registered HUD layer (`ClientHooks.getGuiFarPlane`), and the blur leaves
+  its own depth over the whole screen, so in a modpack with many HUD layers everything a menu drew
+  after the blur failed the depth test and only the blur showed. The blur is a flat picture, so
+  nothing after it needs its depth.
 - Quick Skin's screens over the title screen draw the panorama the title screen last drew
   (`PanoramaRendererMixin` hands it to `BackgroundRenderer.rememberTitlePanorama`), so a mod
   that draws its own there, such as Aquamirae, or a resource pack carries over; before the
@@ -559,16 +570,22 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   because the 1.20.1 overlay replaces the canonical file on the only lane official TaCZ exists
   for. The animation plays on the real local player, so other first-person draws of that
   player's model show it too; it never reaches the first-person arms.
-- A skin may have a cape of its own (`SkinCapes`, appearance-services), kept as the skin's `cape`
-  in its preferences (`SkinPreferences`): a `local_cape:` content ID or a `known:` built-in name,
-  nothing else. It is picked from the skin menu's context menu through the cape menu opened for
-  that skin (`PlayerCapeMenuScreen.forSkin`). Its Elytra tab picks the skin's `elytra`: "" (the
-  cape), `minecraft:elytra` or a cape ID, null keeping what the elytra wear. Choosing the skin in
-  the skin menu or the favourites fan puts both on like clicks in the cape menu (the active cape
-  and `activeElytraId`, applied to the player); a skin without a choice, a CPM model, or a skin
-  whose cape was deleted keeps what is worn. The skin list shows it as a ribbon on the card or
-  tile, edged purple when the skin chooses its elytra; Remove cape takes both choices away. It is a local choice: nothing new
-  travels on the wire, and a deleted cape is not forgotten, so importing it again brings it back.
+- Capes belong to skins (`SkinCapes`, appearance-services): every skin wears its own cape or
+  none, kept as the skin's `cape` in its preferences (`SkinPreferences`), a `local_cape:` content
+  ID or a `known:` built-in name, nothing else. Putting a skin on (the skin menu, the favourites
+  fan, a join through `ClientRuntime`) puts its cape on, or `SkinCapes.NO_CAPE`
+  (`known:__NONE__`) when it has none; that id resolves to no texture anywhere, so neither this
+  client nor any other (older versions included) draws a cape or the account's Mojang cape for
+  it, and the elytra fall back to vanilla's. A CPM model wears no Quick Skin cape (an empty cape
+  id, `SkinCapes.wearNone`). The cape menu picks the cape of the skin worn (its clicks and Remove
+  Cape store the choice on that skin) or, opened from a skin's context menu
+  (`PlayerCapeMenuScreen.forSkin`), of that skin; with a CPM model or no Quick Skin skin worn it
+  sets only the worn cape. Its Elytra tab picks the skin's `elytra`: "" (the cape),
+  `minecraft:elytra` or a cape ID; without a choice the elytra wear the cape. The cape worn before
+  capes belonged to skins goes to the skin worn then, once, when the catalog loads
+  (`ClientConfig.capesFollowSkins`); other skins start without a cape. The skin list shows a
+  skin's cape as a ribbon on the card or tile, edged purple when the skin chooses its elytra. A
+  deleted cape is not forgotten: importing it again brings it back.
 - The favourites fan (`favourites-fan`) is a HUD layer, never a screen, so the player keeps
   walking while it is open. Its key is unbound until the player binds it. One press opens it on
   the skins and CPM models marked as favourites, in the skin menu's order, at most
@@ -718,7 +735,8 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   model interpretation cannot replace the deterministic contract.
 - Cape-removal evidence must begin from a renderer-confirmed custom-cape elytra, activate the real
   Remove Cape control while leaving the elytra equipped, and then hold the same separated-wing pose.
-  Require persisted, service, cloak, and profile-elytra inputs to be empty so the renderer is forced
+  Require persisted, service, cloak, and profile-elytra inputs to be empty (or the no-cape id a skin
+  without a cape wears, `SkinCapes.NO_CAPE`) so the renderer is forced
   onto Minecraft's vanilla elytra texture; compare the bounded player region against the custom
   wings so a stale custom surface cannot pass on state assertions alone.
 - Skin-fidelity evidence derives every variant from the one plaid fixture so exactly one property

@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.1.0 (2026-11-05)
+## 4.1.0 (2026-11-09)
 
 ### Added
 
@@ -10,11 +10,11 @@
 - **Elytra with a cape of their own**
 > The cape menu has Cape and Elytra tabs: in the Elytra tab, pick any cape for your elytra, keep them the same as your cape, or give them vanilla's elytra texture. In the Cape tab, right-click a cape to put it on your elytra. Other players with Quick Skin 4.1.0 see your elytra's own cape; players on older versions see your elytra wear your cape as before.
 
-- **A cape for each skin**
-> Right-click a skin in the skin menu and pick Assign a cape...: the cape menu opens for that skin, and the cape you click is put on whenever you wear the skin, from the skin menu or the favourites fan. The menu's Elytra tab picks what the elytra wear with that skin too (its cape, vanilla's elytra or another cape). A skin with a cape of its own has it hanging from its card as a ribbon, edged purple when it also has its own elytra; Change cape... and Remove cape are in the same menu. A skin without one keeps the cape and elytra you are wearing.
+- **Every skin wears its own cape**
+> Capes now belong to skins: each skin wears its own cape or none, and putting a skin on, from the skin menu or the favourites fan, puts its cape on. The cape menu picks the cape of the skin you are wearing; right-click any skin in the skin menu and pick Assign a cape... to choose another skin's. Its Elytra tab picks what the elytra wear with that skin (its cape, vanilla's elytra or another cape). A skin without a cape shows none at all, not even your Mojang cape, to you and to everyone else. A skin with a cape has it hanging from its card as a ribbon, edged purple when it also has its own elytra. When you update, the cape you are wearing goes to the skin you are wearing; your other skins start without one. CPM models wear no Quick Skin cape.
 
-- **Your skins in every modpack, and on every computer**
-> Skins and capes you import are kept in one library outside the Minecraft instance (`%APPDATA%\QuickSkin` on Windows, `~/Library/Application Support/QuickSkin` on macOS, `~/.local/share/quickskin` on Linux), so every modpack on your computer lists the same skins with the same favourites and models. Each modpack's own `quickskin/uploads` folders are still read. With a premium Minecraft account the library also syncs with your account through the Quick Skin website, so another computer or launcher lists it too: Quick Skin proves the account through Mojang's own session server and never sends your Minecraft login anywhere else. Offline accounts never sync. Static skins and capes up to 2 MB travel with their name, model and favourite mark; animated capes and CPM models stay on the computer. Turn the sync off in Settings › Modpack.
+- **Your skins in every modpack**
+> Skins, capes (animated ones too) and CPM models you import are kept in one library outside the Minecraft instance (`%APPDATA%\QuickSkin` on Windows, `~/Library/Application Support/QuickSkin` on macOS, `~/.local/share/quickskin` on Linux), so every modpack on your computer lists the same skins with the same favourites, models and the cape each skin puts on. Each modpack's own `quickskin/uploads` and CPM `player_models` folders are still read.
 
 - **Hide Cosmetic Armor pieces from everyone**
 > With Cosmetic Armor Reworked, a cosmetic piece over your armour is now a piece of its own on the skin menu's model: hide it and every other player sees the armour under it instead, like any hidden piece. The server needs this update for others to see it.
@@ -22,7 +22,13 @@
 - **Silent admin commands**
 > Put `silent` after `/quickskin` (for example `/quickskin silent nickname random @a`) and only the players themselves learn their new names or skins: nothing is said to whoever runs the command, to other operators or in a command block's output, and the names it gives show no account name beside them in the operators' tab list or in join and leave messages. Made for games where the admins play too.
 
+- **Servers can turn HD skins off**
+> An operator can untick Allow HD skins in the Server tab of Quick Skin's settings, and the server then takes standard 64x64 skins only, at once and without a restart; ticking it again allows them again. For another limit, set `maxSkinResolution` in `config/quickskin-server.json` to the widest skin allowed (`128` for up to 128x128, `0` for none). Capes are not limited. A player whose skin is wider keeps it on their own screen and gets a chat message, and the rest of their look still syncs.
+
 ### Fixes
+
+- **The skin menu no longer opens to a blurred screen in big modpacks**
+> In modpacks with many HUD mods, mostly on NeoForge, opening the skin or cape menu in a world showed only the blurred world, with no menu over it. The menus now draw over their blur in any modpack.
 
 - **Skins show up in ReplayMod replays on every version**
 > Replays recorded with ReplayMod now show the Quick Skin skins, capes and models players wore, and every change they made while recording, on every Minecraft version ReplayMod exists for. Before, only 1.20.1 did; newer versions showed everyone's Mojang skin.

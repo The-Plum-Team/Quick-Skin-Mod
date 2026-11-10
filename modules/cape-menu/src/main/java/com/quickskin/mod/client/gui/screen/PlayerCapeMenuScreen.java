@@ -767,7 +767,8 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         if (this.skinTarget != null) {
             // The skin's own cape, or none
             activeCapeId = com.quickskin.mod.client.services.SkinCapes.assigned(this.skinTarget.hash());
-        } else if (!config.activeCapeHash.isEmpty()) {
+        } else if (!config.activeCapeHash.isEmpty()
+                && !com.quickskin.mod.client.services.SkinCapes.isNoCape(config.activeCapeHash)) {
             activeCapeId = config.activeCapeHash;
         }
 
@@ -777,7 +778,8 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             com.quickskin.mod.common.data.PlayerAppearance appearance =
                     PlayerAppearanceService.getInstance().getAppearance(playerId);
 
-            if (appearance != null && appearance.getCapeId() != null && !appearance.getCapeId().isEmpty()) {
+            if (appearance != null && appearance.getCapeId() != null && !appearance.getCapeId().isEmpty()
+                    && !com.quickskin.mod.client.services.SkinCapes.isNoCape(appearance.getCapeId())) {
                 activeCapeId = appearance.getCapeId();
             }
         }
@@ -846,7 +848,8 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         if (this.skinTarget == null) {
             return Component.translatable("quickskin.button.remove_cape");
         }
-        return Component.translatable(this.elytraTab ? "quickskin.cape.assign.no_elytra" : "quickskin.cape.assign.none");
+        // A skin without a cape wears none, so taking its cape away removes the cape
+        return Component.translatable(this.elytraTab ? "quickskin.cape.assign.no_elytra" : "quickskin.button.remove_cape");
     }
 
     /** Whether the elytra wear this entry: Same as Cape (None) when they wear the cape. */
@@ -878,6 +881,10 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         ClientConfig config = ClientConfig.getInstance();
         config.activeElytraId = elytraId;
         config.save();
+        String wornSkin = wornSkin();
+        if (wornSkin != null) {
+            com.quickskin.mod.client.services.SkinCapes.assignElytra(wornSkin, elytraId.isEmpty() ? null : elytraId);
+        }
         java.util.UUID target = null;
         if (minecraft != null && minecraft.player != null) {
 //? if <1.21 {
@@ -1245,10 +1252,15 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         // Update speed slider visibility (hide it since no cape is selected)
         updateSpeedSliderVisibility();
 
-        // Clear from config for persistence
+        // Clear from config for persistence: the worn skin has no cape, which shows none at all
         ClientConfig config = ClientConfig.getInstance();
-        config.activeCapeHash = "";
+        String wornSkin = wornSkin();
+        String noCape = wornSkin != null ? com.quickskin.mod.client.services.SkinCapes.NO_CAPE : "";
+        config.activeCapeHash = noCape;
         config.save();
+        if (wornSkin != null) {
+            com.quickskin.mod.client.services.SkinCapes.assign(wornSkin, null);
+        }
 
         // Remove from PlayerAppearanceService
         // Note: We use applyCape with empty string instead of removeCape
@@ -1258,19 +1270,19 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             // Use ReplayModHelper to get the correct player UUID (handles replay mode)
             java.util.UUID targetUUID = com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
             if (targetUUID != null) {
-                PlayerAppearanceService.getInstance().applyCape(targetUUID, "");
+                PlayerAppearanceService.getInstance().applyCape(targetUUID, noCape);
             }
 //?} else {
             // In-game: use the real player's UUID
             PlayerAppearanceService.getInstance()
-                    .applyCape(minecraft.player.getUUID(), "");
+                    .applyCape(minecraft.player.getUUID(), noCape);
 //?}
         } else {
             // Title screen: use cached player UUID if available
             java.util.UUID dummyUUID = getDummyPlayerUUID();
             if (dummyUUID != null) {
                 PlayerAppearanceService.getInstance()
-                        .applyCape(dummyUUID, "");
+                        .applyCape(dummyUUID, noCape);
             }
         }
     }
@@ -2202,9 +2214,8 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             return;
         }
         com.quickskin.mod.client.services.SkinCapes.assign(this.skinTarget.hash(), cape != null ? cape.getCapeId() : null);
-        ClientConfig config = ClientConfig.getInstance();
-        if (cape != null && this.skinTarget.hash().equals(config.activeSkinHash) && config.activeCpmModelHash.isEmpty()) {
-            applyCape(cape);
+        if (this.skinTarget.hash().equals(wornSkin())) {
+            com.quickskin.mod.client.services.SkinCapes.wear(this.skinTarget.hash(), localPlayerTarget());
         }
         onClose();
     }
@@ -2220,11 +2231,30 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         }
         String elytraId = choice == null ? null : choice.isNone() ? "" : choice.getCapeId();
         com.quickskin.mod.client.services.SkinCapes.assignElytra(this.skinTarget.hash(), elytraId);
-        ClientConfig config = ClientConfig.getInstance();
-        if (choice != null && this.skinTarget.hash().equals(config.activeSkinHash) && config.activeCpmModelHash.isEmpty()) {
-            applyElytra(choice);
+        if (this.skinTarget.hash().equals(wornSkin())) {
+            com.quickskin.mod.client.services.SkinCapes.wear(this.skinTarget.hash(), localPlayerTarget());
         }
         onClose();
+    }
+
+    /** The Quick Skin skin worn, whose cape the menu picks; null while a CPM model or no skin is the look. */
+    @Nullable
+    private static String wornSkin() {
+        ClientConfig config = ClientConfig.getInstance();
+        return !config.activeSkinHash.isEmpty() && config.activeCpmModelHash.isEmpty() ? config.activeSkinHash : null;
+    }
+
+    /** The player a choice applies to: the local player in a world, the title screen's model outside. */
+    @Nullable
+    private java.util.UUID localPlayerTarget() {
+        if (minecraft != null && minecraft.player != null) {
+//? if <1.21 {
+            return com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
+//?} else {
+            return minecraft.player.getUUID();
+//?}
+        }
+        return getDummyPlayerUUID();
     }
 
     /** Over the model: whose look the menu picks, in the selected tab's blue. */
@@ -2288,6 +2318,11 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         // Save to config for persistence
         config.activeCapeHash = capeId;
         config.save();
+        // Capes belong to skins: the skin worn keeps the cape
+        String wornSkin = wornSkin();
+        if (wornSkin != null) {
+            com.quickskin.mod.client.services.SkinCapes.assign(wornSkin, capeId);
+        }
 
         // Apply to PlayerAppearanceService
         if (minecraft != null && minecraft.player != null) {

@@ -81,6 +81,12 @@ public final class ServerRuntime implements AutoCloseable {
         int uploadLimit = ProtocolSessions.getInstance().configureServerUploadLimit(
                 ServerConfig.getInstance().maxTextureUploadBytes());
         textureCache.configureUploadLimit(uploadLimit);
+        int skinResolution = textureCache.configureMaxSkinResolution(
+                ServerConfig.getInstance().maxSkinResolutionPixels());
+        if (skinResolution > 0) {
+            QuickSkinInfo.LOGGER.info("Quick Skin accepts skins up to {} pixels wide (maxSkinResolution"
+                    + " in quickskin-server.json); capes are not limited", skinResolution);
+        }
         QuickSkinInfo.LOGGER.info("Quick Skin accepts skins and capes up to {} KiB per texture"
                 + " (maxTextureUploadKilobytes in quickskin-server.json)", uploadLimit / 1024);
         if (uploadLimit < TextureTransferLimits.DEFAULT_SERVER_UPLOAD_BYTES) {

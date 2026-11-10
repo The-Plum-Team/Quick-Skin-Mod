@@ -100,6 +100,7 @@ public class BlurHandler {
         RenderSystem.disableDepthTest();
         blurShader.process(0.0F);
         mc.getMainRenderTarget().bindWrite(false);
+        clearBlurDepth();
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         //?} else if <1.21.2 {
@@ -107,9 +108,13 @@ public class BlurHandler {
         graphics.flush();
         mc.gameRenderer.processBlurEffect(mc.getTimer().getGameTimeDeltaTicks());
         mc.getMainRenderTarget().bindWrite(false);
+        clearBlurDepth();
         //?} else if <1.21.6 {
         graphics.flush();
         mc.gameRenderer.processBlurEffect();
+        //? if <1.21.5 {
+        clearBlurDepth();
+        //?}
         //?} else {
         // Start a stratum so everything already drawn, including the panorama, is behind the blur.
         graphics.nextStratum();
@@ -121,6 +126,22 @@ public class BlurHandler {
         }
         //?}
     }
+
+    //? if <1.21.5 {
+    /**
+     * The blur leaves its own depth over the whole screen. NeoForge pushes the GUI's depth back by
+     * every registered HUD layer, so in a modpack with many of them everything the menu draws next
+     * lies behind that depth and fails the depth test: only the blur shows. The blur is a flat
+     * picture of what is behind the menu, so its depth is cleared for what comes after it.
+     */
+    private static void clearBlurDepth() {
+        //? if <1.21.2 {
+        com.mojang.blaze3d.systems.RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
+        //?} else {
+        com.mojang.blaze3d.systems.RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT);
+        //?}
+    }
+    //?}
 
     //? if <1.21 {
     private static boolean ensureBlurShader(Minecraft mc) {

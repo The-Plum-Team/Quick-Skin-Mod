@@ -221,10 +221,6 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 showToast(Component.translatable("quickskin.skin.assigned_hint"), ErrorToast.Kind.INFO);
             }
         }
-        // Once ever, after the first sync of the library with the account's cloud library
-        if (com.quickskin.mod.client.sync.CloudSkinSync.takeNotice()) {
-            showToast(Component.translatable("quickskin.cloud_sync.notice"), ErrorToast.Kind.INFO);
-        }
     }
 
     /**
@@ -776,6 +772,9 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             registerCapeAnimationIfNeeded(capeId, capeLocation);
 
             playerPreviewPanel.updateCape(capeLocation, capeId);
+        } else if (capeId.isEmpty() || com.quickskin.mod.client.services.SkinCapes.isNoCape(capeId)) {
+            // A skin without a cape wears none
+            playerPreviewPanel.updateCape(null, null);
         }
     }
 
@@ -2425,8 +2424,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 showError(Component.translatable("quickskin.error.cpm_select_failed"));
                 return false;
             }
+            // A CPM model wears no Quick Skin cape
+            com.quickskin.mod.client.services.SkinCapes.wearNone(localWearTarget());
             // The model replaces the applied Quick Skin skin. Withdraw it here and on the
-            // server (the cape stays), or other players keep drawing the old skin.
+            // server, or other players keep drawing the old skin.
             if (this.minecraft != null && this.minecraft.player != null) {
 //? if <1.21 {
                 java.util.UUID targetUUID = com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
@@ -2509,9 +2510,21 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 mouseX, mouseY, width, height);
     }
 
+    /** The player a look applies to: the local player in a world, the title screen's model outside. */
+    private java.util.UUID localWearTarget() {
+        if (this.minecraft != null && this.minecraft.player != null) {
+//? if <1.21 {
+            return com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
+//?} else {
+            return this.minecraft.player.getUUID();
+//?}
+        }
+        return com.quickskin.mod.client.rendering.PlayerModelRenderer.getCachedPlayerUUID();
+    }
+
     /**
-     * Puts on the cape the chosen skin has, if any, on the player in a world and on the model the
-     * title screen draws, as the cape menu does.
+     * Puts on the chosen skin's cape, or no cape when it has none, on the player in a world and on
+     * the model the title screen draws, as the cape menu does.
      */
     private void wearSkinCape(AssetMetadata metadata) {
         java.util.UUID target;

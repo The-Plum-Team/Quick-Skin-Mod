@@ -97,6 +97,8 @@ public final class ClientRuntime implements AutoCloseable {
         ClientConfig.getInstance();
         appearanceStorage.init(configDirectory);
         assetManager.init();
+        // Capes belong to skins: the cape worn until now goes to the skin worn, once
+        com.quickskin.mod.client.services.SkinCapes.migrateWornCapeOnce();
         storesInitialized = true;
     }
 
@@ -132,6 +134,11 @@ public final class ClientRuntime implements AutoCloseable {
                 account, config.activeSkinHash, !config.activeCpmModelHash.isEmpty());
         config.activeSkinHash = projection.activeSkinHash();
         if (projection.changed()) config.save();
+        // Capes belong to skins: the account's skin puts its cape on (no cape when it has none)
+        com.quickskin.mod.client.services.SkinCapes.migrateWornCapeOnce();
+        if (config.activeCpmModelHash.isEmpty() && !config.activeSkinHash.isEmpty()) {
+            com.quickskin.mod.client.services.SkinCapes.wear(config.activeSkinHash, null);
+        }
         return projection.hasSelection();
     }
 

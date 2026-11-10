@@ -153,12 +153,12 @@ public class SettingsScreen extends Screen {
 
     // Server setting checkboxes
     private Checkbox serverDisableSkinTransparencyCheckbox;
+    private Checkbox serverAllowHdSkinsCheckbox;
     private EditBox skinChangeCooldownEditBox;
     private Button playerSkinsButton;
 
     // --- NEW --- Modpack setting widgets
     private Checkbox enablePlayerOwnSkinSystemCheckbox;
-    private Checkbox cloudSkinSyncCheckbox;
 
     // The settings a menu reads when it is built, as they were when the dialog opened: a change
     // rebuilds the parent on close
@@ -470,6 +470,18 @@ public class SettingsScreen extends Screen {
         serverSettingWidgets.add(serverDisableSkinTransparencyCheckbox);
         currentY += spacing;
 
+        // HD skins: allowed while the server sets no maxSkinResolution; a limit of a given size
+        // is set in its configuration file, and unticking sets the standard 64
+        boolean allowsHdSkins = serverOverride == null
+                || ServerConfig.normalizedSkinResolution(serverOverride.maxSkinResolution) == 0;
+        serverAllowHdSkinsCheckbox = checkbox(leftColumnX, currentY,
+                "quickskin.settings.allow_hd_skins_server",
+                allowsHdSkins,
+                "quickskin.settings.allow_hd_skins_server.tooltip", this::applyServerHdSkins);
+        serverAllowHdSkinsCheckbox.active = isAdmin;
+        serverSettingWidgets.add(serverAllowHdSkinsCheckbox);
+        currentY += spacing;
+
         // Skin Change Cooldown Setting
         int editBoxWidth = 60;
         int editBoxSpacing = 5;
@@ -567,12 +579,6 @@ public class SettingsScreen extends Screen {
                 config.enablePlayerOwnSkinSystem,
                 "quickskin.settings.own_skin_tooltip", this::applyClientSettings);
         modpackSettingWidgets.add(enablePlayerOwnSkinSystemCheckbox);
-
-        cloudSkinSyncCheckbox = checkbox(leftColumnX, startY + 30,
-                "quickskin.settings.cloud_sync",
-                config.cloudSkinSync,
-                "quickskin.settings.cloud_sync_tooltip", this::applyClientSettings);
-        modpackSettingWidgets.add(cloudSkinSyncCheckbox);
     }
 
     private void switchTab(Tab tab) {
@@ -992,7 +998,6 @@ public class SettingsScreen extends Screen {
         config.disableSkinTransparency = disableSkinTransparencyCheckbox.selected();
         config.enablePlayerPreviewCustomization = enablePlayerPreviewCustomizationCheckbox.selected();
         config.enablePlayerOwnSkinSystem = enablePlayerOwnSkinSystemCheckbox.selected();
-        config.cloudSkinSync = cloudSkinSyncCheckbox.selected();
         config.hideBuiltInCapes = hideBuiltInCapesCheckbox.selected();
         config.showTitleScreenPreview = showTitlePreviewCheckbox.selected();
         config.showPauseMenuPreview = showPausePreviewCheckbox.selected();
@@ -1016,6 +1021,18 @@ public class SettingsScreen extends Screen {
         }
         com.quickskin.mod.client.api.ClientNetworkApi.actions().updateServerConfig(
                 "disableSkinTransparency", serverDisableSkinTransparencyCheckbox.selected());
+    }
+
+    /**
+     * Sends the server's HD skins checkbox as soon as an admin toggles it; the server applies it at
+     * once and broadcasts its settings, and every client then syncs its own skin again.
+     */
+    private void applyServerHdSkins() {
+        if (!isAdmin()) {
+            return;
+        }
+        com.quickskin.mod.client.api.ClientNetworkApi.actions().updateServerConfig(
+                "allowHdSkins", serverAllowHdSkinsCheckbox.selected());
     }
 
     /** Whether this client hosts the server it plays on (singleplayer or LAN). */

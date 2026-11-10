@@ -616,6 +616,14 @@ public class ServerNetworkHandler {
                     nicknamesToggled = serverConfig.allowNicknames != payload.value();
                     serverConfig.allowNicknames = payload.value();
                     break;
+                case "allowHdSkins":
+                    // On: no limit. Off: standard skins only. A limit of another size is set in
+                    // the configuration file. Applied at once to the skins uploaded from now on;
+                    // clients sync their own skin again when the broadcast reaches them.
+                    serverConfig.maxSkinResolution = payload.value() ? 0 : 64;
+                    com.quickskin.mod.server.storage.ServerTextureCache.getInstance()
+                            .configureMaxSkinResolution(serverConfig.maxSkinResolutionPixels());
+                    break;
                 default:
                     return;
             }

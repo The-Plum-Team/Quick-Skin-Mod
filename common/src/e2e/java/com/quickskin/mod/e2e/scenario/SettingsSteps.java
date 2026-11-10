@@ -323,6 +323,15 @@ final class SettingsSteps {
                                 + "for a non-admin");
                     if (cooldown.active)
                         return Step.Result.fail("skinChangeCooldownEditBox is active for a non-admin");
+                    Checkbox hdSkins = widget(s, "serverAllowHdSkinsCheckbox", Checkbox.class);
+                    if (hdSkins.active)
+                        return Step.Result.fail("serverAllowHdSkinsCheckbox is active for a non-admin");
+                    ServerConfig syncedPolicy = ClientConfig.getInstance().getServerOverride();
+                    boolean serverAllowsHd = syncedPolicy == null
+                            || ServerConfig.normalizedSkinResolution(syncedPolicy.maxSkinResolution) == 0;
+                    if (hdSkins.selected() != serverAllowsHd)
+                        return Step.Result.fail("serverAllowHdSkinsCheckbox selected=" + hdSkins.selected()
+                                + " but the server's synced maxSkinResolution allows HD skins=" + serverAllowsHd);
                     // A remote server's cooldown: the configuration it synced, not this client's
                     ServerConfig synced = ClientConfig.getInstance().getServerOverride();
                     String expectedCooldown = String.valueOf(
@@ -342,7 +351,9 @@ final class SettingsSteps {
                             + (override == null ? "<none>" : String.valueOf(override.disableSkinTransparency))
                             + "); skinChangeCooldownEditBox active=false value='"
                             + cooldown.getValue() + "' == server's synced skinChangeCooldownSeconds="
-                            + expectedCooldown + "; render draws the yellow notice '" + notice + "'";
+                            + expectedCooldown + "; serverAllowHdSkinsCheckbox active=false selected="
+                            + hdSkins.selected() + " == server allows HD skins; render draws the yellow notice '"
+                            + notice + "'";
                     s.onClose();
                     if (VanillaShim.currentScreen(mc) instanceof SettingsScreen)
                         return Step.Result.fail("SettingsScreen.onClose did not close the screen");

@@ -93,6 +93,13 @@ public class LocalAssetManager {
     private Path capesDirectory;
     // This instance's own upload folders while the shared library holds the imports, else null.
     private Path instanceSkinsDirectory;
+    /**
+     * Where animated capes' frame timing lives: the shared library's {@code animations} folder,
+     * so a cape the library holds animates in every instance, or this instance's cache.
+     */
+    private Path animationsDirectory;
+    /** The shared library's CPM models folder, mirrored into this instance's player_models. */
+    private Path sharedCpmModelsDirectory;
     private Path instanceCapesDirectory;
     // Further files of a catalogued asset found in another library (primary -> paths), deleted with it.
     private volatile Map<String, List<Path>> otherCopies = Map.of();
@@ -312,6 +319,16 @@ public class LocalAssetManager {
         }
     }
 
+    private static Path createdOrNull(Path directory) {
+        try {
+            Files.createDirectories(directory);
+            return Files.isWritable(directory) ? directory : null;
+        } catch (IOException | SecurityException e) {
+            QuickSkinInfo.LOGGER.warn("Unable to create {} in the shared skin library", directory, e);
+            return null;
+        }
+    }
+
     /**
      * Adds this instance's skin choices (model, favourite) to the shared library the first time
      * the instance uses it, never overriding a choice the library already holds. The instance's
@@ -366,6 +383,9 @@ public class LocalAssetManager {
             preferencesFile = SharedLibrary.preferencesFile(shared);
             skinPreferences = SkinPreferences.load(preferencesFile);
             addInstancePreferencesOnce(ownPreferences);
+            animationsDirectory = createdOrNull(SharedLibrary.animationsDirectory(shared));
+            sharedCpmModelsDirectory = createdOrNull(SharedLibrary.cpmModelsDirectory(shared));
+            if (animationsDirectory == null) animationsDirectory = cacheDirectory;
         } else {
             skinsDirectory = ownSkins;
             capesDirectory = ownCapes;
@@ -373,6 +393,8 @@ public class LocalAssetManager {
             instanceCapesDirectory = null;
             preferencesFile = ownPreferences;
             skinPreferences = SkinPreferences.load(preferencesFile);
+            animationsDirectory = cacheDirectory;
+            sharedCpmModelsDirectory = null;
         }
 
         // Discover assets
@@ -404,6 +426,15 @@ public class LocalAssetManager {
         // CPM is optional: do not even expose model files when the mod is absent.
         if (com.quickskin.mod.client.compat.CPMCompatIntegration.isAvailable()) {
             com.quickskin.mod.client.compat.CpmModelWorkflow.reconcilePendingSkinModeReset();
+            if (sharedCpmModelsDirectory != null) {
+                CpmLibraryMirror.Result mirrored = CpmLibraryMirror.sync(sharedCpmModelsDirectory,
+                        com.quickskin.mod.client.compat.CPMCompatIntegration.getCPMModelsDirectory(),
+                        MAX_ASSET_BYTES);
+                if (mirrored.changed()) {
+                    QuickSkinInfo.LOGGER.info("Shared CPM models: {} into the library, {} into this instance, {} removed",
+                            mirrored.addedToLibrary(), mirrored.addedToInstance(), mirrored.removedFromInstance());
+                }
+            }
             scanCpmModels(scanned);
         } else {
             com.quickskin.mod.client.compat.CpmModelWorkflow.sanitizeUnavailableState();
@@ -863,7 +894,7 @@ public class LocalAssetManager {
                 try {
                     long srcMtime = Files.getLastModifiedTime(path).toMillis();
                     long atlasMtime = Files.getLastModifiedTime(cachedAtlasFast).toMillis();
-                    Path cachedMetaFast = NetworkSecurity.resolveContained(cacheDirectory, hash, ".json");
+                    Path cachedMetaFast = animationMetadataPath(hash);
                     long metaMtime = Files.getLastModifiedTime(cachedMetaFast).toMillis();
                     if (atlasMtime >= srcMtime && metaMtime >= srcMtime) {
                         BufferedImage atlasImg = SafeImageReader.readPng(cachedAtlasFast);
@@ -1026,8 +1057,34 @@ public class LocalAssetManager {
     }
 
     @Nullable
+    /**
+     * The file holding an animated cape's frame timing: the library's, else this instance's
+     * cache, which an older Quick Skin wrote and which is copied into the library when read.
+     */
+    private Path animationMetadataPath(String hash) {
+        Path directory = animationsDirectory != null ? animationsDirectory : cacheDirectory;
+        Path shared = NetworkSecurity.resolveContained(directory, hash, ".json");
+        if (shared != null && !Files.isSymbolicLink(shared) && Files.exists(shared)) return shared;
+        if (directory.equals(cacheDirectory)) return shared;
+        Path cached = NetworkSecurity.resolveContained(cacheDirectory, hash, ".json");
+        if (cached == null || Files.isSymbolicLink(cached) || !Files.exists(cached)) return shared;
+        try {
+            byte[] bytes = BoundedFileReader.readBytes(
+                    cached, com.quickskin.mod.networking.TextureTransferLimits.MAX_JSON_BYTES);
+            if (shared != null && isValidAnimationMetadataBytes(bytes)) {
+                writeVerifiedCacheFile(directory, shared, bytes,
+                        com.quickskin.mod.networking.TextureTransferLimits.MAX_JSON_BYTES,
+                        LocalAssetManager::isValidAnimationMetadataBytes);
+                return shared;
+            }
+        } catch (IOException | RuntimeException e) {
+            QuickSkinInfo.LOGGER.debug("Unable to move cape animation {} into the shared library", hash, e);
+        }
+        return cached;
+    }
+
     private AnimationMetadata readAnimationMetadataFile(String hash) {
-        Path metadataPath = NetworkSecurity.resolveContained(cacheDirectory, hash, ".json");
+        Path metadataPath = animationMetadataPath(hash);
         if (metadataPath == null || Files.isSymbolicLink(metadataPath) || !Files.exists(metadataPath)) return null;
         try {
             String json = BoundedFileReader.readUtf8(
@@ -1046,10 +1103,11 @@ public class LocalAssetManager {
     private void writeAnimationMetadataFile(String hash, AnimationMetadata metadata) throws IOException {
         String json = metadata.toJson();
         if (!NetworkSecurity.isValidAnimationMetadata(json)) throw new IOException("Invalid animation metadata");
-        Path metadataPath = NetworkSecurity.resolveContained(cacheDirectory, hash, ".json");
+        Path directory = animationsDirectory != null ? animationsDirectory : cacheDirectory;
+        Path metadataPath = NetworkSecurity.resolveContained(directory, hash, ".json");
         if (metadataPath == null || Files.isSymbolicLink(metadataPath)) throw new IOException("Unsafe metadata path");
         writeVerifiedCacheFile(
-                cacheDirectory,
+                directory,
                 metadataPath,
                 json.getBytes(java.nio.charset.StandardCharsets.UTF_8),
                 com.quickskin.mod.networking.TextureTransferLimits.MAX_JSON_BYTES,
@@ -1605,6 +1663,10 @@ public class LocalAssetManager {
             }
             if (metadata.isCpmModel()) {
                 com.quickskin.mod.client.compat.CpmModelWorkflow.onModelDeleted(metadata);
+                // The library's copy goes too, so the other instances drop their copies
+                if (sharedCpmModelsDirectory != null) {
+                    CpmLibraryMirror.deleteFromLibrary(sharedCpmModelsDirectory, primary, MAX_ASSET_BYTES);
+                }
             }
             catalog = snapshot.without(primary);
             invalidatePendingScans();
