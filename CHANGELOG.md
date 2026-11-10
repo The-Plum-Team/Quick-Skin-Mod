@@ -30,6 +30,9 @@
 - **The skin menu no longer opens to a blurred screen in big modpacks**
 > In modpacks with many HUD mods, mostly on NeoForge, opening the skin or cape menu in a world showed only the blurred world, with no menu over it. The menus now draw over their blur in any modpack.
 
+- **The skin menu's player moves again with Fresh Animations and Fresh Moves**
+> With Entity Model Features and a resource pack that animates players, such as Fresh Animations' Player Extension or Fresh Moves, the player in the skin menu stood stiff and trembling instead of sitting, walking or playing its idles, and its cape hung inside its body. The menu's player now poses and wears its cape as it does without those packs. In the world, the packs animate players as before.
+
 - **Skins show up in ReplayMod replays on every version**
 > Replays recorded with ReplayMod now show the Quick Skin skins, capes and models players wore, and every change they made while recording, on every Minecraft version ReplayMod exists for. Before, only 1.20.1 did; newer versions showed everyone's Mojang skin.
 
