@@ -61,6 +61,7 @@ import net.minecraft.resources.ResourceLocation;
 //?} else {
 import net.minecraft.resources.Identifier;
 //?}
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -970,6 +971,17 @@ public class PlayerModelRenderer {
 //?}
     }
 
+    /** The partial tick the world is drawn with this frame. */
+    private static float framePartialTick(Minecraft mc) {
+//? if <1.21 {
+        return mc.getFrameTime();
+//?} else if <1.21.2 {
+        return mc.getTimer().getGameTimeDeltaPartialTick(true);
+//?} else {
+        return mc.getDeltaTracker().getGameTimeDeltaPartialTick(true);
+//?}
+    }
+
     private static void renderPosedPlayerModel(
 //? if <26.1 {
             GuiGraphics graphics,
@@ -1051,10 +1063,17 @@ public class PlayerModelRenderer {
         // Set rotation for preview using the yRotation parameter
         // Convert yRotation to match InventoryScreen orientation (180 + yRotation)
         float targetRotation = 180.0F + yRotation;
-        playerToRender.setYRot(targetRotation);
+        // The player keeps the body yaw the world draws it with this frame; the turn from there
+        // to the preview's own rotation goes into the draw's pose (previewPose below), which shows
+        // the same model. Mods that animate the player read its body yaw on every draw: Fresh
+        // Animations (Entity Model Features) adds the yaw's change since the previous draw to the
+        // walk cycle, so two previews turned to different rotations in one frame, as the pause
+        // menu's and the HUD's are once one of them is rotated, made the walking player shake.
+        float bodyYaw = Mth.rotLerp(framePartialTick(mc), originalYBodyRotO, originalYBodyRot);
+        playerToRender.setYRot(bodyYaw);
         playerToRender.setXRot(0.0F);
-        playerToRender.yHeadRot = targetRotation + playerData.getHeadYaw();
-        playerToRender.yBodyRot = targetRotation;
+        playerToRender.yHeadRot = bodyYaw + playerData.getHeadYaw();
+        playerToRender.yBodyRot = bodyYaw;
 
         // The draw runs at partial tick 1, so vanilla ignores the previous-tick rotation. A hook
         // that interpolates with the frame's own partial tick does not (Player Animator adjustment
@@ -1086,6 +1105,11 @@ public class PlayerModelRenderer {
         // Create quaternions for rotation (no mouse tracking)
         // First quaternion: 180-degree flip to orient the model correctly
         Quaternionf quaternionXZ = new Quaternionf().rotationXYZ(0.0F, 0.0F, (float)Math.PI);
+        // The entity's pose: the flip, then the turn from the player's body yaw to the preview's
+        // rotation. The renderer turns the model by 180 - bodyYaw itself, which adds up to the
+        // 180 - targetRotation it applied when the preview set the body yaw.
+        Quaternionf previewPose = new Quaternionf(quaternionXZ)
+                .rotateY((float) Math.toRadians(bodyYaw - targetRotation));
         // Second quaternion: empty (no rotation)
         Quaternionf quaternionY = new Quaternionf();
 
@@ -1330,7 +1354,7 @@ public class PlayerModelRenderer {
                     (float)(int) scale * swap.get(SkinSwapAnimation.Whole.SCALE),
                     offset,
 //?}
-                    quaternionXZ,
+                    previewPose,
                     quaternionY,
 //? if <1.21.6 {
                     playerToRender
