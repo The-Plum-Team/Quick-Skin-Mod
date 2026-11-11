@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "com.quickskin.mod.mixin.menu",
+  "compatibilityLevel": "JAVA_17",
+  "minVersion": "0.8",
+  "client": [
+    "MenuToastsMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

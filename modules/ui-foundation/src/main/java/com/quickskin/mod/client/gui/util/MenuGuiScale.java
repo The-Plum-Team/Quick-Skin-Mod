@@ -41,6 +41,11 @@ public final class MenuGuiScale {
     public interface Scaled {
     }
 
+    /** Whether the screen is drawn at a menu's scale: a menu, or a dialog that follows one. */
+    public static boolean isScaled(@Nullable Screen screen) {
+        return screen instanceof Scaled || FOLLOWERS.contains(screen);
+    }
+
     /**
      * Gives a dialog the menu's scale when the screen it is drawn over has it. Call first in the
      * dialog's {@code init()}, which runs after the menu's {@code removed()} put back the player's
@@ -49,7 +54,7 @@ public final class MenuGuiScale {
      * @return whether the dialog follows the menu's scale
      */
     public static boolean follow(Minecraft minecraft, Screen dialog, @Nullable Screen parent) {
-        if (!(parent instanceof Scaled) && !FOLLOWERS.contains(parent)) {
+        if (!isScaled(parent)) {
             FOLLOWERS.remove(dialog);
             return false;
         }
