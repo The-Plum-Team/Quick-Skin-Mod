@@ -440,6 +440,28 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   shims named by string without a compatibility lane; the face cache is bounded and cleared with
   the session. Xaero's Minimap and World Map read the player's skin through `PlayerInfo` and the
   renderer, which Quick Skin already overrides, and need no shim.
+- The previews' own posed models (`PlayerModelRenderer.ensureModelsLoaded`: the skin menu's
+  model, the title preview and every other preview that does not draw the live player) are baked
+  from vanilla's layer definitions (`PlayerModel.createMesh`, `PlayerCapeModel.createCapeLayer`,
+  `ElytraModel.createLayer`), never through the entity model set, and before 1.21.2 their cloak is
+  drawn as the root's own `cloak` part, never through `PlayerModel.renderCloak`. Entity Model
+  Features wraps every root baked through the set and drives it with the resource pack's
+  animations on each draw, over the pose the preview set, and it replaces `renderCloak` with the
+  pack's cape model after discarding the caller's transform; with Fresh Animations' Player
+  Extension or Fresh Moves the model stood stiff and its cape hung inside its body. A preview that
+  draws the live player goes through the game's renderer and keeps the pack's model and
+  animations, as the world does. `test_preview_model_policy.py` holds the rule; Entity Model
+  Features has no compatibility lane.
+- A preview that draws the live player never sets the player's body yaw to its own rotation. For
+  the draw it gives the player the body yaw the world draws this frame (`Mth.rotLerp` of the
+  previous and current `yBodyRot` at the frame's partial tick, pinned as the previous-tick value
+  too) and puts the turn from there to the preview's rotation into the draw's pose
+  (`previewPose` in `PlayerModelRenderer.renderPosedPlayerModel`); the head keeps the preview's
+  own yaw and level pitch, relative to that body yaw. Mods that animate the player read the body
+  yaw on every draw: Fresh Animations (Entity Model Features) adds its change since the previous
+  draw to the walk cycle, so two previews turned to different rotations in one frame, as the pause
+  menu's and the HUD's are once one is rotated, made the walking player shake. The pack's
+  animations stay on in these previews; never pause them or force the vanilla model there.
 - From Minecraft 1.21.2 onward, the vanilla outer skin parts are children of their matching body
   parts. Preserve their baked local poses; copying the parent pose onto a child applies the pivot
   twice and detaches both the flat outer layers and the 3D Skin Layers geometry in offline previews.

@@ -36,8 +36,14 @@ import net.minecraft.client.model.Model;
 import net.minecraft.client.model.player.PlayerCapeModel;
 import net.minecraft.client.model.player.PlayerModel;
 //?}
-import net.minecraft.client.model.geom.ModelLayers;
+//? if <1.21.11 {
+import net.minecraft.client.model.ElytraModel;
+//?} else {
+import net.minecraft.client.model.object.equipment.ElytraModel;
+//?}
 import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.geom.builders.CubeDeformation;
+import net.minecraft.client.model.geom.builders.LayerDefinition;
 //? if <1.21.11 {
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -55,6 +61,7 @@ import net.minecraft.resources.ResourceLocation;
 //?} else {
 import net.minecraft.resources.Identifier;
 //?}
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -125,12 +132,18 @@ public class PlayerModelRenderer {
 //? if <1.21 {
     private static PlayerModel<?> classicModel;
     private static PlayerModel<?> slimModel;
+    /** The models' cloak parts, drawn directly instead of through {@code renderCloak}. */
+    private static ModelPart classicCloak;
+    private static ModelPart slimCloak;
 
     // Grass block caching - cache is built on first use
     private static boolean grassBlockCacheBuilt = false;
 //?} else if <1.21.2 {
     private static PlayerModel<?> classicModel;
     private static PlayerModel<?> slimModel;
+    /** The models' cloak parts, drawn directly instead of through {@code renderCloak}. */
+    private static ModelPart classicCloak;
+    private static ModelPart slimCloak;
 //?} else if <1.21.6 {
     private static PlayerModel classicModel;
     private static PlayerModel slimModel;
@@ -362,43 +375,38 @@ public class PlayerModelRenderer {
 //?}
 
     /**
-     * Initialize models (lazy initialization).
+     * Bakes the preview's own models (lazy initialization) from vanilla's layer definitions, the
+     * ones {@code LayerDefinitions} registers for the player, its cape and the elytra.
      *
-     * <p>The entity model set is filled by the first resource reload. Mods that remove the loading
-     * screen (Remove Reloading Screen) show the title screen while that reload is still running, and
-     * baking a layer the set does not hold yet throws. The preview then draws nothing and the next
-     * frame tries again; the models are published together, only once every layer has baked.
-     *
-     * @return {@code false} while the entity model set does not hold the player layers yet
+     * <p>They are deliberately not baked through the entity model set. That set is where mods
+     * that replace entity models hook in: Entity Model Features wraps every root baked there and
+     * drives it with the resource pack's animations on each draw, over the pose the preview has
+     * just set, so with a player animation pack (Fresh Animations' player extension, Fresh Moves)
+     * the skin menu's model stood stiff and trembled instead of sitting or walking. The preview's
+     * models are posed by Quick Skin alone, so they are plain vanilla parts no other mod animates.
+     * Baking them here also needs no resource reload to have finished.
      */
-    private static boolean ensureModelsLoaded() {
+    private static void ensureModelsLoaded() {
         if (classicModel != null) {
-            return true;
+            return;
         }
-        Minecraft mc = Minecraft.getInstance();
-        ModelPart classicRoot;
-        ModelPart slimRoot;
-//? if <1.21.2 {
-//?} else {
-        ModelPart capeRoot;
-//?}
-        try {
-            classicRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER);
-            slimRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER_SLIM);
-            elytraModel = mc.getEntityModels().bakeLayer(ModelLayers.ELYTRA);
-//? if <1.21.2 {
-//?} else {
-            // In MC 1.21.2+, the cape is a separate model (PlayerCapeModel).
-            capeRoot = mc.getEntityModels().bakeLayer(ModelLayers.PLAYER_CAPE);
-//?}
-        } catch (IllegalArgumentException layerNotLoadedYet) {
-            return false;
-        }
+        ModelPart classicRoot = LayerDefinition.create(
+                PlayerModel.createMesh(CubeDeformation.NONE, false), 64, 64).bakeRoot();
+        ModelPart slimRoot = LayerDefinition.create(
+                PlayerModel.createMesh(CubeDeformation.NONE, true), 64, 64).bakeRoot();
+        elytraModel = ElytraModel.createLayer().bakeRoot();
 
 //? if <1.21.2 {
+        // Before 1.21.2 the cloak is a part of the player model. It is drawn from here, not through
+        // PlayerModel.renderCloak, which Entity Model Features replaces with the pack's own cape
+        // model after discarding the transform the preview applied.
+        classicCloak = classicRoot.getChild("cloak");
+        slimCloak = slimRoot.getChild("cloak");
         slimModel = new PlayerModel<>(slimRoot, true);
         classicModel = new PlayerModel<>(classicRoot, false);
 //?} else {
+        // In MC 1.21.2+, the cape is a separate model (PlayerCapeModel).
+        ModelPart capeRoot = PlayerCapeModel.createCapeLayer().bakeRoot();
 //? if <1.21.6 {
         capeModel = new PlayerCapeModel<>(capeRoot);
 //?} else {
@@ -407,7 +415,6 @@ public class PlayerModelRenderer {
         slimModel = new PlayerModel(slimRoot, true);
         classicModel = new PlayerModel(classicRoot, false);
 //?}
-        return true;
 //? if <1.21.6 {
 //?} else if <26.2 {
     }
@@ -964,6 +971,17 @@ public class PlayerModelRenderer {
 //?}
     }
 
+    /** The partial tick the world is drawn with this frame. */
+    private static float framePartialTick(Minecraft mc) {
+//? if <1.21 {
+        return mc.getFrameTime();
+//?} else if <1.21.2 {
+        return mc.getTimer().getGameTimeDeltaPartialTick(true);
+//?} else {
+        return mc.getDeltaTracker().getGameTimeDeltaPartialTick(true);
+//?}
+    }
+
     private static void renderPosedPlayerModel(
 //? if <26.1 {
             GuiGraphics graphics,
@@ -982,9 +1000,7 @@ public class PlayerModelRenderer {
         if (playerData.getSkinLocation() == null) {
             return; // No skin to render
         }
-        if (!ensureModelsLoaded()) {
-            return; // The first resource reload has not filled the entity model set yet
-        }
+        ensureModelsLoaded();
         // The live player cannot wear wings it may not have, so a preview of the elytra draws its own
         // model as well
         if (playerData.isOwnPose() || playerData.isElytraPreview()) {
@@ -1047,10 +1063,17 @@ public class PlayerModelRenderer {
         // Set rotation for preview using the yRotation parameter
         // Convert yRotation to match InventoryScreen orientation (180 + yRotation)
         float targetRotation = 180.0F + yRotation;
-        playerToRender.setYRot(targetRotation);
+        // The player keeps the body yaw the world draws it with this frame; the turn from there
+        // to the preview's own rotation goes into the draw's pose (previewPose below), which shows
+        // the same model. Mods that animate the player read its body yaw on every draw: Fresh
+        // Animations (Entity Model Features) adds the yaw's change since the previous draw to the
+        // walk cycle, so two previews turned to different rotations in one frame, as the pause
+        // menu's and the HUD's are once one of them is rotated, made the walking player shake.
+        float bodyYaw = Mth.rotLerp(framePartialTick(mc), originalYBodyRotO, originalYBodyRot);
+        playerToRender.setYRot(bodyYaw);
         playerToRender.setXRot(0.0F);
-        playerToRender.yHeadRot = targetRotation + playerData.getHeadYaw();
-        playerToRender.yBodyRot = targetRotation;
+        playerToRender.yHeadRot = bodyYaw + playerData.getHeadYaw();
+        playerToRender.yBodyRot = bodyYaw;
 
         // The draw runs at partial tick 1, so vanilla ignores the previous-tick rotation. A hook
         // that interpolates with the frame's own partial tick does not (Player Animator adjustment
@@ -1082,6 +1105,11 @@ public class PlayerModelRenderer {
         // Create quaternions for rotation (no mouse tracking)
         // First quaternion: 180-degree flip to orient the model correctly
         Quaternionf quaternionXZ = new Quaternionf().rotationXYZ(0.0F, 0.0F, (float)Math.PI);
+        // The entity's pose: the flip, then the turn from the player's body yaw to the preview's
+        // rotation. The renderer turns the model by 180 - bodyYaw itself, which adds up to the
+        // 180 - targetRotation it applied when the preview set the body yaw.
+        Quaternionf previewPose = new Quaternionf(quaternionXZ)
+                .rotateY((float) Math.toRadians(bodyYaw - targetRotation));
         // Second quaternion: empty (no rotation)
         Quaternionf quaternionY = new Quaternionf();
 
@@ -1326,7 +1354,7 @@ public class PlayerModelRenderer {
                     (float)(int) scale * swap.get(SkinSwapAnimation.Whole.SCALE),
                     offset,
 //?}
-                    quaternionXZ,
+                    previewPose,
                     quaternionY,
 //? if <1.21.6 {
                     playerToRender
@@ -1422,9 +1450,7 @@ public class PlayerModelRenderer {
             int mouseY,
             boolean followMouse
     ) {
-        if (!ensureModelsLoaded()) {
-            return;
-        }
+        ensureModelsLoaded();
 
         // Select model based on type
 //? if <1.21.11 {
@@ -1642,8 +1668,8 @@ public class PlayerModelRenderer {
                 poseStack.mulPose(Axis.XP.rotationDegrees(6.0F));
                 poseStack.mulPose(Axis.YP.rotationDegrees(180.0F)); // The cloak model part is drawn facing backwards
 
-                MinecraftCompat.INSTANCE.renderCloak(
-                        model, poseStack, capeVertexConsumer, 15728880, OverlayTexture.NO_OVERLAY);
+                (model == slimModel ? slimCloak : classicCloak).render(
+                        poseStack, capeVertexConsumer, 15728880, OverlayTexture.NO_OVERLAY);
 
                 poseStack.popPose();
             }

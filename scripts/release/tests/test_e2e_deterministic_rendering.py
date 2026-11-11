@@ -203,9 +203,11 @@ class E2EDeterministicRenderingTest(unittest.TestCase):
                 )
                 self.assertEqual(2, source.count(f"playerToRender.{field} = {saved};"))
 
-        # The pin copies the preview rotation, so it must follow it and precede the first draw.
+        # The pin copies the body yaw the preview draws with (the player's own, interpolated for
+        # the frame), so it must follow it and precede the first draw.
         pin = source.index("playerToRender.yBodyRotO = playerToRender.yBodyRot;")
-        self.assertLess(source.index("playerToRender.yBodyRot = targetRotation;"), pin)
+        self.assertEqual(1, source.count("playerToRender.yBodyRot = bodyYaw;"))
+        self.assertLess(source.index("playerToRender.yBodyRot = bodyYaw;"), pin)
         self.assertLess(pin, source.index("InventoryScreen.renderEntityInInventory("))
 
     def test_only_the_hud_preview_keeps_a_held_tacz_gun_visible(self) -> None:
