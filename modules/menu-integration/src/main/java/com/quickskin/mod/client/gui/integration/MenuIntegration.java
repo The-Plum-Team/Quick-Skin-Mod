@@ -369,6 +369,10 @@ public final class MenuIntegration {
                 }
 
                 playerWidget = new PlayerWidget(widgetX, widgetY, widgetSize, widgetSize, skinLocation, capeLocation, capeId, modelType);
+                // While a CPM model is the look and no world is loaded, CPM draws that model on
+                // the preview's own model; the skin above stays the fallback
+                playerWidget.setCpmModel(
+                        com.quickskin.mod.client.rendering.LocalLookPreview.cpmModelFile(player != null), false);
                 // Set context based on screen type
                 if ("title".equals(screenType)) {
                     playerWidget.setContext(com.quickskin.mod.client.gui.widget.PlayerWidget.WidgetContext.TITLE_SCREEN);

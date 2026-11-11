@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.2.0 (2026-11-11)
+
+### Added
+
+- **CPM models show as models in every menu**
+> With Customizable Player Models installed, your CPM model is now drawn as the model itself before you join a world: on the title screen's player, on the skin menu's big model when you pick a model there, and in the cape menu and the cape editor. Until now those showed your skin, or the model's icon, until you were in a world. The skin list and the favourites fan show a picture of each model made from the model itself, in the list's own style, instead of the icon saved in its file. It works on every Minecraft version Quick Skin supports, 26.3 included; with a CPM build too old to draw a model outside a world, the menus keep showing your skin or the model's icon.
+
 ## 4.1.0 (2026-11-09)
 
 ### Added

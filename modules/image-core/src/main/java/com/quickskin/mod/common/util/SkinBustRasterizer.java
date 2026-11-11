@@ -24,20 +24,20 @@ public final class SkinBustRasterizer {
 
     /** How far the bust is turned toward the right, and how far the camera looks down, in degrees. */
     private static final double YAW = 28.0;
-    private static final double PITCH = 7.0;
+    static final double PITCH = 7.0;
     /** The turn, in degrees, every picture is drawn at unless asked for another. */
     public static final double DEFAULT_YAW = YAW;
     /** Model pixels shown per picture pixel, for a picture this many pixels tall... */
-    private static final double ZOOM_PER_HEIGHT = 6.4 / 99.0;
+    static final double ZOOM_PER_HEIGHT = 6.4 / 99.0;
     /** ...with its bottom edge this high on the model, in model pixels above the feet: mid-chest. */
-    private static final double CUT = 17.5;
+    static final double CUT = 17.5;
     /** The whole player: a picture this many model pixels tall, its bottom edge just under the feet. */
-    private static final double BODY_HEIGHT = 34.0;
-    private static final double BODY_CUT = -0.8;
+    static final double BODY_HEIGHT = 34.0;
+    static final double BODY_CUT = -0.8;
     /** Faces in full light keep all their colour; faces turned away keep this share of it. */
-    private static final double AMBIENT = 0.42;
-    private static final double DIFFUSE = 0.68;
-    private static final double[] LIGHT = normalize(new double[] {0.3, 0.55, 0.8});
+    static final double AMBIENT = 0.42;
+    static final double DIFFUSE = 0.68;
+    static final double[] LIGHT = normalize(new double[] {0.3, 0.55, 0.8});
 
     private SkinBustRasterizer() {
     }
@@ -228,7 +228,7 @@ public final class SkinBustRasterizer {
         }
     }
 
-    private static int shaded(int argb, double shade) {
+    static int shaded(int argb, double shade) {
         int r = (int) Math.round(((argb >> 16) & 0xFF) * shade);
         int g = (int) Math.round(((argb >> 8) & 0xFF) * shade);
         int b = (int) Math.round((argb & 0xFF) * shade);
@@ -260,17 +260,17 @@ public final class SkinBustRasterizer {
         return Math.max(Math.max(a, b), Math.max(c, d));
     }
 
-    private static double[][] rotateY(double angle) {
+    static double[][] rotateY(double angle) {
         double c = Math.cos(angle), s = Math.sin(angle);
         return new double[][] {{c, 0, s}, {0, 1, 0}, {-s, 0, c}};
     }
 
-    private static double[][] rotateX(double angle) {
+    static double[][] rotateX(double angle) {
         double c = Math.cos(angle), s = Math.sin(angle);
         return new double[][] {{1, 0, 0}, {0, c, -s}, {0, s, c}};
     }
 
-    private static double[][] multiply(double[][] a, double[][] b) {
+    static double[][] multiply(double[][] a, double[][] b) {
         double[][] m = new double[3][3];
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
@@ -280,7 +280,7 @@ public final class SkinBustRasterizer {
         return m;
     }
 
-    private static double[] apply(double[][] m, double[] p) {
+    static double[] apply(double[][] m, double[] p) {
         return new double[] {
                 m[0][0] * p[0] + m[0][1] * p[1] + m[0][2] * p[2],
                 m[1][0] * p[0] + m[1][1] * p[1] + m[1][2] * p[2],
@@ -295,7 +295,7 @@ public final class SkinBustRasterizer {
         return new double[] {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]};
     }
 
-    private static double[] normalize(double[] v) {
+    static double[] normalize(double[] v) {
         double length = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
         return new double[] {v[0] / length, v[1] / length, v[2] / length};
     }

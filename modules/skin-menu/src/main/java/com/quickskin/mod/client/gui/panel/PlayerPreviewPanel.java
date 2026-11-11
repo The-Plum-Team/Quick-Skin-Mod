@@ -51,6 +51,8 @@ public class PlayerPreviewPanel extends AbstractWidget {
     private net.minecraft.resources.Identifier cpmIconLocation = null;
     //?}
     private boolean isCpmModel = false;
+    // The model file CPM draws on the preview's own model while no world is loaded
+    private java.nio.file.Path cpmModelFile;
     private long skinChangedAt = 0;
     private boolean lastCpmWearing = false;
 
@@ -78,6 +80,10 @@ public class PlayerPreviewPanel extends AbstractWidget {
         playerWidget.setContext(PlayerWidget.WidgetContext.SKIN_MENU);
         playerWidget.setCustomReferencePoint(centerX, feetY);
         playerWidget.setScaleCap(scaleCap);
+        // Until an entry is previewed the model shows the player's look. On the title screen,
+        // while a CPM model is that look (CPM's own choice selects no entry), CPM draws it here
+        playerWidget.setCpmModel(com.quickskin.mod.client.rendering.LocalLookPreview.cpmModelFile(
+                net.minecraft.client.Minecraft.getInstance().player != null), false);
         // The model draws before this panel, so its first frame needs the pose already
         syncOwnPose();
 
@@ -259,7 +265,9 @@ public class PlayerPreviewPanel extends AbstractWidget {
     }
 
     /**
-     * Shows a skin, or a CPM model's icon on the title screen, with the given arm width.
+     * Shows a skin with the given arm width, or a CPM model: in a world on the live player, which
+     * CPM draws it on; on the title screen on the preview's own model, or as its icon while CPM
+     * cannot draw it there.
      */
     //? if <1.21.11 {
     public void previewSkin(AssetMetadata metadata, net.minecraft.resources.ResourceLocation skinLocation,
@@ -279,11 +287,18 @@ public class PlayerPreviewPanel extends AbstractWidget {
         }
         boolean isInGame = net.minecraft.client.Minecraft.getInstance().player != null;
         if (isCpmModel && !isInGame) {
+            // No player for CPM to draw on: CPM draws the model on the preview's own model, and
+            // the model's icon shows only while it cannot
             cpmIconLocation = skinLocation;
-            playerWidget.visible = false;
+            cpmModelFile = com.quickskin.mod.client.compat.CpmModelPreview.isAvailable() ? metadata.path() : null;
+            playerWidget.setCpmModel(cpmModelFile, true);
+            playerWidget.setModelType("classic");
+            syncCpmModelPreview();
             return;
         }
         cpmIconLocation = null;
+        cpmModelFile = null;
+        playerWidget.setCpmModel(null, false);
         playerWidget.visible = true;
         playerWidget.setSkin(skinLocation);
         applyModelTypeToPreview();
@@ -359,6 +374,19 @@ public class PlayerPreviewPanel extends AbstractWidget {
         }
     }
 
+    /**
+     * On the title screen a CPM model shows as the model itself while CPM draws it or is still
+     * building it, and as its icon otherwise.
+     */
+    private void syncCpmModelPreview() {
+        if (playerWidget == null || cpmIconLocation == null) {
+            return;
+        }
+        boolean modelShown = cpmModelFile != null && (playerWidget.isCpmModelDrawn()
+                || com.quickskin.mod.client.compat.CpmModelPreview.isLoading(cpmModelFile));
+        playerWidget.visible = modelShown;
+    }
+
     private void updateCpmWearingState() {
         long elapsed = System.currentTimeMillis() - skinChangedAt;
         lastCpmWearing = elapsed < 2000
@@ -373,7 +401,8 @@ public class PlayerPreviewPanel extends AbstractWidget {
     protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
     //?}
         syncOwnPose();
-        if (cpmIconLocation == null) {
+        syncCpmModelPreview();
+        if (cpmIconLocation == null || (playerWidget != null && playerWidget.visible)) {
             return;
         }
         int iconSize = Math.min(getWidth(), getHeight()) - 16;

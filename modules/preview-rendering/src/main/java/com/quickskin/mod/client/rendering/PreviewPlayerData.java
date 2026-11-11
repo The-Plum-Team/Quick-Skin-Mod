@@ -40,6 +40,9 @@ public class PreviewPlayerData {
     private boolean showcaseIdle;
     private boolean ownPose;
     private boolean elytraPreview;
+    private java.nio.file.Path cpmModelFile;
+    private boolean cpmModelOnly;
+    private boolean cpmModelDrawn;
     private final float animationProgress;
 
     // The move the skin menu's model makes when another skin is picked
@@ -398,6 +401,44 @@ public class PreviewPlayerData {
 
     public void setElytraPreview(boolean elytraPreview) {
         this.elytraPreview = elytraPreview;
+    }
+
+    /**
+     * The CPM model file the preview draws on its own model, where there is no player for CPM
+     * to draw on, or null for the skin. While CPM cannot draw it, the preview draws the skin.
+     */
+    public java.nio.file.Path getCpmModelFile() {
+        return cpmModelFile;
+    }
+
+    public void setCpmModelFile(java.nio.file.Path cpmModelFile) {
+        this.cpmModelFile = cpmModelFile;
+        if (cpmModelFile == null) {
+            this.cpmModelDrawn = false;
+        }
+    }
+
+    /**
+     * Whether the preview shows its CPM model or nothing: while CPM cannot draw the model, the
+     * skin is not drawn in its place. The skin menu sets it for a model the player is looking at,
+     * and shows the model's icon then; a preview of the player's look leaves it off and falls
+     * back to the skin.
+     */
+    public boolean isCpmModelOnly() {
+        return cpmModelOnly;
+    }
+
+    public void setCpmModelOnly(boolean cpmModelOnly) {
+        this.cpmModelOnly = cpmModelOnly;
+    }
+
+    /** Whether the latest draw showed the CPM model, not the skin or nothing. */
+    public boolean isCpmModelDrawn() {
+        return cpmModelDrawn;
+    }
+
+    void setCpmModelDrawn(boolean cpmModelDrawn) {
+        this.cpmModelDrawn = cpmModelDrawn;
     }
 
     public void setCurrentAnimation(String currentAnimation) {
