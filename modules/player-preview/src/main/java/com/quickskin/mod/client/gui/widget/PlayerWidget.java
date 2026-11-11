@@ -1032,6 +1032,22 @@ public class PlayerWidget extends AbstractWidget {
     }
 
     /**
+     * Draws a CPM model file on the widget's own model where there is no player for CPM to draw
+     * on, or the skin again with null (see {@link PreviewPlayerData#getCpmModelFile}).
+     *
+     * @param only whether nothing is drawn while CPM cannot draw the model, instead of the skin
+     */
+    public void setCpmModel(@Nullable java.nio.file.Path file, boolean only) {
+        previewData.setCpmModelFile(file);
+        previewData.setCpmModelOnly(file != null && only);
+    }
+
+    /** Whether the latest draw showed the CPM model set with {@link #setCpmModel}. */
+    public boolean isCpmModelDrawn() {
+        return previewData.isCpmModelDrawn();
+    }
+
+    /**
      * Shows the cape's texture on folded elytra wings instead of on the cape (see
      * {@link PreviewPlayerData#isElytraPreview}).
      */

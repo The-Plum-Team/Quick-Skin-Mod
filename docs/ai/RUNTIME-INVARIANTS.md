@@ -510,8 +510,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Skin's previews of the local look (the HUD overlay, the title and pause menu widgets and the cape
   screens) follow the same choice (`LocalLookPreview`): in a world they draw the live player, whose
   model CPM draws; while a CPM model is the look their skin data is never the saved Quick Skin
-  skin, and a title-screen preview that has no player entity to draw, where CPM draws nothing,
-  shows the player's imported own skin. Screens read the choice as it stands when they are built;
+  skin, and a title-screen preview, which has no player entity for CPM to draw on, draws the
+  model CPM has selected on its own model (`LocalLookPreview.cpmModelFile`, next bullet) and
+  falls back to the player's imported own skin. Screens read the choice as it stands when they are built;
   the HUD overlay reads `CpmLookArbiter`'s latest decision every frame. Re-applying an appearance
   never resets CPM. Quick Skin never hides a model CPM draws: the renderer-level texture override
   stands down for every player CPM draws a model for
@@ -532,6 +533,31 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   switches schema. Nothing is uploaded on that connection, and `ReplayModHelper` re-applies the
   recorded player's look. The 1.20.1 overlay additionally routes recorded payloads through
   `ReplayModCompatMixin`.
+- Outside a world CPM has no player to draw a model on, so Quick Skin's own previews draw CPM
+  models themselves (`CpmModelPreview`, cpm-integration): the title screen's preview and the cape
+  screens show the model CPM has selected while a CPM model is the look, and the skin menu shows
+  the model of the entry the player picks. CPM binds the model file to the preview's own
+  `PlayerModel`, already posed, the preview draws it with the texture CPM answers, and the model
+  is handed back in a `finally`; a model left bound would keep CPM's parts. Everything is
+  reflection, nothing is required and every failure is local: without CPM, on a CPM build with no
+  way in, while CPM is still building the model (nothing is drawn for up to five seconds, never
+  the wrong skin) or when CPM refuses it, the preview draws what it drew before (the skin; in the
+  skin menu the model's icon). CPM's client API (`IClientAPI.createPlayerRenderer`) is the way in
+  wherever a CPM build has it; a model without a texture of its own, which that API cannot draw,
+  and CPM's 26.3 builds, which leave it off, bind on CPM's render manager with the same calls
+  and the preview's skin as the texture. The file is read on the client I/O workers, bounded,
+  and loaded for the local account's profile, so CPM does not hold the player's own model to its
+  limits for strangers' models. Before 1.21.6 the bound model is drawn inline; from 1.21.6 the
+  picture-in-picture pass is handed a model that draws nothing and `GuiSkinRendererMixin` draws
+  the bound model there, from 1.21.9 through CPM's own collector, the only thing CPM's parts
+  draw through, with the preview's pose copied onto CPM's parts. The elytra view keeps the skin.
+  In a world nothing changes: previews of the live player show what CPM draws on it. The skin
+  list's tiles and rows and the favourites fan show pictures of the model itself, not the icon
+  saved in the file: `CpmModelCapture` (preview-rendering) binds a model of its own at rest once,
+  records the vertices CPM writes instead of drawing them, with the pixels of CPM's texture, and
+  `ModelMeshRasterizer` (image-core) draws the bust or the whole figure from that mesh on the
+  I/O workers with the skin bust's camera, light and scale; until a picture is ready, and for a
+  model CPM cannot draw or whose texture cannot be read, the icon stays.
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.

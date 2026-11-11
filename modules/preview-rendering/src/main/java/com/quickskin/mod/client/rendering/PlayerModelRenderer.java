@@ -11,6 +11,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 //?}
 import com.mojang.math.Axis;
+import com.quickskin.mod.client.compat.CpmModelPreview;
 import com.quickskin.mod.client.services.CapeAnimationHelper;
 import com.quickskin.mod.platform.MinecraftCompat;
 import com.quickskin.mod.platform.CapeRenderTypes;
@@ -152,6 +153,8 @@ public class PlayerModelRenderer {
     private static PlayerModel classicModel;
     private static PlayerModel slimModel;
     private static PlayerCapeModel capeModel;
+    // Handed to the picture-in-picture pass when it is to draw no skin (see PendingCpmModel)
+    private static PlayerModel hiddenModel;
 
     // Match cape data to the exact value-state used by the PiP cache.
     private static final Map<PreviewCapeKey, PreviewCapeState> PENDING_CAPES =
@@ -180,21 +183,28 @@ public class PlayerModelRenderer {
             int x0, int y0, int x1, int y1, float scale) {
     }
 
+    /**
+     * {@code submitted} is the model object the pass is handed, which keys the entry;
+     * {@code bodyModel} the posed model the cape hangs from. They differ only while a CPM model is
+     * drawn in the skin's place ({@link #hiddenModel}).
+     */
     private static void registerPendingCape(
 //? if <1.21.11 {
-            PlayerModel bodyModel, ResourceLocation skin, float rotationX, float rotationY, float pivotY,
+            PlayerModel submitted, PlayerModel bodyModel, ResourceLocation skin,
+            float rotationX, float rotationY, float pivotY,
             int x0, int y0, int x1, int y1, float scale,
             ResourceLocation texture, PlayerCapeModel playerCapeModel, ModelPart elytra,
             PreviewEquipment.Worn worn) {
 //?} else {
-            PlayerModel bodyModel, Identifier skin, float rotationX, float rotationY, float pivotY,
+            PlayerModel submitted, PlayerModel bodyModel, Identifier skin,
+            float rotationX, float rotationY, float pivotY,
             int x0, int y0, int x1, int y1, float scale,
             Identifier texture, PlayerCapeModel playerCapeModel, ModelPart elytra,
             PreviewEquipment.Worn worn) {
 //?}
         synchronized (PENDING_CAPES) {
             PreviewCapeKey key = new PreviewCapeKey(
-                    bodyModel, skin, rotationX, rotationY, pivotY, x0, y0, x1, y1, scale);
+                    submitted, skin, rotationX, rotationY, pivotY, x0, y0, x1, y1, scale);
             if (!PENDING_CAPES.containsKey(key) && PENDING_CAPES.size() >= MAX_PENDING_CAPES) {
                 var oldest = PENDING_CAPES.keySet().iterator();
                 if (oldest.hasNext()) PENDING_CAPES.remove(oldest.next());
@@ -285,6 +295,131 @@ public class PlayerModelRenderer {
 //?}
 
 //? if >=1.21.6 {
+    /**
+     * The CPM model one picture-in-picture pass draws in place of the model it was handed, which
+     * is one that draws nothing ({@link #hiddenModel}, or an empty root from 26.2). CPM draws only
+     * while its parts are bound to the posed model, and from 1.21.9 only through its own
+     * collector, so the pass cannot draw it itself. {@code skinHidden} is whether the pass was
+     * handed that model: when it draws the skin, the CPM model is only tried, so the next frame
+     * knows whether to hide the skin, and never drawn over it.
+     */
+    private record PendingCpmModel(PreviewPlayerData data, PlayerModel model, boolean skinHidden) {
+    }
+
+    // Keyed by the exact model object the draw submits, as the pending sits are
+    private static final java.util.Map<Object, PendingCpmModel> PENDING_CPM_MODELS =
+            new java.util.IdentityHashMap<>();
+    private static final int MAX_PENDING_CPM_MODELS = 16;
+
+    private static void registerPendingCpmModel(Object key, PlayerModel model, PreviewPlayerData playerData,
+                                                boolean skinHidden) {
+        synchronized (PENDING_CPM_MODELS) {
+            if (cpmModelFile(playerData) == null) {
+                PENDING_CPM_MODELS.remove(key);
+                return;
+            }
+            if (PENDING_CPM_MODELS.size() >= MAX_PENDING_CPM_MODELS) {
+                PENDING_CPM_MODELS.clear();
+            }
+            PENDING_CPM_MODELS.put(key, new PendingCpmModel(playerData, model, skinHidden));
+        }
+    }
+
+    /**
+     * Whether the pass is handed a model that draws nothing, because the preview's CPM model is
+     * drawn in its place or, while CPM cannot draw it, nothing is.
+     */
+    private static boolean cpmModelReplacesSkin(PreviewPlayerData playerData) {
+        return cpmModelFile(playerData) != null
+                && (playerData.isCpmModelDrawn() || hidesSkinForCpmModel(playerData));
+    }
+
+    /** The parts a preview poses, which CPM replaces with its own while a model is bound. */
+    private static ModelPart[] posedParts(PlayerModel model) {
+        return new ModelPart[] {model.head, model.hat, model.body, model.rightArm, model.leftArm,
+                model.rightLeg, model.leftLeg, model.jacket, model.rightSleeve, model.leftSleeve,
+                model.rightPants, model.leftPants};
+    }
+
+    /**
+     * Draws the CPM model pending for {@code key} in the picture-in-picture pass, where the pass
+     * has placed the model. Does nothing for a pass without one, or while CPM cannot draw it.
+     */
+//? if <1.21.9 {
+    public static void renderPendingCpmModel(Object key, PoseStack poseStack, MultiBufferSource.BufferSource bufferSource) {
+//?} else if <26.2 {
+    public static void renderPendingCpmModel(Object key, PoseStack poseStack) {
+//?} else {
+    public static void renderPendingCpmModel(Object key, PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector collector) {
+//?}
+        PendingCpmModel pending;
+        synchronized (PENDING_CPM_MODELS) {
+            pending = PENDING_CPM_MODELS.remove(key);
+        }
+        if (pending == null) {
+            return;
+        }
+        PlayerModel model = pending.model();
+        PreviewPlayerData playerData = pending.data();
+        ModelPart[] parts = posedParts(model);
+        net.minecraft.client.model.geom.PartPose[] pose = new net.minecraft.client.model.geom.PartPose[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            pose[i] = parts[i].storePose();
+        }
+//? if <1.21.9 {
+        ResourceLocation texture = CpmModelPreview.bind(playerData.getCpmModelFile(), model, bufferSource,
+                cpmPose(playerData), playerData.getSkinLocation());
+//?} else if <1.21.11 {
+        ResourceLocation texture = CpmModelPreview.bind(playerData.getCpmModelFile(), model,
+                cpmPose(playerData), playerData.getSkinLocation());
+//?} else {
+        Identifier texture = CpmModelPreview.bind(playerData.getCpmModelFile(), model,
+                cpmPose(playerData), playerData.getSkinLocation());
+//?}
+        playerData.setCpmModelDrawn(texture != null);
+        if (texture == null) {
+            return;
+        }
+        if (!pending.skinHidden()) {
+            // The pass has drawn the skin this frame; from the next one it is handed nothing
+            CpmModelPreview.unbind();
+            return;
+        }
+        try {
+            // CPM's parts take the preview's pose; from 1.21.9 they start from the rest pose
+            ModelPart[] bound = posedParts(model);
+            for (int i = 0; i < bound.length; i++) {
+                if (bound[i] != parts[i]) {
+                    bound[i].loadPose(pose[i]);
+                }
+            }
+//? if <1.21.9 {
+            model.renderToBuffer(poseStack, bufferSource.getBuffer(RenderType.entityTranslucent(texture)),
+                    15728880, OverlayTexture.NO_OVERLAY);
+//?} else if <1.21.11 {
+            var features = Minecraft.getInstance().gameRenderer.getFeatureRenderDispatcher();
+            if (CpmModelPreview.submit(features.getSubmitNodeStorage(),
+                    new net.minecraft.client.model.Model.Simple(model.root(), RenderType::entityTranslucent), poseStack,
+                    RenderType.entityTranslucent(texture), 15728880, OverlayTexture.NO_OVERLAY)) {
+                features.renderAllFeatures();
+            }
+//?} else if <26.2 {
+            var features = Minecraft.getInstance().gameRenderer.getFeatureRenderDispatcher();
+            if (CpmModelPreview.submit(features.getSubmitNodeStorage(),
+                    new net.minecraft.client.model.Model.Simple(model.root(), RenderTypes::entityTranslucent), poseStack,
+                    RenderTypes.entityTranslucent(texture), 15728880, OverlayTexture.NO_OVERLAY)) {
+                features.renderAllFeatures();
+            }
+//?} else {
+            CpmModelPreview.submit(collector,
+                    new net.minecraft.client.model.Model.Simple(model.root(), RenderTypes::entityTranslucent), poseStack,
+                    RenderTypes.entityTranslucent(texture), 15728880, OverlayTexture.NO_OVERLAY);
+//?}
+        } finally {
+            CpmModelPreview.unbind();
+        }
+    }
+
     /**
      * The sitting pose's block and the jump onto it or off it for one picture-in-picture draw, as
      * the inline draw before 1.21.6 shows them: the jump lifts and squashes the model, its cape and
@@ -414,6 +549,12 @@ public class PlayerModelRenderer {
 //?}
         slimModel = new PlayerModel(slimRoot, true);
         classicModel = new PlayerModel(classicRoot, false);
+//?}
+//? if >=1.21.6 && <26.2 {
+        ModelPart hiddenRoot = LayerDefinition.create(
+                PlayerModel.createMesh(CubeDeformation.NONE, false), 64, 64).bakeRoot();
+        hiddenRoot.visible = false;
+        hiddenModel = new PlayerModel(hiddenRoot, false);
 //?}
 //? if <1.21.6 {
 //?} else if <26.2 {
@@ -1428,6 +1569,48 @@ public class PlayerModelRenderer {
     }
 
 //?}
+    /** The pose a preview draws, for the pose animations of a CPM model drawn in it. */
+    private static CpmModelPreview.Pose cpmPose(PreviewPlayerData playerData) {
+        String animation = playerData.getCurrentAnimation();
+        return new CpmModelPreview.Pose(
+                "walk".equalsIgnoreCase(animation) || "run".equalsIgnoreCase(animation),
+                "sit".equalsIgnoreCase(animation));
+    }
+
+    /**
+     * Whether a preview whose CPM model was not bound draws nothing instead of its skin: while CPM
+     * is still building the model, and always for a preview that shows its model or nothing.
+     */
+    private static boolean hidesSkinForCpmModel(PreviewPlayerData playerData) {
+        java.nio.file.Path file = cpmModelFile(playerData);
+        return file != null && (playerData.isCpmModelOnly() || CpmModelPreview.isLoading(file));
+    }
+
+    /**
+     * The CPM model a preview draws on its own model, or null for the skin. The elytra view keeps
+     * the skin: it shows the cape's texture on vanilla's wings, as it does in a world.
+     */
+    private static java.nio.file.Path cpmModelFile(PreviewPlayerData playerData) {
+        return playerData.isElytraPreview() ? null : playerData.getCpmModelFile();
+    }
+
+//? if <1.21.9 {
+    /**
+     * Binds the CPM model a preview without a player shows to the preview's own model, already
+     * posed. Answers CPM's texture for the draw, after which {@link CpmModelPreview#unbind} must
+     * follow, or null when the preview draws its skin.
+     */
+    private static ResourceLocation bindCpmModel(
+            PreviewPlayerData playerData, net.minecraft.client.model.Model model, MultiBufferSource buffers) {
+        java.nio.file.Path file = cpmModelFile(playerData);
+        ResourceLocation texture = file != null
+                ? CpmModelPreview.bind(file, model, buffers, cpmPose(playerData), playerData.getSkinLocation())
+                : null;
+        playerData.setCpmModelDrawn(texture != null);
+        return texture;
+    }
+//?}
+
     /**
      * Manually render player model without requiring a player entity
      * Used on title screen where no world/player exists
@@ -1560,8 +1743,11 @@ public class PlayerModelRenderer {
 //?}
 
 //? if <1.21 {
-        // Render the model with skin texture
-        RenderType renderType = RenderType.entityTranslucent(playerData.getSkinLocation());
+        // Render the model with skin texture, or the CPM model the preview shows in its place
+        ResourceLocation cpmTexture = bindCpmModel(playerData, model, bufferSource);
+        boolean cpmLoading = cpmTexture == null && hidesSkinForCpmModel(playerData);
+        RenderType renderType = RenderType.entityTranslucent(
+                cpmTexture != null ? cpmTexture : playerData.getSkinLocation());
         var vertexConsumer = bufferSource.getBuffer(renderType);
 
         // Determine if using slim model
@@ -1569,20 +1755,26 @@ public class PlayerModelRenderer {
 
         // 3D Skin Layers' compatibility path replaces each flat outer ModelPart while it renders.
         // Keeping the injection scoped to this synchronous draw prevents stale preview state.
-        boolean injectedSkinLayers = SkinLayers3DIntegration.prepareInjectedPreview(
-                model, playerData.getSkinLocation(), isSlimModel);
+        boolean injectedSkinLayers = cpmTexture == null && !cpmLoading
+                && SkinLayers3DIntegration.prepareInjectedPreview(
+                        model, playerData.getSkinLocation(), isSlimModel);
         try {
-            model.renderToBuffer(
-                    poseStack,
-                    vertexConsumer,
-                    15728880, // Full brightness (light level) - same as InventoryScreen
-                    OverlayTexture.NO_OVERLAY,
-                    1.0f, 1.0f, 1.0f, 1.0f // RGBA
-            );
+            // While CPM is still building the model, nothing is drawn in its place
+            if (!cpmLoading) {
+                model.renderToBuffer(
+                        poseStack,
+                        vertexConsumer,
+                        15728880, // Full brightness (light level) - same as InventoryScreen
+                        OverlayTexture.NO_OVERLAY,
+                        1.0f, 1.0f, 1.0f, 1.0f // RGBA
+                );
+            }
         } finally {
             if (injectedSkinLayers) {
                 SkinLayers3DIntegration.clearInjectedPreview(model);
             }
+            // Flushes what CPM batched and hands the model's own parts back
+            CpmModelPreview.unbind();
         }
 
         // What the player wears, as the world shows it (ADR 0017)
@@ -1593,28 +1785,37 @@ public class PlayerModelRenderer {
 
         // Render cape AFTER model if present
 //?} else if <1.21.6 {
-        // Render the model with skin texture
-        RenderType renderType = RenderType.entityTranslucent(playerData.getSkinLocation());
+        // Render the model with skin texture, or the CPM model the preview shows in its place
+        ResourceLocation cpmTexture = bindCpmModel(playerData, model, bufferSource);
+        boolean cpmLoading = cpmTexture == null && hidesSkinForCpmModel(playerData);
+        RenderType renderType = RenderType.entityTranslucent(
+                cpmTexture != null ? cpmTexture : playerData.getSkinLocation());
         var vertexConsumer = bufferSource.getBuffer(renderType);
 
         // Determine if using slim model
         boolean isSlimModel = "slim".equals(playerData.getModelType() != null ? playerData.getModelType().toLowerCase(Locale.ROOT) : null);
 
         // 3D Skin Layers' compatibility path replaces each flat outer ModelPart while it renders.
-        boolean injectedSkinLayers = SkinLayers3DIntegration.prepareInjectedPreview(
-                model, playerData.getSkinLocation(), isSlimModel);
+        boolean injectedSkinLayers = cpmTexture == null && !cpmLoading
+                && SkinLayers3DIntegration.prepareInjectedPreview(
+                        model, playerData.getSkinLocation(), isSlimModel);
         try {
-            model.renderToBuffer(
-                    poseStack,
-                    vertexConsumer,
-                    15728880, // Full brightness (light level) - same as InventoryScreen
-                    OverlayTexture.NO_OVERLAY,
-                    0xFFFFFFFF  // ARGB color format
-            );
+            // While CPM is still building the model, nothing is drawn in its place
+            if (!cpmLoading) {
+                model.renderToBuffer(
+                        poseStack,
+                        vertexConsumer,
+                        15728880, // Full brightness (light level) - same as InventoryScreen
+                        OverlayTexture.NO_OVERLAY,
+                        0xFFFFFFFF  // ARGB color format
+                );
+            }
         } finally {
             if (injectedSkinLayers) {
                 SkinLayers3DIntegration.clearInjectedPreview(model);
             }
+            // Flushes what CPM batched and hands the model's own parts back
+            CpmModelPreview.unbind();
         }
 
         // What the player wears, as the world shows it (ADR 0017)
@@ -1645,6 +1846,10 @@ public class PlayerModelRenderer {
                     capeAtlasLocation, capeId);
             if (worn != null && worn.wings()) {
                 // The elytra the player wears is drawn in the cape's place, as the world does
+                finalCapeTexture = null;
+            }
+            if (cpmLoading) {
+                // No cape hangs in the air while CPM is still building the model
                 finalCapeTexture = null;
             }
 //?} else {
@@ -1751,8 +1956,15 @@ public class PlayerModelRenderer {
 //?} else if <26.1 {
         float submittedScale = (float)(int) scale * swapScale + scaleNudge;
         float submittedRotationY = -45.0f + yRotation;
+        // A CPM model is drawn in the pass in the skin's place: the pass is handed a model that
+        // draws nothing, and no cape hangs in the air while CPM is still building the model
+        boolean cpmReplacesSkin = cpmModelReplacesSkin(playerData);
+        PlayerModel submitted = cpmReplacesSkin ? hiddenModel : model;
+        if (cpmReplacesSkin && !playerData.isCpmModelDrawn()) {
+            capeTexture = null;
+        }
         graphics.submitSkinRenderState(
-                model,
+                submitted,
                 playerData.getSkinLocation(),
                 submittedScale,
                 rotationXNudge,
@@ -1763,16 +1975,24 @@ public class PlayerModelRenderer {
                 x + boxHalfWidth,
                 y
         );
-        registerPendingSit(model, playerData);
-        registerPendingCape(model, playerData.getSkinLocation(), rotationXNudge,
+        registerPendingSit(submitted, playerData);
+        registerPendingCpmModel(submitted, model, playerData, cpmReplacesSkin);
+        registerPendingCape(submitted, model, playerData.getSkinLocation(), rotationXNudge,
                 submittedRotationY, -1.0625f, x - boxHalfWidth, y - boxHeight,
                 x + boxHalfWidth, y, submittedScale, worn != null && worn.wings() ? null : capeTexture, capeModel,
                 playerData.isElytraPreview() ? elytraModel : null, worn);
 //?} else if <26.2 {
         float submittedScale = (float)(int) scale * swapScale + scaleNudge;
         float submittedRotationY = -45.0f + yRotation;
+        // A CPM model is drawn in the pass in the skin's place: the pass is handed a model that
+        // draws nothing, and no cape hangs in the air while CPM is still building the model
+        boolean cpmReplacesSkin = cpmModelReplacesSkin(playerData);
+        PlayerModel submitted = cpmReplacesSkin ? hiddenModel : model;
+        if (cpmReplacesSkin && !playerData.isCpmModelDrawn()) {
+            capeTexture = null;
+        }
         graphics.skin(
-                model,
+                submitted,
                 playerData.getSkinLocation(),
                 submittedScale,
                 rotationXNudge,
@@ -1783,14 +2003,22 @@ public class PlayerModelRenderer {
                 x + boxHalfWidth,
                 y
         );
-        registerPendingSit(model, playerData);
-        registerPendingCape(model, playerData.getSkinLocation(), rotationXNudge,
+        registerPendingSit(submitted, playerData);
+        registerPendingCpmModel(submitted, model, playerData, cpmReplacesSkin);
+        registerPendingCape(submitted, model, playerData.getSkinLocation(), rotationXNudge,
                 submittedRotationY, -1.0625f, x - boxHalfWidth, y - boxHeight,
                 x + boxHalfWidth, y, submittedScale, worn != null && worn.wings() ? null : capeTexture, capeModel,
                 playerData.isElytraPreview() ? elytraModel : null, worn);
 //?} else {
+        // A CPM model is drawn in the pass in the skin's place: the pass is handed a root that
+        // draws nothing, and no cape hangs in the air while CPM is still building the model
+        boolean cpmReplacesSkin = cpmModelReplacesSkin(playerData);
+        if (cpmReplacesSkin && !playerData.isCpmModelDrawn()) {
+            capeTexture = null;
+        }
         Model.Simple renderModel = new Model.Simple(
-                model.root(), net.minecraft.client.renderer.rendertype.RenderTypes::entityTranslucent);
+                cpmReplacesSkin ? new ModelPart(java.util.List.of(), java.util.Map.of()) : model.root(),
+                net.minecraft.client.renderer.rendertype.RenderTypes::entityTranslucent);
         graphics.skin(
                 renderModel,
                 playerData.getSkinLocation(),
@@ -1804,6 +2032,7 @@ public class PlayerModelRenderer {
                 y
         );
         registerPendingSit(renderModel, playerData);
+        registerPendingCpmModel(renderModel, model, playerData, cpmReplacesSkin);
         registerPendingCape(renderModel, worn != null && worn.wings() ? null : capeTexture, model, capeModel,
                 playerData.isElytraPreview() ? elytraModel : null, worn);
 //?}

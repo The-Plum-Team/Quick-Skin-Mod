@@ -288,7 +288,7 @@ the launcher can read are available; copy a missing file into the game folder us
 that can access the launcher's storage. The underlined hint and matching Game folder label identify
 this alternative; the chooser does not request Android storage permissions.
 
-When CPM is installed, standalone models live under `.minecraft/player_models/` and can be imported as `.cpmmodel` files.
+When CPM is installed, standalone models live under `.minecraft/player_models/` and can be imported as `.cpmmodel` files. Quick Skin's menus draw a CPM model as the model itself before a world is joined too (the title screen's player, the skin menu, the cape menus), and the skin list and the favourites fan show a picture made from the model; in a world CPM draws it on the player as always. Where CPM cannot draw a model outside a world, the menus keep the skin or the model's icon.
 
 3D Skin Layers preview support follows the availability of the upstream mod for each loader. Entity previews are owned by the third-party renderer; Quick Skin supplies only the missing manual/title-screen preview path.
 

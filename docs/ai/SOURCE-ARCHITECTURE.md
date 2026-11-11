@@ -155,6 +155,15 @@ ARGB atlas and animation metadata; `MinecraftGifDecoder` in the adapter owns nat
 channel conversion, and native-frame disposal. A GIF it refuses only for its size falls back to
 `ScaledGifDecoder` in `image-core`, which decodes in Java frame by frame and shrinks. Keep native image objects out of import processing.
 
+CPM models drawn where there is no player belong to three modules. `CpmModelPreview`
+(cpm-integration) is the only code that reaches CPM for it, by reflection: it loads a model file
+and binds it to a model handed to it. `PlayerModelRenderer` (preview-rendering) draws the bound
+model in a preview's own pose on each API family, and `CpmModelCapture` there records one
+bound draw as a `ModelMesh`. `ModelMesh` and `ModelMeshRasterizer` (image-core) are free of
+Minecraft types and draw the skin list's and the favourites fan's pictures of a model from that
+mesh, beside `SkinBustRasterizer`, whose camera and light they share; `SkinBustTextures`
+(player-preview) keeps both kinds of picture as textures.
+
 `ClientFeatureBindings` installs the process-owned links before catalog scans or network callbacks:
 CPM consumes `CpmAssetAccess`, accepted packets target `RemoteAppearanceTarget`, and feature code
 uses `ClientNetworkActions` without depending on the mixed client/server networking implementation.

@@ -130,6 +130,14 @@ public class GuiSkinRendererMixin {
     )
     private void quickskin$renderCapeInPiP(GuiSkinRenderState state, PoseStack poseStack, SubmitNodeCollector collector, CallbackInfo ci) {
 //?}
+        // The CPM model a preview without a player shows in the skin's place
+//? if <1.21.9 {
+        PlayerModelRenderer.renderPendingCpmModel(state.playerModel(), poseStack, bufferSource);
+//?} else if <26.2 {
+        PlayerModelRenderer.renderPendingCpmModel(state.playerModel(), poseStack);
+//?} else {
+        PlayerModelRenderer.renderPendingCpmModel(state.playerModel(), poseStack, collector);
+//?}
         // The sitting pose's block, where the inline draw before 1.21.6 puts it
 //? if <26.2 {
         PlayerModelRenderer.renderPendingSitBlock(

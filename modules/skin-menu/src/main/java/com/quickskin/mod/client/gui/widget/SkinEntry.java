@@ -206,10 +206,19 @@ public class SkinEntry {
             var grayFace = marked && !metadata.isCpmModel()
                     ? SkinBustTextures.grayFace(metadata.hash(), textureLocation) : null;
             if (metadata.isCpmModel()) {
-                GuiCompat.blit(graphics, textureLocation, faceX, faceY, faceSize, faceSize,
-                    0, 0, 64, 64, 64, 64);
-                if (marked) {
-                    graphics.fill(faceX, faceY, faceX + faceSize, faceY + faceSize, MARKED_DIM);
+                // The model itself, as the list's rows show it; its icon until that picture is made
+                int scale = Math.max(1, (int) Math.round(mc.getWindow().getGuiScale()));
+                int pixels = faceSize * scale;
+                var model = SkinBustTextures.getModel(metadata.hash(), metadata.path(), pixels, pixels, marked);
+                if (model != null) {
+                    GuiCompat.blit(graphics, model, faceX, faceY, faceSize, faceSize,
+                            0, 0, pixels, pixels, pixels, pixels);
+                } else {
+                    GuiCompat.blit(graphics, textureLocation, faceX, faceY, faceSize, faceSize,
+                        0, 0, 64, 64, 64, 64);
+                    if (marked) {
+                        graphics.fill(faceX, faceY, faceX + faceSize, faceY + faceSize, MARKED_DIM);
+                    }
                 }
             } else if (grayFace != null) {
                 // Marked for deletion: the face in grey
@@ -448,7 +457,25 @@ public class SkinEntry {
             //?}
             int x, int y, int width, int height, boolean gray) {
         if (metadata.isCpmModel()) {
-            // A CPM model has an icon, not a skin: show it like the grid does, centred
+            // The model itself, drawn at the window's own pixels like a skin's bust
+            if (!departing) {
+                int scale = Math.max(1, (int) Math.round(mc.getWindow().getGuiScale()));
+                int pixelWidth = width * scale;
+                int pixelHeight = height * scale;
+                var model = SkinBustTextures.getModel(metadata.hash(), metadata.path(), pixelWidth, pixelHeight, gray);
+                if (model != null) {
+                    //? if <1.21.5 {
+                    RenderSystem.enableBlend();
+                    //?}
+                    GuiCompat.blit(graphics, model, x, y, width, height,
+                            0, 0, pixelWidth, pixelHeight, pixelWidth, pixelHeight);
+                    //? if <1.21.5 {
+                    RenderSystem.disableBlend();
+                    //?}
+                    return;
+                }
+            }
+            // Until that picture is made, or when CPM cannot draw the model: its icon, centred
             if (textureLocation != null && !departing) {
                 int size = Math.min(width, height) - 8;
                 //? if <1.21.5 {
