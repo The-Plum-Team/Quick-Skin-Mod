@@ -140,7 +140,7 @@
       "mod-compatibility": "Mod compatibility",
       "mod-compatibility-remote": "Remote observer",
       "mod-compatibility-late-join": "Late join",
-      "mod-compatibility-cpm-first-person": "CPM first person",
+      "mod-compatibility-cpm-first-person": "CPM first person and title screen",
       "feature-navigation": "Feature navigation"
     },
     "roles": {
@@ -174,7 +174,7 @@
       "Optional-mod pairs appear only after the full runtime lane and complete visual review are clean."
     ],
     "family_notes": {
-      "mod-compatibility": "Each lane shows its contracted local, first-person, remote and late-join pairs (2, 5 or 7)."
+      "mod-compatibility": "Each lane shows its contracted local, CPM, remote and late-join pairs (2, 5 or 8)."
     }
   },
   "theme": {
