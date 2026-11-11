@@ -700,13 +700,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Authenticate and validate the full runnable/N/A plan, every exact compatibility-profile paired
   review manifest and normalized report, every clean lane marker, and the source completion marker
   before publishing. Publish exactly the two local `mod-compatibility` checkpoints and, only when
-  the mod contract opts in, the two CPM `mod-compatibility-cpm-first-person` hand checkpoints, the
+  the mod contract opts in, the three CPM `mod-compatibility-cpm-first-person` checkpoints (two
+  of the first-person hand, one of the title screen), the
   two live `mod-compatibility-remote` observer checkpoints, plus the one sequential
   `mod-compatibility-late-join` observer checkpoint per applicable lane. Each
   remains its clean reference plus modded candidate, with deterministic assertion,
   exact mod version, semantic fingerprints, source/derivative proof, clean verdict booleans, and
   run provenance. Never publish provider-authored explanations or anomaly text.
-  `reviewed_frame_count` must equal that exact mod-selective two-, five-, or seven-checkpoint model
+  `reviewed_frame_count` must equal that exact mod-selective two-, five-, or eight-checkpoint model
   product; the authenticated runtime result, not repeated model review of ordinary screenshots,
   proves the complete base suite. The shared-source native bundle, public compatibility schema v6,
   encodes that count and travels unchanged inside the kit's family envelope; the Pages path no
@@ -852,6 +853,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   requires, besides the asserted remote state and rear vantage, that the observer's renderer has
   compiled the terrain at and below the subject. Vanilla skips entities in uncompiled sections, so
   appearance state alone can pass on a sky-only frame.
+- The CPM scenario's last checkpoint (`model_on_title_screen`) leaves the world, because Quick
+  Skin draws a CPM model itself only where there is no player for CPM to draw on. Before the
+  capture it must prove that no level or player is left, that the title screen holds one Quick
+  Skin preview whose latest draw showed its CPM model on the preview's own model, that this model
+  is the file CPM has selected and the harness imported, and that the skin list's picture of it
+  has a captured mesh with CPM's texture. A CPM build with no way to draw a model outside a world
+  fails the lane; the preview's fallback to the skin must never pass. The step disconnects, so it
+  stays the scenario's last, and its clean reference is `session.client_a.quit_to_title`, the
+  same preview with a skin.
 - The CPM apply checkpoints (`mod-compatibility` local apply and the live remote apply/observe
   pair) first prove, without a capture, Quick Skin's own skin that carries a CPM model in its
   pixels, imported through the ordinary skin import: on every band the stored file (locally) and

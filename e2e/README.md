@@ -55,8 +55,8 @@ This `master` shared source exercises the following exact packaged lanes:
 | `fabric-26.3` | `26.3` | Fabric | `25` | `11` |
 | `neoforge-26.3` | `26.3` | NeoForge | `25` | `11` |
 
-Scenario contract SHA-256: `83e07ac07655642994bf24f626ecfa5193bfc109242e52f18fc7054b1e8e8658`
-Contract totals: `129` ordered steps, `98` captures.
+Scenario contract SHA-256: `b6f540378322a04a968802917ba02af4c1ebc81557f2e51724d439d95996044a`
+Contract totals: `130` ordered steps, `99` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
@@ -69,7 +69,7 @@ Contract totals: `129` ordered steps, `98` captures.
 | `mod-compatibility` | `compatibility` | `single-client` | `client_a` | `3` | `2` |
 | `mod-compatibility-remote` | `compatibility-remote` | `concurrent-two-client` | `client_a`, `client_b` | `8` | `2` |
 | `mod-compatibility-late-join` | `compatibility-remote` | `sequential-two-client` | `client_a`, `client_b` | `5` | `1` |
-| `mod-compatibility-cpm-first-person` | `compatibility-cpm` | `single-client` | `client_a` | `4` | `2` |
+| `mod-compatibility-cpm-first-person` | `compatibility-cpm` | `single-client` | `client_a` | `5` | `3` |
 | `feature-navigation` | `pr`, `release` | `single-client` | `client_a` | `4` | `4` |
 
 `e2e/scenario-contract.json` is the sole source for scenario ids, execution profiles, launch topology, steps, assertions, captures, probes, and comparisons. Screenshot emission is exact: each role step must emit a screenshot if and only if its contract entry declares `capture`. Version/loader/Java/runtime pins come only from this branch's validated release matrix.
@@ -629,7 +629,10 @@ workflow for each locked mod:
   and fails when `CpmCapabilities` disagrees; later versions check the bytes only, because CPM
   reads the Mojang profile there. Its dedicated first-person scenario reloads the protected
   fixture, captures the custom hand, holds first-person view for at least 200 ticks (10 seconds),
-  and captures it again to catch delayed hand-render corruption.
+  and captures it again to catch delayed hand-render corruption. Its last step then leaves the
+  world for the title screen, where CPM has no player to draw on: Quick Skin's preview there must
+  draw the protected model on its own posed model, bound by CPM, and the skin list's picture of
+  the model must have its captured mesh, before the title screen is captured.
 - Ears compares an ordinary Quick Skin control with a skin authored through Ears' own feature
   writer, then requires parsed tall ears and a rear tail in Ears' public renderer storage.
 - 3D Skin Layers compares subdued and saturated outer-layer fixtures over a uniquely coloured
@@ -690,8 +693,10 @@ A missing or altered chunk fails the CPM lane before Minecraft is launched. The 
 absent from source archives, production JARs, E2E harness JARs, and uploaded evidence.
 
 Only CPM opts into `compatibility-cpm`. Its two first-person hand captures use the clean
-`phase0-smoke.client_a.apply_local_skin` frame as their same-version reference and are reviewed
-independently, so other optional mods do not pay the extra ten-second runtime or AI-image cost.
+`phase0-smoke.client_a.apply_local_skin` frame as their same-version reference, and its title
+screen capture the clean `session.client_a.quit_to_title` frame, which shows the same preview with
+a skin. They are reviewed independently, so other optional mods do not pay the extra ten-second
+runtime or AI-image cost.
 
 CPM and Ears additionally opt into two live remote capture IDs and one late-join capture ID. In the
 live scenario, Bob first proves the real optional renderer state for Alice, captures it, and
@@ -778,9 +783,9 @@ source-wave block and cancels the remaining model calls.
 Once every applicable lane is complete and clean, the protected reviewer can publish the wave
 without another model call. It reauthenticates the source plan, every full capsule, all normalized
 reports and lane-complete records, then retains only the contracted compatibility checkpoints: two
-local checkpoints per lane, two CPM-only first-person hand checkpoints, plus two live-remote and
-one late-join checkpoint for CPM and Ears. CPM therefore publishes seven checkpoints, Ears five,
-and every other mod two. Each public checkpoint is a paired clean reference and modded candidate,
+local checkpoints per lane, three CPM-only checkpoints (the first-person hand twice and the title
+screen), plus two live-remote and one late-join checkpoint for CPM and Ears. CPM therefore
+publishes eight checkpoints, Ears five, and every other mod two. Each public checkpoint is a paired clean reference and modded candidate,
 encoded as a content-addressed 1280x720 WebP. The manifest still records the exact selected
 reviewed-frame count and mod version; raw model explanations, anomaly strings, and the other
 reviewed images are not public.

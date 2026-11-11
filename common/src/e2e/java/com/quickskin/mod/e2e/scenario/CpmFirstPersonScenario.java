@@ -10,11 +10,18 @@ import net.minecraft.client.Minecraft;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Proves that CPM keeps its custom first-person hand intact after ten seconds of play. */
+/**
+ * Proves that CPM keeps its custom first-person hand intact after ten seconds of play, and then,
+ * with the world left behind, that Quick Skin's own title-screen preview draws the model, which
+ * CPM alone cannot do where there is no player.
+ */
 public final class CpmFirstPersonScenario implements Scenario {
     static final int FIRST_PERSON_RECHECK_TICKS = 20 * 10;
     private static final int FIRST_PERSON_SETTLE_TICKS = 20;
     private static final int FIRST_PERSON_TIMEOUT_TICKS = 400;
+    private static final int TITLE_HOLD_TICKS = 25;
+    /** CPM builds the model again for the preview after the disconnect cleared its players. */
+    private static final int TITLE_TIMEOUT_TICKS = 600;
 
     private volatile CompatibilityProbe.Result probe =
             new CompatibilityProbe.Result(false, "probe not executed");
@@ -78,6 +85,18 @@ public final class CpmFirstPersonScenario implements Scenario {
                 .screenshot(version + "_compat_cpm_02_first_person_hand_after_10_seconds_"
                         + role + ".png")
                 .assertion(() -> feature.assertFirstPersonHand("10-second")));
+
+        // Last: it leaves the world, where the earlier steps need the player
+        steps.add(Step.of("model_on_title_screen")
+                .action(feature::quitToTitle)
+                .minTicks(TITLE_HOLD_TICKS)
+                .ready(() -> probe.active() && feature.titleModelReady())
+                .settleTicks(TITLE_HOLD_TICKS)
+                .timeoutTicks(TITLE_TIMEOUT_TICKS)
+                .screenshot(version + "_compat_cpm_03_model_on_title_screen_" + role + ".png")
+                .assertion(() -> probe.active()
+                        ? feature.assertTitleModel()
+                        : Step.Result.fail(probe.detail())));
 
         return steps;
     }

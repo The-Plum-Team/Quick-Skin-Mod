@@ -164,6 +164,7 @@ EXPECTED_STEPS = {
         "prepare_model",
         "first_person_hand_initial",
         "first_person_hand_after_10_seconds",
+        "model_on_title_screen",
     ),
 }
 
@@ -229,10 +230,11 @@ EXPECTED_CAPTURES = {
     ("mod-compatibility-cpm-first-person", "client_a"): (
         "first_person_hand_initial",
         "first_person_hand_after_10_seconds",
+        "model_on_title_screen",
     ),
 }
 
-EXPECTED_CAPTURE_COUNT = 98
+EXPECTED_CAPTURE_COUNT = 99
 
 # The scenario index the mutation cases below address. Mutations must target the intended
 # scenario even after the contract grows, so these are named rather than inlined.

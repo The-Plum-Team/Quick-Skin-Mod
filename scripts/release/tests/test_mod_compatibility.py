@@ -1243,6 +1243,8 @@ class ModCompatibilityContractTest(unittest.TestCase):
                 "first_person_hand_initial",
                 "mod-compatibility-cpm-first-person.client_a."
                 "first_person_hand_after_10_seconds",
+                "mod-compatibility-cpm-first-person.client_a."
+                "model_on_title_screen",
             ],
             [frame["capture_id"] for frame in selected],
         )
