@@ -48,6 +48,18 @@ class SkinSortOrderTest {
     }
 
     @Test
+    void anOwnSkinThatIsAFavouriteStaysFirst() {
+        Set<String> favourites = Set.of(OWN.hash(), FAVOURITE.hash());
+        for (SkinSortMode mode : SkinSortMode.values()) {
+            List<String> order = List.of(NEW, FAVOURITE, OWN, OLD).stream()
+                    .sorted(LocalAssetManager.sortComparator(mode, OWN.hash(), favourites::contains))
+                    .map(AssetMetadata::friendlyName)
+                    .toList();
+            assertEquals(List.of("zed", "yak"), order.subList(0, 2), mode.name());
+        }
+    }
+
+    @Test
     void everyModeGivesItsOwnOrder() {
         assertEquals(3, Set.of(sorted(SkinSortMode.LATEST_LAST), sorted(SkinSortMode.LATEST_FIRST),
                 sorted(SkinSortMode.ALPHABETICAL)).size());

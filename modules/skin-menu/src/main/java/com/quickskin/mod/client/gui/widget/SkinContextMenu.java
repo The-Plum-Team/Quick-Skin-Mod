@@ -114,9 +114,7 @@ public class SkinContextMenu extends AbstractWidget {
         this.capeAssigned = capeAssigned;
         this.armed = false;
         items.clear();
-        if (!ownSkin) {
-            items.add(Item.FAVORITE);
-        }
+        items.add(Item.FAVORITE);
         items.add(Item.RENAME);
         if (!metadata.isCpmModel()) {
             items.add(Item.ASSIGN_CAPE);

@@ -1,0 +1,7 @@
+{
+  "fan.open": {"sounds": ["quickskin:fan/open"]},
+  "fan.point": {"sounds": ["quickskin:fan/point"]},
+  "fan.page": {"sounds": ["quickskin:fan/page"]},
+  "fan.choose": {"sounds": ["quickskin:fan/choose"]},
+  "fan.wear": {"sounds": ["quickskin:fan/wear"]}
+}

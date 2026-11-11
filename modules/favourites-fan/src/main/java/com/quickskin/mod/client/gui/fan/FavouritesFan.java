@@ -6,9 +6,7 @@ import com.quickskin.mod.client.gui.fan.FanMotion.Phase;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
-import net.minecraft.sounds.SoundEvents;
 //? if <26.3 {
 import net.minecraft.world.InteractionHand;
 //?}
@@ -66,6 +64,7 @@ public final class FavouritesFan {
         pointerY = minecraft.getWindow().getGuiScaledHeight() * 0.4f;
         moved = 0;
         setPhase(Phase.OPENING);
+        FanSounds.play(FanSounds.OPEN, 0.8f);
     }
 
     /** Whether mouse movement and clicks belong to the fan instead of the game. */
@@ -105,6 +104,8 @@ public final class FavouritesFan {
         chosen = hovered;
         worn = false;
         setPhase(Phase.CHOOSING);
+        // The card's turn sounds from the click; the skin's own sound follows when it is put on
+        FanSounds.play(FanSounds.CHOOSE, 0.45f);
     }
 
     public static void close() {
@@ -119,7 +120,7 @@ public final class FavouritesFan {
         page = Math.floorMod(page + (amount < 0 ? 1 : -1), pages());
         hovered = -1;
         hover = new float[FanMotion.PAGE_SIZE];
-        playPageTurn();
+        FanSounds.play(FanSounds.PAGE, 0.7f);
     }
 
     /** Every tick: a screen that opens, or leaving the world, puts the fan away at once. */
@@ -199,7 +200,7 @@ public final class FavouritesFan {
         if (capturesMouse()) {
             int pointed = moved < 4f ? -1 : FanMotion.pick(layout, count, pointerX, pointerY);
             if (pointed != hovered) {
-                if (pointed >= 0) playPageTurn();
+                if (pointed >= 0) FanSounds.play(FanSounds.POINT, 0.5f);
                 hovered = pointed;
             }
         }
@@ -219,7 +220,7 @@ public final class FavouritesFan {
         AssetMetadata metadata = favourites.get(index);
         switch (FavouriteSkins.wear(minecraft, metadata)) {
             case WORN -> {
-                minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f, 0.4f));
+                FanSounds.play(FanSounds.WEAR, 0.9f);
                 //? if <26.3 {
                 // The hand lowers and comes back up wearing the new skin, as it does for a new item
                 minecraft.gameRenderer.itemInHandRenderer.itemUsed(InteractionHand.MAIN_HAND);
@@ -240,10 +241,6 @@ public final class FavouritesFan {
     private static void setPhase(Phase next) {
         phase = next;
         phaseStart = System.nanoTime();
-    }
-
-    private static void playPageTurn() {
-        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.BOOK_PAGE_TURN, 1.0f, 0.6f));
     }
 
     private static void notice(Minecraft minecraft, Component message) {
