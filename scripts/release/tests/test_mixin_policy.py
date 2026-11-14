@@ -540,6 +540,40 @@ class MixinPolicyTest(unittest.TestCase):
                     self.assertIn("level == null", gate)
                 self.assertNotRegex(source, r"&&\s*isLocalPlayer\s*\)")
 
+    def test_an_invisible_player_wears_no_cape(self) -> None:
+        # Quick Skin's handler replaces vanilla's cape layer, and with it vanilla's own rule that
+        # an invisible player shows no cape. Every handler has to apply it before it draws, with
+        # what that version hands it: the player before 1.21.2, the render state afterwards.
+        draw = re.compile(r"\b(?:renderCloak|renderToBuffer|submitModel)\(")
+        for path in (
+            CANONICAL_JAVA / "com/quickskin/mod/mixin/CapeLayerMixin.java",
+            ROOT / "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/CapeLayerMixin.java",
+        ):
+            source = JAVA_COMMENT.sub("", path.read_text(encoding="utf-8"))
+            # One body per handler; the declarations ahead of it are its Stonecutter variants
+            declarations, *bodies = source.split("CallbackInfo ci) {")
+            self.assertTrue(bodies, relative(path))
+            for index, body in enumerate(bodies):
+                with self.subTest(path=relative(path), handler=index):
+                    signature = declarations[declarations.rindex("@Mixin(") :]
+                    declarations = body
+                    first_draw = draw.search(body)
+                    self.assertIsNotNone(first_draw)
+                    before_drawing = body[: first_draw.start()]
+                    subjects = []
+                    if "AbstractClientPlayer player," in signature:
+                        subjects.append(r"player\.isInvisible\(\)")
+                    if "RenderState renderState," in signature:
+                        subjects.append(r"renderState\.isInvisible")
+                    self.assertTrue(subjects)
+                    for subject in subjects:
+                        # The other Stonecutter variant of the same condition may follow it
+                        self.assertRegex(
+                            before_drawing,
+                            r"if \(!(?:quickskin\$)?previewing && " + subject
+                            + r"\) \{(?:\s*if \(![^\n]*\) \{)?\s*ci\.cancel\(\);\s*return;",
+                        )
+
     def test_ears_five_lookup_selects_every_overload(self) -> None:
         source = (
             CANONICAL_JAVA / "com/quickskin/mod/mixin/compat/EarsFiveMixin.java"

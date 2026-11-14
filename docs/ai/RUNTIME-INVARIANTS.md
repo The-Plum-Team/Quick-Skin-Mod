@@ -436,6 +436,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   gives that dedicated field priority and would otherwise replace only the worn wings when the
   profile response arrives asynchronously. While a custom cape texture is pending, clear both
   inputs together; removing the cape restores the original/vanilla fallback path.
+- For a player wearing a Quick Skin cape, `CapeLayerMixin` (both copies) draws the cape and
+  cancels vanilla's cape layer, so it applies vanilla's rule itself: an invisible player shows no
+  cape, read from the entity before 1.21.2 and from the render state afterwards. A cape a preview
+  bound to its own draw (the cape menu and editor) still shows. Armour and elytra are vanilla's
+  and stay visible, as in vanilla.
 
 ## Optional integrations
 

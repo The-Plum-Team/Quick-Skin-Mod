@@ -26,6 +26,9 @@
 - **The cape menu shows the skin you opened it for**
 > Right-click a skin and pick Assign cape or Change cape, and the cape menu's model now wears that skin. In a world it showed the skin you were wearing, which could be another one.
 
+- **A cape on an invisible player**
+> A player with the Invisibility effect no longer shows their Quick Skin cape floating in the air: the cape hides with the player, as a Minecraft cape does. Armour and elytra still show, as they do in Minecraft.
+
 ## 4.1.0 (2026-11-09)
 
 ### Added
