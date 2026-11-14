@@ -3,6 +3,7 @@ package com.quickskin.mod.client.gui.util;
 import com.quickskin.mod.common.data.AnimationMetadata;
 import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import com.quickskin.mod.common.util.HashUtil;
+import com.quickskin.mod.common.util.OversizedImageException;
 import com.quickskin.mod.common.util.BoundedFileReader;
 import com.quickskin.mod.common.util.RawArgbImages;
 import com.quickskin.mod.common.util.SafeImageReader;
@@ -59,7 +60,8 @@ public final class CapeImportProcessor {
             return false;
         }
         String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
-        return name.endsWith(".png") || name.endsWith(".gif") || name.endsWith(".webp");
+        return name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg")
+                || name.endsWith(".webp") || name.endsWith(".gif");
     }
 
     public static PreparedCape prepare(Path source, GifDecoder gifDecoder) throws IOException {
@@ -67,7 +69,7 @@ public final class CapeImportProcessor {
             throw new IOException("Cape file does not exist or is not readable");
         }
         if (!isSupported(source)) {
-            throw new UserFacingIOException("Only PNG, WebP and GIF cape files are supported",
+            throw new UserFacingIOException("Only PNG, JPG, WebP and GIF cape files are supported",
                     "quickskin.cape.error.unsupported");
         }
 
@@ -82,10 +84,20 @@ public final class CapeImportProcessor {
             return prepareGif(source, gifDecoder);
         }
 
-        // A still cape, PNG or WebP, is saved as a PNG like every other catalogued cape
+        // A still cape, PNG, JPG or WebP, is saved as a PNG like every other catalogued cape. A
+        // picture larger than a cape can be comes back already shrunk
         BufferedImage image;
         try {
             image = SafeImageReader.readStillCape(source);
+        } catch (OversizedImageException oversized) {
+            if (oversized.exceedsSide()) {
+                throw new UserFacingIOException(
+                        "Cape picture exceeds " + oversized.maxSide() + " pixels per side",
+                        "quickskin.cape.error.dimensions",
+                        oversized.width() + "×" + oversized.height(), oversized.maxSide());
+            }
+            throw new UserFacingIOException("Cape picture has too many pixels to open",
+                    "quickskin.cape.error.too_big");
         } catch (IOException unreadable) {
             throw new UserFacingIOException(unreadable.getMessage(), "quickskin.cape.error.invalid_image");
         }

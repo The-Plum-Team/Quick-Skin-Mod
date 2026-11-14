@@ -7,6 +7,12 @@
 - **CPM models show as models in every menu**
 > With Customizable Player Models installed, your CPM model is now drawn as the model itself before you join a world: on the title screen's player, on the skin menu's big model when you pick a model there, and in the cape menu and the cape editor. Until now those showed your skin, or the model's icon, until you were in a world. The skin list and the favourites fan show a picture of each model made from the model itself, in the list's own style, instead of the icon saved in its file. It works on every Minecraft version Quick Skin supports, 26.3 included; with a CPM build too old to draw a model outside a world, the menus keep showing your skin or the model's icon.
 
+- **JPG images as capes**
+> The cape menu now takes JPG images too, dropped on it or picked from the file dialog, next to PNG, WebP and GIF. A JPG opens in the cape editor like any other picture, where you place it on the cape, and a photo taken with a phone opens the right way up. Skins saved as `.jpeg` are accepted as well; until now only `.jpg` was.
+
+- **Big pictures as capes**
+> A picture larger than 4096 pixels per side, such as a camera's photo or a long WebP, is now made smaller as it opens in the cape editor instead of being refused. PNG and JPG go up to 16384 pixels per side and 64 megapixels (32 for a progressive JPG); a WebP can have any shape up to 16 megapixels. A picture over that now says it is too big, or its size and the limit, instead of that it can't be opened as an image.
+
 ### Changed
 
 - **Brighter player previews**

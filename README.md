@@ -91,7 +91,8 @@ certify those images. Version-branch synchronization is retired under the shared
 
 - Change skins and capes from the title screen or pause menu.
 - Import PNG, WebP, and JPEG skins, including HD skins up to 2048x1024.
-- Import static and animated capes, with server-configurable change cooldowns.
+- Import static capes from PNG, JPEG, and WebP images and animated capes from GIFs, with
+  server-configurable change cooldowns.
 - Choose automatic, classic, or slim player models.
 - Preview appearances in an interactive 3D player widget.
 - Synchronize Quick Skin appearances between players who run Quick Skin when the mod is also

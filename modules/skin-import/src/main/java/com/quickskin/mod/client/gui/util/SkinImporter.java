@@ -32,24 +32,26 @@ public class SkinImporter {
     private static final int MAX_BATCH_FILES = 64;
     private static final int MAX_NAME_LENGTH = 128;
 
+    /** Whether the file is named as an image a skin can be imported from: PNG, WebP or JPG. */
+    public static boolean isSkinImage(Path path) {
+        if (path == null || path.getFileName() == null) {
+            return false;
+        }
+        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+        return name.endsWith(".png") || name.endsWith(".webp")
+                || name.endsWith(".jpg") || name.endsWith(".jpeg");
+    }
+
     /**
      * Import a skin file
      * @param sourcePath Source file path
      * @return The imported asset metadata, or null on failure
      */
     public static AssetMetadata importSkin(Path sourcePath) {
-        if (sourcePath == null || sourcePath.getFileName() == null
-                || !Files.isRegularFile(sourcePath)) {
+        if (!isSkinImage(sourcePath) || !Files.isRegularFile(sourcePath)) {
             return null;
         }
-
-        // Validate it's a supported image file (PNG, WebP, or JPG)
         String fileName = sourcePath.getFileName().toString();
-        String lowerName = fileName.toLowerCase(Locale.ROOT);
-        if (!lowerName.endsWith(".png") && !lowerName.endsWith(".webp")
-                && !lowerName.endsWith(".jpg")) {
-            return null;
-        }
 
         try {
             // Process the skin using the new HDTextureProcessor

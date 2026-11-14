@@ -390,7 +390,23 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   wearing anything (`SkinDeletionLook`). An import
   or search whose content is already catalogued writes no second file and selects the catalogued
   skin.
-- A cape saved through the cape editor keeps its original PNG, WebP or GIF in
+- A cape is imported from a PNG, JPG, WebP or GIF. `SafeImageReader.readStillCape` takes the
+  format from the bytes, never the file name, and turns a JPEG the way its EXIF orientation shows
+  it (`JpegHeader`, read from the file's own bytes with every offset checked), since ImageIO
+  ignores it and a phone photo would open on its side; a skin's JPEG is never turned. A still
+  cape is always saved as a PNG.
+- A still picture larger than a cape can be (4096 pixels per side) is shrunk as it is read, never
+  refused for that: the decoder keeps one pixel in every `n` each way, the smallest whole `n` that
+  fits, so the full picture is never handed over. Every source may be up to 16384 pixels per
+  side; how many pixels it may have follows what its decoder holds: a PNG or a sequential JPEG,
+  read a few rows at a time, 64M; a JPEG libjpeg holds whole as coefficients (progressive, or
+  with a scan per component, as `JpegHeader` reads from its segments) 32M, about 190 MB outside
+  the heap at worst; a WebP, which its reader decodes whole on the heap at about six bytes a
+  pixel, no more than a still cape itself (16M), so its shape is free but its memory is what it
+  always was. Over its limit a picture is refused from its header (`OversizedImageException`)
+  with the text that names its size, or the too-big text when only its pixel count is over. The
+  32 MB file limit is unchanged.
+- A cape saved through the cape editor keeps its original PNG, JPG, WebP or GIF in
   `quickskin_cache/cape_editor_sources/<cape content ID>.<ext>` (`CapeEditorSources`). That file
   only reopens `CapeAdjustScreen`: it is never scanned, registered as a texture or animation, or
   substituted for a cape that has none. An edit writes the new metadata and source association
