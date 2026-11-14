@@ -29,6 +29,9 @@
 - **A cape on an invisible player**
 > A player with the Invisibility effect no longer shows their Quick Skin cape floating in the air: the cape hides with the player, as a Minecraft cape does. Armour and elytra still show, as they do in Minecraft.
 
+- **The cape preview stays turned to the cape**
+> On Minecraft 1.20.1, dragging the player in the cape menu or in the cape editor turned it, and letting go left it facing you with the cape out of sight. That preview no longer turns: it always shows the player from behind, where the cape is.
+
 ## 4.1.0 (2026-11-09)
 
 ### Added
