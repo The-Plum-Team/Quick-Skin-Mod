@@ -569,6 +569,20 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.
+- Quick Skin's previews of the player have a light of their own (`PreviewLighting`), never the
+  inventory's, which leaves a model's front at 82% of its colours and its sides at half: two lamps
+  in front of the model, fixed to the screen, so what faces the screen keeps all its colour, the
+  sides and the top most of theirs, and only what faces the floor stays dark. The preview's own
+  model sets it where it draws: inline before 1.21.6, and from 1.21.6 in `GuiSkinRendererMixin`
+  (both copies), after the pass set vanilla's and before any of it is drawn, only for a model a
+  preview handed over. A preview of the live player is drawn by vanilla's renderer, which sets
+  the inventory's light itself, so the light is set again at the end of `PlayerModel.setupAnim`
+  (`PreviewSkinSwapPoseMixin`, both copies), only for a draw recognised as a preview: the inline
+  draw before 1.21.6, or a render state a preview handed over from 1.21.6. From 1.21.6 the
+  lamps live in a `Lighting` of the previews' own, written through that class's one private
+  writer, found by its shape since its name differs by loader; without it, or without the pose
+  hook, a preview keeps vanilla's light. Vanilla's inventory doll, other mods' GUIs and the
+  world are never lit by it. The skin list's bust pictures are shaded by their own rasterizer.
 - A preview hides everything the previewed player wears or holds, except the pause menu's and the
   skin menu's previews, which show the live local player's armour, elytra, held items and worn head
   as the world does, without the pieces the player hides (`PreviewPlayerData.isEquipmentVisible`,

@@ -1,10 +1,8 @@
 package com.quickskin.mod.client.rendering;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import com.mojang.blaze3d.platform.Lighting;
 //? if <1.21.6 {
-import com.mojang.blaze3d.systems.RenderSystem;
-//?} else {
+import com.mojang.blaze3d.platform.Lighting;
 //?}
 import com.mojang.blaze3d.vertex.PoseStack;
 //? if <1.21.6 {
@@ -1098,9 +1096,13 @@ public class PlayerModelRenderer {
         guiPose.scale(swapScale, swapScale, swapScale);
         guiPose.translate((double) -x, (double) -y, 0.0);
         SkinSwapPoser.beginInline(swap);
+        // The same hook finds the previews' light for a draw of the live player, which vanilla's
+        // renderer lights for the inventory first
+        PreviewLighting.beginInline();
         try {
             renderPosedPlayerModel(graphics, x, y, scale, turnedRotation, playerData, mouseX, mouseY, followMouse);
         } finally {
+            PreviewLighting.endInline();
             SkinSwapPoser.endInline();
             guiPose.popPose();
         }
@@ -1381,6 +1383,8 @@ public class PlayerModelRenderer {
             // The skin-change move is keyed the same way, for the model's pose hook.
             SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
             SkinSwapPoser.bind(renderState, swap);
+            // And the preview's light, which the same hook sets over the inventory's
+            PreviewLighting.bind(renderState);
 
             // Compute offset: center entity vertically (bbHeight/2 + small offset). A positive
             // offset moves the model down the box, so the move's lift is taken off it.
@@ -1433,6 +1437,8 @@ public class PlayerModelRenderer {
             // The skin-change move is keyed the same way, for the model's pose hook.
             SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
             SkinSwapPoser.bind(renderState, swap);
+            // And the preview's light, which the same hook sets over the inventory's
+            PreviewLighting.bind(renderState);
 
             // Compute offset: center entity vertically (bbHeight/2 + small offset). A positive
             // offset moves the model down the box, so the move's lift is taken off it.
@@ -1484,6 +1490,8 @@ public class PlayerModelRenderer {
             // The skin-change move is keyed the same way, for the model's pose hook.
             SkinSwapAnimation.Pose swap = playerData.getSkinSwapPose();
             SkinSwapPoser.bind(renderState, swap);
+            // And the preview's light, which the same hook sets over the inventory's
+            PreviewLighting.bind(renderState);
 
             // Compute offset: center entity vertically (bbHeight/2 + small offset). A positive
             // offset moves the model down the box, so the move's lift is taken off it.
@@ -1670,9 +1678,9 @@ public class PlayerModelRenderer {
         // CRITICAL: Position the model at feet (line 84 in LivingEntityRenderer)
         poseStack.translate(0.0F, -1.501F, 0.0F);
 
-        // Every draw sets the inventory lighting, as InventoryScreen does: whatever drew in
-        // between, such as an item, left its own, which lights the model's front darker
-        Lighting.setupForEntityInInventory();
+        // Every draw sets the preview's light, as InventoryScreen sets the inventory's: whatever
+        // drew in between, such as an item, left its own
+        PreviewLighting.apply();
 
         // Get Minecraft instance for tick count
 //?} else if <1.21.6 {
@@ -1703,8 +1711,7 @@ public class PlayerModelRenderer {
         // CRITICAL: Position the model at feet (line 84 in LivingEntityRenderer)
         poseStack.translate(0.0F, -1.501F, 0.0F);
 
-        // Lighting.setupForEntityInInventory();
-        Lighting.setupForEntityInInventory();
+        PreviewLighting.apply();
 
         // Get Minecraft instance for tick count
 //?} else {
@@ -1975,6 +1982,7 @@ public class PlayerModelRenderer {
                 x + boxHalfWidth,
                 y
         );
+        PreviewLighting.bind(submitted);
         registerPendingSit(submitted, playerData);
         registerPendingCpmModel(submitted, model, playerData, cpmReplacesSkin);
         registerPendingCape(submitted, model, playerData.getSkinLocation(), rotationXNudge,
@@ -2003,6 +2011,7 @@ public class PlayerModelRenderer {
                 x + boxHalfWidth,
                 y
         );
+        PreviewLighting.bind(submitted);
         registerPendingSit(submitted, playerData);
         registerPendingCpmModel(submitted, model, playerData, cpmReplacesSkin);
         registerPendingCape(submitted, model, playerData.getSkinLocation(), rotationXNudge,
@@ -2031,6 +2040,7 @@ public class PlayerModelRenderer {
                 x + boxHalfWidth,
                 y
         );
+        PreviewLighting.bind(renderModel);
         registerPendingSit(renderModel, playerData);
         registerPendingCpmModel(renderModel, model, playerData, cpmReplacesSkin);
         registerPendingCape(renderModel, worn != null && worn.wings() ? null : capeTexture, model, capeModel,
@@ -3440,56 +3450,6 @@ public class PlayerModelRenderer {
         consumer.vertex(matrix, x1, y1, z1).color(r, g, b, 255).normal(1, 0, 0).endVertex();
         consumer.vertex(matrix, x2, y2, z2).color(r, g, b, 255).normal(1, 0, 0).endVertex();
 //?} else {
-//?}
-    }
-
-    /**
-     * Setup lighting for the model based on rotation
-     * Adds dynamic brightness that changes with rotation angle
-     */
-    private static void setupLighting(float yRotation) {
-        // Normalize rotation to 0-360
-        float normalizedRotation = yRotation % 360.0f;
-        if (normalizedRotation < 0) {
-            normalizedRotation += 360.0f;
-        }
-
-        // Calculate brightness based on rotation (front is brightest)
-        // Front (0°): 1.425f
-        // Side (90°/270°): 1.2f
-        // Back (180°): 1.3f
-        float brightness;
-        if (normalizedRotation < 90.0f) {
-            // Front to side
-            brightness = 1.425f - (normalizedRotation / 90.0f) * 0.225f;
-        } else if (normalizedRotation < 180.0f) {
-            // Side to back
-            brightness = 1.2f + ((normalizedRotation - 90.0f) / 90.0f) * 0.1f;
-        } else if (normalizedRotation < 270.0f) {
-            // Back to side
-            brightness = 1.3f - ((normalizedRotation - 180.0f) / 90.0f) * 0.1f;
-        } else {
-            // Side to front
-            brightness = 1.2f + ((normalizedRotation - 270.0f) / 90.0f) * 0.225f;
-        }
-
-//? if <1.21.6 {
-        // Setup shader lights with custom light vector
-        // Standard light direction (from top-left-front)
-        org.joml.Vector3f lightDirection = new org.joml.Vector3f(0.2f, 1.0f, -0.7f).normalize();
-
-        RenderSystem.setShaderLights(
-                new org.joml.Vector3f(lightDirection).mul(brightness),
-                new org.joml.Vector3f(lightDirection).mul(brightness * 0.5f)
-        );
-//?} else if <26.2 {
-        // 1.21.6+: RenderSystem.setShaderLights now takes GpuBufferSlice instead of Vector3f.
-        // Use Lighting.Entry-based API instead. This method is currently unused.
-        Minecraft.getInstance().gameRenderer.getLighting().setupFor(Lighting.Entry.ENTITY_IN_UI);
-//?} else {
-        // 1.21.11: RenderSystem.setShaderLights now takes GpuBufferSlice instead of Vector3f.
-        // Use Lighting.Entry-based API instead. This method is currently unused.
-        Minecraft.getInstance().gameRenderer.lighting().setupFor(Lighting.Entry.ENTITY_IN_UI);
 //?}
     }
 
