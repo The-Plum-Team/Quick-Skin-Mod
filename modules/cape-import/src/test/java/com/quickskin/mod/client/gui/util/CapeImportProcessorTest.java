@@ -2,6 +2,7 @@ package com.quickskin.mod.client.gui.util;
 
 import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import com.quickskin.mod.common.util.GifDecoder;
+import com.quickskin.mod.common.util.UserFacingIOException;
 import com.quickskin.mod.common.data.AnimationMetadata;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -27,12 +28,80 @@ class CapeImportProcessorTest {
     Path temporaryDirectory;
 
     @Test
-    void acceptsOnlyPngWebpAndGifFileNames() {
+    void acceptsOnlyPngJpgWebpAndGifFileNames() {
         assertTrue(CapeImportProcessor.isSupported(Path.of("cape.PNG")));
         assertTrue(CapeImportProcessor.isSupported(Path.of("animated.GiF")));
         assertTrue(CapeImportProcessor.isSupported(Path.of("cape.WebP")));
-        assertFalse(CapeImportProcessor.isSupported(Path.of("cape.jpg")));
+        assertTrue(CapeImportProcessor.isSupported(Path.of("photo.jpg")));
+        assertTrue(CapeImportProcessor.isSupported(Path.of("photo.JPEG")));
+        assertFalse(CapeImportProcessor.isSupported(Path.of("cape.bmp")));
+        assertFalse(CapeImportProcessor.isSupported(Path.of("jpg")));
         assertFalse(CapeImportProcessor.isSupported(null));
+    }
+
+    @Test
+    void aJpgGoesToTheEditorLikeAnyOtherPicture() throws IOException {
+        Path source = temporaryDirectory.resolve("photo.jpeg");
+        BufferedImage photo = new BufferedImage(120, 90, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = photo.createGraphics();
+        graphics.setColor(new java.awt.Color(0x2060C0));
+        graphics.fillRect(0, 0, 120, 90);
+        graphics.dispose();
+        assertTrue(ImageIO.write(photo, "jpg", source.toFile()));
+
+        CapeImportProcessor.PreparedCape prepared = preparePng(source);
+
+        assertEquals(120, prepared.atlas().getWidth());
+        assertEquals(90, prepared.atlas().getHeight());
+        assertEquals(1, prepared.frameCount());
+        assertFalse(prepared.gif());
+        assertFalse(prepared.standardFormat());
+        // A JPG has no transparency: every pixel is opaque
+        assertEquals(0xFF, prepared.atlas().getRGB(60, 45) >>> 24);
+    }
+
+    @Test
+    void aPictureLargerThanACapeCanBeIsShrunkAndGoesToTheEditor() throws IOException {
+        Path source = temporaryDirectory.resolve("camera.jpg");
+        assertTrue(ImageIO.write(new BufferedImage(6000, 40, BufferedImage.TYPE_INT_RGB), "jpg", source.toFile()));
+
+        CapeImportProcessor.PreparedCape prepared = preparePng(source);
+
+        assertEquals(3000, prepared.atlas().getWidth());
+        assertEquals(20, prepared.atlas().getHeight());
+        assertFalse(prepared.standardFormat());
+    }
+
+    @Test
+    void aPictureTooLargeToOpenIsRefusedWithItsSize() throws IOException {
+        Path longSide = temporaryDirectory.resolve("endless.png");
+        Files.write(longSide, pngDeclaring(20000, 10));
+        Path manyPixels = temporaryDirectory.resolve("vast.png");
+        Files.write(manyPixels, pngDeclaring(16000, 9000));
+
+        UserFacingIOException side = assertThrows(UserFacingIOException.class, () -> preparePng(longSide));
+        UserFacingIOException pixels = assertThrows(UserFacingIOException.class, () -> preparePng(manyPixels));
+
+        assertEquals("quickskin.cape.error.dimensions", side.userMessage().translationKey());
+        assertEquals(List.of("20000×10", "16384"), side.userMessage().args());
+        assertEquals("quickskin.cape.error.too_big", pixels.userMessage().translationKey());
+    }
+
+    @Test
+    void aJpgOfACapeTexturesSizeIsSavedAsAPngCape() throws IOException {
+        Path source = temporaryDirectory.resolve("texture.jpg");
+        assertTrue(ImageIO.write(new BufferedImage(64, 32, BufferedImage.TYPE_INT_RGB), "jpg", source.toFile()));
+        Path capes = Files.createDirectories(temporaryDirectory.resolve("capes"));
+        Path cache = Files.createDirectories(temporaryDirectory.resolve("cache"));
+
+        CapeImportProcessor.PreparedCape prepared = preparePng(source);
+        Path saved = CapeImportProcessor.saveStandard(prepared, capes, cache, null);
+
+        assertTrue(prepared.standardFormat());
+        assertEquals("texture.png", saved.getFileName().toString());
+        BufferedImage cape = ImageIO.read(saved.toFile());
+        assertEquals(64, cape.getWidth());
+        assertEquals(32, cape.getHeight());
     }
 
     @Test
@@ -211,6 +280,15 @@ class CapeImportProcessorTest {
 
         cape.setRGB(36, 2, 0xffffffff);
         assertFalse(CapeImportProcessor.isElytraAreaTransparent(cape));
+    }
+
+    /** A 1x1 PNG whose header declares another size: enough for a refusal made before decoding. */
+    private static byte[] pngDeclaring(int width, int height) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        assertTrue(ImageIO.write(new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB), "png", out));
+        byte[] encoded = out.toByteArray();
+        java.nio.ByteBuffer.wrap(encoded).putInt(16, width).putInt(20, height);
+        return encoded;
     }
 
     private static CapeImportProcessor.PreparedCape preparePng(Path source) throws IOException {

@@ -105,6 +105,13 @@ public class CapeLayerMixin {
             return;
         }
 
+        // An invisible player wears no cape, as vanilla's own layer has it; a cape a preview is
+        // showing stays
+        if (!previewing && renderState.isInvisible) {
+            ci.cancel();
+            return;
+        }
+
         String capeId = previewing ? null : service.getCapeId(playerId);
         if (capeId != null) {
             CapeAnimationHelper.markCapeVisible(capeId);
@@ -323,6 +330,17 @@ public class CapeLayerMixin {
         if (!quickskin$previewing && !service.hasActiveCape(playerUUID)) {
 //?}
             return; // No custom cape, let vanilla logic run
+        }
+
+        // An invisible player wears no cape, as vanilla's own layer has it; a cape a preview is
+        // showing stays
+//? if <1.21.6 {
+        if (!quickskin$previewing && player.isInvisible()) {
+//?} else {
+        if (!quickskin$previewing && renderState.isInvisible) {
+//?}
+            ci.cancel();
+            return;
         }
 
 //? if <1.21.6 {

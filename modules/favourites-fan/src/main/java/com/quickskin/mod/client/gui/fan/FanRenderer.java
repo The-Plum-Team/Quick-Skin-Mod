@@ -200,18 +200,21 @@ final class FanRenderer {
             //?}
             AssetMetadata metadata, FanMotion.Card card, int w, int h, int unit, float alpha, float hot, float time,
             boolean back) {
-        if (metadata.isCpmModel()) {
+        int figureHeight = Math.round(h * 0.74f);
+        int figureWidth = Math.round(figureHeight * 0.6f);
+        int top = -h / 2 + Math.round(h * 0.05f);
+        String hash = metadata.hash();
+        // A CPM model stands on its card like a skin, drawn from the model itself
+        java.nio.file.Path model = metadata.isCpmModel() ? metadata.path() : null;
+        if (model != null && picture(hash, model, false, figureWidth, figureHeight, unit, 1f, 0) == null) {
+            // Until that picture is made, or when CPM cannot draw the model: its icon
             var icon = LocalAssetManager.getInstance().getTextureLocation(metadata.hash(), TextureQuality.PREVIEW);
             if (icon == null) return;
             int size = Math.round(w * 0.78f);
             blit(graphics, icon, -size / 2, -size / 2 - Math.round(h * 0.06f), size, size, 64, 64, alpha);
             return;
         }
-        int figureHeight = Math.round(h * 0.74f);
-        int figureWidth = Math.round(figureHeight * 0.6f);
-        int top = -h / 2 + Math.round(h * 0.05f);
-        String hash = metadata.hash();
-        boolean slim = "slim".equals(FavouriteSkins.modelType(metadata));
+        boolean slim = model == null && "slim".equals(FavouriteSkins.modelType(metadata));
 
         float scale = 1f;
         int turn = 0;
@@ -224,16 +227,16 @@ final class FanRenderer {
             // Every turn of the sway, and the chosen size from both sides, are made while the card
             // is pointed at
             for (int t = -SWAY_DEGREES; t <= SWAY_DEGREES; t += SWAY_STEP) {
-                picture(hash, slim, figureWidth, figureHeight, unit, HOT_SCALE, t);
+                picture(hash, model, slim, figureWidth, figureHeight, unit, HOT_SCALE, t);
             }
-            picture(hash, slim, figureWidth, figureHeight, unit, CHOSEN_SCALE, 0);
-            picture(hash, slim, figureWidth, figureHeight, unit, CHOSEN_SCALE, 180);
+            picture(hash, model, slim, figureWidth, figureHeight, unit, CHOSEN_SCALE, 0);
+            picture(hash, model, slim, figureWidth, figureHeight, unit, CHOSEN_SCALE, 180);
         }
-        var picture = picture(hash, slim, figureWidth, figureHeight, unit, scale, turn);
+        var picture = picture(hash, model, slim, figureWidth, figureHeight, unit, scale, turn);
         if (picture == null && scale != 1f) {
             // Until its own picture is made, the resting one of the same side stands in
             scale = 1f;
-            picture = picture(hash, slim, figureWidth, figureHeight, unit, 1f, back ? 180 : 0);
+            picture = picture(hash, model, slim, figureWidth, figureHeight, unit, 1f, back ? 180 : 0);
         }
         if (picture == null) return;
         blit(graphics, picture, -figureWidth / 2, top, figureWidth, figureHeight,
@@ -245,9 +248,14 @@ final class FanRenderer {
     //?} else {
     private static Identifier picture(
     //?}
-            String hash, boolean slim, int width, int height, int unit, float scale, int turn) {
-        return SkinBustTextures.getBody(hash, slim, Math.round(width * unit * scale), Math.round(height * unit * scale),
-                (int) SkinBustRasterizer.DEFAULT_YAW + turn);
+            String hash, java.nio.file.Path model, boolean slim, int width, int height, int unit, float scale,
+            int turn) {
+        int pixelWidth = Math.round(width * unit * scale);
+        int pixelHeight = Math.round(height * unit * scale);
+        int yaw = (int) SkinBustRasterizer.DEFAULT_YAW + turn;
+        return model != null
+                ? SkinBustTextures.getModelBody(hash, model, pixelWidth, pixelHeight, yaw)
+                : SkinBustTextures.getBody(hash, slim, pixelWidth, pixelHeight, yaw);
     }
 
     /** A green tick in the corner of the look being worn, seven GUI pixels square. */

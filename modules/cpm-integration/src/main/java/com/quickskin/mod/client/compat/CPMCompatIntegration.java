@@ -772,6 +772,25 @@ public final class CPMCompatIntegration {
         }
     }
 
+    /**
+     * The file of the model CPM has selected: the model that is the look while CPM's selection
+     * is one, whether it was chosen in Quick Skin or in CPM's own screen. Null when CPM has none
+     * selected, the selection cannot be read, or its file is gone.
+     */
+    public static Path selectedModelFile() {
+        String selected = normalizeRelativeModelName(selectedModel());
+        if (selected == null) {
+            return null;
+        }
+        try {
+            Path directory = getCPMModelsDirectory().toAbsolutePath().normalize();
+            Path file = directory.resolve(selected.replace('/', File.separatorChar)).normalize();
+            return file.startsWith(directory) && Files.isRegularFile(file) ? file : null;
+        } catch (InvalidPathException | SecurityException e) {
+            return null;
+        }
+    }
+
     /** Selects a model path relative to CPM's player_models directory. */
     public static boolean selectModel(String modelFileName) {
         if (!isAvailable()) {

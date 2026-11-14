@@ -1,5 +1,6 @@
 package com.quickskin.mod.neoforge.mixin;
 
+import com.quickskin.mod.client.rendering.PreviewLighting;
 import com.quickskin.mod.client.rendering.SkinSwapAnimation;
 import com.quickskin.mod.client.rendering.SkinSwapPoser;
 //? if <1.21.2 {
@@ -42,7 +43,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * model's body, posed from the same render state, so its body gets the same move and the cape
  * follows the bending body.
  *
- * <p>Losing the hook only stills an in-world preview's move.
+ * <p>The end of the pose is also where a preview of the live player gets the previews' own light
+ * ({@link PreviewLighting}): vanilla's renderer has just set the inventory's, and nothing of the
+ * draw has reached the screen yet.
+ *
+ * <p>Losing the hook only stills an in-world preview's move and leaves it in the inventory's light.
  */
 //? if <1.21.2 {
 @Mixin(PlayerModel.class)
@@ -73,6 +78,7 @@ public class PreviewSkinSwapPoseMixin {
     private void quickskin$applySkinSwap(LivingEntity entity, float limbSwing, float limbSwingAmount,
                                         float ageInTicks, float netHeadYaw, float headPitch,
                                         CallbackInfo ci) {
+        PreviewLighting.lightFor(entity);
         SkinSwapAnimation.Pose pose = SkinSwapPoser.poseFor(entity);
         if (pose != null) {
             SkinSwapPoser.apply((PlayerModel<?>) (Object) this, pose);
@@ -116,6 +122,7 @@ public class PreviewSkinSwapPoseMixin {
     //?} else {
     private void quickskin$applySkinSwap(AvatarRenderState renderState, CallbackInfo ci) {
     //?}
+        PreviewLighting.lightFor(renderState);
         SkinSwapAnimation.Pose pose = SkinSwapPoser.poseFor(renderState);
         if (pose == null) {
             return;

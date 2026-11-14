@@ -2,8 +2,11 @@ package com.quickskin.mod.client.gui.widget;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.quickskin.mod.client.concurrent.ClientIoExecutor;
+import com.quickskin.mod.client.rendering.CpmModelCapture;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.common.data.TextureQuality;
+import com.quickskin.mod.common.util.ModelMesh;
+import com.quickskin.mod.common.util.ModelMeshRasterizer;
 import com.quickskin.mod.common.util.SafeImageReader;
 import com.quickskin.mod.common.util.SkinBustRasterizer;
 import com.quickskin.mod.config.ClientConfig;
@@ -42,6 +45,9 @@ import java.util.function.Supplier;
  * face. A grey copy is made on the render thread, as soon as it is asked for, from pixels already
  * in memory: the colour bust's, which its slot keeps, or the loaded skin texture's. It shows in
  * the same frame, so marking a skin never leaves a gap while a copy is made.
+ *
+ * <p>A CPM model has the same pictures, of the model itself: {@link ModelMeshRasterizer} draws
+ * them from the geometry CPM draws for the model ({@link CpmModelCapture}).
  */
 @Environment(EnvType.CLIENT)
 public final class SkinBustTextures {
@@ -128,6 +134,72 @@ public final class SkinBustTextures {
         String key = hash + "_body" + (slim ? "_slim" : "_wide") + (opaque ? "_opaque" : "")
                 + "_" + width + "x" + height + "_" + turn;
         return get(key, width, height, () -> drawBody(hash, slim, width, height, turn), false);
+    }
+
+    /**
+     * The bust of a CPM model at this many pixels, in grey when asked: a picture of the model
+     * itself, drawn from the geometry CPM draws for it ({@link CpmModelCapture}), framed and lit
+     * as a skin's bust. {@code null} while it is being drawn, while CPM has not built the model
+     * yet, or when CPM cannot draw it; the caller shows the model's icon then. Call from the
+     * render thread.
+     */
+    //? if <1.21.11 {
+    @Nullable
+    public static ResourceLocation getModel(String hash, java.nio.file.Path file, int width, int height, boolean gray) {
+    //?} else {
+    @Nullable
+    public static Identifier getModel(String hash, java.nio.file.Path file, int width, int height, boolean gray) {
+    //?}
+        if (width < 1 || height < 1 || width > SkinBustRasterizer.MAX_SIZE || height > SkinBustRasterizer.MAX_SIZE) {
+            return null;
+        }
+        String key = hash + "_cpm_" + width + "x" + height;
+        Slot existing = SLOTS.get(gray ? key + "_gray" : key);
+        if (existing != null && (!gray || existing.location != null)) {
+            return existing.location;
+        }
+        ModelMesh mesh = CpmModelCapture.mesh(hash, file);
+        if (mesh == null) {
+            return null;
+        }
+        if (!gray) {
+            return get(key, width, height, () -> ModelMeshRasterizer.renderBust(mesh, width, height), true);
+        }
+        // The grey copy comes from the colour bust, which is drawn first when it is not yet
+        Slot colour = SLOTS.get(key);
+        if (colour == null || colour.pixels == null) {
+            get(key, width, height, () -> ModelMeshRasterizer.renderBust(mesh, width, height), true);
+            return null;
+        }
+        return putReady(key + "_gray", gray(colour.pixels.clone()), width, height);
+    }
+
+    /**
+     * The whole CPM model standing, at this many pixels and turned {@code yaw} whole degrees, as
+     * {@link #getBody} shows a skin; {@code null} as {@link #getModel} is.
+     */
+    //? if <1.21.11 {
+    @Nullable
+    public static ResourceLocation getModelBody(String hash, java.nio.file.Path file, int width, int height, int yaw) {
+    //?} else {
+    @Nullable
+    public static Identifier getModelBody(String hash, java.nio.file.Path file, int width, int height, int yaw) {
+    //?}
+        if (width < 1 || height < 1 || width > SkinBustRasterizer.MAX_SIZE || height > SkinBustRasterizer.MAX_SIZE) {
+            return null;
+        }
+        // A negative turn would read as a separator in the texture's path
+        int turn = Math.floorMod(yaw, 360);
+        String key = hash + "_cpm_body_" + width + "x" + height + "_" + turn;
+        Slot existing = SLOTS.get(key);
+        if (existing != null) {
+            return existing.location;
+        }
+        ModelMesh mesh = CpmModelCapture.mesh(hash, file);
+        if (mesh == null) {
+            return null;
+        }
+        return get(key, width, height, () -> ModelMeshRasterizer.renderBody(mesh, width, height, turn), false);
     }
 
     /**
