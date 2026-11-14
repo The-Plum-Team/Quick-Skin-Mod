@@ -558,6 +558,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   `ModelMeshRasterizer` (image-core) draws the bust or the whole figure from that mesh on the
   I/O workers with the skin bust's camera, light and scale; until a picture is ready, and for a
   model CPM cannot draw or whose texture cannot be read, the icon stays.
+- CPM draws a model through parts of its own, swapped into the vanilla player model for each
+  draw: they start from the vanilla parts' poses, and each vanilla part that is drawn is left
+  with the pose it was drawn in. What Quick Skin lays over the live player's pose for one draw
+  (the skin-change move, `SkinSwapPoser`) is therefore put back when that inline draw ends, into
+  the parts the model holds then, never only at the next `setupAnim` nor only on the part that
+  was moved. Before 1.21.2 vanilla resets neither the pivots nor the roll, and the first-person
+  hand poses the model without drawing its body, so a leftover would pile up frame after frame
+  and stay on the player in the world.
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.
