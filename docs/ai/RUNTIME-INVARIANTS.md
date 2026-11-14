@@ -436,11 +436,20 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   gives that dedicated field priority and would otherwise replace only the worn wings when the
   profile response arrives asynchronously. While a custom cape texture is pending, clear both
   inputs together; removing the cape restores the original/vanilla fallback path.
-- For a player wearing a Quick Skin cape, `CapeLayerMixin` (both copies) draws the cape and
-  cancels vanilla's cape layer, so it applies vanilla's rule itself: an invisible player shows no
-  cape, read from the entity before 1.21.2 and from the render state afterwards. A cape a preview
-  bound to its own draw (the cape menu and editor) still shows. Armour and elytra are vanilla's
-  and stay visible, as in vanilla.
+- For a player wearing a Quick Skin cape, `CapeLayerMixin` (both copies) draws the cape at the
+  start of vanilla's cape layer and leaves that layer nothing to draw. It never returns early
+  from the layer: another mod may pair a hook at its start with one at its end (Touch'n Motion
+  pushes a pose there and pops it), and a call cut short runs the first without the second, which
+  stops the game with "Pose stack not empty" as soon as the player is drawn in third person.
+  Instead the layer is told, for that call, that the cape part is off: before 1.21.2 through
+  `Player.isModelPartShown` (`CapeLayerTakeover`, answered by `PreviewEquipmentMixin`), afterwards
+  on the render state's `showCape`, both put back when the layer returns. Do not lower the
+  mixin's priority to run first instead: a mod that draws capes in a layer of its own (Wavy
+  Capes) cancels vanilla's layer before this hook, and running ahead of it would draw two capes.
+  Since vanilla's draw is replaced, the handler applies vanilla's rule itself: an invisible
+  player shows no cape, read from the entity before 1.21.2 and from the render state afterwards.
+  A cape a preview bound to its own draw (the cape menu and editor) still shows. Armour and
+  elytra are vanilla's and stay visible, as in vanilla.
 
 ## Optional integrations
 
