@@ -373,8 +373,9 @@ Quick Skin's sources below own the scenarios, the adapter and the review semanti
   existing order and shares only fully admitted terminal review owners within that collection;
   each artifact still binds its own metadata and immutable bytes, and API errors stop collection.
   That projection retains the two local
-  `mod-compatibility` checkpoints and, for integrations that opt in through the lock, the two CPM
-  `mod-compatibility-cpm-first-person` hand checkpoints, the two live
+  `mod-compatibility` checkpoints and, for integrations that opt in through the lock, the three
+  CPM `mod-compatibility-cpm-first-person` checkpoints (first-person hand twice, then the title
+  screen), the two live
   `mod-compatibility-remote` observer checkpoints, plus the one sequential
   `mod-compatibility-late-join` checkpoint as paired clean/modded 1280x720 WebPs, source and
   derivative metrics, deterministic assertions, clean booleans, and provenance; ordinary-suite
@@ -382,7 +383,7 @@ Quick Skin's sources below own the scenarios, the adapter and the review semanti
   provider text stays in short-lived private artifacts. Manual publication recovery consumes the
   same already-complete reports and never calls a model. The shared-source native bundle is public
   compatibility schema v6, whose `reviewed_frame_count` equals the mod-selective two-, five-, or
-  seven-checkpoint product. The `publish-evidence` job uploads it unchanged, wrapped by the kit's
+  eight-checkpoint product. The `publish-evidence` job uploads it unchanged, wrapped by the kit's
   `publish-family` composite, as the family handoff
   `mb-family-handoff--mod-compatibility--<key>--a<attempt>`; the separate `notify-family` job, which
   holds only `actions: write` and checks out nothing, wakes the Pages caller with

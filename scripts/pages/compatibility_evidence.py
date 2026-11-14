@@ -89,6 +89,7 @@ LATE_JOIN_PUBLIC_CAPTURE_IDS = (
 CPM_FIRST_PERSON_PUBLIC_CAPTURE_IDS = (
     "mod-compatibility-cpm-first-person.client_a.first_person_hand_initial",
     "mod-compatibility-cpm-first-person.client_a.first_person_hand_after_10_seconds",
+    "mod-compatibility-cpm-first-person.client_a.model_on_title_screen",
 )
 PUBLIC_IMAGE_SIZE = (1280, 720)
 PUBLIC_WEBP_QUALITY = 80
@@ -244,8 +245,9 @@ def _public_capture_ids(
     scenario_contract: ScenarioContract,
     compatibility_mod: CompatibilityMod,
 ) -> list[str]:
-    """The mod-selective public checkpoints: two local, plus CPM first-person, remote-observer
-    and late-join checkpoints for the integrations whose lock opts in (2, 5 or 7)."""
+    """The mod-selective public checkpoints: two local, plus the CPM scenario's (first-person
+    hand and title screen), remote-observer and late-join checkpoints for the integrations
+    whose lock opts in (2, 5 or 8)."""
 
     authored = {
         SOURCE_SCENARIO: BASE_PUBLIC_CAPTURE_IDS,
