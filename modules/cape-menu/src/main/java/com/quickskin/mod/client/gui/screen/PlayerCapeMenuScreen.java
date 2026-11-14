@@ -533,6 +533,9 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         // on the preview's own model, as it draws it on the live player in a world
         this.playerWidget.setCpmModel(
                 this.skinTarget == null ? LocalLookPreview.cpmModelFile(player != null) : null, false);
+        // Opened for one skin, the preview is that skin, which the player may not be wearing: the
+        // preview's own model with it, in a world too, where it otherwise draws the live player
+        this.playerWidget.setOwnPose(this.skinTarget != null);
 
         // The right-click menu, drawn over everything else
         this.contextMenu = new CapeContextMenu(new CapeContextMenu.Actions() {

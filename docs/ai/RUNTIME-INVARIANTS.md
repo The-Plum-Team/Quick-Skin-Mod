@@ -635,8 +635,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   it, and the elytra fall back to vanilla's. A CPM model wears no Quick Skin cape (an empty cape
   id, `SkinCapes.wearNone`). The cape menu picks the cape of the skin worn (its clicks and Remove
   Cape store the choice on that skin) or, opened from a skin's context menu
-  (`PlayerCapeMenuScreen.forSkin`), of that skin; with a CPM model or no Quick Skin skin worn it
-  sets only the worn cape. Its Elytra tab picks the skin's `elytra`: "" (the cape),
+  (`PlayerCapeMenuScreen.forSkin`), of that skin, which its preview then wears on the preview's
+  own model, in a world too, since the live player may wear another; with a CPM model or no
+  Quick Skin skin worn it sets only the worn cape. Its Elytra tab picks the skin's `elytra`: "" (the cape),
   `minecraft:elytra` or a cape ID; without a choice the elytra wear the cape. The cape worn before
   capes belonged to skins goes to the skin worn then, once, when the catalog loads
   (`ClientConfig.capesFollowSkins`); other skins start without a cape. The skin list shows a

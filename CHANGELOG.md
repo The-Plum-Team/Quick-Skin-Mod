@@ -12,6 +12,9 @@
 - **A CPM model no longer ends up twisted after you pick a look**
 > With Customizable Player Models on Minecraft 1.21.1 and older, picking a skin or a model in the skin menu inside a world could leave your character bent out of shape, in the menu and in the world, until you restarted the game. The little move the menu's model makes when you pick a look no longer stays on the player.
 
+- **The cape menu shows the skin you opened it for**
+> Right-click a skin and pick Assign cape or Change cape, and the cape menu's model now wears that skin. In a world it showed the skin you were wearing, which could be another one.
+
 ## 4.1.0 (2026-11-09)
 
 ### Added
