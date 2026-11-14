@@ -3,6 +3,7 @@ package com.quickskin.mod.common.util;
 import com.twelvemonkeys.imageio.plugins.webp.WebPImageReaderSpi;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReadParam;
 import javax.imageio.ImageReader;
 import javax.imageio.spi.ImageReaderSpi;
 import javax.imageio.stream.ImageInputStream;
@@ -26,16 +27,31 @@ import java.util.Set;
  *
  * <p>WebP skins and capes are decoded by the bundled pure-Java reader, called directly rather than through
  * the ImageIO registry: it is relocated into Quick Skin's package and registers nothing globally,
- * so it never meets another mod's copy of a WebP library.</p>
+ * so it never meets another mod's copy of a WebP library. JPEG skins and capes are decoded by
+ * the Java runtime's own reader.</p>
  */
 public final class SafeImageReader {
     public static final long MAX_ENCODED_BYTES = 32L * 1024L * 1024L;
     public static final int MAX_WIDTH = 4096;
     public static final int MAX_HEIGHT = 32 * 1024;
     public static final long MAX_PIXELS = 16L * 1024L * 1024L;
+    /** A still cape's limit per side: a larger picture is shrunk to it as it is read. */
+    public static final int MAX_STILL_CAPE_SIDE = MAX_WIDTH;
+    /** The longest side of a picture a cape import opens. */
+    public static final int MAX_CAPE_SOURCE_SIDE = 16384;
+    /**
+     * The most pixels such a picture may have when its decoder reads it a few rows at a time (a
+     * PNG, or a JPEG that is not progressive): only the shrunk picture is ever held.
+     */
+    public static final long MAX_CAPE_SOURCE_PIXELS = 64L * 1024L * 1024L;
+    /**
+     * The same for a JPEG its decoder holds whole until the last scan is in, as up to six bytes of
+     * coefficients a pixel outside the Java heap.
+     */
+    public static final long MAX_HELD_JPEG_SOURCE_PIXELS = 32L * 1024L * 1024L;
     private static final Set<String> PNG_FORMAT = Set.of("png");
     private static final Set<String> SKIN_FORMATS = Set.of("png", "jpeg", "jpg");
-    private static final Set<String> STILL_CAPE_FORMATS = PNG_FORMAT;
+    private static final Set<String> STILL_CAPE_FORMATS = SKIN_FORMATS;
     private static final byte[] RIFF = "RIFF".getBytes(StandardCharsets.US_ASCII);
     private static final byte[] WEBP = "WEBP".getBytes(StandardCharsets.US_ASCII);
     private static final ImageReaderSpi WEBP_READER = new WebPImageReaderSpi();
@@ -73,8 +89,16 @@ public final class SafeImageReader {
     }
 
     /**
-     * Decodes an imported still cape, PNG or WebP, under the PNG limits. The format comes from the
-     * bytes, never the file name; an animated WebP gives its first frame.
+     * Decodes an imported still cape, PNG, JPEG or WebP, into at most
+     * {@link #MAX_STILL_CAPE_SIDE} pixels per side. The format comes from the bytes, never the
+     * file name; an animated WebP gives its first frame, and a JPEG is turned the way its EXIF
+     * orientation says it is shown, as a photo viewer does.
+     *
+     * <p>A larger picture, such as a camera's photo, is shrunk evenly as it is read, up to the
+     * source limits above. A WebP is decoded whole on the heap, about six bytes a pixel, so it
+     * may be of any shape but of no more pixels than a still cape itself ({@link #MAX_PIXELS}).
+     * A picture over its limit is refused from its header with an
+     * {@link OversizedImageException}.</p>
      */
     public static BufferedImage readStillCape(Path source) throws IOException {
         if (source == null || !Files.isRegularFile(source) || !Files.isReadable(source)) {
@@ -86,10 +110,17 @@ public final class SafeImageReader {
         }
         try (ImageInputStream input =
                      new MemoryCacheImageInputStream(new ByteArrayInputStream(encoded))) {
-            ImageReader reader = isWebP(encoded)
+            boolean webp = isWebP(encoded);
+            ImageReader reader = webp
                     ? WEBP_READER.createReaderInstance(null)
                     : registeredReader(input, STILL_CAPE_FORMATS);
-            return decode(input, reader, MAX_WIDTH, MAX_HEIGHT, MAX_PIXELS);
+            JpegHeader jpeg = JpegHeader.read(encoded);
+            long maxSourcePixels = webp ? MAX_PIXELS
+                    : jpeg.isJpeg() && !jpeg.decodedRowByRow() ? MAX_HELD_JPEG_SOURCE_PIXELS
+                    : MAX_CAPE_SOURCE_PIXELS;
+            BufferedImage decoded = decodeShrunk(
+                    input, reader, MAX_STILL_CAPE_SIDE, MAX_CAPE_SOURCE_SIDE, maxSourcePixels);
+            return JpegOrientation.upright(decoded, jpeg.orientation());
         } catch (RuntimeException exception) {
             throw new IOException("Invalid cape image", exception);
         }
@@ -140,6 +171,48 @@ public final class SafeImageReader {
             throw new IOException("Unsupported image format: " + format);
         }
         return reader;
+    }
+
+    /**
+     * Decodes a picture into at most {@code maxSide} pixels per side. One that is larger, within
+     * the source limits, is read keeping one pixel in every {@code step} each way, with the
+     * smallest whole {@code step} that fits, so the decoder never hands over the full picture.
+     */
+    private static BufferedImage decodeShrunk(
+            ImageInputStream input,
+            ImageReader reader,
+            int maxSide,
+            int maxSourceSide,
+            long maxSourcePixels
+    ) throws IOException {
+        try {
+            reader.setInput(input, true, true);
+            int width = reader.getWidth(0);
+            int height = reader.getHeight(0);
+            if (width < 1 || height < 1) {
+                throw new IOException("Image dimensions exceed the configured limits");
+            }
+            if (width > maxSourceSide || height > maxSourceSide
+                    || (long) width * height > maxSourcePixels) {
+                throw new OversizedImageException(width, height, maxSourceSide);
+            }
+            int step = Math.max((width + maxSide - 1) / maxSide, (height + maxSide - 1) / maxSide);
+            BufferedImage decoded;
+            if (step > 1) {
+                ImageReadParam shrunk = reader.getDefaultReadParam();
+                shrunk.setSourceSubsampling(step, step, 0, 0);
+                decoded = reader.read(0, shrunk);
+            } else {
+                decoded = reader.read(0);
+            }
+            if (decoded == null || decoded.getWidth() != (width + step - 1) / step
+                    || decoded.getHeight() != (height + step - 1) / step) {
+                throw new IOException("Image decoder returned inconsistent dimensions");
+            }
+            return decoded;
+        } finally {
+            reader.dispose();
+        }
     }
 
     private static BufferedImage decode(

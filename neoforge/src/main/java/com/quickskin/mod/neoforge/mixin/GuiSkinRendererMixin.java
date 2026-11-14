@@ -9,6 +9,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.PreviewEquipment;
+import com.quickskin.mod.client.rendering.PreviewLighting;
 import com.quickskin.mod.platform.CapeRenderTypes;
 import com.quickskin.mod.client.rendering.SkinLayers3DIntegration;
 //? if <26.2 {
@@ -133,6 +134,8 @@ public class GuiSkinRendererMixin {
     )
     private void quickskin$renderCapeInPiP(GuiSkinRenderState state, PoseStack poseStack, SubmitNodeCollector collector, CallbackInfo ci) {
 //?}
+        // A preview's own light, over the one this pass set and before any of it is drawn
+        PreviewLighting.lightFor(state.playerModel());
         // The CPM model a preview without a player shows in the skin's place
 //? if <1.21.9 {
         PlayerModelRenderer.renderPendingCpmModel(state.playerModel(), poseStack, bufferSource);

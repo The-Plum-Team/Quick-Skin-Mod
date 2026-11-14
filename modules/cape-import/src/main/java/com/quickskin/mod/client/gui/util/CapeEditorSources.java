@@ -14,7 +14,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 
 /**
- * Original PNG and GIF files of the capes that were saved through the cape editor.
+ * Original PNG, JPG, WebP and GIF files of the capes that were saved through the cape editor.
  *
  * <p>A source is kept in a cache subdirectory that no asset scan visits, named after the content
  * ID of the cape it produced. It exists only to reopen the editor: it is never a cape itself, and
@@ -23,7 +23,7 @@ import java.util.Locale;
 @Environment(EnvType.CLIENT)
 public final class CapeEditorSources {
     private static final String DIRECTORY = "cape_editor_sources";
-    private static final String[] EXTENSIONS = {".png", ".gif", ".webp"};
+    private static final String[] EXTENSIONS = {".png", ".jpg", ".webp", ".gif"};
 
     private CapeEditorSources() {
     }
@@ -57,7 +57,10 @@ public final class CapeEditorSources {
             throw new IOException("Could not compute cape content hash");
         }
         String name = source.getFileName().toString().toLowerCase(Locale.ROOT);
-        String extension = name.endsWith(".gif") ? ".gif" : name.endsWith(".webp") ? ".webp" : ".png";
+        String extension = name.endsWith(".gif") ? ".gif"
+                : name.endsWith(".webp") ? ".webp"
+                : name.endsWith(".jpg") || name.endsWith(".jpeg") ? ".jpg"
+                : ".png";
         Path target = resolve(cacheDirectory, contentId, extension);
         if (target == null) {
             throw new IOException("Cape editor source cache is not initialized");

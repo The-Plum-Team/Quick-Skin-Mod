@@ -71,6 +71,13 @@ public class CapeLayerMixin {
             return; // No cape from either source, let vanilla handle
         }
 
+        // An invisible player wears no cape, as vanilla's own layer has it; a cape a preview is
+        // showing stays
+        if (!quickskin$previewing && player.isInvisible()) {
+            ci.cancel();
+            return;
+        }
+
         String capeId = quickskin$previewing ? null : service.getCapeId(player.getUUID());
         // Visibility must be recorded before the getter can return null while a bounded network
         // first-frame texture is being prepared; this also drives bounded activation retry.
@@ -270,6 +277,13 @@ public class CapeLayerMixin {
             return;
         }
 
+        // An invisible player wears no cape, as vanilla's own layer has it; a cape a preview is
+        // showing stays
+        if (!previewing && renderState.isInvisible) {
+            ci.cancel();
+            return;
+        }
+
         String capeId = previewing ? null : service.getCapeId(playerId);
         if (capeId != null) {
             CapeAnimationHelper.markCapeVisible(capeId);
@@ -445,6 +459,13 @@ public class CapeLayerMixin {
 
         if (!quickskin$previewing && !hasServiceCape && !hasConfigCape) {
             return; // No cape from either source, let vanilla handle
+        }
+
+        // An invisible player wears no cape, as vanilla's own layer has it; a cape a preview is
+        // showing stays
+        if (!quickskin$previewing && renderState.isInvisible) {
+            ci.cancel();
+            return;
         }
 
         String capeId = quickskin$previewing ? null : service.getCapeId(playerUUID);

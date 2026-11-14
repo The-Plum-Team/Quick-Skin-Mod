@@ -22,6 +22,7 @@ import org.joml.Matrix4f;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.function.Supplier;
 
 /**
  * Puts the skin-change move on a vanilla player model, and tells the models' pose hooks which
@@ -36,7 +37,11 @@ import java.util.WeakHashMap;
  *
  * <p>The move moves the parts' pivots as well as their angles, and neither vanilla before 1.21.2
  * nor the preview's idle resets every one of them each frame, so each part's pose before the move
- * is kept and put back before the model is posed again.
+ * is kept and put back before the model is posed again. An inline draw puts it back as soon as it
+ * ends, into the parts the model holds then: Customizable Player Models swaps parts of its own
+ * into the model for each draw, starts them from the vanilla parts' poses and leaves each vanilla
+ * part with the pose it was drawn in, so a pose kept only by the part that was moved would leave
+ * the move on the vanilla parts, for the next draw to start from and for the world to show.
  *
  * <p>The preview's looping walk and sit ({@link PreviewLoops}) use the same skeleton on the
  * preview's own model, laid over the pose the model was baked with.
@@ -52,6 +57,12 @@ public final class SkinSwapPoser {
     private static int nextBinding;
     /** Each moved part's pose before the move, until it is put back. */
     private static final Map<ModelPart, PartPose> unmoved = new IdentityHashMap<>();
+    /** The six parts of the model the inline draw laid its move over, as it holds them when asked. */
+    private static Supplier<ModelPart[]> inlineHeld;
+    /** That model's six poses before the move, indexed by {@link Part}. */
+    private static PartPose[] inlineUnmoved;
+    /** Puts back what the move changed on that model besides its six parts' poses. */
+    private static Runnable inlineSettle;
     /**
      * The pose each preview model part was baked with, taken the first time it is posed, before
      * anything has moved it. A part has no {@code equals}, so this is keyed by identity, and a
@@ -67,8 +78,33 @@ public final class SkinSwapPoser {
         inlinePose = pose.isRest() ? null : pose;
     }
 
+    /**
+     * Closes the inline preview draw and puts back what its move changed: the poses of the model
+     * it was laid over, into the parts that model holds now, and every other moved part's.
+     */
     static void endInline() {
         inlinePose = null;
+        if (inlineHeld != null) {
+            ModelPart[] parts = inlineHeld.get();
+            for (int i = 0; i < parts.length; i++) {
+                unmoved.remove(parts[i]);
+                write(inlineUnmoved[i], parts[i]);
+                parts[i].xScale = 1.0f;
+            }
+            if (inlineSettle != null) {
+                inlineSettle.run();
+            }
+            inlineHeld = null;
+            inlineUnmoved = null;
+            inlineSettle = null;
+        }
+        if (!unmoved.isEmpty()) {
+            unmoved.forEach((part, pose) -> {
+                write(pose, part);
+                part.xScale = 1.0f;
+            });
+            unmoved.clear();
+        }
     }
 
     /**
@@ -171,16 +207,11 @@ public final class SkinSwapPoser {
 //?} else {
     public static void apply(PlayerModel model, SkinSwapAnimation.Pose pose) {
 //?}
-        ModelPart[] parts = parts(model);
-        PartPose[] poses = new PartPose[parts.length];
-        for (int i = 0; i < parts.length; i++) {
-            poses[i] = read(parts[i]);
-            unmoved.putIfAbsent(parts[i], read(parts[i]));
-        }
-        SkinSwapSkeleton.pose(pose, poses);
-        for (int i = 0; i < parts.length; i++) {
-            write(poses[i], parts[i]);
-        }
+//? if <1.21.2 {
+        boolean inline = layOver(() -> parts(model), pose);
+//?} else {
+        layOver(() -> parts(model), pose);
+//?}
         // The arms changing width: each is scaled about its pivot and moved so its inner side,
         // one pixel from the pivot in both widths, stays against the body
         float armWidth = pose.get(SkinSwapAnimation.Whole.ARM_WIDTH);
@@ -200,7 +231,43 @@ public final class SkinSwapPoser {
         model.leftPants.copyFrom(model.leftLeg);
         model.rightSleeve.xScale = model.rightArm.xScale;
         model.leftSleeve.xScale = model.leftArm.xScale;
+        if (inline) {
+            inlineSettle = () -> {
+                model.rightSleeve.xScale = 1.0f;
+                model.leftSleeve.xScale = 1.0f;
+            };
+        }
 //?}
+    }
+
+    /**
+     * Lays the move over the six posed parts {@code held} supplies, indexed by {@link Part}, and
+     * keeps their poses before it. Inside an inline draw the first model moved is the one put
+     * back when the draw ends, into the parts {@code held} supplies then.
+     *
+     * @return whether this model is the one the inline draw puts back
+     */
+    static boolean layOver(Supplier<ModelPart[]> held, SkinSwapAnimation.Pose pose) {
+        ModelPart[] parts = held.get();
+        PartPose[] poses = new PartPose[parts.length];
+        boolean inline = inlinePose != null && inlineHeld == null;
+        PartPose[] before = inline ? new PartPose[parts.length] : null;
+        for (int i = 0; i < parts.length; i++) {
+            poses[i] = read(parts[i]);
+            PartPose kept = unmoved.putIfAbsent(parts[i], read(parts[i]));
+            if (inline) {
+                before[i] = kept != null ? kept : read(parts[i]);
+            }
+        }
+        if (inline) {
+            inlineHeld = held;
+            inlineUnmoved = before;
+        }
+        SkinSwapSkeleton.pose(pose, poses);
+        for (int i = 0; i < parts.length; i++) {
+            write(poses[i], parts[i]);
+        }
+        return inline;
     }
 
     /** Lays the move over the posed body of the model a cape hangs from. */
