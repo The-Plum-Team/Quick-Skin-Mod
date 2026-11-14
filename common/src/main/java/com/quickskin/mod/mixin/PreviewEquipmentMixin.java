@@ -1,9 +1,15 @@
 package com.quickskin.mod.mixin;
 
+//? if <1.21.2 {
+import com.quickskin.mod.client.rendering.CapeLayerTakeover;
+//?}
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+//? if <1.21.2 {
+import net.minecraft.world.entity.player.PlayerModelPart;
+//?}
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -59,4 +65,25 @@ public class PreviewEquipmentMixin {
             cir.setReturnValue(ItemStack.EMPTY);
         }
     }
+//? if <1.21.2 {
+
+    /**
+     * Answers the cape part as off for the length of a cape layer call in which Quick Skin has
+     * drawn the player's cape itself, or decided none shows ({@link CapeLayerTakeover}). Vanilla's
+     * layer then adds nothing and still takes its own way out, so the hooks another mod put at
+     * its start and its end stay paired. From 1.21.2 the layer reads the render state instead.
+     */
+    @Inject(
+            method = "isModelPartShown(Lnet/minecraft/world/entity/player/PlayerModelPart;)Z",
+            at = @At("HEAD"),
+            cancellable = true,
+            require = 0,
+            expect = 1,
+            allow = 1)
+    private void quickskin$capeDrawnByQuickSkin(PlayerModelPart part, CallbackInfoReturnable<Boolean> cir) {
+        if (part == PlayerModelPart.CAPE && CapeLayerTakeover.covers(this)) {
+            cir.setReturnValue(false);
+        }
+    }
+//?}
 }

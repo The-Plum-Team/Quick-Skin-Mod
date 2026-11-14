@@ -3,6 +3,7 @@ package com.quickskin.mod.neoforge.mixin;
 
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.platform.CapeRenderTypes;
+import com.quickskin.mod.client.rendering.CapeLayerTakeover;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.PreviewCapeBindings;
 import com.quickskin.mod.client.services.CapeAnimationHelper;
@@ -21,6 +22,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.Items;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -30,7 +32,6 @@ public class CapeLayerMixin {
 
     @Inject(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/player/AbstractClientPlayer;FFFFFF)V",
             at = @At("HEAD"),
-            cancellable = true,
             require = 1,
             expect = 1,
             allow = 1)
@@ -38,13 +39,15 @@ public class CapeLayerMixin {
                                             AbstractClientPlayer player, float limbSwing, float limbSwingAmount,
                                             float partialTicks, float ageInTicks, float netHeadYaw, float headPitch,
                                             CallbackInfo ci) {
+        // A call another mod cut short may have left the cape part off
+        quickskin$giveCapeBack();
         // The GUI preview renders the real player entity, so without this the cape below would be
         // the one the player is wearing rather than the one the editor has selected. The preview
         // binds its cape to this draw only; an unbound draw keeps resolving the applied cape.
         PreviewCapeBindings.Resolution<ResourceLocation> quickskin$preview =
                 PlayerModelRenderer.consumePreviewCape(player);
         if (quickskin$preview.decision() == PreviewCapeBindings.Decision.HIDDEN) {
-            ci.cancel(); // The editor has no cape selected: show none, do not fall back to the worn one.
+            quickskin$leaveNoCapeToVanilla(player); // The editor has no cape selected: show none, do not fall back to the worn one.
             return;
         }
         boolean quickskin$previewing =
@@ -74,7 +77,7 @@ public class CapeLayerMixin {
         // An invisible player wears no cape, as vanilla's own layer has it; a cape a preview is
         // showing stays
         if (!quickskin$previewing && player.isInvisible()) {
-            ci.cancel();
+            quickskin$leaveNoCapeToVanilla(player);
             return;
         }
 
@@ -107,12 +110,12 @@ public class CapeLayerMixin {
         }
 
         if (capeTexture == null) {
-            ci.cancel();
+            quickskin$leaveNoCapeToVanilla(player);
             return;
         }
 
         if (!quickskin$previewing && player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA)) {
-            ci.cancel();
+            quickskin$leaveNoCapeToVanilla(player);
             return;
         }
 
@@ -120,7 +123,7 @@ public class CapeLayerMixin {
         if (finalTexture == null) {
             // A network animation deliberately renders nothing until its bounded first-frame
             // texture is ready; never expose the stacked atlas as a cape.
-            ci.cancel();
+            quickskin$leaveNoCapeToVanilla(player);
             return;
         }
 
@@ -171,7 +174,29 @@ public class CapeLayerMixin {
 
         poseStack.popPose();
 
-        ci.cancel();
+        quickskin$leaveNoCapeToVanilla(player);
+    }
+
+    /**
+     * Leaves vanilla's own layer nothing to draw without returning early from it, so the hooks
+     * other mods put at the start and the end of the layer stay paired ({@code CapeLayerTakeover}).
+     */
+    @Unique
+    private void quickskin$leaveNoCapeToVanilla(AbstractClientPlayer player) {
+        CapeLayerTakeover.begin(player);
+    }
+
+    @Unique
+    private void quickskin$giveCapeBack() {
+        CapeLayerTakeover.end();
+    }
+
+    @Inject(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/player/AbstractClientPlayer;FFFFFF)V",
+            at = @At("RETURN"),
+            require = 1,
+            expect = 1)
+    private void quickskin$afterVanillaCape(CallbackInfo ci) {
+        quickskin$giveCapeBack();
     }
 }
 //?} else if <1.21.6 {
@@ -202,6 +227,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.Items;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -218,13 +244,14 @@ public class CapeLayerMixin {
     @Inject(
             method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/renderer/entity/state/PlayerRenderState;FF)V",
             at = @At("HEAD"),
-            cancellable = true,
             require = 1,
             expect = 1,
             allow = 1)
     private void quickskin$renderCustomCape(PoseStack poseStack, MultiBufferSource buffer,
                                             int packedLight, PlayerRenderState renderState,
                                             float yRot, float xRot, CallbackInfo ci) {
+        // A call another mod cut short may have left the cape part off
+        quickskin$giveCapeBack();
         if (CPMCompatIntegration.shouldDeferToCPM()) {
             return;
         }
@@ -243,7 +270,7 @@ public class CapeLayerMixin {
         PreviewCapeBindings.Resolution<ResourceLocation> preview =
                 PlayerModelRenderer.consumePreviewCape(player);
         if (preview.decision() == PreviewCapeBindings.Decision.HIDDEN) {
-            ci.cancel();
+            quickskin$leaveNoCapeToVanilla(renderState);
             return;
         }
         boolean previewing = preview.decision() == PreviewCapeBindings.Decision.PREVIEW;
@@ -259,7 +286,7 @@ public class CapeLayerMixin {
 //?} else {
         if (!previewing && renderState.chestEquipment.is(Items.ELYTRA)) {
 //?}
-            ci.cancel();
+            quickskin$leaveNoCapeToVanilla(renderState);
             return;
         }
 
@@ -280,7 +307,7 @@ public class CapeLayerMixin {
         // An invisible player wears no cape, as vanilla's own layer has it; a cape a preview is
         // showing stays
         if (!previewing && renderState.isInvisible) {
-            ci.cancel();
+            quickskin$leaveNoCapeToVanilla(renderState);
             return;
         }
 
@@ -300,14 +327,14 @@ public class CapeLayerMixin {
             capeTexture = CapeService.getInstance().getCapeLocation(null, config.activeCapeHash);
         }
         if (capeTexture == null) {
-            ci.cancel();
+            quickskin$leaveNoCapeToVanilla(renderState);
             return;
         }
 
         ResourceLocation finalTexture =
                 CapeAnimationHelper.resolveCurrentFrameOnce(capeTexture, capeId);
         if (finalTexture == null) {
-            ci.cancel();
+            quickskin$leaveNoCapeToVanilla(renderState);
             return;
         }
 
@@ -323,7 +350,40 @@ public class CapeLayerMixin {
         ((CapeLayer) (Object) this).getParentModel().copyPropertiesTo(capeModel);
         capeModel.setupAnim(renderState);
         capeModel.renderToBuffer(poseStack, vertices, packedLight, OverlayTexture.NO_OVERLAY);
-        ci.cancel();
+        quickskin$leaveNoCapeToVanilla(renderState);
+    }
+
+    /** The render state whose cape part this call turned off, to turn it back on at its end. */
+    @Unique
+    private PlayerRenderState quickskin$capeTurnedOff;
+
+    /**
+     * Leaves vanilla's own layer nothing to draw without returning early from it, so the hooks
+     * other mods put at the start and the end of the layer stay paired ({@code CapeLayerTakeover}).
+     */
+    @Unique
+    private void quickskin$leaveNoCapeToVanilla(PlayerRenderState renderState) {
+        if (renderState.showCape) {
+            renderState.showCape = false;
+            quickskin$capeTurnedOff = renderState;
+        }
+    }
+
+    @Unique
+    private void quickskin$giveCapeBack() {
+        if (quickskin$capeTurnedOff != null) {
+            quickskin$capeTurnedOff.showCape = true;
+            quickskin$capeTurnedOff = null;
+        }
+    }
+
+    @Inject(
+            method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/renderer/entity/state/PlayerRenderState;FF)V",
+            at = @At("RETURN"),
+            require = 1,
+            expect = 1)
+    private void quickskin$afterVanillaCape(CallbackInfo ci) {
+        quickskin$giveCapeBack();
     }
 }
 //?} else {
@@ -371,6 +431,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.Items;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -390,7 +451,6 @@ public class CapeLayerMixin {
     @Inject(method = "submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/client/renderer/entity/state/AvatarRenderState;FF)V",
 //?}
             at = @At("HEAD"),
-            cancellable = true,
             require = 1,
             expect = 1,
             allow = 1)
@@ -402,6 +462,8 @@ public class CapeLayerMixin {
                                             AvatarRenderState renderState, float yRot, float xRot,
 //?}
                                             CallbackInfo ci) {
+        // A call another mod cut short may have left the cape part off
+        quickskin$giveCapeBack();
         // The GUI preview renders the real player entity, so without this the cape below would be
         // the one the player is wearing rather than the one the editor has selected. The preview
         // binds its cape to this draw only; an unbound draw keeps resolving the applied cape.
@@ -412,7 +474,7 @@ public class CapeLayerMixin {
 //?}
                 PlayerModelRenderer.consumePreviewCape(renderState);
         if (quickskin$preview.decision() == PreviewCapeBindings.Decision.HIDDEN) {
-            ci.cancel(); // The editor has no cape selected: show none, do not fall back to the worn one.
+            quickskin$leaveNoCapeToVanilla(renderState); // The editor has no cape selected: show none, do not fall back to the worn one.
             return;
         }
         boolean quickskin$previewing =
@@ -423,7 +485,7 @@ public class CapeLayerMixin {
         // unchanged, while in a preview the renderer has already blanked the state's equipment, so
         // the cape being previewed is never hidden by gear the preview is not drawing either.
         if (!quickskin$previewing && renderState.chestEquipment.is(Items.ELYTRA)) {
-            ci.cancel();
+            quickskin$leaveNoCapeToVanilla(renderState);
             return;
         }
 
@@ -464,7 +526,7 @@ public class CapeLayerMixin {
         // An invisible player wears no cape, as vanilla's own layer has it; a cape a preview is
         // showing stays
         if (!quickskin$previewing && renderState.isInvisible) {
-            ci.cancel();
+            quickskin$leaveNoCapeToVanilla(renderState);
             return;
         }
 
@@ -510,7 +572,7 @@ public class CapeLayerMixin {
         }
 
         if (capeTexture == null) {
-            ci.cancel();
+            quickskin$leaveNoCapeToVanilla(renderState);
             return;
         }
 
@@ -522,7 +584,7 @@ public class CapeLayerMixin {
         if (finalTexture == null) {
             // A network animation deliberately renders nothing until its bounded first-frame
             // texture is ready; never expose the stacked atlas as a cape.
-            ci.cancel();
+            quickskin$leaveNoCapeToVanilla(renderState);
             return;
         }
 
@@ -568,7 +630,51 @@ public class CapeLayerMixin {
     //?}
 //?}
 
-        ci.cancel();
+        quickskin$leaveNoCapeToVanilla(renderState);
+    }
+
+    /** The render state whose cape part this call turned off, to turn it back on at its end. */
+    @Unique
+    //? if <1.21.9 {
+    private PlayerRenderState quickskin$capeTurnedOff;
+    //?} else {
+    private AvatarRenderState quickskin$capeTurnedOff;
+    //?}
+
+    /**
+     * Leaves vanilla's own layer nothing to draw without returning early from it, so the hooks
+     * other mods put at the start and the end of the layer stay paired ({@code CapeLayerTakeover}).
+     */
+    @Unique
+    //? if <1.21.9 {
+    private void quickskin$leaveNoCapeToVanilla(PlayerRenderState renderState) {
+    //?} else {
+    private void quickskin$leaveNoCapeToVanilla(AvatarRenderState renderState) {
+    //?}
+        if (renderState.showCape) {
+            renderState.showCape = false;
+            quickskin$capeTurnedOff = renderState;
+        }
+    }
+
+    @Unique
+    private void quickskin$giveCapeBack() {
+        if (quickskin$capeTurnedOff != null) {
+            quickskin$capeTurnedOff.showCape = true;
+            quickskin$capeTurnedOff = null;
+        }
+    }
+
+//? if <1.21.9 {
+    @Inject(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/renderer/entity/state/PlayerRenderState;FF)V",
+//?} else {
+    @Inject(method = "submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/client/renderer/entity/state/AvatarRenderState;FF)V",
+//?}
+            at = @At("RETURN"),
+            require = 1,
+            expect = 1)
+    private void quickskin$afterVanillaCape(CallbackInfo ci) {
+        quickskin$giveCapeBack();
     }
 }
 //?}
