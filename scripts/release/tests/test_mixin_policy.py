@@ -81,6 +81,8 @@ DEGRADABLE_MIXINS = {
     # Esc opening the pause menu over it.
     "main:com/quickskin/mod/mixin/input/MouseTurnMixin.java",
     "main:com/quickskin/mod/mixin/input/PauseGameMixin.java",
+    # The menus: a hook that fails leaves the game's toasts showing over them, as before.
+    "main:com/quickskin/mod/mixin/menu/MenuToastsMixin.java",
 }
 
 # Like the nickname mixins, NeoForge loads the hidden-armour mixins from their own config.
@@ -90,6 +92,10 @@ NEOFORGE_ARMOR_CONFIG = ROOT / "neoforge" / "src" / "main" / "resources" / "quic
 # And the favourites fan's input hooks from their own.
 INPUT_MIXIN_PACKAGE = "com.quickskin.mod.mixin.input"
 NEOFORGE_INPUT_CONFIG = ROOT / "neoforge" / "src" / "main" / "resources" / "quickskin-input.mixins.json"
+
+# And the menus' hook on the game's toasts from its own.
+MENU_MIXIN_PACKAGE = "com.quickskin.mod.mixin.menu"
+NEOFORGE_MENU_CONFIG = ROOT / "neoforge" / "src" / "main" / "resources" / "quickskin-menu.mixins.json"
 
 # NeoForge never reads quickskin.mixins.json, so it loads the nickname mixins from their own config.
 NICKNAME_MIXIN_PACKAGE = "com.quickskin.mod.mixin.nickname"
@@ -482,6 +488,41 @@ class MixinPolicyTest(unittest.TestCase):
         for toml in NEOFORGE_MOD_TOMLS:
             with self.subTest(toml=relative(toml)):
                 self.assertIn('config = "quickskin-input.mixins.json"', toml.read_text(encoding="utf-8"))
+
+    def test_every_loader_loads_the_menu_mixins(self) -> None:
+        menu_sources = {
+            path.stem
+            for path in (CANONICAL_JAVA / "com/quickskin/mod/mixin/menu").glob("*.java")
+            if MIXIN_MARKER.search(path.read_text(encoding="utf-8"))
+        }
+        self.assertTrue(menu_sources)
+        for path in self.configs_named("quickskin.mixins.json"):
+            with self.subTest(config=relative(path)):
+                config = json.loads(path.read_text(encoding="utf-8"))
+                listed = {name.split(".", 1)[1] for name in config["client"] if name.startswith("menu.")}
+                self.assertEqual(listed, menu_sources)
+        neoforge = json.loads(NEOFORGE_MENU_CONFIG.read_text(encoding="utf-8"))
+        self.assertEqual(neoforge["package"], MENU_MIXIN_PACKAGE)
+        self.assertEqual(set(neoforge["client"]), menu_sources)
+        self.assertNotIn("mixins", neoforge)
+        for toml in NEOFORGE_MOD_TOMLS:
+            with self.subTest(toml=relative(toml)):
+                self.assertIn('config = "quickskin-menu.mixins.json"', toml.read_text(encoding="utf-8"))
+
+    def test_menu_toasts_are_held_and_not_only_hidden(self) -> None:
+        # From 1.21.2 the game advances its toasts in update(), apart from drawing them: a hook on
+        # the draw alone would let a toast run out its time behind the menu and never be seen.
+        source = JAVA_COMMENT.sub(
+            "",
+            (CANONICAL_JAVA / "com/quickskin/mod/mixin/menu/MenuToastsMixin.java").read_text(
+                encoding="utf-8"
+            ),
+        )
+        self.assertEqual(
+            set(re.findall(r'method = "(\w+)"', source)),
+            {"update", "render", "extractRenderState"},
+        )
+        self.assertEqual(source.count("MenuGuiScale.isScaled(GuiCompat.currentScreen())"), 2)
 
     def test_neoforge_loads_every_server_mixin_of_its_targets(self) -> None:
         # NeoForge never reads quickskin.mixins.json, so each server mixin its targets' common

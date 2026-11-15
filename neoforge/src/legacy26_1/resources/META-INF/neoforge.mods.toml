@@ -34,6 +34,10 @@ config = "quickskin-armor.mixins.json"
 [[mixins]]
 config = "quickskin-input.mixins.json"
 
+# The menus: the game's toasts wait while one is shown
+[[mixins]]
+config = "quickskin-menu.mixins.json"
+
 # Sharing the account skin with vanilla clients: the server accessors (ADR 0012)
 [[mixins]]
 config = "quickskin-account-skin.mixins.json"

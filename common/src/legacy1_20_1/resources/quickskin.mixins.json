@@ -22,7 +22,8 @@
     "armor.LocalHeadLayerMixin",
     "armor.PreviewArmorPoseMixin",
     "input.MouseTurnMixin",
-    "input.PauseGameMixin"
+    "input.PauseGameMixin",
+    "menu.MenuToastsMixin"
   ],
   "mixins": [
     "ChunkMapAccessor",

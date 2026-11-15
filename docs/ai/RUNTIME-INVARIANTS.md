@@ -881,6 +881,17 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   player's scale when it goes away. The
   skin menu's packaged checkpoint asserts both the menu's scale on the window and the unchanged
   option.
+- The game's toasts (the tutorial, advancements, unlocked recipes, other mods' notices) never show
+  over a Quick Skin menu, whose header and buttons they would cover. While the current screen is
+  drawn at a menu's scale (`MenuGuiScale.isScaled`: the skin and cape menus and the dialogs that
+  follow them), `MenuToastsMixin` neither advances nor draws the game's toast manager, so nothing
+  is dropped: a toast that arrives meanwhile waits and comes in, with its sound, once the menu
+  goes away. Before 1.21.2 it cancels `ToastComponent.render`, which does both; from 1.21.2 it
+  cancels `ToastManager.update` and `render` (`extractRenderState` from 26.1), since skipping the
+  draw alone would let a toast run out its time unseen. The mixin is degradable (`require = 0`).
+  Fabric and Forge load it from `quickskin.mixins.json`; NeoForge loads it from
+  `quickskin-menu.mixins.json`. Quick Skin's own messages in its menus (`ErrorToast`) are drawn by
+  its screens and never go through the game's toast manager.
 - GUI cape import evidence must go through `CapeImportWorkflow` from the real drop entry point:
   a translucent user cape with a transparent elytra area must be saved with the vanilla elytra
   composited in, keep its half-transparent face in-world and on the equipped wings, and the menu
