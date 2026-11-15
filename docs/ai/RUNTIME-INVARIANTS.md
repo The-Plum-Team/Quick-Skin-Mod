@@ -302,6 +302,10 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Use `BoundedFileReader`, `SafeImageReader`, and the established GIF preflight path. Do not add
   production `ImageIO.read`, unbounded `Files.readAllBytes`/`readString`, or decode-before-dimension
   validation.
+- Catalogue scans list their folders with `BoundedFileWalk`, never `Files.walk`: that stream
+  fails as a whole, with an unchecked exception, on one unreadable subfolder or on a file another
+  instance removed from the shared library meanwhile, which ended the scan and the game's start.
+  Such an entry is left out, counted and logged, and the rest of the folder is catalogued.
 - Skin import copies decoded pixels that have alpha exactly and never composites them, except in
   its intended transforms (resizing to a supported resolution and the 64x32 legacy conversion);
   images without alpha keep the plain blit, so greyscale skins are not gamma-shifted, and a

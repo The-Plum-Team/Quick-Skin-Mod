@@ -38,6 +38,9 @@
 - **A Quick Skin error can no longer keep a world from loading**
 > What Quick Skin does when you enter, respawn in or leave a world is now kept apart from the game's own work: if it ever fails, the failure goes to the log and the world loads anyway. On Forge 1.20.1 such a failure left the game on "Joining world..." forever with no error screen, or sent you back to the menu with "Invalid player data".
 
+- **The game no longer stops at startup over one unreadable file**
+> If the skin, cape or CPM model folder held a subfolder Quick Skin could not read, or a file went away while the folder was being listed (another Minecraft instance using the shared library at the same moment), the game could stop while it started. Quick Skin now leaves that entry out, says so in the log and lists the rest.
+
 ## 4.1.0 (2026-11-09)
 
 ### Added
