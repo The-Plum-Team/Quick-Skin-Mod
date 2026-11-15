@@ -2059,11 +2059,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         List<Path> imageFiles = new ArrayList<>();
         List<Path> cpmModelFiles = new ArrayList<>();
         for (Path path : files) {
-            String lower = path.toString().toLowerCase(Locale.ROOT);
-            if (lower.endsWith(".png") || lower.endsWith(".webp") || lower.endsWith(".jpg")) {
+            if (SkinImporter.isSkinImage(path)) {
                 imageFiles.add(path);
 //? if <1.21.11 {
-            } else if (lower.endsWith(".cpmmodel")) {
+            } else if (path.toString().toLowerCase(Locale.ROOT).endsWith(".cpmmodel")) {
 //?} else {
             } else if (com.quickskin.mod.client.compat.CpmModelWorkflow.isModelFile(path)) {
 //?}

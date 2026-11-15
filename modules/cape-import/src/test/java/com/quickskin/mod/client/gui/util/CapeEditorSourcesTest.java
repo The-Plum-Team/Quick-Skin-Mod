@@ -53,6 +53,28 @@ class CapeEditorSourcesTest {
     }
 
     @Test
+    void retainsAJpgUnderOneExtensionAndReopensIt() throws IOException {
+        Path source = temporaryDirectory.resolve("photo.JPEG");
+        assertTrue(ImageIO.write(new BufferedImage(100, 80, BufferedImage.TYPE_INT_RGB), "jpg", source.toFile()));
+        Path cape = CapeImportProcessor.saveAdjusted(
+                CapeImportProcessor.prepare(source, NO_GIF), atlas(1, 0xff117788), capes(), cache(), null);
+
+        Path retained = CapeEditorSources.retain(cache(), cape, source);
+
+        assertEquals(retained, CapeEditorSources.find(cache(), contentId(cape)));
+        assertEquals(contentId(cape) + ".jpg", retained.getFileName().toString());
+        assertArrayEquals(Files.readAllBytes(source), Files.readAllBytes(retained));
+        assertEquals(List.of(cape), files(capes()), "the source must not become a second cape");
+
+        CapeImportProcessor.PreparedCape reopened = CapeImportProcessor.prepare(retained, NO_GIF);
+        assertEquals(100, reopened.atlas().getWidth());
+        assertEquals(80, reopened.atlas().getHeight());
+
+        CapeEditorSources.delete(cache(), contentId(cape));
+        assertNull(CapeEditorSources.find(cache(), contentId(cape)));
+    }
+
+    @Test
     void retainsTheOriginalGifWithItsFramesAndTiming() throws IOException {
         Path source = temporaryDirectory.resolve("animated.gif");
         Files.write(source, new byte[] {42});

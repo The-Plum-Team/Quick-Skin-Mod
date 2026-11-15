@@ -2,6 +2,7 @@ package com.quickskin.mod.e2e.scenario;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
+import com.quickskin.mod.client.compat.CpmModelPreview;
 import com.quickskin.mod.client.compat.CpmModelWorkflow;
 import com.quickskin.mod.client.compat.CustomNPCsIntegration;
 import com.quickskin.mod.client.compat.EarsCompatIntegration;
@@ -13,6 +14,8 @@ import com.quickskin.mod.client.gui.util.MenuGuiScale;
 import com.quickskin.mod.client.gui.util.SkinImporter;
 import com.quickskin.mod.client.gui.widget.IconActionButton;
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
+import com.quickskin.mod.client.rendering.CpmModelCapture;
+import com.quickskin.mod.client.rendering.LocalLookPreview;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.PreviewPlayerData;
 import com.quickskin.mod.client.rendering.SkinLayers3DIntegration;
@@ -21,6 +24,7 @@ import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.common.data.PlayerAppearance;
 import com.quickskin.mod.common.data.TextureQuality;
+import com.quickskin.mod.common.util.ModelMesh;
 import com.quickskin.mod.config.ClientConfig;
 import com.quickskin.mod.e2e.DefaultSkinEvidenceView;
 import com.quickskin.mod.e2e.E2ELog;
@@ -267,6 +271,11 @@ interface ModCompatibilityFeature {
         private int plaidPolls;
         private final CpmEmbeddedSkinProof.WaitLog embeddedWait =
                 new CpmEmbeddedSkinProof.WaitLog("CPM embedded skin phase");
+        /** The title checkpoint: why leaving the world failed, and the mesh its proof names. */
+        private volatile String titleFailure;
+        private volatile ModelMesh titleMesh;
+        private final CpmEmbeddedSkinProof.WaitLog titleWait =
+                new CpmEmbeddedSkinProof.WaitLog("CPM title checkpoint");
 //? if <1.21.9 {
         private volatile long firstPersonRenderTypeCheckpoint;
 //?} else {
@@ -352,6 +361,92 @@ interface ModCompatibilityFeature {
             return Step.Result.pass("CPM " + checkpoint + " first-person hand checkpoint retained "
                     + "the protected complex model " + model.hash()
                     + "; " + renderProof + " and the screenshot records its rendered hand geometry");
+        }
+
+        /**
+         * Leaves the world for the title screen, where CPM has no player to draw the model on:
+         * Quick Skin's preview there must draw the model on its own.
+         */
+        void quitToTitle() {
+            titleFailure = VanillaShim.disconnectToTitle(minecraft);
+            if (titleFailure == null) {
+                titleFailure = VanillaShim.installDeterministicSplash(
+                        VanillaShim.currentScreen(minecraft), SessionScenario.TITLE_SPLASH);
+            }
+            pinCursorToWindowCorner("CPM");
+            E2ELog.info("CPM title checkpoint: disconnected; level=" + minecraft.level
+                    + " player=" + minecraft.player
+                    + (titleFailure == null ? "" : " failure=" + titleFailure));
+        }
+
+        boolean titleModelReady() {
+            pinCursorToWindowCorner("CPM");
+            if (titleFailure != null) return true;
+            String problem = titleModelProblem();
+            titleWait.note(problem);
+            return problem == null;
+        }
+
+        /**
+         * {@code null} once the title screen's preview has drawn the protected model on its own
+         * model and the skin list's picture of it has its mesh; otherwise what is still missing.
+         */
+        private String titleModelProblem() {
+            if (minecraft.level != null || minecraft.player != null) {
+                return "the world is still loaded after the disconnect";
+            }
+            Screen screen = VanillaShim.currentScreen(minecraft);
+            if (!(screen instanceof TitleScreen)) {
+                return "title screen is not open: "
+                        + (screen == null ? "no screen" : screen.getClass().getSimpleName());
+            }
+            AssetMetadata imported = model;
+            if (imported == null || imported.path() == null) return "CPM model was not imported";
+            PlayerWidget preview = null;
+            for (GuiEventListener child : screen.children()) {
+                if (child instanceof PlayerWidget widget) {
+                    if (preview != null) return "title screen holds more than one Quick Skin PlayerWidget";
+                    preview = widget;
+                }
+            }
+            if (preview == null) return "title screen has no Quick Skin PlayerWidget";
+            if (!CpmModelPreview.isAvailable()) {
+                return "CPM offers no way to draw a model on Quick Skin's own preview model";
+            }
+            Path look = LocalLookPreview.cpmModelFile(false);
+            if (look == null) return "no CPM model is the look on the title screen";
+            try {
+                if (!Files.isSameFile(look, imported.path())) {
+                    return "the title screen's CPM model is " + look.getFileName()
+                            + ", not the imported " + imported.path().getFileName();
+                }
+            } catch (java.io.IOException exception) {
+                return "CPM model file comparison failed: " + concise(exception);
+            }
+            if (!preview.isCpmModelDrawn()) {
+                return "the title preview has not drawn the CPM model"
+                        + (CpmModelPreview.isLoading(look) ? " yet; CPM is still building it" : "");
+            }
+            ModelMesh mesh = CpmModelCapture.mesh(imported.hash(), imported.path());
+            if (mesh == null) return "CPM's model is not captured yet for the skin list's picture";
+            if (mesh.quadCount() < 6 || mesh.textureWidth() < 1) {
+                return "the captured CPM model has " + mesh.quadCount() + " quads and a "
+                        + mesh.textureWidth() + "x" + mesh.textureHeight() + " texture";
+            }
+            titleMesh = mesh;
+            return null;
+        }
+
+        Step.Result assertTitleModel() {
+            if (titleFailure != null) return Step.Result.fail(titleFailure);
+            String problem = titleModelProblem();
+            if (problem != null) return Step.Result.fail(problem);
+            ModelMesh mesh = titleMesh;
+            return Step.Result.pass("no world is loaded and the title screen's Quick Skin preview drew "
+                    + "the protected complex CPM model " + model.hash() + " on its own posed model, "
+                    + "bound by CPM; the skin list's picture of the model is drawn from "
+                    + mesh.quadCount() + " captured quads and CPM's " + mesh.textureWidth() + "x"
+                    + mesh.textureHeight() + " texture; the screenshot records the model on the title screen");
         }
 
         private static boolean usesModernFirstPersonCollector() {

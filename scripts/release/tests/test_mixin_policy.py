@@ -581,6 +581,84 @@ class MixinPolicyTest(unittest.TestCase):
                     self.assertIn("level == null", gate)
                 self.assertNotRegex(source, r"&&\s*isLocalPlayer\s*\)")
 
+    CAPE_MIXINS = (
+        CANONICAL_JAVA / "com/quickskin/mod/mixin/CapeLayerMixin.java",
+        ROOT / "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/CapeLayerMixin.java",
+    )
+    CAPE_DRAW = re.compile(r"\b(?:renderCloak|renderToBuffer|submitModel)\(")
+
+    def cape_handlers(self, path: Path) -> list[tuple[str, str]]:
+        """The declaration (its Stonecutter variants) and the body of each handler that draws a cape."""
+        source = JAVA_COMMENT.sub("", path.read_text(encoding="utf-8"))
+        handlers = []
+        for opening in re.finditer(r"CallbackInfo ci\) \{", source):
+            declaration = source[source.rindex("@Inject", 0, opening.start()) : opening.start()]
+            if "quickskin$renderCustomCape(" in declaration:
+                body = source[opening.end() : source.index("\n    }\n", opening.end())]
+                handlers.append((declaration, body))
+        self.assertTrue(handlers, relative(path))
+        return handlers
+
+    def test_the_cape_layer_is_never_cut_short(self) -> None:
+        # Another mod may pair a hook at the start of vanilla's cape layer with one at its end
+        # (Touch'n Motion pushes a pose and pops it). A cancelled call runs the first without the
+        # second and the game stops with "Pose stack not empty" once the player is drawn. Quick
+        # Skin draws its cape and tells vanilla, for that call, that the cape part is off.
+        for path in self.CAPE_MIXINS:
+            source = JAVA_COMMENT.sub("", path.read_text(encoding="utf-8"))
+            with self.subTest(path=relative(path)):
+                self.assertNotIn("cancel", source)
+                self.assertEqual(
+                    source.count('at = @At("HEAD")'), source.count('at = @At("RETURN")')
+                )
+                self.assertEqual(
+                    source.count('at = @At("RETURN")'),
+                    source.count("private void quickskin$afterVanillaCape(CallbackInfo ci) {"),
+                )
+            for index, (declaration, body) in enumerate(self.cape_handlers(path)):
+                with self.subTest(path=relative(path), handler=index):
+                    # Nothing is drawn before a call another mod cut short is closed
+                    self.assertLess(
+                        body.index("quickskin$giveCapeBack();"), self.CAPE_DRAW.search(body).start()
+                    )
+                    # After its own draw the handler's last statement leaves vanilla nothing
+                    self.assertRegex(
+                        body.rstrip(), r"quickskin\$leaveNoCapeToVanilla\([\w$]+\);$"
+                    )
+                    self.assertNotRegex(declaration, r"cancellable")
+        for path in (
+            CANONICAL_JAVA / "com/quickskin/mod/mixin/PreviewEquipmentMixin.java",
+            ROOT / "neoforge/src/main/java/com/quickskin/mod/neoforge/mixin/PreviewEquipmentMixin.java",
+        ):
+            with self.subTest(path=relative(path)):
+                source = path.read_text(encoding="utf-8")
+                hook = source[source.index("isModelPartShown(") :]
+                self.assertIn("part == PlayerModelPart.CAPE && CapeLayerTakeover.covers(this)", hook)
+                self.assertIn("cir.setReturnValue(false);", hook)
+
+    def test_an_invisible_player_wears_no_cape(self) -> None:
+        # Quick Skin's handler replaces vanilla's cape layer, and with it vanilla's own rule that
+        # an invisible player shows no cape. Every handler has to apply it before it draws, with
+        # what that version hands it: the player before 1.21.2, the render state afterwards.
+        for path in self.CAPE_MIXINS:
+            for index, (declaration, body) in enumerate(self.cape_handlers(path)):
+                with self.subTest(path=relative(path), handler=index):
+                    before_drawing = body[: self.CAPE_DRAW.search(body).start()]
+                    subjects = []
+                    if "AbstractClientPlayer player," in declaration:
+                        subjects.append(r"player\.isInvisible\(\)")
+                    if "RenderState renderState," in declaration:
+                        subjects.append(r"renderState\.isInvisible")
+                    self.assertTrue(subjects)
+                    for subject in subjects:
+                        # The other Stonecutter variant of the same condition may follow it
+                        self.assertRegex(
+                            before_drawing,
+                            r"if \(!(?:quickskin\$)?previewing && " + subject
+                            + r"\) \{(?:\s*if \(![^\n]*\) \{)?"
+                            + r"\s*quickskin\$leaveNoCapeToVanilla\([\w$]+\);\s*return;",
+                        )
+
     def test_ears_five_lookup_selects_every_overload(self) -> None:
         source = (
             CANONICAL_JAVA / "com/quickskin/mod/mixin/compat/EarsFiveMixin.java"

@@ -276,7 +276,9 @@
         "client-api"
       ],
       "implementation": [
+        "client-foundation",
         "configuration",
+        "content-core",
         "platform-api"
       ],
       "runtime_only": [],

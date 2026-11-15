@@ -796,7 +796,7 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn('"cpm".equals(modId) ? 20 * 180 : 20 * 90', remote)
         self.assertIn("Alice still wears the embedded CPM skin", evidence)
 
-        # No new step and no new capture: the public checkpoint products stay 2/5/7.
+        # No new step and no new capture: the public checkpoint products stay 2/5/8.
         self.assertEqual(2, local.count(".screenshot("))
         self.assertEqual(2, remote.count(".screenshot("))
         self.assertEqual(0, feature.count(".screenshot("))
@@ -813,7 +813,8 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         harness = (E2E_JAVA / "E2EHarness.java").read_text(encoding="utf-8")
 
         self.assertIn("MOD_COMPATIBILITY_CPM_FIRST_PERSON", harness)
-        self.assertEqual(2, scenario.count(".screenshot("))
+        # The two hand captures, and the title screen's after the world is left
+        self.assertEqual(3, scenario.count(".screenshot("))
         self.assertIn('Step.of("first_person_hand_initial")', scenario)
         self.assertIn(
             'Step.of("first_person_hand_after_10_seconds")',
@@ -825,6 +826,29 @@ class E2ECompatibilityPolicyTest(unittest.TestCase):
         self.assertIn("feature.firstPersonReady()", scenario)
         self.assertIn("CPMCompatIntegration.isLocalPlayerWearingCpmModel()", feature)
         self.assertIn("CameraType.FIRST_PERSON", feature)
+
+    def test_cpm_model_is_captured_on_the_title_screen_after_the_world_is_left(self) -> None:
+        """With no world there is no player for CPM to draw on: Quick Skin's preview draws it."""
+
+        scenario = (
+            E2E_JAVA / "scenario" / "CpmFirstPersonScenario.java"
+        ).read_text(encoding="utf-8")
+        feature = (
+            E2E_JAVA / "scenario" / "ModCompatibilityFeature.java"
+        ).read_text(encoding="utf-8")
+
+        # The step leaves the world, so it is the scenario's last
+        last = scenario.rindex("steps.add(Step.of(")
+        self.assertEqual(last, scenario.index('steps.add(Step.of("model_on_title_screen")'))
+        self.assertIn(".action(feature::quitToTitle)", scenario[last:])
+        self.assertIn("feature.titleModelReady()", scenario[last:])
+        self.assertIn("feature.assertTitleModel()", scenario[last:])
+        self.assertIn("VanillaShim.disconnectToTitle(minecraft)", feature)
+        # It is the preview's own draw of the model that is proven, and the list's picture
+        self.assertIn("preview.isCpmModelDrawn()", feature)
+        self.assertIn("LocalLookPreview.cpmModelFile(false)", feature)
+        self.assertIn("CpmModelCapture.mesh(imported.hash(), imported.path())", feature)
+        self.assertIn("minecraft.level != null || minecraft.player != null", feature)
 
     def test_cpm_cache_refresh_waits_for_the_extracted_frame_boundary(self) -> None:
         """A skin/model transition must not invalidate CPM's active extracted frame."""

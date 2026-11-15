@@ -683,6 +683,14 @@
         1.0
       ]
     ],
+    "mod-compatibility-cpm-first-person.client_a.model_on_title_screen": [
+      [
+        0.68,
+        0.18,
+        0.88,
+        0.64
+      ]
+    ],
     "mod-compatibility-late-join.client_b.observe_late_join_state": [
       [
         0.32,
@@ -4590,6 +4598,39 @@
                   "client-textures",
                   "configuration",
                   "cpm-integration",
+                  "skin-import"
+                ],
+                "bindings": [
+                  "cpm-assets"
+                ]
+              }
+            },
+            {
+              "id": "model_on_title_screen",
+              "assertion_required": true,
+              "capture": {
+                "title": "CPM model on the title screen",
+                "review_tier": "all",
+                "expectation": "After disconnecting, with no world loaded, the Minecraft title screen shows Quick Skin's 3D player preview next to the Change Skin button as the protected complex CPM model itself, which CPM draws on the preview's own model: its layered red cap, face, blue overalls, white gloves and brown boots form one coherent, attached and textured figure with the model's custom proportions. It must not be a plain vanilla-shaped skin, a flat icon or an empty space, and no part may be missing, detached or corrupted.",
+                "compatibility_reference_capture_id": "session.client_a.quit_to_title",
+                "probes": []
+              },
+              "requires": [
+                "prepare_model"
+              ],
+              "requires_captures": [],
+              "covers": {
+                "modules": [
+                  "appearance-data",
+                  "appearance-services",
+                  "asset-catalog",
+                  "client-textures",
+                  "configuration",
+                  "cpm-integration",
+                  "image-core",
+                  "menu-integration",
+                  "player-preview",
+                  "preview-rendering",
                   "skin-import"
                 ],
                 "bindings": [

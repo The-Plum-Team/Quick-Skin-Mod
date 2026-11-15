@@ -93,9 +93,18 @@ public class PlayerWidget extends AbstractWidget {
     public enum WidgetContext {
         TITLE_SCREEN,
         SKIN_MENU,
+        /** The cape menu and the cape editor, which show the player from behind. */
         CAPE_MENU,
         PAUSE_MENU,
-        OTHER
+        OTHER;
+
+        /**
+         * Whether a drag of the model itself turns it, which happens only before 1.21. A cape
+         * preview keeps the player's back to the screen, where the cape is, so it never turns.
+         */
+        public boolean turnsWhenDragged() {
+            return this != CAPE_MENU;
+        }
     }
     private WidgetContext context = WidgetContext.OTHER;
 
@@ -888,9 +897,11 @@ public class PlayerWidget extends AbstractWidget {
 
         // Different instructions based on customization mode
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
-        String instructionText = config.enablePlayerPreviewCustomization
-            ? "LMB: move | RMB: rotate | Wheel: resize"
-            : "LMB/RMB drag: rotate";
+        String instructionText = !config.enablePlayerPreviewCustomization
+            ? "LMB/RMB drag: rotate"
+            : context.turnsWhenDragged()
+                ? "LMB: move | RMB: rotate | Wheel: resize"
+                : "LMB: move | Wheel: resize";
 
 //?} else {
         String instructionText = "Mouse wheel: resize | Left click: move";
@@ -1032,6 +1043,22 @@ public class PlayerWidget extends AbstractWidget {
     }
 
     /**
+     * Draws a CPM model file on the widget's own model where there is no player for CPM to draw
+     * on, or the skin again with null (see {@link PreviewPlayerData#getCpmModelFile}).
+     *
+     * @param only whether nothing is drawn while CPM cannot draw the model, instead of the skin
+     */
+    public void setCpmModel(@Nullable java.nio.file.Path file, boolean only) {
+        previewData.setCpmModelFile(file);
+        previewData.setCpmModelOnly(file != null && only);
+    }
+
+    /** Whether the latest draw showed the CPM model set with {@link #setCpmModel}. */
+    public boolean isCpmModelDrawn() {
+        return previewData.isCpmModelDrawn();
+    }
+
+    /**
      * Shows the cape's texture on folded elytra wings instead of on the cape (see
      * {@link PreviewPlayerData#isElytraPreview}).
      */
@@ -1146,8 +1173,8 @@ public class PlayerWidget extends AbstractWidget {
                 activeInteractionWidget = this; // Register as active for global event handling
                 return true;
             }
-            // In normal mode: left-click rotates
-            else {
+            // In normal mode: left-click rotates, where the preview turns at all
+            else if (context.turnsWhenDragged()) {
                 isRotating = true;
                 rotationDragStartX = (int)mouseX;
                 rotationDragStartYaw = targetYRotation;
@@ -1156,8 +1183,8 @@ public class PlayerWidget extends AbstractWidget {
                 return true;
             }
         }
-        // Right-click: Always rotation dragging (works in both modes)
-        else if (button == InputConstants.MOUSE_BUTTON_RIGHT) {
+        // Right-click: rotation dragging in both modes, where the preview turns at all
+        else if (button == InputConstants.MOUSE_BUTTON_RIGHT && context.turnsWhenDragged()) {
             isRotating = true;
             rotationDragStartX = (int)mouseX;
             rotationDragStartYaw = targetYRotation;

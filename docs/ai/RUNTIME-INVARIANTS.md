@@ -390,7 +390,23 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   wearing anything (`SkinDeletionLook`). An import
   or search whose content is already catalogued writes no second file and selects the catalogued
   skin.
-- A cape saved through the cape editor keeps its original PNG, WebP or GIF in
+- A cape is imported from a PNG, JPG, WebP or GIF. `SafeImageReader.readStillCape` takes the
+  format from the bytes, never the file name, and turns a JPEG the way its EXIF orientation shows
+  it (`JpegHeader`, read from the file's own bytes with every offset checked), since ImageIO
+  ignores it and a phone photo would open on its side; a skin's JPEG is never turned. A still
+  cape is always saved as a PNG.
+- A still picture larger than a cape can be (4096 pixels per side) is shrunk as it is read, never
+  refused for that: the decoder keeps one pixel in every `n` each way, the smallest whole `n` that
+  fits, so the full picture is never handed over. Every source may be up to 16384 pixels per
+  side; how many pixels it may have follows what its decoder holds: a PNG or a sequential JPEG,
+  read a few rows at a time, 64M; a JPEG libjpeg holds whole as coefficients (progressive, or
+  with a scan per component, as `JpegHeader` reads from its segments) 32M, about 190 MB outside
+  the heap at worst; a WebP, which its reader decodes whole on the heap at about six bytes a
+  pixel, no more than a still cape itself (16M), so its shape is free but its memory is what it
+  always was. Over its limit a picture is refused from its header (`OversizedImageException`)
+  with the text that names its size, or the too-big text when only its pixel count is over. The
+  32 MB file limit is unchanged.
+- A cape saved through the cape editor keeps its original PNG, JPG, WebP or GIF in
   `quickskin_cache/cape_editor_sources/<cape content ID>.<ext>` (`CapeEditorSources`). That file
   only reopens `CapeAdjustScreen`: it is never scanned, registered as a texture or animation, or
   substituted for a cape that has none. An edit writes the new metadata and source association
@@ -420,6 +436,20 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   gives that dedicated field priority and would otherwise replace only the worn wings when the
   profile response arrives asynchronously. While a custom cape texture is pending, clear both
   inputs together; removing the cape restores the original/vanilla fallback path.
+- For a player wearing a Quick Skin cape, `CapeLayerMixin` (both copies) draws the cape at the
+  start of vanilla's cape layer and leaves that layer nothing to draw. It never returns early
+  from the layer: another mod may pair a hook at its start with one at its end (Touch'n Motion
+  pushes a pose there and pops it), and a call cut short runs the first without the second, which
+  stops the game with "Pose stack not empty" as soon as the player is drawn in third person.
+  Instead the layer is told, for that call, that the cape part is off: before 1.21.2 through
+  `Player.isModelPartShown` (`CapeLayerTakeover`, answered by `PreviewEquipmentMixin`), afterwards
+  on the render state's `showCape`, both put back when the layer returns. Do not lower the
+  mixin's priority to run first instead: a mod that draws capes in a layer of its own (Wavy
+  Capes) cancels vanilla's layer before this hook, and running ahead of it would draw two capes.
+  Since vanilla's draw is replaced, the handler applies vanilla's rule itself: an invisible
+  player shows no cape, read from the entity before 1.21.2 and from the render state afterwards.
+  A cape a preview bound to its own draw (the cape menu and editor) still shows. Armour and
+  elytra are vanilla's and stay visible, as in vanilla.
 
 ## Optional integrations
 
@@ -510,8 +540,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Skin's previews of the local look (the HUD overlay, the title and pause menu widgets and the cape
   screens) follow the same choice (`LocalLookPreview`): in a world they draw the live player, whose
   model CPM draws; while a CPM model is the look their skin data is never the saved Quick Skin
-  skin, and a title-screen preview that has no player entity to draw, where CPM draws nothing,
-  shows the player's imported own skin. Screens read the choice as it stands when they are built;
+  skin, and a title-screen preview, which has no player entity for CPM to draw on, draws the
+  model CPM has selected on its own model (`LocalLookPreview.cpmModelFile`, next bullet) and
+  falls back to the player's imported own skin. Screens read the choice as it stands when they are built;
   the HUD overlay reads `CpmLookArbiter`'s latest decision every frame. Re-applying an appearance
   never resets CPM. Quick Skin never hides a model CPM draws: the renderer-level texture override
   stands down for every player CPM draws a model for
@@ -532,9 +563,56 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   switches schema. Nothing is uploaded on that connection, and `ReplayModHelper` re-applies the
   recorded player's look. The 1.20.1 overlay additionally routes recorded payloads through
   `ReplayModCompatMixin`.
+- Outside a world CPM has no player to draw a model on, so Quick Skin's own previews draw CPM
+  models themselves (`CpmModelPreview`, cpm-integration): the title screen's preview and the cape
+  screens show the model CPM has selected while a CPM model is the look, and the skin menu shows
+  the model of the entry the player picks. CPM binds the model file to the preview's own
+  `PlayerModel`, already posed, the preview draws it with the texture CPM answers, and the model
+  is handed back in a `finally`; a model left bound would keep CPM's parts. Everything is
+  reflection, nothing is required and every failure is local: without CPM, on a CPM build with no
+  way in, while CPM is still building the model (nothing is drawn for up to five seconds, never
+  the wrong skin) or when CPM refuses it, the preview draws what it drew before (the skin; in the
+  skin menu the model's icon). CPM's client API (`IClientAPI.createPlayerRenderer`) is the way in
+  wherever a CPM build has it; a model without a texture of its own, which that API cannot draw,
+  and CPM's 26.3 builds, which leave it off, bind on CPM's render manager with the same calls
+  and the preview's skin as the texture. The file is read on the client I/O workers, bounded,
+  and loaded for the local account's profile, so CPM does not hold the player's own model to its
+  limits for strangers' models. Before 1.21.6 the bound model is drawn inline; from 1.21.6 the
+  picture-in-picture pass is handed a model that draws nothing and `GuiSkinRendererMixin` draws
+  the bound model there, from 1.21.9 through CPM's own collector, the only thing CPM's parts
+  draw through, with the preview's pose copied onto CPM's parts. The elytra view keeps the skin.
+  In a world nothing changes: previews of the live player show what CPM draws on it. The skin
+  list's tiles and rows and the favourites fan show pictures of the model itself, not the icon
+  saved in the file: `CpmModelCapture` (preview-rendering) binds a model of its own at rest once,
+  records the vertices CPM writes instead of drawing them, with the pixels of CPM's texture, and
+  `ModelMeshRasterizer` (image-core) draws the bust or the whole figure from that mesh on the
+  I/O workers with the skin bust's camera, light and scale; until a picture is ready, and for a
+  model CPM cannot draw or whose texture cannot be read, the icon stays.
+- CPM draws a model through parts of its own, swapped into the vanilla player model for each
+  draw: they start from the vanilla parts' poses, and each vanilla part that is drawn is left
+  with the pose it was drawn in. What Quick Skin lays over the live player's pose for one draw
+  (the skin-change move, `SkinSwapPoser`) is therefore put back when that inline draw ends, into
+  the parts the model holds then, never only at the next `setupAnim` nor only on the part that
+  was moved. Before 1.21.2 vanilla resets neither the pivots nor the roll, and the first-person
+  hand poses the model without drawing its body, so a leftover would pile up frame after frame
+  and stay on the player in the world.
 - Player Armor Stands is deliberately not a supported integration. Do not restore its mixins,
   accessors, dependency suggestion, or runtime adapter without a new explicit design decision and
   a complete compatibility lane.
+- Quick Skin's previews of the player have a light of their own (`PreviewLighting`), never the
+  inventory's, which leaves a model's front at 82% of its colours and its sides at half: two lamps
+  in front of the model, fixed to the screen, so what faces the screen keeps all its colour, the
+  sides and the top most of theirs, and only what faces the floor stays dark. The preview's own
+  model sets it where it draws: inline before 1.21.6, and from 1.21.6 in `GuiSkinRendererMixin`
+  (both copies), after the pass set vanilla's and before any of it is drawn, only for a model a
+  preview handed over. A preview of the live player is drawn by vanilla's renderer, which sets
+  the inventory's light itself, so the light is set again at the end of `PlayerModel.setupAnim`
+  (`PreviewSkinSwapPoseMixin`, both copies), only for a draw recognised as a preview: the inline
+  draw before 1.21.6, or a render state a preview handed over from 1.21.6. From 1.21.6 the
+  lamps live in a `Lighting` of the previews' own, written through that class's one private
+  writer, found by its shape since its name differs by loader; without it, or without the pose
+  hook, a preview keeps vanilla's light. Vanilla's inventory doll, other mods' GUIs and the
+  world are never lit by it. The skin list's bust pictures are shaded by their own rasterizer.
 - A preview hides everything the previewed player wears or holds, except the pause menu's and the
   skin menu's previews, which show the live local player's armour, elytra, held items and worn head
   as the world does, without the pieces the player hides (`PreviewPlayerData.isEquipmentVisible`,
@@ -601,8 +679,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   it, and the elytra fall back to vanilla's. A CPM model wears no Quick Skin cape (an empty cape
   id, `SkinCapes.wearNone`). The cape menu picks the cape of the skin worn (its clicks and Remove
   Cape store the choice on that skin) or, opened from a skin's context menu
-  (`PlayerCapeMenuScreen.forSkin`), of that skin; with a CPM model or no Quick Skin skin worn it
-  sets only the worn cape. Its Elytra tab picks the skin's `elytra`: "" (the cape),
+  (`PlayerCapeMenuScreen.forSkin`), of that skin, which its preview then wears on the preview's
+  own model, in a world too, since the live player may wear another; with a CPM model or no
+  Quick Skin skin worn it sets only the worn cape. Its Elytra tab picks the skin's `elytra`: "" (the cape),
   `minecraft:elytra` or a cape ID; without a choice the elytra wear the cape. The cape worn before
   capes belonged to skins goes to the skin worn then, once, when the catalog loads
   (`ClientConfig.capesFollowSkins`); other skins start without a cape. The skin list shows a
@@ -674,13 +753,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Authenticate and validate the full runnable/N/A plan, every exact compatibility-profile paired
   review manifest and normalized report, every clean lane marker, and the source completion marker
   before publishing. Publish exactly the two local `mod-compatibility` checkpoints and, only when
-  the mod contract opts in, the two CPM `mod-compatibility-cpm-first-person` hand checkpoints, the
+  the mod contract opts in, the three CPM `mod-compatibility-cpm-first-person` checkpoints (two
+  of the first-person hand, one of the title screen), the
   two live `mod-compatibility-remote` observer checkpoints, plus the one sequential
   `mod-compatibility-late-join` observer checkpoint per applicable lane. Each
   remains its clean reference plus modded candidate, with deterministic assertion,
   exact mod version, semantic fingerprints, source/derivative proof, clean verdict booleans, and
   run provenance. Never publish provider-authored explanations or anomaly text.
-  `reviewed_frame_count` must equal that exact mod-selective two-, five-, or seven-checkpoint model
+  `reviewed_frame_count` must equal that exact mod-selective two-, five-, or eight-checkpoint model
   product; the authenticated runtime result, not repeated model review of ordinary screenshots,
   proves the complete base suite. The shared-source native bundle, public compatibility schema v6,
   encodes that count and travels unchanged inside the kit's family envelope; the Pages path no
@@ -837,6 +917,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   requires, besides the asserted remote state and rear vantage, that the observer's renderer has
   compiled the terrain at and below the subject. Vanilla skips entities in uncompiled sections, so
   appearance state alone can pass on a sky-only frame.
+- The CPM scenario's last checkpoint (`model_on_title_screen`) leaves the world, because Quick
+  Skin draws a CPM model itself only where there is no player for CPM to draw on. Before the
+  capture it must prove that no level or player is left, that the title screen holds one Quick
+  Skin preview whose latest draw showed its CPM model on the preview's own model, that this model
+  is the file CPM has selected and the harness imported, and that the skin list's picture of it
+  has a captured mesh with CPM's texture. A CPM build with no way to draw a model outside a world
+  fails the lane; the preview's fallback to the skin must never pass. The step disconnects, so it
+  stays the scenario's last, and its clean reference is `session.client_a.quit_to_title`, the
+  same preview with a skin.
 - The CPM apply checkpoints (`mod-compatibility` local apply and the live remote apply/observe
   pair) first prove, without a capture, Quick Skin's own skin that carries a CPM model in its
   pixels, imported through the ordinary skin import: on every band the stored file (locally) and

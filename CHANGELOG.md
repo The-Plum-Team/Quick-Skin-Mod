@@ -1,5 +1,40 @@
 # Changelog
 
+## 4.2.0 (2026-11-11)
+
+### Added
+
+- **CPM models show as models in every menu**
+> With Customizable Player Models installed, your CPM model is now drawn as the model itself before you join a world: on the title screen's player, on the skin menu's big model when you pick a model there, and in the cape menu and the cape editor. Until now those showed your skin, or the model's icon, until you were in a world. The skin list and the favourites fan show a picture of each model made from the model itself, in the list's own style, instead of the icon saved in its file. It works on every Minecraft version Quick Skin supports, 26.3 included; with a CPM build too old to draw a model outside a world, the menus keep showing your skin or the model's icon.
+
+- **JPG images as capes**
+> The cape menu now takes JPG images too, dropped on it or picked from the file dialog, next to PNG, WebP and GIF. A JPG opens in the cape editor like any other picture, where you place it on the cape, and a photo taken with a phone opens the right way up. Skins saved as `.jpeg` are accepted as well; until now only `.jpg` was.
+
+- **Big pictures as capes**
+> A picture larger than 4096 pixels per side, such as a camera's photo or a long WebP, is now made smaller as it opens in the cape editor instead of being refused. PNG and JPG go up to 16384 pixels per side and 64 megapixels (32 for a progressive JPG); a WebP can have any shape up to 16 megapixels. A picture over that now says it is too big, or its size and the limit, instead of that it can't be opened as an image.
+
+### Changed
+
+- **Brighter player previews**
+> Your player on the title screen, in the pause menu, in the skin and cape menus and in the corner preview is now lit from the front instead of with the inventory's dim light: the side facing you keeps all its colour and the rest most of it, so dark skins no longer look like a black shape.
+
+### Fixes
+
+- **A CPM model no longer ends up twisted after you pick a look**
+> With Customizable Player Models on Minecraft 1.21.1 and older, picking a skin or a model in the skin menu inside a world could leave your character bent out of shape, in the menu and in the world, until you restarted the game. The little move the menu's model makes when you pick a look no longer stays on the player.
+
+- **The cape menu shows the skin you opened it for**
+> Right-click a skin and pick Assign cape or Change cape, and the cape menu's model now wears that skin. In a world it showed the skin you were wearing, which could be another one.
+
+- **A cape on an invisible player**
+> A player with the Invisibility effect no longer shows their Quick Skin cape floating in the air: the cape hides with the player, as a Minecraft cape does. Armour and elytra still show, as they do in Minecraft.
+
+- **No more crash in third person with Touch'n Motion**
+> With Touch'n Motion and an Entity Model Features player animation pack, wearing a Quick Skin cape closed the game with "Pose stack not empty" as soon as your player was drawn, for example in third person. Quick Skin now draws its cape without cutting Minecraft's own cape layer short, so what other mods do around that layer stays whole.
+
+- **The cape preview stays turned to the cape**
+> On Minecraft 1.20.1, dragging the player in the cape menu or in the cape editor turned it, and letting go left it facing you with the cape out of sight. That preview no longer turns: it always shows the player from behind, where the cape is.
+
 ## 4.1.0 (2026-11-09)
 
 ### Added

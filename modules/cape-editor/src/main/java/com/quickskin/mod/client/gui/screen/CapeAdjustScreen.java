@@ -922,6 +922,9 @@ public class CapeAdjustScreen extends Screen {
                 modelX0, areaTop, modelWidth, areaHeight,
                 skinLocation, null, null, modelType));
         playerWidget.setContext(PlayerWidget.WidgetContext.CAPE_MENU);
+        // The player's look: on the title screen, while a CPM model is that look, CPM draws it
+        // on the preview's own model, as it draws it on the live player in a world
+        playerWidget.setCpmModel(LocalLookPreview.cpmModelFile(player != null), false);
         // Feet on the bottom of the area, no taller than the area
         playerWidget.setCustomReferencePoint(modelX0 + modelWidth / 2, previewY1 - 2);
         playerWidget.setScaleCap((areaHeight - 4) / 1.95f);
