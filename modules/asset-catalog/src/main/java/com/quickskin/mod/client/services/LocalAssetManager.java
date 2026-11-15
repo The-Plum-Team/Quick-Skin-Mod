@@ -11,6 +11,7 @@ import com.quickskin.mod.common.data.SkinSortMode;
 import com.quickskin.mod.common.data.TextureQuality;
 import com.quickskin.mod.common.util.HashUtil;
 import com.quickskin.mod.common.util.BoundedFileReader;
+import com.quickskin.mod.common.util.BoundedFileWalk;
 import com.quickskin.mod.common.util.CapeElytraSilhouette;
 import com.quickskin.mod.common.util.HDTextureProcessor;
 import com.quickskin.mod.common.util.RawArgbImages;
@@ -46,7 +47,6 @@ import java.lang.ref.SoftReference;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Stream;
 
 /**
  * Manages local skin and cape assets
@@ -471,12 +471,8 @@ public class LocalAssetManager {
         Path modelsDir = com.quickskin.mod.client.compat.CPMCompatIntegration.getCPMModelsDirectory();
         if (!Files.exists(modelsDir)) return;
 
-        try (Stream<Path> paths = Files.walk(modelsDir, MAX_SCAN_DEPTH)) {
-            List<Path> candidates = paths.limit(MAX_SCAN_CANDIDATES)
-                    .filter(Files::isRegularFile).toList();
-            if (candidates.size() == MAX_SCAN_CANDIDATES) {
-                QuickSkinInfo.LOGGER.warn("CPM model scan reached the {} file cap in {}", MAX_SCAN_CANDIDATES, modelsDir);
-            }
+        try {
+            List<Path> candidates = scanCandidates(modelsDir, "CPM model");
             for (Path path : candidates) {
                 String fileName = path.getFileName().toString();
                 if (!fileName.toLowerCase(Locale.ROOT).endsWith(".cpmmodel")) continue;
@@ -518,6 +514,23 @@ public class LocalAssetManager {
     }
 
     /**
+     * The regular files a scan looks at. An entry that cannot be read, such as a subfolder
+     * without permission or a file another game instance removed meanwhile, is left out: the
+     * stream of Files.walk fails as a whole on it, which ended the scan and the game's start.
+     */
+    private static List<Path> scanCandidates(Path directory, String what) throws IOException {
+        BoundedFileWalk.Result walked = BoundedFileWalk.regularFiles(directory, MAX_SCAN_DEPTH, MAX_SCAN_CANDIDATES);
+        if (walked.capped()) {
+            QuickSkinInfo.LOGGER.warn("{} scan reached the {} entry cap in {}", what, MAX_SCAN_CANDIDATES, directory);
+        }
+        if (walked.skipped() > 0) {
+            QuickSkinInfo.LOGGER.warn("{} scan left out {} entries it could not read in {}",
+                    what, walked.skipped(), directory);
+        }
+        return walked.files();
+    }
+
+    /**
      * Scan directory for PNG and GIF files and process them
      * @return Number of assets found
      */
@@ -528,12 +541,8 @@ public class LocalAssetManager {
 
         int count = 0;
 
-        try (Stream<Path> paths = Files.walk(directory, MAX_SCAN_DEPTH)) {
-            List<Path> candidates = paths.limit(MAX_SCAN_CANDIDATES)
-                    .filter(Files::isRegularFile).toList();
-            if (candidates.size() == MAX_SCAN_CANDIDATES) {
-                QuickSkinInfo.LOGGER.warn("Local asset scan reached the {} file cap in {}", MAX_SCAN_CANDIDATES, directory);
-            }
+        try {
+            List<Path> candidates = scanCandidates(directory, "Local asset");
             if ("cape".equals(type)) {
                 preflightCapeAliases(candidates, scanned);
             }
@@ -583,12 +592,8 @@ public class LocalAssetManager {
             return;
         }
 
-        try (Stream<Path> paths = Files.walk(modelsDirectory, MAX_SCAN_DEPTH)) {
-            List<Path> candidates = paths.limit(MAX_SCAN_CANDIDATES)
-                    .filter(Files::isRegularFile).toList();
-            if (candidates.size() == MAX_SCAN_CANDIDATES) {
-                QuickSkinInfo.LOGGER.warn("CPM model scan reached the {} file cap in {}", MAX_SCAN_CANDIDATES, modelsDirectory);
-            }
+        try {
+            List<Path> candidates = scanCandidates(modelsDirectory, "CPM model");
             for (Path path : candidates) {
                 String fileName = path.getFileName().toString();
                 if (!fileName.toLowerCase(Locale.ROOT).endsWith(".cpmmodel")) {

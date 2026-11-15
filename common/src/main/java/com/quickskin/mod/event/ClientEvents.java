@@ -89,7 +89,8 @@ public class ClientEvents {
         PlayerOwnSkinBootstrap.ensurePlayerOwnSkinExists();
 
         // Player joins world (client-side)
-        ClientPlayerEvent.CLIENT_PLAYER_JOIN.register(player -> {
+        ClientPlayerEvent.CLIENT_PLAYER_JOIN.register(player -> GameCallbacks.guarded(
+                "set up its session for the world being joined", () -> {
             clientRuntime.beginSession(
                     player != null ? player.getUUID() : null,
                     player != null ? player.connection : Minecraft.getInstance().getConnection());
@@ -104,10 +105,11 @@ public class ClientEvents {
             //?}
             // Restore saved skin and model type from config
             restoreSavedAppearance(player);
-        });
+        }));
 
         // Player quits world (client-side)
-        ClientPlayerEvent.CLIENT_PLAYER_QUIT.register(player -> {
+        ClientPlayerEvent.CLIENT_PLAYER_QUIT.register(player -> GameCallbacks.guarded(
+                "end its session for the world being left", () -> {
             boolean ended = clientRuntime.endSession(
                     player != null ? player.getUUID() : null,
                     player != null ? player.connection : null);
@@ -118,14 +120,15 @@ public class ClientEvents {
 
             // Re-register appearance for Essential's title screen player model
             com.quickskin.mod.client.compat.EssentialCompatIntegration.registerMenuAppearance();
-        });
+        }));
 
         // Respawn event (player dies and respawns)
-        ClientPlayerEvent.CLIENT_PLAYER_RESPAWN.register((oldPlayer, newPlayer) -> {
+        ClientPlayerEvent.CLIENT_PLAYER_RESPAWN.register((oldPlayer, newPlayer) -> GameCallbacks.guarded(
+                "put the saved look back after a respawn", () -> {
 
             // Re-apply appearance after respawn
             restoreSavedAppearance(newPlayer);
-        });
+        }));
 
         com.quickskin.mod.client.gui.integration.MenuIntegration.init(parent ->
                 com.quickskin.mod.client.gui.GuiCompat.openScreen(new PlayerSkinMenuScreen(parent)));
@@ -266,7 +269,9 @@ public class ClientEvents {
             com.quickskin.mod.client.compat.ReplayModHelper.startReplayPlayerWatcher();
             return;
         }
-        restoreSavedAppearanceToPlayer(player.getUUID());
+        if (player != null) {
+            restoreSavedAppearanceToPlayer(player.getUUID());
+        }
     }
 
     private static void restoreSavedAppearanceToPlayer(java.util.UUID targetPlayerId) {
