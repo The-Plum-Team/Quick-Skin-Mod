@@ -23,7 +23,11 @@
   },
   "curseforge": {
     "project_id": 1323980,
-    "display_name": "Quick-Skin-{minecraft}-v{version} [{loader_name}]"
+    "display_name": "Quick-Skin-{minecraft}-v{version} [{loader_name}]",
+    "environments": [
+      "client",
+      "server"
+    ]
   },
   "lanes": {
     "fabric-1.20.1": {
