@@ -35,6 +35,9 @@
 - **The cape preview stays turned to the cape**
 > On Minecraft 1.20.1, dragging the player in the cape menu or in the cape editor turned it, and letting go left it facing you with the cape out of sight. That preview no longer turns: it always shows the player from behind, where the cape is.
 
+- **A Quick Skin error can no longer keep a world from loading**
+> What Quick Skin does when you enter, respawn in or leave a world is now kept apart from the game's own work: if it ever fails, the failure goes to the log and the world loads anyway. On Forge 1.20.1 such a failure left the game on "Joining world..." forever with no error screen, or sent you back to the menu with "Invalid player data".
+
 ## 4.1.0 (2026-11-09)
 
 ### Added

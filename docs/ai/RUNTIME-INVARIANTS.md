@@ -12,6 +12,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   decoding, hashing, chunk assembly, and other bulk work belong on the bounded worker executors.
 - Executors, queues, prepared handoffs, and pending transfers must remain bounded and must release
   leases on success, failure, cancellation, disconnect, and shutdown.
+- Quick Skin's code in the game's player callbacks (the client's join, respawn and quit; the
+  server's join, quit, respawn and dimension change) runs through `GameCallbacks.guarded`. They
+  fire inside the game's own login, respawn and disconnect handling, where an exception costs the
+  player the world. Seen on Forge 1.20.1: the client's join fires before the player is in the
+  level, and an exception leaves the game on "Joining world..." forever with one "Error
+  executing task on Client" line and no crash screen; one from the server's join sends the
+  player back with "Invalid player data". A failure is logged and that step left out; never
+  rethrow it there. `ServerRuntime.start` is not guarded: a server whose stores did not start
+  fails at once instead of running without them.
 - A skin selection belongs to the launcher account (profile UUID plus exact name), never to the
   instance. At every join outside a replay `ClientRuntime` makes `ClientConfig.activeSkinHash`
   the joining account's selection (`AccountSkinPreferences.project`); the selection that
