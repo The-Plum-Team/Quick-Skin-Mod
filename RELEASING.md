@@ -52,8 +52,11 @@ The publish job then:
 2. creates one draft GitHub Release per target with its files and the sealed plan
    (`mod-base-release-plan.json`), and a publication ledger in a hidden block at the end of the
    draft's notes;
-3. uploads every lane to Modrinth and to CurseForge, four at a time, each step holding only its own
-   token; upload intent is saved in the ledger before a file is sent;
+3. uploads every lane to Modrinth and to CurseForge, one file at a time (oldest Minecraft version
+   first), each step holding only its own token; upload intent is saved in the ledger before a
+   file is sent. Every CurseForge upload names the `Client` and `Server` game versions
+   (`curseforge.environments` in the release config): the project refuses a file without one,
+   which stopped the 4.1.0 release;
 4. verifies every file by content: Modrinth by its hashes, CurseForge through its public listing
    and a download of the published copy;
 5. publishes each GitHub Release whose rows are all `verified` and only then creates its tag
