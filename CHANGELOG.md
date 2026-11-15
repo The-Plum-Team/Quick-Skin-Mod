@@ -41,6 +41,9 @@
 - **The game no longer stops at startup over one unreadable file**
 > If the skin, cape or CPM model folder held a subfolder Quick Skin could not read, or a file went away while the folder was being listed (another Minecraft instance using the shared library at the same moment), the game could stop while it started. Quick Skin now leaves that entry out, says so in the log and lists the rest.
 
+- **The game's pop-ups no longer cover the skin and cape menus**
+> Minecraft's notices in the top right corner (the tutorial, advancements, unlocked recipes and other mods' messages) were drawn over the skin and cape menus, on top of their header and buttons. While a Quick Skin menu is open they now wait, and they come in, with their sound, once you close it. None is lost.
+
 ## 4.1.0 (2026-11-09)
 
 ### Added
