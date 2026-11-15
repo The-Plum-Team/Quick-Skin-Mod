@@ -48,7 +48,8 @@ public class CommonEvents {
         }
 
         // Player joins server
-        PlayerEvent.PLAYER_JOIN.register(player -> {
+        PlayerEvent.PLAYER_JOIN.register(player -> GameCallbacks.guarded(
+                "prepare a player who joined the server", () -> {
             // Phase 5: Load player's saved appearance from server storage
             com.quickskin.mod.common.data.PlayerAppearance savedAppearance =
                 ServerAppearanceStorage.getInstance().loadPlayerAppearance(player.getUUID());
@@ -104,31 +105,34 @@ public class CommonEvents {
             // Vanilla's join packets named the player in the tab list; operators also see the
             // account name of whoever uses a nickname
             com.quickskin.mod.networking.ServerNicknames.playerJoined(serverPlayer);
-        });
+        }));
 
         // Player quits server
-        PlayerEvent.PLAYER_QUIT.register(player -> {
+        PlayerEvent.PLAYER_QUIT.register(player -> GameCallbacks.guarded(
+                "release a player who left the server", () -> {
             ServerPlayer serverPlayer = (ServerPlayer) player;
             serverRuntime.playerDisconnected(
                     serverPlayer.level().getServer(),
                     serverPlayer.getUUID(),
                     serverPlayer.connection);
-        });
+        }));
 
         // Player respawns (after death)
         //? if <1.21 {
-        PlayerEvent.PLAYER_RESPAWN.register((player, conqueredEnd) -> {
+        PlayerEvent.PLAYER_RESPAWN.register((player, conqueredEnd) -> GameCallbacks.guarded(
+                "send a player the appearances again after a respawn", () -> {
             if (player instanceof ServerPlayer) {
                 ServerPlayer serverPlayer = (ServerPlayer) player;
                 if (ProtocolNetwork.canReceive(serverPlayer)) {
                     ServerNetworkHandler.sendAllAppearancesToPlayer(serverPlayer);
                 }
             }
-        });
+        }));
         //?}
 
         // Player changes dimension
-        PlayerEvent.CHANGE_DIMENSION.register((player, oldLevel, newLevel) -> {
+        PlayerEvent.CHANGE_DIMENSION.register((player, oldLevel, newLevel) -> GameCallbacks.guarded(
+                "send a player the appearances again after a dimension change", () -> {
             // Re-sync appearance if needed (sometimes skins don't transfer across dimensions)
             if (player instanceof ServerPlayer) {
                 ServerPlayer serverPlayer = (ServerPlayer) player;
@@ -137,7 +141,7 @@ public class CommonEvents {
                     ServerNetworkHandler.sendAllAppearancesToPlayer(serverPlayer);
                 }
             }
-        });
+        }));
 
         TickEvent.SERVER_POST.register(ServerNetworkHandler::tickTextureResponses);
         TickEvent.SERVER_POST.register(MissingModNotice::tick);
