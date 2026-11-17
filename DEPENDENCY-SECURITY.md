@@ -30,11 +30,17 @@ checksum change, never by relaxing the mode: see
   Gradle refuse any dynamic or changing selector in that classpath, so a new Fabric Loader release
   cannot break strict verification. The build declares no dynamic versions anywhere else either.
 - `gradle/maven-mirror.gradle.kts` puts The Plum Team's
-  [Maven mirror](https://github.com/The-Plum-Team/maven-mirror) first in every project that applies
-  the policy or the Java module conventions, and `settings.gradle.kts` does the same for plugins.
-  It is limited to exact Fabric, Architectury, Stonecutter, NeoForge and Forge groups, serves only
-  openly licensed files whose SHA-256 matched the mods' own verification metadata, and answers 404
-  for everything else, so Gradle falls back to the upstream repositories unchanged. Strict
+  [Maven mirror](https://github.com/The-Plum-Team/maven-mirror), at `https://maven.quickskin.net/`,
+  first in every project that applies the policy or the Java module conventions, and
+  `settings.gradle.kts` does the same for plugins. It is asked for everything but what it never
+  holds (Mojang's and Minecraft's files and the namespaces Loom generates): the Fabric,
+  Architectury, Stonecutter, NeoForge and Forge groups and the libraries and plugins Maven Central
+  and the Gradle Plugin Portal serve. It serves only openly licensed files whose SHA-256 matched
+  the mods' own verification metadata, and answers 404 for everything else, so Gradle falls back to
+  the upstream repositories unchanged. Loom would take LWJGL from Maven Central alone;
+  `gradle/repository-policy.gradle.kts` declares the repository Loom looks for
+  (`MavenCentralLWJGL`) itself, without that exclusivity, so LWJGL comes from the mirror first like
+  every other library. Strict
   verification checks every file the mirror serves against `gradle/verification-metadata.xml`,
   exactly as it checks files from the upstream repositories. `-Pplum.mavenMirror=false` (or
   `ORG_GRADLE_PROJECT_plum.mavenMirror=false` in the environment) is the emergency switch: it
