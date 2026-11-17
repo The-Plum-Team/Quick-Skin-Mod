@@ -489,7 +489,7 @@ class DependencySecurityPolicyTest(unittest.TestCase):
                 )
 
     def test_maven_mirror_has_an_emergency_switch(self) -> None:
-        mirror_url = 'maven("https://the-plum-team.github.io/maven-mirror/")'
+        mirror_url = 'maven("https://maven.quickskin.net/")'
         guard = 'if (plumMirrorSwitch != "false") {'
         for relative in ("settings.gradle.kts", "gradle/maven-mirror.gradle.kts"):
             with self.subTest(script=relative):
@@ -500,7 +500,7 @@ class DependencySecurityPolicyTest(unittest.TestCase):
                 )
                 self.assertIn('"plum.mavenMirror must be true or false', script)
                 # The mirror is declared exactly once, inside the switch's block.
-                self.assertEqual(script.count("the-plum-team.github.io/maven-mirror/"), 1)
+                self.assertEqual(script.count("https://maven.quickskin.net/"), 1)
                 start = script.index(guard)
                 self.assertGreater(script.index(mirror_url), start)
                 depth = 0
