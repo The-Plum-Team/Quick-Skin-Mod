@@ -14,6 +14,7 @@ import com.quickskin.mod.client.immersive.ImmersiveMode;
 import com.quickskin.mod.client.immersive.ImmersiveOpening;
 import com.quickskin.mod.client.immersive.ImmersiveShaderPacks;
 import com.quickskin.mod.client.immersive.LegacyOpeningRenderer;
+import com.quickskin.mod.client.immersive.compat.ChunkApertureGl;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
@@ -91,8 +92,27 @@ public final class ImmersiveBlockReveal {
         Minecraft game = Minecraft.getInstance();
         LocalPlayer player = game.player;
         if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SOLID_BLOCKS) pending = null;
+        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY) ChunkApertureGl.useLegacyOpening(null, 0, 0);
         if (player == null || shader == null
                 || !event.getCamera().isDetached() || event.getCamera().getEntity() != player) return;
+        if (ImmersiveShaderPacks.active()) {
+            // A shader pack shades, fogs and smooths the frame from its own G-buffer. Drawing the
+            // world a second time through it, with a cropped projection, left the pack fogging the
+            // whole frame, losing the scene behind the player and drawing the cape over the body.
+            // The pack's terrain programs discard the opening instead (LegacySodiumTerrainShaderMixin,
+            // LegacyIrisTerrainShaderMixin), so the frame keeps one camera and one G-buffer.
+            if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SOLID_BLOCKS) {
+                // The camera can sit inside a block, whose outward faces it cannot see. The pack's
+                // terrain program shades these inward faces and opens them with the rest.
+                ImmersiveTerrainInterior.draw(event);
+            } else if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY) {
+                worldView.last().pose().set(event.getPoseStack().last().pose());
+                worldView.last().normal().set(event.getPoseStack().last().normal());
+                RenderTarget world = game.getMainRenderTarget();
+                ChunkApertureGl.useLegacyOpening(findOpening(event, player, world), world.width, world.height);
+            }
+            return;
+        }
         if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SOLID_BLOCKS) {
             ImmersiveTerrainInterior.draw(event);
         } else if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_CUTOUT_BLOCKS) {
@@ -192,7 +212,7 @@ public final class ImmersiveBlockReveal {
         float cut = opening.cut();
         // This remaps the original depth interval [cut, 1] to [0, 1] without moving a pixel in XY.
         Matrix4f clipped = new Matrix4f().m22(1 / (1 - cut)).m32(-cut / (1 - cut)).mul(event.getProjectionMatrix());
-        int[] priorScissor = LegacyOpeningRenderer.beginOpeningScissor(opening, ImmersiveShaderPacks.active());
+        int[] priorScissor = LegacyOpeningRenderer.beginOpeningScissor(opening);
         RenderSystem.setProjectionMatrix(clipped, sorting);
         drawingOpening = true;
         try {

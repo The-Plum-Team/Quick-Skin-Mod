@@ -623,12 +623,22 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Iris and Oculus shadow-map passes before reading the projection or changing pending camera state.
   Terrain searches reconstructed from a projection have a bounded number of block visits.
   The terrain depth copy restores the active read and draw framebuffers and viewport. The
-  second world pass uses Minecraft's render clock so shader packs get consistent frame deltas
-  for exposure and other time filters. Iris and Oculus receive the original camera and render
-  their shadow and lighting targets at their own dimensions. The opening clips terrain after
-  the shadow pass. The player, equipment and supporting ground enter the shader pack together
-  so their lighting and contact shadow remain continuous at the edge. The final composition
-  limits the result to the opening and restores projection and depth before the interface draws.
+  final composition limits the result to the opening and restores projection and depth before
+  the interface draws.
+- Through 1.21.5 an active Iris or Oculus shader pack never gets a second world pass: a pass
+  through a pack restarts its whole G-buffer pipeline, whose fog and lighting then read the
+  cropped depth (the frame turns to fog, the scene behind the player and the floor drop out)
+  while the player loses its depth order (the cape draws over the body). The world is drawn once.
+  The opening is found before the terrain draws (Forge 1.20.1 at `AFTER_SKY`, the other loaders at
+  the head of `renderLevel`) and handed to `ChunkApertureGl`, and the pack's own G-buffer terrain
+  and block-entity programs discard it, as on 1.21.6+. Sodium's programs are wrapped through
+  `GlShader` (`LegacySodiumTerrainShaderMixin` for the `me.jellysquid` package on 1.20.1,
+  `SodiumTerrainShaderMixin` from 1.21.1) and Iris's through `ShaderCreator`
+  (`LegacyIrisTerrainShaderMixin` until 1.21.1, `IrisTerrainShaderMixin` from 1.21.2). The
+  uniforms are set where the program is in use: Sodium's `GlProgram.bind`, Iris's `apply`, and on
+  1.21.5 `setDefaultUniforms` (`LegacyIrisTerrainProgramMixin`). Shadow-map programs keep every
+  block. The interior faces of the block holding the camera are still drawn, through the pack's
+  terrain program, and open with the rest.
 - From 1.21.6 the chunk renderer clips foreground fragments in its terrain pass, before the
   usual player and shadow draws. The section uses block textures and shapes where the near
   plane intersects terrain. The aperture uniforms and the section geometry share the world

@@ -3,8 +3,6 @@ package com.quickskin.mod.forge;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.quickskin.mod.client.immersive.ImmersiveOpening;
 import com.quickskin.mod.client.immersive.LegacyOpeningRenderer;
-import com.quickskin.mod.client.immersive.LegacyPackCamera;
-import com.quickskin.mod.client.immersive.ImmersiveShaderPacks;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.quickskin.mod.platform.QuickSkinInfo;
@@ -58,28 +56,12 @@ public final class ImmersiveUnclippedPlayer {
         var buffers = Minecraft.getInstance().renderBuffers().bufferSource();
         boolean shadowFlushed = false;
         boolean wholePlayer = LegacyOpeningRenderer.needsWholePlayer(opening);
-        boolean pack = ImmersiveShaderPacks.active();
-        boolean drawnInPack = false;
         try {
-            if (!pack) GL11.glDepthRange(Mth.lerp(opening.cut(), range[0], range[1]), range[1]);
+            GL11.glDepthRange(Mth.lerp(opening.cut(), range[0], range[1]), range[1]);
             clippedPlayer = player;
             omitModel = wholePlayer;
             try {
-                if (pack) {
-                    Matrix4f cameraView = new Matrix4f(RenderSystem.getModelViewMatrix()).mul(worldView.last().pose());
-                    drawnInPack = LegacyPackCamera.render(opening, normalProjection, clippedProjection, range, drawClippedWorld, () -> {
-                        PoseStack poses = LegacyOpeningRenderer.modelView(cameraView);
-                        ImmersiveTerrainInterior.drawGround(player, camera.getPosition(), poses, partialTick, opening);
-                        omitModel = false;
-                        try {
-                            drawModel(player, camera.getPosition(), poses, partialTick, buffers);
-                        } finally {
-                            omitModel = true;
-                        }
-                    });
-                } else {
-                    drawClippedWorld.accept(clippedProjection);
-                }
+                drawClippedWorld.accept(clippedProjection);
                 buffers.endBatch();
             } finally {
                 clippedPlayer = null;
@@ -88,16 +70,15 @@ public final class ImmersiveUnclippedPlayer {
             }
             RenderSystem.setProjectionMatrix(normalProjection, sorting);
             Minecraft.getInstance().getMainRenderTarget().bindWrite(false);
-            // Oculus ends its fullscreen colour pass with depth writes disabled.
             RenderSystem.depthMask(true);
-            if (!drawnInPack) ImmersiveTerrainInterior.drawGround(player, camera.getPosition(), worldView, partialTick, opening);
+            ImmersiveTerrainInterior.drawGround(player, camera.getPosition(), worldView, partialTick, opening);
             // Shadow vertices are already in view space. Project them onto the finished ground once.
             if (deferredShadow != null) deferredShadow.endBatch();
             shadowFlushed = true;
             // Close the cut terrain in front of the background and its shadows. The skin can
             // extend past its collision box, so leave the real scene depth for the player draw.
             ImmersiveTerrainSection.draw(camera.getPosition(), worldView, partialTick, opening);
-            if (!drawnInPack && wholePlayer) drawModel(player, camera.getPosition(), worldView, partialTick, buffers);
+            if (wholePlayer) drawModel(player, camera.getPosition(), worldView, partialTick, buffers);
         } finally {
             if (!shadowFlushed) deferredShadow = null;
             RenderSystem.setProjectionMatrix(clippedProjection, sorting);
