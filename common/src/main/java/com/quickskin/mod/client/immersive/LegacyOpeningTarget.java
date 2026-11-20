@@ -8,6 +8,7 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL14;
+import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryStack;
@@ -256,7 +257,7 @@ final class LegacyOpeningTarget implements AutoCloseable {
                     pixels.put((byte)((bits & ImmersiveOpening.LATE) == 0 ? 0 : 255));
                 }
                 pixels.flip();
-                GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, 256, 16, GL30.GL_RG, GL11.GL_UNSIGNED_BYTE, pixels);
+                uploadCells(pixels);
                 bind(3, terrainCaptured ? terrainDepth : depth);
                 GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
             } finally {
@@ -266,6 +267,27 @@ final class LegacyOpeningTarget implements AutoCloseable {
                 GL20.glBlendEquationSeparate(eq, eqA); GL14.glBlendFuncSeparate(src, dst, srcA, dstA);
                 GL30.glBindVertexArray(oldArray); GL20.glUseProgram(oldProgram);
             }
+        }
+    }
+
+    /** Atlas and animated sprite uploads can leave a row stride and source offset behind. */
+    private static void uploadCells(ByteBuffer pixels) {
+        int rowLength = GL11.glGetInteger(GL11.GL_UNPACK_ROW_LENGTH);
+        int skipRows = GL11.glGetInteger(GL11.GL_UNPACK_SKIP_ROWS);
+        int skipPixels = GL11.glGetInteger(GL11.GL_UNPACK_SKIP_PIXELS);
+        int unpackBuffer = GL11.glGetInteger(GL30.GL_PIXEL_UNPACK_BUFFER_BINDING);
+        try {
+            GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, 0);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, 0);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, 0);
+            GL15.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, 0);
+            GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, ImmersiveOpening.SIDE * ImmersiveOpening.SIDE,
+                    ImmersiveOpening.SIDE, GL30.GL_RG, GL11.GL_UNSIGNED_BYTE, pixels);
+        } finally {
+            GL15.glBindBuffer(GL30.GL_PIXEL_UNPACK_BUFFER, unpackBuffer);
+            GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, rowLength);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, skipRows);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, skipPixels);
         }
     }
 

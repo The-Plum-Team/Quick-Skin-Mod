@@ -108,7 +108,7 @@ public final class LegacyOpeningRenderer {
                 player.getBbHeight(), player.getBbWidth(), false, (x, y, z, cell) -> {
                     pos.set(x, y, z);
                     var state = level.getBlockState(pos);
-                    if (state.getRenderShape() == RenderShape.INVISIBLE) return false;
+                    if (state.getRenderShape() == RenderShape.INVISIBLE && !state.hasBlockEntity()) return false;
                     RenderType layer = ItemBlockRenderTypes.getChunkRenderType(state);
                     cell.set(LegacyTerrainGeometry.offset(state, level, pos), state.getCollisionShape(level, pos).isEmpty(),
                             state.hasBlockEntity() || layer == RenderType.translucent() || layer == RenderType.tripwire());

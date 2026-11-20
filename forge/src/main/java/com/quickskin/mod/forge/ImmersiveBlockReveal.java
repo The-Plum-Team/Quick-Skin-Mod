@@ -122,7 +122,7 @@ public final class ImmersiveBlockReveal {
                 (x, y, z, cell) -> {
                     pos.set(x, y, z);
                     var state = level.getBlockState(pos);
-                    if (state.getRenderShape() == RenderShape.INVISIBLE) return false;
+                    if (state.getRenderShape() == RenderShape.INVISIBLE && !state.hasBlockEntity()) return false;
                     cell.set(state.getOffset(level, pos), state.getCollisionShape(level, pos).isEmpty(),
                             drawnAfterTerrain(level, state, pos));
                     return true;
