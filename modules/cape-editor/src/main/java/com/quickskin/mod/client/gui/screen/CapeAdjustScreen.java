@@ -68,7 +68,7 @@ import java.util.function.Consumer;
  * The "cape back" area (the main visible part) is highlighted.
  */
 @Environment(EnvType.CLIENT)
-public class CapeAdjustScreen extends Screen {
+public class CapeAdjustScreen extends Screen implements com.quickskin.mod.client.immersive.ImmersiveScreen {
 
     private final Screen parent;
     private final BufferedImage sourceImage;
@@ -250,6 +250,21 @@ public class CapeAdjustScreen extends Screen {
 
     // 3D player model preview (mirrors the main cape menu)
     private PlayerWidget playerWidget;
+    // The immersive view: where the model would stand, which is where the player is seen, and the
+    // drag on that place that takes the camera round the player
+    private float immersiveFeetX;
+    private float immersiveFeetY;
+    private float immersiveScale;
+    /** How far the canvas column and the right panel swing away from the flat screen, round the player. */
+    private static final float IMMERSIVE_PANEL_SWING = 20.0f;
+    /** The room the player has between the canvas and the right panel, and its bounds. */
+    private int immersiveRoom;
+    private static final int IMMERSIVE_MIN_ROOM = 64;
+    private static final int IMMERSIVE_MAX_ROOM = 160;
+    /** The player turns their back to the camera, with the cape, a little to the side as the model stands. */
+    private static final float IMMERSIVE_PLAYER_TURN = 200.0f;
+    private final com.quickskin.mod.client.immersive.ImmersiveOrbit immersiveOrbit =
+            new com.quickskin.mod.client.immersive.ImmersiveOrbit();
     //? if <1.21.11 {
     private ResourceLocation lastPlayerWidgetCape;
     //?} else {
@@ -295,6 +310,54 @@ public class CapeAdjustScreen extends Screen {
         this.timeline = this.frameCount > 1 ? new CapeAnimationTimeline(this.frameCount, timing) : null;
         this.onApply = onApply;
         this.onCancel = onCancel != null ? onCancel : () -> {};
+    }
+
+    /**
+     * In a world the editor floats round the player, who stands in a room of their own between the
+     * canvas and the right panel, under the Cape and Elytra buttons, where the model's place at the
+     * top of that panel would be far too small: the camera stands where the player fills that
+     * room, and the canvas column, with the zoom panel and the timeline, and the
+     * right panel, with Cancel and Apply, swing away on their outer edges like the covers of an
+     * open book. The header stays across the top.
+     */
+    @Override
+    public com.quickskin.mod.client.immersive.ImmersiveLayout immersiveLayout() {
+        if (playerWidget == null || immersiveRoom <= 0 || immersiveScale <= 0.0f) {
+            return null;
+        }
+        float canvasRight = zoomX1 + MARGIN / 2.0f;
+        float panelLeft = panelX0 - MARGIN / 2.0f;
+        return new com.quickskin.mod.client.immersive.ImmersiveLayout(immersiveFeetX, immersiveFeetY, immersiveScale,
+                java.util.List.of(
+                        new com.quickskin.mod.client.immersive.ImmersiveLayout.Panel(0.0f, HEADER_H, canvasRight,
+                                this.height, com.quickskin.mod.client.immersive.ImmersiveLayout.Hinge.LEFT,
+                                IMMERSIVE_PANEL_SWING),
+                        new com.quickskin.mod.client.immersive.ImmersiveLayout.Panel(panelLeft, HEADER_H, this.width,
+                                this.height, com.quickskin.mod.client.immersive.ImmersiveLayout.Hinge.RIGHT,
+                                IMMERSIVE_PANEL_SWING)));
+    }
+
+    /** The cape is on the player's back, so the player shows it to the camera, as the model does. */
+    @Override
+    public float immersivePlayerTurn() {
+        return IMMERSIVE_PLAYER_TURN;
+    }
+
+    /**
+     * In the immersive view the real player stands where the model would be drawn: the model is
+     * left out, and the player in the world wears the cape being edited, as it is now, or that
+     * texture on wings in the Elytra view, until the editor is left. Cancel leaves them in their
+     * own cape again, as it was.
+     */
+    private void dressPlayerInWorld(boolean immersive) {
+        if (playerWidget == null) {
+            return;
+        }
+        playerWidget.setLeftOut(immersive);
+        if (immersive) {
+            com.quickskin.mod.client.rendering.WorldLook.show(com.quickskin.mod.client.immersive.ImmersiveMode.session(),
+                    this, playerWidget.getPreviewData());
+        }
     }
 
     @Override
@@ -360,12 +423,16 @@ public class CapeAdjustScreen extends Screen {
         int bodyTop = HEADER_H + MARGIN;
         int bodyBottom = footerY - MARGIN;
         int rightWidth = Mth.clamp(this.width * 3 / 10, RIGHT_MIN_W, RIGHT_MAX_W);
+        // In the immersive view the player stands in the world between the canvas and the right
+        // panel, which give up that room
+        immersiveRoom = com.quickskin.mod.client.immersive.ImmersiveMode.active()
+                ? Mth.clamp(this.width / 5, IMMERSIVE_MIN_ROOM, IMMERSIVE_MAX_ROOM) : 0;
         // An animation's timeline goes under the zoom panel, down to the bottom beside Cancel and Apply
         int leftBottom = timeline != null ? this.height - MARGIN : bodyBottom;
         int timelineRoom = timeline != null ? PANEL_GAP + TIMELINE_PANEL_H : 0;
         canvasLeft = MARGIN + CANVAS_FRAME;
         canvasTop = bodyTop + CANVAS_FRAME;
-        canvasAvailW = Math.max(64, this.width - 3 * MARGIN - rightWidth - 2 * CANVAS_FRAME);
+        canvasAvailW = Math.max(64, this.width - 3 * MARGIN - rightWidth - 2 * CANVAS_FRAME - immersiveRoom);
         canvasAvailH = Math.max(32,
                 leftBottom - bodyTop - ZOOM_PANEL_H - PANEL_GAP - timelineRoom - 2 * CANVAS_FRAME);
         recalculateGrid();
@@ -387,7 +454,7 @@ public class CapeAdjustScreen extends Screen {
         trackX1 = timelineX1 - PANEL_PAD;
         trackY0 = timelineY0 + 18;
         // A canvas narrower than its room, on a short window, leaves the right panel the rest
-        panelX0 = zoomX1 + MARGIN;
+        panelX0 = immersiveRoom > 0 ? this.width - MARGIN - rightWidth : zoomX1 + MARGIN;
         panelX1 = this.width - MARGIN;
         panelY0 = frameY0;
         panelY1 = timeline != null ? bodyBottom : zoomY1;
@@ -402,6 +469,15 @@ public class CapeAdjustScreen extends Screen {
         previewX1 = panelX1 - PANEL_PAD;
         previewY0 = panelY0 + PANEL_PAD;
         previewY1 = resolutionLabelY - 4;
+        if (immersiveRoom > 0) {
+            // The player stands in the room between the canvas and this panel, under the Cape and
+            // Elytra buttons, and the panel holds its sections alone
+            panelY0 = Math.max(frameY0, resolutionLabelY - PANEL_PAD);
+            previewX0 = zoomX1 + MARGIN;
+            previewX1 = panelX0 - MARGIN;
+            previewY0 = bodyTop;
+            previewY1 = this.height - MARGIN;
+        }
     }
 
     private int maxResolutionIndex() {
@@ -591,6 +667,8 @@ public class CapeAdjustScreen extends Screen {
         CapeGuideChip chip = new CapeGuideChip(x, legendY, CapeGuideChip.width(this.font, label), label, color,
                 message, b -> toggle.accept((CapeGuideChip) b));
         chip.setShown(shown);
+        // Under an open picker in the immersive view (updatePickerVisibility)
+        chip.visible = !(immersiveRoom > 0 && pickerOpen && opaqueFill);
         chip.setTooltip(Tooltip.create(message.copy().append("\n")
                 .append(Component.translatable("quickskin.cape.adjust_guide_tip"))));
         return this.addRenderableWidget(chip);
@@ -848,7 +926,10 @@ public class CapeAdjustScreen extends Screen {
         capeViewButton = null;
         elytraViewButton = null;
         int areaWidth = previewX1 - previewX0;
-        if (previewY1 - previewY0 < 24 + VIEW_BUTTON_H + 4) {
+        // In the immersive view the model is not drawn: the player in the world stands in the
+        // room between the canvas and the right panel, and wears what the model would wear
+        boolean inWorld = immersiveRoom > 0;
+        if (!inWorld && previewY1 - previewY0 < 24 + VIEW_BUTTON_H + 4) {
             return;
         }
         initViewButtons();
@@ -856,7 +937,7 @@ public class CapeAdjustScreen extends Screen {
         int areaHeight = previewY1 - areaTop;
         int modelX0 = previewX0;
         int modelWidth = areaWidth;
-        if (modelWidth < 30 || areaHeight < 40) {
+        if (!inWorld && (modelWidth < 30 || areaHeight < 40)) {
             return;
         }
 
@@ -925,12 +1006,26 @@ public class CapeAdjustScreen extends Screen {
         // The player's look: on the title screen, while a CPM model is that look, CPM draws it
         // on the preview's own model, as it draws it on the live player in a world
         playerWidget.setCpmModel(LocalLookPreview.cpmModelFile(player != null), false);
-        // Feet on the bottom of the area, no taller than the area
-        playerWidget.setCustomReferencePoint(modelX0 + modelWidth / 2, previewY1 - 2);
-        playerWidget.setScaleCap((areaHeight - 4) / 1.95f);
+        // Feet on the bottom of the area, no taller than the area. The player in the world keeps
+        // room under the feet for the block the sit puts nearer the camera, and over the head
+        // for the menu's jumps
+        int floorRoom = inWorld ? areaHeight / 8 : 0;
+        playerWidget.setCustomReferencePoint(modelX0 + modelWidth / 2, previewY1 - 2 - floorRoom);
+        playerWidget.setScaleCap((areaHeight - 4 - floorRoom) / (inWorld ? 2.2f : 1.95f));
         // Face the player's back to the camera so the cape is visible (same default as cape menu).
         playerWidget.setRotationState(20.0f, 200.0f);
         playerWidget.setElytraPreview(elytraView);
+        // The player in the world stands where the model is drawn; the model is two units tall
+        // where the player is 1.875 blocks
+        immersiveFeetX = playerWidget.getLayoutCenterX();
+        immersiveFeetY = playerWidget.getLayoutFeetY();
+        immersiveScale = playerWidget.getEffectiveScale() * (2.0f / 1.875f);
+        // The cape is put on once the preview is composed, as the model wears it
+        if (previewTextureLocation != null) {
+            playerWidget.setCape(previewTextureLocation, null);
+            lastPlayerWidgetCape = previewTextureLocation;
+        }
+        dressPlayerInWorld(com.quickskin.mod.client.immersive.ImmersiveMode.active());
     }
 
     /** Cape and Elytra, side by side across the panel; the one the model wears is blue. */
@@ -997,6 +1092,12 @@ public class CapeAdjustScreen extends Screen {
         pickerH = PICKER_H;
         pickerX = gridX + 4;
         pickerY = Math.max(gridY + 4, gridY + gridH - pickerH - 4);
+        if (immersiveRoom > 0) {
+            // The canvas gives the player room in the immersive view and may be shorter than the
+            // picker: it hangs from the canvas's top instead, down over the zoom panel's label
+            // but not its buttons, which would draw over it
+            pickerY = Math.max(frameY0 + 2, Math.min(gridY + 4, zoomY0 + 14 - pickerH));
+        }
 
         // Each channel's label goes in a column left of its slider, so the slider's own track runs
         // the widget's full width and a click lands where its knob is drawn
@@ -1071,6 +1172,14 @@ public class CapeAdjustScreen extends Screen {
         setPickerWidgetVisible(greenSlider, visible);
         setPickerWidgetVisible(blueSlider, visible);
         setPickerWidgetVisible(hexField, visible);
+        if (immersiveRoom > 0) {
+            // The picker hangs over the guide legend there, whose chips would draw over it
+            for (GuiEventListener child : this.children()) {
+                if (child instanceof CapeGuideChip chip) {
+                    chip.visible = !visible;
+                }
+            }
+        }
     }
 
     /**
@@ -1612,6 +1721,7 @@ public class CapeAdjustScreen extends Screen {
         }
 
         BackgroundRenderer.renderBackground(this, graphics, partialTick);
+        dressPlayerInWorld(com.quickskin.mod.client.immersive.ImmersiveMode.active());
         renderHeader(graphics);
 
         // The canvas, in its frame
@@ -2228,6 +2338,12 @@ public class CapeAdjustScreen extends Screen {
             dragStartOffsetY = imgOffsetY;
             return true;
         }
+        // In the immersive view a drag on the player's place takes the camera round them
+        if (button == InputConstants.MOUSE_BUTTON_LEFT && playerWidget != null
+                && mouseX >= playerWidget.getX() && mouseX < playerWidget.getX() + playerWidget.getWidth()
+                && mouseY >= playerWidget.getY() && mouseY < playerWidget.getY() + playerWidget.getHeight()) {
+            return immersiveOrbit.press();
+        }
         return false;
     }
 
@@ -2245,6 +2361,9 @@ public class CapeAdjustScreen extends Screen {
         if (button == InputConstants.MOUSE_BUTTON_LEFT && isDragging) {
             isDragging = false;
             previewDirty = true;
+            return true;
+        }
+        if (button == InputConstants.MOUSE_BUTTON_LEFT && immersiveOrbit.release()) {
             return true;
         }
         //? if <1.21.9 {
@@ -2275,6 +2394,9 @@ public class CapeAdjustScreen extends Screen {
             imgOffsetY = dragStartOffsetY + deltaY;
             applySnap();
             previewDirty = true;
+            return true;
+        }
+        if (immersiveOrbit.drag()) {
             return true;
         }
         //? if <1.21.9 {

@@ -184,6 +184,38 @@ class PedestalDropsTest {
     }
 
     @Test
+    void onTheRealGroundADropAndARiseCrossTheDepthBetweenThePlayerAndThePlace() {
+        // The immersive view's places name a depth towards the camera; the player's body has its own
+        float[] place = {-30, 0, 18};
+        float[] worn = {0, -60, 4};
+        PedestalDrops drops = new PedestalDrops();
+        drops.update(pieces(), slot -> place, SIZE, piece -> worn, 1000);
+        drops.update(pieces(4), slot -> place, SIZE, piece -> worn, 2000);
+        PedestalDrops.Item item = drops.item(4);
+        assertEquals(4, item.z, 1e-4, "it leaves the body");
+        drops.update(pieces(4), slot -> place, SIZE, piece -> worn, 2000 + PedestalDrops.DROP_MILLIS / 2);
+        assertEquals(11, item.z, 1e-3, "half way at half its flight");
+        drops.update(pieces(4), slot -> place, SIZE, piece -> worn, 2000 + PedestalDrops.DROP_MILLIS);
+        assertEquals(18, item.z, 1e-4, "it lands on its place");
+        drops.update(pieces(), slot -> place, SIZE, piece -> worn, 4000);
+        PedestalDrops.Rise rise = drops.rises().get(0);
+        assertEquals(18, rise.z(4000), 1e-4);
+        assertEquals(4, rise.z(4000 + PedestalDrops.RISE_MILLIS), 1e-4, "back at the body");
+    }
+
+    @Test
+    void theFlatMenusPlacesHaveNoDepth() {
+        PedestalDrops drops = new PedestalDrops();
+        drops.update(pieces(4), slots(places(1)), SIZE, piece -> WORN, 1000);
+        drops.update(pieces(4, 8), slots(places(2)), SIZE, piece -> WORN, 1100);
+        for (PedestalDrops.Item item : drops.items()) {
+            assertEquals(0, item.z, 0.0);
+        }
+        drops.update(pieces(8), slots(places(2)), SIZE, piece -> WORN, 1200);
+        assertEquals(0, drops.rises().get(0).z(1250), 0.0);
+    }
+
+    @Test
     void aLyingItemTurnsAndBobsWithinItsBounds() {
         for (long t = 0; t < PedestalDrops.TURN_MILLIS; t += 37) {
             float width = PedestalDrops.width(t, 3);

@@ -170,7 +170,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   copy of the equipment packet, alone or in a bundle, for every client, Quick Skin or not. The item
   stays worn; nothing is written to the player. `allowHiddenArmor` (default on) turns it off. The
   player's own client hides the pieces only where the server does. On NeoForge these mixins load
-  from `quickskin-armor.mixins.json`. A Cosmetic Armor Reworked piece over an armour piece is a
+  from `quickskin-armor.mixins.json`. Before 1.21.2 the layers that draw what the local player
+  wears (`LocalArmorLayerMixin`, `LocalElytraLayerMixin`, `LocalHeadLayerMixin`) never return
+  early for a hidden piece: each reads the hidden slot as empty and takes its own way out, for
+  the reason the cape layer does (Touch'n Motion pairs a pushed pose with its pop round the
+  elytra layer, and a cancelled call stopped the game with "Pose stack not empty"). A Cosmetic Armor Reworked piece over an armour piece is a
   piece of its own, four bits up in the same mask, sent only on a session that also negotiated
   `hidden-cosmetic-armor` (an older server refuses the whole update otherwise) and kept per account
   in a map apart, so an older client reading the configuration keeps the armour pieces. The server
@@ -181,6 +185,28 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   again when the mask changes. Their Cosmetic Armor then draws the armour piece, which the
   equipment filter hides in turn if the player hides it too. A slot showing its cosmetic piece is
   never hidden on the player's own client for its armour piece, which everyone else sees covered.
+- Immersive poses (ADR 0019) are drawing only and reach only Quick Skin clients. A client sends
+  `immersive_pose` (player, sequence, pose, facing yaw, closing flag, skin-change move counter and
+  move) only on a negotiated v2 session with `immersive-poses` (bit 10), never during a replay or
+  while the server's `allowImmersivePoses` (default on) is off: on a change at most every 250 ms,
+  the start, the start of the close and the end at once, and every 5 s while it lasts. The server
+  admits it only from that exact session about the sender itself, behind its own per-session
+  bucket (`allowImmersivePose`, never the storage budget), and `ImmersivePoseRelay` drops what is
+  out of sequence or over its second budget (ending a pose is never refused), passes on only a
+  change, and ends a pose not repeated for 15 s. `ServerImmersivePoses` relays a change only to
+  the other sessions with the capability whose connections the game's entity tracker pairs with
+  the player (`seenBy`, bound by `ServerRuntime`, never a whole world), tells one that starts to
+  see a posing player the pose as `SETTLED` (a flag only the server sets) and one that stops that
+  it ended (`ImmersivePoseAudience`), and ends a pose when the player leaves (exact connection),
+  dies, respawns, changes world or becomes a spectator. The client admits poses through a window
+  of their own (`allowImmersivePosePacket`, never the appearance control budget), keeps them per
+  player with the world they were told in (`RemoteImmersivePoses`, bounded, cleared with the
+  session, the other worlds' forgotten when the client changes world) and `WorldPose` plays each
+  with an animation state of its own on the viewer's clock; a pose never changes the player
+  entity, their hitbox or movement, never shows on a player who is sneaking, swimming, gliding,
+  riding, asleep or a CPM model, and shows neither pose nor sit block on a player invisible to
+  the viewer. Remote poses are drawn on every supported version, as the immersive view is; the
+  payloads, server and store are the same on all of them.
 - A cosmetic nickname (ADR 0015) is text, not an appearance, and reaches every client through
   display names; account names keep every other role. `Nickname` (content-core) is the only rule
   set, applied by the client's text box, the wire check (`NetworkSecurity.isValidNickname`, 32
@@ -463,11 +489,24 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   player shows no cape, read from the entity before 1.21.2 and from the render state afterwards.
   A cape a preview bound to its own draw (the cape menu and editor) still shows. Armour and
   elytra are vanilla's and stay visible, as in vanilla.
+  The worn custom cape checks the accessory renderer's visibility decision before drawing.
+  Fabric asks its cape render event. Forge and NeoForge use Caelus when installed, passing the
+  same player or render state that its version of Elytra Slot inspects. The editor can still
+  preview the selected cape, and equipping wings keeps their selected texture.
 
 ## Optional integrations
 
 - CPM, Ears, CustomNPCs, 3D Skin Layers, Essential, ReplayMod, and FancyMenu are optional. Guard
   their entry points and preserve the normal skin/cape path when an optional mod or API is absent.
+- Ears keeps extra data of a skin (wings, a cape, erased rectangles) in the low seven bits of the
+  alpha of the body regions the game always draws opaque, with the high bit set, so those texels
+  are 50 to 100 percent opaque in the file. Drawn with that alpha the body looks half see-through.
+  With Ears installed (`ClientConfig.isEarsInstalled`) every skin is therefore shown without
+  transparency in its body, as without Quick Skin, and the settings box says so and is locked.
+  The saved file is never flattened for it: `shouldFlattenImportedSkins` answers no with Ears
+  installed, whatever the player or the server chose, because the bridge parses Ears' features
+  from the stored original (`EarsCompatIntegration.parseAndStoreFeatures`). Only the places that
+  show a skin ask `shouldDisableSkinTransparency`.
 - Real Camera finds the first-person body by a captured texture id containing `minecraft:skins/`.
   `RealCameraTextureIdMixin` prefixes Quick Skin skin ids inside Real Camera's own buffer record
   only; it is a fail-open shim without a compatibility lane. Do not rename the registered
@@ -509,6 +548,20 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   parts. Preserve their baked local poses; copying the parent pose onto a child applies the pivot
   twice and detaches both the flat outer layers and the 3D Skin Layers geometry in offline previews.
   The compatibility harness must authenticate these local poses before visual review.
+- The skin menu's Sitting pose seats the model on a grass block, which a cape hanging at its usual
+  6 degrees would go into. `SitClearance` tilts the cape back about its hinge, every frame, by the
+  least angle that takes its inner face past the block's top back edge, working that edge back
+  through the jump's lift and squash (`SitJump`) and the posed body, so the cape lies over the
+  edge, hangs behind the back face and eases with the jumps instead of snapping. Every cape draw
+  of that pose uses it: the cloak before 1.21.2, the cape model to 1.21.5, `GuiSkinRendererMixin`
+  (both copies) from 1.21.6 and, in the immersive view, the player's own cape in the world
+  (`WorldPose.clearSitBlock`, which works from the least angle the game's cape lag can give).
+  Folded elytra, 15 degrees back and reaching 23 pixels down, also go into the block's edge while
+  the seated body leans back: `SitClearance.wingsTilt` tilts them about the same hinge, keeping
+  the part of the edge each wing covers behind that wing's own inner face, which the wing's
+  sideways spread turns, for the wings layer the preview borrows
+  (`PreviewEquipment.alongBody`, from the `Worn` of that draw) and, in the immersive view, the
+  player's own (`WorldPose.clearSitBlockWithWings`).
 - FancyMenu layout support for the title/pause preview lives in `menu-integration` and reaches
   FancyMenu's per-widget API by reflection only: no dependency, mixin or module edge. Only when
   that API is present does the preview report its drawn model box as its size, and only from its
@@ -528,6 +581,183 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   that draws its own there, such as Aquamirae, or a resource pack carries over; before the
   title screen has drawn one, and on NeoForge, which does not load `quickskin.mixins.json`,
   they draw the vanilla panorama.
+- In the immersive view (`immersiveMenu`) the cape menu and the cape editor float round the real
+  player as the skin menu does (`ImmersiveScreen`), and leave their own model out: the player in
+  the world wears what that model would (`WorldLook`): the cape under the mouse or the one picked,
+  the cape being edited as it is cropped and as it plays, that texture on elytra wings, worn or
+  not, on the menu's Elytra tab and in the editor's Elytra view (elsewhere in those screens a worn
+  elytra is left out, as the model wears nothing), and, for the menu opened for one skin, that
+  skin and its model (on 1.20.1 and from 1.21.6; 1.21.1 to 1.21.5 show the look's cape on the skin
+  worn). It binds only the world's draw of the local player (the previews' own
+  `PreviewCapeBindings`, `ImmersiveLookRendererMixin`, `ImmersiveLookElytraMixin`, and the
+  `MixinAbstractClientPlayer` skin lookups); nothing the player wears, saves or sends changes, and
+  it holds only while its screen, or a dialog over it, is open, so leaving without a pick (Cancel)
+  shows exactly what the player wore. A screen says how far the player turns from the camera
+  (`immersivePlayerTurn`; the cape screens show the back), also when the player does not play the
+  skin menu's pose (riding, crouching, a CPM look; never lying, gliding, swimming or spinning,
+  whose model is not upright), and the view glides the player's place and size from one screen to
+  the next, so the skin menu, the cape menu and the editor never run the camera's opening or
+  closing again between them. The editor gives the player the room between its canvas and its
+  right panel, which swing away. The flat screens, and every screen outside a world, are
+  unchanged.
+- A held mouse button in the immersive view stays on the panel it started on, even outside its
+  edges and when opening or closing a context menu moves the panel to a different list index.
+  If the panel disappears or the screen changes, the cursor picks a surface again on release.
+- The immersive orbit keeps its distance near walls on every supported target. The aperture
+  uses the same camera geometry, support height, core radius and breathing dither falloff
+  across renderers. Only foreground terrain between the camera and the player is eligible.
+- Through 1.21.5 the renderer uses two world passes. When the near plane cuts into
+  solid terrain, the renderer draws the intersected models' interior faces with the block's
+  textures and biome tint. The light at the player keeps those faces legible. A circular opening
+  reveals the player. It compares the finished scene depth with the solid and cutout terrain
+  depth so displaced grass blades follow their rendered pixels. A separate cell mask identifies
+  block entities and late terrain layers.
+  The opening retains the actual ground below the feet, including partial blocks and gaps.
+  When foreground terrain reaches the player, the cut can advance to the body centre. During
+  the second pass, the shadow hook collects the local player's shadow vertices. They draw once, after the support terrain, with the regular
+  projection and depth range. The renderer then closes the section of each opaque block that
+  the cut plane intersects using its occlusion shape, face texture and biome tint. Open passages
+  retain their view of the world. The sections write colour only so the player and equipment
+  draw against the original geometry, including when an animated arm overlaps a wall.
+  The clear core stays still and the dithered rim breathes. All stages of the opening skip
+  Iris and Oculus shadow-map passes before reading the projection or changing pending camera state.
+  Terrain searches reconstructed from a projection have a bounded number of block visits.
+  The terrain depth copy restores the active read and draw framebuffers and viewport. The
+  second world pass uses Minecraft's render clock so shader packs get consistent frame deltas
+  for exposure and other time filters. The renderer restores projection and depth before the
+  floating interface draws.
+- From 1.21.6 the chunk renderer clips foreground fragments in its terrain pass, before the
+  usual player and shadow draws. The section uses block textures and shapes where the near
+  plane intersects terrain. The aperture uniforms and the section geometry share the world
+  camera's projection and the current near and player planes.
+- In the immersive view the local player's textured faces share the diffuse light
+  of an upward-facing surface. The player renderer samples that normal before posing the model,
+  including when the player is drawn again through the opening. Opening and closing the menu
+  blend each face's directional brightness with the top face's brightness using the camera's
+  eased progress and the current world lights. Reversing the camera reverses the same blend.
+  Its vertices keep their sky
+  and block light, texture colour and overlay. The terrain and the player's ground shadow use
+  their usual lighting.
+- The immersive view runs on every supported version. Its hooks
+  (`com.quickskin.mod.mixin.immersive`) have one canonical copy each in `common/src/main`, never an
+  overlay copy, and each declares its type outside every Stonecutter guard: Fabric and Forge list
+  them in every `quickskin.mixins.json` and NeoForge in its own required
+  `quickskin-immersive.mixins.json` (priority 2000, as the common configs), where a class missing on
+  one version stops the game, so a version a class does not serve keeps it, empty
+  (`ImmersiveMinecraftMixin` on 1.20.1, `ImmersiveArmorPlayerMixin` from 1.21.2, the GUI pass's
+  accessors `ImmersiveTargetAccessor` and `ImmersiveGameRendererAccessor` before 1.21.6,
+  `ImmersiveRenderStateAccessor` outside 1.21.6 to 1.21.8, `ImmersivePicturePassMixin` outside
+  1.21.9 to 1.21.11, `ImmersiveGuiMixin` before 26.2). Each version family fills its own guarded
+  block (`<1.21` 1.20.1, `<1.21.2` 1.21.1, `<1.21.6` 1.21.2 to 1.21.5, `<1.21.9` 1.21.6 to 1.21.8,
+  `<26.1` 1.21.9 to 1.21.11, else 26.1 on), the same in every immersive file, and
+  `ImmersiveSurface.SUPPORTED` is true in each. From 1.21 the game no longer hands
+  `GameRenderer.render` the time the frame started, so `ImmersiveMinecraftMixin` takes it at the
+  start of `Minecraft.runTick`. The hooks are degradable (`require = 0`), never `@Redirect`
+  (NeoForge 26.x), and an accessor names a field only on the versions it was checked against. A draw
+  is named by what the game's renderer is handed (the entity before 1.21.2, its render state from
+  then) and bound to its player and that player's own or remote pose (`WorldPose.bind`). A hook
+  inside the draw's own call finds it as the draw going on (`WorldPose.drawing`); only a family
+  whose renderer hands each draw a render state of its own (1.21.9 on, where the model is posed
+  again after `submit` returned) keeps it for later hooks (`WorldPose.keep`/`kept`), since 1.21.2 to
+  1.21.8 reuse one state for every draw of an entity type and a later unbound draw (the inventory's
+  paper doll) would find the world's pose. The posing is one shared body (`WorldPose.transform`,
+  `startPose`, `posed`, handed the binding the entry point found) and the floating picture's mesh
+  one pure class (`ImmersiveMesh`), so no family writes either twice. The bullets below say what
+  each later family changes.
+- 1.21.1 hooks the same methods as 1.20.1 (the frame is `GameRenderer.render(DeltaTracker,
+  boolean)`), the armour and the cape screens' look included (`LocalElytraLayerMixin` asks
+  `WorldLook.dressesWithWings`, so wings show over a hidden chest piece), and NeoForge's own
+  `CapeLayerMixin` hangs Quick Skin's cape from the posed body there, as the common one does. From
+  1.21.2 each batch the GUI draws goes to whatever `Minecraft.getMainRenderTarget()` answers then
+  (1.21.5: a render pass on it), so while a screen draws into its floating picture that call
+  answers the picture (`ImmersiveSurface.drawingInto`), and nothing else: 1.21.5 draws the picture
+  with a pipeline of its own. A screen draw that never reached its end (another mod cut it short)
+  leaves that answer behind only until the next frame starts (`ImmersiveSurface.frameStarts`).
+  From 1.21.2 players are drawn from render states: to 1.21.8 the draw is bound by the state right
+  before `EntityModel.setupAnim` in `LivingEntityRenderer.render` (the model is posed there,
+  before `isBodyVisible`), its player found by `PlayerRenderState.id`, and never kept. The cape
+  layer's own `PlayerCapeModel` re-poses its body from the state, so the posed body is copied in
+  at the end of its `setupAnim` (`WorldPose.poseCape`, Mojang's cape and Quick Skin's alike) and
+  the sit clearance turns its `cape` child back about the hinge; the wings hang from the posed body
+  at `WingsLayer`'s translate. For the armour on the real player (`WorldArmor`) the draw's feet are
+  the state's position, the posed model's copy keeps its root's pose (the parts hang from it), and
+  no piece counts as covered (other mods change what a player shows while the state is filled).
+  The ghost is extracted into the renderer's one state, the very state still being drawn (its name
+  tag, leash and the loaders' events read it after), so to 1.21.5 `WorldArmor.layersDrawn` keeps
+  that state's fields and writes them back after the ghost. `WingsLayer` reads the chest item from
+  the state, which already lacks a piece the player hides, so to 1.21.5 the state is handed, for
+  the length of that layer's own draw, an elytra (the look's wings, a hidden chest piece included)
+  or nothing (a worn elytra over the look's cape) and given back its item after; a draw cut short
+  leaves the item to the next extraction, never hands it to a later draw. The texture is the
+  look's through `getPlayerElytraTexture`. The armour layer, drawn before, keeps the chest item. To
+  1.21.5 the look's cape stays bound to the player, by which Quick Skin's cape layer finds it.
+- From 1.21.6 the screens extract into a `GuiRenderState` that the game draws once, at the end of
+  the frame. Right after the open screen's own `render` call in `Screen.renderWithTooltip`
+  (`renderWithTooltipAndSubtitles` from 1.21.9), before its deferred tooltip, the game's own
+  `GuiRenderer.render` runs once more with the floating picture swapped in as
+  `Minecraft.mainRenderTarget` (`ImmersiveTargetAccessor`, swapped back in a `finally`): it draws
+  everything extracted so far this frame, which is the screen while the HUD is hidden (a HUD
+  layer that ignores hiding, or vanilla's sleep fade, floats with it), and empties the state. The
+  mesh then goes into the state as one premultiplied `GuiElementRenderState`, at most once a frame
+  (the hook before the toasts hands it while the view closes), and the vanilla tooltip and Quick
+  Skin's held-back ones (`ImmersiveMode.above`) follow above it, moved to the real mouse on the
+  GUI pose (`ImmersiveMode.aboveX/aboveY`). Each pass ends by letting go of what it did not use,
+  so the frame's own pass would close what only the picture's pass used: the oversized-item
+  renderers, which the picture's pass keeps on 1.21.9 to 1.21.11 (`ImmersivePicturePassMixin`)
+  and the other versions make again each frame, and, on NeoForge, the picture-in-picture renderers
+  of its per-frame pools, made again each frame (no immersive screen draws either today). The
+  player is drawn as on 1.21.5, but the ghost drawn on the player in the middle of the world's
+  draw is handed a render state of its own for that call (`ImmersiveRenderStateAccessor`, to
+  1.21.8), never the one the world still draws; the projection lives only on the GPU, so the
+  armour on the player reads it as the game hands it to `LevelRenderer.renderLevel` (to 1.21.11),
+  and the camera's turn from the model-view matrix the world is drawn with (to 1.21.8). The cape
+  screens' look is bound to the render state (Quick Skin's cape layer looks it up by the state
+  from 1.21.6) and released when the draw ends; the wings layer's own chest-item local is handed
+  an elytra for the look's wings whatever the chest holds, or no item while the look hides worn
+  wings, and the texture it hands `EquipmentLayerRenderer.renderLayers` is the look's. The cape
+  menu opened for one skin answers the player's `getSkin` with that skin and its model, which
+  also chooses the renderer of the skin's model, in both getSkin mixins, the common one (Fabric)
+  and NeoForge's own twin, during the world pass (to 1.21.11). On Fabric Quick Skin's
+  renderer-level skin lookup (`PlayerRendererMixin`) would put the worn skin back: to 1.21.8 it
+  answers the look's skin for that draw, so a player class that answers `getSkin` itself
+  (Essential) still wears it, and from 1.21.9 it leaves the look's skin in the state, asking by the
+  lookup's own rule (`WorldLook.skinLookOf` to 1.21.11).
+- From 1.21.9 `LivingEntityRenderer.submit` only collects the model and its layers, which the game
+  poses and draws after it returned. Right before it asks whether the body shows, the draw is
+  bound to its player (`AvatarRenderState.id`), kept and posed, with the sit's block submitted in
+  the player's light, and a local player who does not play the pose is turned there too, after the
+  pose decided. `PlayerModel.setupAnim` finds the draw with `WorldPose.bound`, inside the submit
+  and when the model is drawn; the cape model (a player model too) is hung from the posed body at
+  the end of its own `setupAnim` and its cape tilted over the block, and the wings at
+  `WingsLayer.submit`'s translate. To 1.21.11 the kept draws are let go at each world pass. The
+  player's armour models are player models as well, posed by the same hook from the state when
+  they are drawn; for a plain humanoid armour model a mod adds, the posed parts are bound to the
+  state, once a draw (`PreviewEquipment.bindPose`, as the menu's preview does). The submit's pose
+  stack holds only the way from the camera to the feet: to 1.21.11 `WorldArmor` traces the pieces
+  with the camera's rotation and the projection the game hands `LevelRenderer.renderLevel` (a
+  `@ModifyArg` that changes nothing). The ghost is submitted after the layers
+  (`PreviewEquipment.submitGhost`) and the lying pieces as items at the end of the submit, each
+  with an item state of its own (the collector keeps its quads). The cape screens' look is
+  released at the submit's end (`WorldLook.drawEnds`), since the cape and wings layers run inside
+  it; the state already lacks a hidden elytra, so `LocalElytraLayerMixin` has nothing to do. A
+  held mouse button is `activeButton != null`.
+- From 26.1 the game extracts a whole frame (`GameRenderer.extract`) before it draws any of it
+  (`render`), so the floating screen's own GUI pass runs during the extraction, right after the
+  screen extracted itself (`Screen.extractRenderStateWithTooltipAndSubtitles`), with `useUiLightmap`
+  and the item lighting set round it as the game sets them round its own pass, and the main target
+  swapped is `GameRenderer`'s from 26.2. Nothing is drawn into the game's own target then: the frame
+  clears it when it is drawn. A frame's GUI starts, and the mesh goes in before the toasts while the
+  view closes, at `GameRenderer.extractGui` to 26.1.2 and at `Gui.extractRenderState` from 26.2
+  (`ImmersiveGuiMixin`); the floating picture is let go once the view has ended. The view's frame
+  begins at `GameRenderer.update`, the camera hooks are the camera's own update
+  (`Camera.alignWithEntity`, `calculateFov`), and 26.3's SDL mouse move is re-entered with its
+  relative move unchanged. The whole world pass is collected before any of it is drawn, so a posing
+  draw is found until the pass ends (`WorldPose.passBound`, however many players pose). `WorldArmor`
+  traces the pieces with the camera state's rotation and the projection the world was drawn with,
+  the bobbing included (`WorldArmor.levelProjection`, read where `renderLevel` hands it to the GPU).
+  The game reads the player's skin as it extracts the render state, before the world pass, so the
+  cape menu opened for one skin is asked for the whole view, and the renderer's own skin override
+  (`PlayerRendererMixin`) leaves that skin alone.
 - Compatibility failures must degrade locally; they must not break base mod initialization or
   dedicated-server startup.
 - A release JAR holds only Quick Skin's own packages, so no other mod's copy of a library can
@@ -585,7 +815,13 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   reflection, nothing is required and every failure is local: without CPM, on a CPM build with no
   way in, while CPM is still building the model (nothing is drawn for up to five seconds, never
   the wrong skin) or when CPM refuses it, the preview draws what it drew before (the skin; in the
-  skin menu the model's icon). CPM's client API (`IClientAPI.createPlayerRenderer`) is the way in
+  skin menu the model's icon). CPM does not tell a model it is still building from one it
+  refuses, and only a preview's draw asks CPM for a model, so the skin menu's preview goes on
+  being drawn under the icon (`PlayerPreviewPanel.isModelShown` says which of the two shows): a
+  preview hidden behind its icon never asked again, and the five seconds count from the last
+  time anything asked for the model or drew it, which the list's capture of its picture does
+  when the menu opens, so a model picked later than that showed its icon until the menu was
+  left. CPM's client API (`IClientAPI.createPlayerRenderer`) is the way in
   wherever a CPM build has it; a model without a texture of its own, which that API cannot draw,
   and CPM's 26.3 builds, which leave it off, bind on CPM's render manager with the same calls
   and the preview's skin as the texture. The file is read on the client I/O workers, bounded,
@@ -672,6 +908,32 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Animator layers shed their fades only when that player ticks), keep every menu preview free of
   held items, and keep the previewed player's previous-tick rotation pinned for the draw, which
   TaCZ's layers read.
+- In the immersive view the skin menu draws no model and no ring of its own: the real player in the
+  world takes the model's place for the armour pieces too (`WorldArmor`). The world's draw of the
+  local player during a view (`ImmersiveArmorRendererMixin`) remembers, once the game and
+  `WorldPose` have posed it, its model space to the camera's and the world's projection onto the
+  GUI, and hands a copy of the posed model to `PreviewEquipment.rememberWorld` in place of a
+  preview, so the menu's own outline tracing (`PreviewArmorSilhouette`, every vertex projected),
+  hover marks, click and ghost work on the player through the flat menu's code, every transform of
+  the draw included. The mouse goes by where it really is (`ImmersiveMode.realMouseX/Y`), and only
+  while it points past the floating panels and the main sheet's controls, which come first; the
+  marks are drawn flat over the floating screen, as its tooltips are, so they stay on the player
+  while the camera travels. The pieces nobody sees lie on the real ground round the feet, laid out
+  and moved by the same `PedestalDrops` (its places then name a depth) in a floor that faces the
+  camera's resting place (`WorldPedestal`), each on the first block that stops a fall under it from
+  1.25 blocks above the feet to 0.6 below (`WorldArmor.groundAt`: a block beside the player, a slab,
+  a step down), and level with the feet when there is none (flying, an edge), since deeper ground
+  would lay them below the view or under Confirm, or where the search starts inside a wall, and are
+  drawn as items at the end of the player's own draw (submitted to its collection from 1.21.9). Only
+  the draws while the menu is open count; closing forgets every one. On 1.20.1 and 1.21.1 what
+  another mod takes off between `PlayerRenderer.render` and the living draw
+  (`ImmersiveArmorPlayerMixin`, Forge's or NeoForge's `RenderPlayerEvent.Pre`) counts as covered, as
+  on the model; from 1.21.2 no piece does (other mods change what a player shows while its render
+  state is filled). The immersive view's version bullets above say where each family reads the
+  camera and the projection from. These hooks are degradable: a hook that throws (another mod's item
+  drawn on the ground, say) is logged once and `WorldArmor` stands down for the game, drawing on its
+  own pose stack so the game's stays balanced. They change only this client's drawing; the pieces
+  still hide through `LocalHiddenArmor` and the `hidden-armor` capability, as from the flat menu.
 - TaCZ starts the local player's third-person reload, recoil and melee animations, and resets
   the stance on a gun switch, from its gun events and only while the camera is not first person.
   The optional `TaczPreviewAnimationMixin` is the only hook into TaCZ: it redirects that one
@@ -690,7 +952,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   (`known:__NONE__`) when it has none; that id resolves to no texture anywhere, so neither this
   client nor any other (older versions included) draws a cape or the account's Mojang cape for
   it, and the elytra fall back to vanilla's. A CPM model wears no Quick Skin cape (an empty cape
-  id, `SkinCapes.wearNone`). The cape menu picks the cape of the skin worn (its clicks and Remove
+  id, `SkinCapes.wearNone`); the skin menu takes the cape off the model it draws in that same
+  step, because that model keeps the cape it was last handed and a CPM model hands it none.
+  The cape menu picks the cape of the skin worn (its clicks and Remove
   Cape store the choice on that skin) or, opened from a skin's context menu
   (`PlayerCapeMenuScreen.forSkin`), of that skin, which its preview then wears on the preview's
   own model, in a world too, since the live player may wear another; with a CPM model or no
@@ -741,8 +1005,9 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 ## Public E2E evidence
 
 - Packaged offline clients use the server's standard `OfflinePlayer:<name>` UUID. Their fresh,
-  disposable Quick Skin config disables the asynchronous own-skin importer and clears persisted
-  selections before mod initialization. A default-skin capture then waits until the renderer has
+  disposable Quick Skin config disables the asynchronous own-skin importer, clears persisted
+  selections and turns the immersive view (`immersiveMenu`) off before mod initialization, so a
+  menu opened in a world is drawn flat with its own model, as the checkpoints show it. A default-skin capture then waits until the renderer has
   held the vanilla texture selected for that exact UUID and must show the complete local model in
   a stable third-person view. Modern built-in clothing palettes must remain recognizable as one
   intact skin instead of an ambiguous isolated sleeve; never accept an account import or the

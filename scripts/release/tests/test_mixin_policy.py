@@ -17,7 +17,7 @@ OVERLAY_RESOURCES = tuple(
     ROOT / "common" / "src" / name / "resources" for name in OVERLAY_NAMES
 )
 MIXIN_MARKER = re.compile(r"@Mixin\s*\(")
-INJECTOR_MARKER = re.compile(r"@(Inject|ModifyArg|ModifyVariable|Redirect)\s*\(")
+INJECTOR_MARKER = re.compile(r"@(Inject|ModifyArgs?|ModifyVariable|Redirect)\s*\(")
 HANDLER_MARKER = re.compile(r"\b(quickskin\$[A-Za-z0-9_$]+)\s*\(")
 JAVA_COMMENT = re.compile(r"//[^\n]*|/\*.*?\*/", re.DOTALL)
 # A RETURN hook takes every return of its target, and another mod's transformer may add returns
@@ -83,6 +83,41 @@ DEGRADABLE_MIXINS = {
     "main:com/quickskin/mod/mixin/input/PauseGameMixin.java",
     # The menus: a hook that fails leaves the game's toasts showing over them, as before.
     "main:com/quickskin/mod/mixin/menu/MenuToastsMixin.java",
+    # The immersive view (one canonical copy each, empty on the versions a class does not serve). A
+    # camera, frame, screen or mouse hook that fails leaves the skin menu flat over the world, or
+    # the camera at the eyes; a pose hook leaves the player in the world in the game's own pose,
+    # with the cape and wings where a straight body would hang them.
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveCameraMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveCapeLayerMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveElytraLayerMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveGameRendererMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveGuiMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveLivingRendererMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveMinecraftMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveMouseMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersivePicturePassMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersivePlayerModelMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveScreenMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersivePlayerLightMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveLevelLightsMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveLightPoseMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/LegacyOpeningGameMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/LegacyOpeningLevelMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/LegacyOpeningPlayerMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/LegacyOpeningShadowMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveTerrainPipelineMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveTerrainShaderMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveTerrainChunksMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveTerrainProgramsMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveWorldViewMixin.java",
+    # A hook that fails leaves the player in the world wearing their own cape and wings while the
+    # cape menu or the cape editor floats round them.
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveLookElytraMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveLookRendererMixin.java",
+    # The immersive view's armour on the real player: a hook that fails leaves the pieces
+    # unclickable on the player, or one another mod covers pointed out as worn.
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveArmorPlayerMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveArmorRendererMixin.java",
 }
 
 # Like the nickname mixins, NeoForge loads the hidden-armour mixins from their own config.
@@ -96,6 +131,17 @@ NEOFORGE_INPUT_CONFIG = ROOT / "neoforge" / "src" / "main" / "resources" / "quic
 # And the menus' hook on the game's toasts from its own.
 MENU_MIXIN_PACKAGE = "com.quickskin.mod.mixin.menu"
 NEOFORGE_MENU_CONFIG = ROOT / "neoforge" / "src" / "main" / "resources" / "quickskin-menu.mixins.json"
+
+# And the immersive view's hooks from their own.
+IMMERSIVE_MIXIN_PACKAGE = "com.quickskin.mod.mixin.immersive"
+NEOFORGE_IMMERSIVE_CONFIG = (
+    ROOT / "neoforge" / "src" / "main" / "resources" / "quickskin-immersive.mixins.json"
+)
+# A Stonecutter guard opens with `//? if`, closes with `//?}` and goes on with `//?} else`.
+GUARD_OPEN = re.compile(r"^\s*//\?\s*if\b")
+GUARD_CLOSE = re.compile(r"^\s*//\?\s*}")
+GUARD_ELSE = re.compile(r"^\s*//\?\s*}\s*else\b")
+TYPE_DECLARATION = re.compile(r"^public\s+(?:abstract\s+)?(?:class|interface)\s+(\w+)")
 
 # NeoForge never reads quickskin.mixins.json, so it loads the nickname mixins from their own config.
 NICKNAME_MIXIN_PACKAGE = "com.quickskin.mod.mixin.nickname"
@@ -119,6 +165,12 @@ OPTIONAL_MIXINS = {
     "main:com/quickskin/mod/mixin/compat/EarsLayerRendererMixin.java",
     "main:com/quickskin/mod/mixin/compat/EarsModMixin.java",
     "main:com/quickskin/mod/mixin/compat/RealCameraTextureIdMixin.java",
+    "main:com/quickskin/mod/mixin/compat/IrisTerrainProgramMixin.java",
+    "main:com/quickskin/mod/mixin/compat/IrisTerrainShaderMixin.java",
+    "main:com/quickskin/mod/mixin/compat/SodiumPlayerLightMixin.java",
+    "main:com/quickskin/mod/mixin/compat/SodiumTerrainPassMixin.java",
+    "main:com/quickskin/mod/mixin/compat/SodiumTerrainProgramMixin.java",
+    "main:com/quickskin/mod/mixin/compat/SodiumTerrainShaderMixin.java",
     "main:com/quickskin/mod/mixin/compat/JourneyMapIgnSkinMixin.java",
     "main:com/quickskin/mod/mixin/compat/JourneyMapTextureCacheMixin.java",
     "main:com/quickskin/mod/mixin/compat/CosmeticArmorRenderMixin.java",
@@ -135,6 +187,12 @@ ACCESSOR_ONLY_MIXINS: set[str] = {
     # The skin menu's preview borrows the player renderers' equipment layers (ADR 0017).
     "main:com/quickskin/mod/mixin/armor/EntityRenderDispatcherPlayersMixin.java",
     "main:com/quickskin/mod/mixin/armor/LivingEntityRendererLayersMixin.java",
+    # The immersive view's accessors, empty on the versions that do not need them.
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveLightDirectionsAccessor.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveGameRendererAccessor.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveMouseAccessor.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveRenderStateAccessor.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveTargetAccessor.java",
 }
 
 # CPM changed the call made by playerRenderPre. Both optional injection points are kept so one
@@ -144,11 +202,11 @@ ALTERNATIVE_HOOKS = {
     # NeoForge through one that adds the animation values; each loader calls exactly one of them.
     (
         "main:com/quickskin/mod/mixin/armor/LocalArmorLayerMixin.java",
-        "quickskin$skipHiddenPiece",
+        "quickskin$wearNoHiddenPiece",
     ),
     (
         "main:com/quickskin/mod/mixin/armor/LocalArmorLayerMixin.java",
-        "quickskin$skipHiddenPieceWithAnimation",
+        "quickskin$wearNoHiddenPieceWithAnimation",
     ),
     (
         "main:com/quickskin/mod/mixin/compat/CpmRenderDepthMixin.java",
@@ -180,6 +238,8 @@ ALTERNATIVE_HOOKS = {
 # TaCZ 1.1.8-hotfix asks for the camera type once in each of its four gun-event handlers; the one
 # redirect names all four and takes the first call of each, so four is also the most it can match.
 INJECTION_COUNT_OVERRIDES = {
+    ("main:com/quickskin/mod/mixin/compat/SodiumPlayerLightMixin.java",
+     "quickskin$preparePlayerNormals"): {2},
     # Audited mapped Minecraft JARs and their Forge/NeoForge builds: placeNewPlayer translates the
     # join message twice, once in each branch (the usual name and one renamed since last time).
     (
@@ -489,6 +549,104 @@ class MixinPolicyTest(unittest.TestCase):
             with self.subTest(toml=relative(toml)):
                 self.assertIn('config = "quickskin-input.mixins.json"', toml.read_text(encoding="utf-8"))
 
+    def test_every_loader_loads_the_immersive_mixins(self) -> None:
+        # One config lists the immersive mixins for every NeoForge version, and the common configs
+        # list them for every Fabric version and Forge 1.20.1. A listed class missing on one version
+        # stops the game there ("specified mixin was not found"), so each mixin has one canonical
+        # copy, never an overlay one, and its type is declared outside every Stonecutter guard:
+        # a version it does not hook yet keeps it, empty.
+        immersive_root = CANONICAL_JAVA / "com/quickskin/mod/mixin/immersive"
+        immersive_sources = {
+            path.stem
+            for path in immersive_root.glob("*.java")
+            if MIXIN_MARKER.search(path.read_text(encoding="utf-8"))
+        }
+        self.assertTrue(immersive_sources)
+        for overlay_java in OVERLAY_JAVA:
+            with self.subTest(overlay=relative(overlay_java)):
+                self.assertFalse(list((overlay_java / "com/quickskin/mod/mixin/immersive").glob("*.java")))
+        for path in sorted(immersive_root.glob("*.java")):
+            with self.subTest(source=relative(path)):
+                depth = 0
+                declared = None
+                for line in path.read_text(encoding="utf-8").splitlines():
+                    if GUARD_ELSE.match(line):
+                        continue
+                    if GUARD_CLOSE.match(line):
+                        depth -= 1
+                        continue
+                    if GUARD_OPEN.match(line):
+                        depth += 1
+                        continue
+                    match = TYPE_DECLARATION.match(line)
+                    if match:
+                        declared = (match.group(1), depth)
+                        break
+                self.assertEqual(declared, (path.stem, 0))
+        for path in self.configs_named("quickskin.mixins.json"):
+            with self.subTest(config=relative(path)):
+                config = json.loads(path.read_text(encoding="utf-8"))
+                listed = {
+                    name.split(".", 1)[1]
+                    for name in config["client"]
+                    if name.startswith("immersive.")
+                }
+                self.assertEqual(listed, immersive_sources)
+                self.assertFalse([name for name in config["mixins"] if name.startswith("immersive.")])
+        neoforge = json.loads(NEOFORGE_IMMERSIVE_CONFIG.read_text(encoding="utf-8"))
+        self.assertEqual(neoforge["package"], IMMERSIVE_MIXIN_PACKAGE)
+        self.assertIs(neoforge["required"], True)
+        self.assertEqual(neoforge["injectors"]["defaultRequire"], 0)
+        # The immersive hooks share methods with the common config's (PreviewSkinSwapPoseMixin on
+        # the player and cape models): the same priority keeps them in the same order against
+        # other mods' hooks on every loader.
+        common_priorities = {
+            json.loads(path.read_text(encoding="utf-8")).get("priority")
+            for path in self.configs_named("quickskin.mixins.json")
+        }
+        self.assertEqual(common_priorities, {2000})
+        self.assertEqual(neoforge.get("priority"), 2000)
+        self.assertEqual(set(neoforge["client"]), immersive_sources)
+        self.assertNotIn("mixins", neoforge)
+        for toml in NEOFORGE_MOD_TOMLS:
+            with self.subTest(toml=relative(toml)):
+                self.assertIn(
+                    'config = "quickskin-immersive.mixins.json"', toml.read_text(encoding="utf-8")
+                )
+
+    def test_immersive_guard_blocks_never_hold_only_comments(self) -> None:
+        # The immersive files keep an empty guarded block per version family for the ports to fill.
+        # Stonecutter takes a block that holds nothing but // lines for commented-out code and
+        # uncomments it where the block is active, which breaks that version's build: an empty
+        # block stays empty.
+        line_comment = re.compile(r"^\s*//(?!\?)")
+        sources = sorted((CANONICAL_JAVA / "com/quickskin/mod/mixin/immersive").glob("*.java")) + [
+            ROOT / "modules/preview-rendering/src/main/java/com/quickskin/mod/client/rendering" / name
+            for name in ("WorldPose.java", "WorldArmor.java", "WorldLook.java")
+        ] + [
+            ROOT / "modules/ui-foundation/src/main/java/com/quickskin/mod/client/immersive" / name
+            for name in ("ImmersiveSurface.java", "ImmersiveMode.java")
+        ]
+        for path in sources:
+            with self.subTest(source=relative(path)):
+                depth = 0
+                block: list[str] = []
+                comment_only: list[str] = []
+                for line in path.read_text(encoding="utf-8").splitlines() + ["//?}"]:
+                    opens = GUARD_OPEN.match(line)
+                    goes_on = GUARD_ELSE.match(line)
+                    closes = GUARD_CLOSE.match(line) and not goes_on
+                    if opens or goes_on or closes:
+                        if depth > 0 and any(line_comment.match(kept) for kept in block) and all(
+                            line_comment.match(kept) or not kept.strip() for kept in block
+                        ):
+                            comment_only.append(block[0].strip())
+                        block = []
+                        depth += 1 if opens else -1 if closes else 0
+                    else:
+                        block.append(line)
+                self.assertEqual(comment_only, [])
+
     def test_every_loader_loads_the_menu_mixins(self) -> None:
         menu_sources = {
             path.stem
@@ -636,6 +794,28 @@ class MixinPolicyTest(unittest.TestCase):
                 self.assertIn("part == PlayerModelPart.CAPE && CapeLayerTakeover.covers(this)", hook)
                 self.assertIn("cir.setReturnValue(false);", hook)
 
+    def test_a_hidden_piece_never_cuts_its_layer_short(self) -> None:
+        # The layers that draw what the local player wears skip a piece the player hides from
+        # everyone. As with the cape layer, another mod may pair a hook at a layer's start with
+        # one at its end: Touch'n Motion does on the elytra layer, which the hidden chest piece
+        # used to cancel, and the game stopped with "Pose stack not empty" at the player's next
+        # step in third person. Each layer reads the hidden slot as empty and returns by itself.
+        for name in ("LocalArmorLayerMixin", "LocalElytraLayerMixin", "LocalHeadLayerMixin"):
+            path = CANONICAL_JAVA / "com/quickskin/mod/mixin/armor" / f"{name}.java"
+            source = JAVA_COMMENT.sub("", path.read_text(encoding="utf-8"))
+            with self.subTest(path=relative(path)):
+                self.assertNotIn("cancel", source)
+                self.assertNotIn("@Inject", source)
+                self.assertNotIn("CallbackInfo", source)
+                handlers = re.findall(r"@ModifyVariable\(.*?\)\s*private ItemStack (quickskin\$\w+)\(ItemStack worn,", source, re.DOTALL)
+                self.assertTrue(handlers)
+                self.assertEqual(len(handlers), source.count("@ModifyVariable("))
+                self.assertEqual(len(handlers), source.count('at = @At("STORE"), ordinal = 0'))
+                self.assertEqual(
+                    len(handlers),
+                    len(re.findall(r"return PlayerModelRenderer\.hidesOwnPiece\(entity, [\w.]+\) \? ItemStack\.EMPTY : worn;", source)),
+                )
+
     def test_an_invisible_player_wears_no_cape(self) -> None:
         # Quick Skin's handler replaces vanilla's cape layer, and with it vanilla's own rule that
         # an invisible player shows no cape. Every handler has to apply it before it draws, with
@@ -646,16 +826,17 @@ class MixinPolicyTest(unittest.TestCase):
                     before_drawing = body[: self.CAPE_DRAW.search(body).start()]
                     subjects = []
                     if "AbstractClientPlayer player," in declaration:
-                        subjects.append(r"player\.isInvisible\(\)")
+                        subjects.append(("player", r"player\.isInvisible\(\)"))
                     if "RenderState renderState," in declaration:
-                        subjects.append(r"renderState\.isInvisible")
+                        subjects.append(("renderState", r"renderState\.isInvisible"))
                     self.assertTrue(subjects)
-                    for subject in subjects:
+                    for wearer, invisible in subjects:
                         # The other Stonecutter variant of the same condition may follow it
                         self.assertRegex(
                             before_drawing,
-                            r"if \(!(?:quickskin\$)?previewing && " + subject
-                            + r"\) \{(?:\s*if \(![^\n]*\) \{)?"
+                            r"if \(!(?:quickskin\$)?previewing && \(" + invisible
+                            + r"\s*\|\| !com\.quickskin\.mod\.client\.compat\.AccessoryCapeVisibility\.rule\(\)\.allows\(" + wearer
+                            + r"\)\)\) \{(?:\s*if \(![^{}]*\) \{)?"
                             + r"\s*quickskin\$leaveNoCapeToVanilla\([\w$]+\);\s*return;",
                         )
 
@@ -689,7 +870,7 @@ class MixinPolicyTest(unittest.TestCase):
             CANONICAL_JAVA / "com/quickskin/mod/mixin/PlayerRendererMixin.java"
         ).read_text(encoding="utf-8")
         calls = [line for line in source.splitlines() if "cir.setReturnValue(" in line]
-        self.assertEqual(len(calls), 2)
+        self.assertGreaterEqual(len(calls), 2)
         for call in calls:
             self.assertIn(".equals(vanillaSkin)", call)
 

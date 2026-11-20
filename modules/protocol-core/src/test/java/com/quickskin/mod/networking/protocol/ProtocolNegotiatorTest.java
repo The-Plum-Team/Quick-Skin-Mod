@@ -227,4 +227,40 @@ class ProtocolNegotiatorTest {
         assertTrue(withOlderPeer.supports(ProtocolCapability.HIDDEN_ARMOR));
         assertFalse(withOlderPeer.supports(ProtocolCapability.ELYTRA_TEXTURE));
     }
+
+    @Test
+    void immersivePosesIsAnOptionalCapabilityThatOlderPeersDrop() {
+        assertEquals(1L << 10, ProtocolCapability.IMMERSIVE_POSES.mask());
+        assertEquals("immersive-poses", ProtocolCapability.IMMERSIVE_POSES.id());
+        assertTrue((QuickSkinProtocol.CAPABILITIES
+                & ProtocolCapability.IMMERSIVE_POSES.mask()) != 0L);
+        assertEquals(0L, QuickSkinProtocol.REQUIRED_CAPABILITIES
+                & ProtocolCapability.IMMERSIVE_POSES.mask());
+
+        long olderPeer = QuickSkinProtocol.CAPABILITIES & ~ProtocolCapability.IMMERSIVE_POSES.mask();
+        ProtocolProfile withOlderPeer = ProtocolNegotiator.negotiate(
+                QuickSkinProtocol.POLICY,
+                new ProtocolOffer(2, 2, olderPeer, 1024 * 1024, 30 * 1024));
+        ProtocolProfile withCurrentPeer = ProtocolNegotiator.negotiate(
+                QuickSkinProtocol.POLICY,
+                new ProtocolOffer(2, 2, QuickSkinProtocol.CAPABILITIES, 1024 * 1024, 30 * 1024));
+
+        assertTrue(withOlderPeer.negotiated());
+        assertTrue(withOlderPeer.supports(ProtocolCapability.ELYTRA_TEXTURE));
+        assertFalse(withOlderPeer.supports(ProtocolCapability.IMMERSIVE_POSES));
+        assertTrue(withCurrentPeer.supports(ProtocolCapability.IMMERSIVE_POSES));
+    }
+
+    @Test
+    void everyCapabilityHasItsOwnBitAndId() {
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        long seen = 0L;
+        for (ProtocolCapability capability : ProtocolCapability.values()) {
+            assertEquals(1, Long.bitCount(capability.mask()), capability.id());
+            assertEquals(0L, seen & capability.mask(), capability.id() + " shares a bit");
+            assertTrue(ids.add(capability.id()), capability.id() + " is named twice");
+            seen |= capability.mask();
+        }
+        assertEquals(seen, ProtocolCapability.knownMask());
+    }
 }

@@ -153,3 +153,18 @@ then took that view for the worn armour and wrote it back after its own draw. Ev
 of the skin menu now first runs the mod's own put-back queue. Fabric's fork reads the slot with
 intermediary names, which the hook names separately; from 1.21.5 the menu shows the worn armour
 only, as before. No compatibility lane covers the mod.
+
+## Amendment (2026-11-19): the immersive view
+
+The immersive view (a prototype, on every supported version) floats the skin menu round the real
+player and draws no model or turntable ring of its own, so the pieces could not be clicked there.
+The real player now takes the model's place: the world's draw of the local player hands where its
+posed model is seen to the menu's outline tracing, which projects every vertex through the world's
+camera, so pointing, the corner marks, the ghost and the click run the flat menu's code on the
+player, poses and all. Hidden pieces lie on the real ground round the feet as items, laid out by
+the same `PedestalDrops`, on the ground found under each place, and a click on one puts it back on.
+Nothing new is sent: the pieces hide from everyone through the same capability. The floating panels
+and the menu's controls keep the mouse where they cover the player. A piece another mod takes off
+for the draw counts as covered only on 1.20.1 and 1.21.1, where the player is drawn from the
+entity; from 1.21.2 such a mod changes the render state as it is filled, before the draw, so what
+it took off is not known and no piece counts as covered, as on the flat menu's model.

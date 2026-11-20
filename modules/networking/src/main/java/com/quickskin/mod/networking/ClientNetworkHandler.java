@@ -954,6 +954,43 @@ public class ClientNetworkHandler {
         });
     }
 
+    /**
+     * The immersive pose another player this client sees plays now (ADR 0019). Drawn on that player
+     * by this client alone; one about the local player is ignored, since it plays its own. Poses
+     * spend a window of their own, never the appearance packets' control budget.
+     */
+    //? if <1.21 {
+    public static void handleSyncImmersivePose(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
+        java.util.UUID playerId = PacketHelper.readPlayerId(buf);
+        ImmersivePose pose = ImmersivePoseCodec.read(buf);
+    //?} else {
+    public static void handleSyncImmersivePose(
+            SyncImmersivePosePayload payload, NetworkManager.PacketContext context) {
+        java.util.UUID playerId = payload.playerId();
+        ImmersivePose pose = payload.pose();
+    //?}
+        Object sourceConnection = packetConnectionIdentity(context);
+        if (playerId == null || pose == null || sourceConnection == null || !isCurrentConnection(sourceConnection)
+                || !acceptsImmersivePoses(sourceConnection)
+                || !ImmersivePose.isValidFromServer(pose.pose(), pose.yaw(), pose.flags(), pose.swaps(), pose.swapVariant())
+                || !ClientTextureIngressLimiter.getInstance().allowImmersivePosePacket()) {
+            return;
+        }
+        context.queue(() -> {
+            if (!isCurrentConnection(sourceConnection)) return;
+            Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft.player != null && playerId.equals(minecraft.player.getUUID())) return;
+            com.quickskin.mod.common.data.RemoteImmersivePoses.getInstance().set(playerId,
+                    new com.quickskin.mod.common.data.RemoteImmersivePoses.Pose(pose.pose(), pose.yaw(), pose.flags(),
+                            pose.swaps(), pose.swapVariant(), minecraft.level));
+        });
+    }
+
+    private static boolean acceptsImmersivePoses(Object connection) {
+        ProtocolProfile profile = ProtocolSessions.getInstance().clientProfile(connection);
+        return acceptsWireMode(connection, true) && profile.supports(ProtocolCapability.IMMERSIVE_POSES);
+    }
+
     /** The skin an admin gave the local player on this server ({@code ""}: none any more). */
     //? if <1.21 {
     public static void handleAssignedSkin(FriendlyByteBuf buf, NetworkManager.PacketContext context) {

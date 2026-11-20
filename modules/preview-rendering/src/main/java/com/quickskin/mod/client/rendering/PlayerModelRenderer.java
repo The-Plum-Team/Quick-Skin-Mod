@@ -292,6 +292,29 @@ public class PlayerModelRenderer {
     }
 //?}
 
+    /**
+     * The sitting pose's block and the jump onto it or off it for one draw of a preview: the jump
+     * lifts and squashes the model, its cape and what it wears about its feet, while the block
+     * stays on the floor with its own pop; from 1.21.6 the picture-in-picture pass does so for the
+     * inline draw before ({@code applyPendingSitJump}, {@code renderPendingSitBlock}). {@code jump}
+     * is null when none plays.
+     */
+    public record PreviewSit(SitJump.Pose jump, boolean block) {
+    }
+
+    /**
+     * The sitting pose's block and jump a preview draws this frame, or null when it draws neither:
+     * the block only where the pose is the preview's own or on the title screen.
+     */
+    static PreviewSit previewSit(PreviewPlayerData playerData) {
+        SitJump.Pose jump = playerData.getSitJumpPose();
+        boolean sitting = "sit".equalsIgnoreCase(playerData.getCurrentAnimation());
+        Minecraft mc = Minecraft.getInstance();
+        boolean block = (mc.level == null || playerData.isOwnPose())
+                && (jump != null ? jump.blockShown() : sitting);
+        return jump == null && !block ? null : new PreviewSit(jump, block);
+    }
+
 //? if >=1.21.6 {
     /**
      * The CPM model one picture-in-picture pass draws in place of the model it was handed, which
@@ -418,15 +441,6 @@ public class PlayerModelRenderer {
         }
     }
 
-    /**
-     * The sitting pose's block and the jump onto it or off it for one picture-in-picture draw, as
-     * the inline draw before 1.21.6 shows them: the jump lifts and squashes the model, its cape and
-     * what it wears about its feet ({@link #applyPendingSitJump}), while the block stays on the
-     * floor with its own pop ({@link #renderPendingSitBlock}). {@code jump} is null when none plays.
-     */
-    public record PreviewSit(SitJump.Pose jump, boolean block) {
-    }
-
     // Keyed by the exact model object the draw submits, as the pending capes are
     private static final java.util.Map<Object, PreviewSit> PENDING_SITS = new java.util.IdentityHashMap<>();
     private static final int MAX_PENDING_SITS = 16;
@@ -436,20 +450,16 @@ public class PlayerModelRenderer {
     private static final float PIP_MODEL_ROOT = 1.6010001f;
 
     private static void registerPendingSit(Object key, PreviewPlayerData playerData) {
-        SitJump.Pose jump = playerData.getSitJumpPose();
-        boolean sitting = "sit".equalsIgnoreCase(playerData.getCurrentAnimation());
-        Minecraft mc = Minecraft.getInstance();
-        boolean block = (mc.level == null || playerData.isOwnPose())
-                && (jump != null ? jump.blockShown() : sitting);
+        PreviewSit sit = previewSit(playerData);
         synchronized (PENDING_SITS) {
-            if (jump == null && !block) {
+            if (sit == null) {
                 PENDING_SITS.remove(key);
                 return;
             }
             if (PENDING_SITS.size() >= MAX_PENDING_SITS) {
                 PENDING_SITS.clear();
             }
-            PENDING_SITS.put(key, new PreviewSit(jump, block));
+            PENDING_SITS.put(key, sit);
         }
     }
 
@@ -657,6 +667,19 @@ public class PlayerModelRenderer {
 //? if <1.21.6 {
         ACTIVE_PREVIEW_CAPE_KEY.set(renderKey);
 //?}
+    }
+
+    /**
+     * Makes {@code texture} the cape of the draws keyed by {@code renderKey} (none for null) until
+     * the cape layer takes it or {@link #releaseWorldCape} lets it go: how the immersive view
+     * dresses the player in the world in what a screen previews ({@link WorldLook}).
+     */
+    static void bindWorldCape(Object renderKey, ResourceLocation texture) {
+        PREVIEW_CAPE_BINDINGS.bind(renderKey, texture);
+    }
+
+    static void releaseWorldCape(Object renderKey) {
+        PREVIEW_CAPE_BINDINGS.unbind(renderKey);
     }
 //?} else {
     private static final PreviewCapeBindings<Object, Identifier> PREVIEW_CAPE_BINDINGS =
@@ -1726,7 +1749,8 @@ public class PlayerModelRenderer {
         // When the live player is drawn, animations are controlled by the game, so don't render it
         SitJump.Pose sitJump = playerData.getSitJumpPose();
         boolean sitting = "sit".equals(playerData.getCurrentAnimation() != null ? playerData.getCurrentAnimation().toLowerCase(Locale.ROOT) : null);
-        if ((mc.level == null || playerData.isOwnPose()) && (sitJump != null ? sitJump.blockShown() : sitting)) {
+        boolean sitBlock = (mc.level == null || playerData.isOwnPose()) && (sitJump != null ? sitJump.blockShown() : sitting);
+        if (sitBlock) {
             renderGrassBlock(poseStack, bufferSource, sitJump);
         }
         if (sitJump != null) {
@@ -1876,8 +1900,9 @@ public class PlayerModelRenderer {
                 model.body.translateAndRotate(poseStack);
                 poseStack.translate(0.0, 0.0, 0.125); // Move behind the player
 
-                // Add some basic swing/angle to make it look like a cape
-                poseStack.mulPose(Axis.XP.rotationDegrees(6.0F));
+                // Add some basic swing/angle to make it look like a cape, tilted further back over
+                // the sit block's edge
+                poseStack.mulPose(Axis.XP.rotationDegrees(6.0F + sitCapeTilt(sitJump, sitBlock, model.body, 0.0f)));
                 poseStack.mulPose(Axis.YP.rotationDegrees(180.0F)); // The cloak model part is drawn facing backwards
 
                 (model == slimModel ? slimCloak : classicCloak).render(
@@ -1897,7 +1922,7 @@ public class PlayerModelRenderer {
                 poseStack.pushPose();
                 model.body.translateAndRotate(poseStack);
                 poseStack.translate(0.0, 0.0, 0.125);
-                poseStack.mulPose(Axis.XP.rotationDegrees(6.0F));
+                poseStack.mulPose(Axis.XP.rotationDegrees(6.0F + sitCapeTilt(sitJump, sitBlock, model.body, 2.0f)));
                 capeModel.body.getChild("cape").render(
                         poseStack, capeVertexConsumer, 15728880, OverlayTexture.NO_OVERLAY);
                 poseStack.popPose();
@@ -2714,10 +2739,47 @@ public class PlayerModelRenderer {
 //?}
 
     /**
+     * How far the preview's cape tilts back past the 6 degrees it hangs at, so it clears the sit
+     * pose's block (see {@link SitClearance}): {@code jump} is the jump going on, or null,
+     * {@code block} whether the block is drawn, {@code body} the posed body the cape hangs from and
+     * {@code inner} how far behind its hinge the cape's inner face is (2 for the cape model from 1.21.2).
+     */
+    public static float sitCapeTilt(SitJump.Pose jump, boolean block, ModelPart body, float inner) {
+        if (!block) {
+            return 0.0f;
+        }
+        return SitClearance.capeTilt(jump, true, SitClearance.CAPE_REST, inner, SitClearance.CAPE_LENGTH,
+                body.x, body.y, body.z, body.xRot, body.yRot, body.zRot);
+    }
+
+    /**
+     * Tilts folded elytra hung from the preview's posed {@code body} back over the sit pose's block
+     * ({@link SitClearance#wingsTilt}), about the hinge they share with the cape, for the draw
+     * prepared in {@code poseStack}, in the body's space: the wings layer then hangs them there.
+     * Does nothing without a block.
+     */
+    static void clearSitBlockWithWings(PreviewSit sit, ModelPart body, PoseStack poseStack) {
+        if (sit == null || !sit.block()) {
+            return;
+        }
+        float tilt = SitClearance.wingsTilt(sit.jump(), true, SitClearance.WINGS_REST,
+                body.x, body.y, body.z, body.xRot, body.yRot, body.zRot);
+        if (tilt > 0.0f) {
+            poseStack.translate(0.0f, 0.0f, 0.125f);
+//? if <26.3 {
+            poseStack.mulPose(Axis.XP.rotationDegrees(tilt));
+//?} else {
+            poseStack.rotate(Axis.XP.rotationDegrees(tilt));
+//?}
+            poseStack.translate(0.0f, 0.0f, -0.125f);
+        }
+    }
+
+    /**
      * Setup model pose with animation based on current animation state
      * Supports idle, walk, run, sneak, sit, jump animations
      */
-    private static void setupModelPoseWithAnimation(
+    static void setupModelPoseWithAnimation(
 //? if <1.21.11 {
             PlayerModel model,
 //?} else {
@@ -2853,12 +2915,58 @@ public class PlayerModelRenderer {
         SkinSwapPoser.loop(model, PreviewLoops.sit(seconds));
     }
 
+//? if >=1.21.9 && <26.1 {
+    /**
+     * The sit's block under the player in the world (the immersive view, {@code WorldPose}), placed
+     * as {@link #renderGrassBlock} places it, in the player's {@code light}: from 1.21.9 to 1.21.11
+     * the world's entities are submitted to {@code collector} and drawn later, and so is it.
+     */
+    static void submitWorldGrassBlock(PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector collector,
+                                      SitJump.Pose sitJump, int light) {
+        poseStack.pushPose();
+        float scale = 0.675f;
+        poseStack.translate(-scale / 2.0f, 1.5f, 0.28125f);
+        poseStack.mulPose(Axis.XP.rotationDegrees(180.0f));
+        poseStack.scale(scale, scale, scale);
+        if (sitJump != null) {
+            poseStack.translate(0.5f, 0.0f, 0.5f);
+            poseStack.scale(sitJump.blockScaleX(), sitJump.blockScaleY(), sitJump.blockScaleX());
+            poseStack.translate(-0.5f, 0.0f, -0.5f);
+        }
+        collector.submitBlock(poseStack, net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(),
+                light, OverlayTexture.NO_OVERLAY, 0);
+        poseStack.popPose();
+    }
+//?}
+//? if >=1.21.11 && <26.1 {
+
+    /**
+     * Makes {@code texture} the cape of the draws keyed by {@code renderKey} (none for null) until
+     * the cape layer takes it or {@link #releaseWorldCape} lets it go: how the immersive view
+     * dresses the player in the world in what a screen previews ({@link WorldLook}). The twin of
+     * the older versions' method, for 1.21.11's {@code Identifier}.
+     */
+    static void bindWorldCape(Object renderKey, Identifier texture) {
+        PREVIEW_CAPE_BINDINGS.bind(renderKey, texture);
+    }
+
+    static void releaseWorldCape(Object renderKey) {
+        PREVIEW_CAPE_BINDINGS.unbind(renderKey);
+    }
+//?}
+
     /**
      * Render a grass block underneath the player when sitting
      * Positioned at the player's feet; {@code sitJump}, when not null, pops and squashes it
      */
 //? if <26.2 {
     private static void renderGrassBlock(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, SitJump.Pose sitJump) {
+        // The previews light their block fully
+        renderGrassBlock(poseStack, bufferSource, sitJump, 15728880);
+    }
+
+    /** The same block in the light it is given, which is how the player in the world sits on it. */
+    static void renderGrassBlock(PoseStack poseStack, MultiBufferSource bufferSource, SitJump.Pose sitJump, int light) {
 //?} else {
     private static void renderGrassBlock(PoseStack poseStack) {
         // Only the live player's draw on a world-less screen reaches this; it has no collector
@@ -2912,7 +3020,7 @@ public class PlayerModelRenderer {
             net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(),
             poseStack,
             bufferSource,
-            15728880, // Full brightness
+            light,
             net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY
         );
 
@@ -2926,7 +3034,7 @@ public class PlayerModelRenderer {
             net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(),
             poseStack,
             bufferSource,
-            15728880, // Full brightness
+            light,
             net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY
         );
 
@@ -2950,6 +3058,50 @@ public class PlayerModelRenderer {
                 state, net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(),
                 net.minecraft.client.renderer.block.model.BlockDisplayContext.create());
         state.submit(poseStack, collector, 15728880, OverlayTexture.NO_OVERLAY, 0);
+    }
+
+    /**
+     * The sit's block under the player in the world from 26.1 (the immersive view's
+     * {@code WorldPose}): the player's draw is collected and drawn later, so the block goes into
+     * the same collection, in the player's {@code light}, placed and popped by the jump as
+     * {@link #renderGrassBlock} places the previews' block.
+     */
+    static void submitGrassBlock(PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector collector,
+                                 SitJump.Pose sitJump, int light) {
+        poseStack.pushPose();
+        float scale = 0.675f;
+        poseStack.translate(-scale / 2.0f, 1.5f, 0.28125f);
+    //? if <26.3 {
+        poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(180.0f));
+    //?} else {
+        poseStack.rotate(com.mojang.math.Axis.XP.rotationDegrees(180.0f));
+    //?}
+        poseStack.scale(scale, scale, scale);
+        if (sitJump != null) {
+            poseStack.translate(0.5f, 0.0f, 0.5f);
+            poseStack.scale(sitJump.blockScaleX(), sitJump.blockScaleY(), sitJump.blockScaleX());
+            poseStack.translate(-0.5f, 0.0f, -0.5f);
+        }
+        var state = new net.minecraft.client.renderer.block.BlockModelRenderState();
+        new net.minecraft.client.renderer.block.BlockModelResolver(Minecraft.getInstance().getModelManager()).update(
+                state, net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(),
+                net.minecraft.client.renderer.block.model.BlockDisplayContext.create());
+        state.submit(poseStack, collector, light, OverlayTexture.NO_OVERLAY, 0);
+        poseStack.popPose();
+    }
+
+    /**
+     * Makes {@code texture} the cape of the draws keyed by {@code renderKey} (none for null) until
+     * the cape layer takes it or {@link #releaseWorldCape} lets it go: how the immersive view
+     * dresses the player in the world in what a screen previews ({@link WorldLook}). The twin of
+     * the older versions' method, for the {@code Identifier} of 26.1 and later.
+     */
+    static void bindWorldCape(Object renderKey, Identifier texture) {
+        PREVIEW_CAPE_BINDINGS.bind(renderKey, texture);
+    }
+
+    static void releaseWorldCape(Object renderKey) {
+        PREVIEW_CAPE_BINDINGS.unbind(renderKey);
     }
 //?}
 

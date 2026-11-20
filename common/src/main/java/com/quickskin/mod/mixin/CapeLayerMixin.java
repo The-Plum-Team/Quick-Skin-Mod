@@ -109,7 +109,8 @@ public class CapeLayerMixin {
 
         // An invisible player wears no cape, as vanilla's own layer has it; a cape a preview is
         // showing stays
-        if (!previewing && renderState.isInvisible) {
+        if (!previewing && (renderState.isInvisible
+                || !com.quickskin.mod.client.compat.AccessoryCapeVisibility.rule().allows(renderState))) {
             quickskin$leaveNoCapeToVanilla(renderState);
             return;
         }
@@ -209,9 +210,13 @@ import com.quickskin.mod.client.services.CapeAnimationHelper;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.util.TextureAlphaDetector;
 //? if <1.21 {
+import com.quickskin.mod.client.rendering.WorldPose;
 //?} else {
 import com.quickskin.mod.config.ClientConfig;
 import net.minecraft.client.Minecraft;
+//?}
+//? if >=1.21 && <1.21.2 {
+import com.quickskin.mod.client.rendering.WorldPose;
 //?}
 import com.mojang.blaze3d.vertex.PoseStack;
 //? if <1.21.6 {
@@ -381,9 +386,11 @@ public class CapeLayerMixin {
         // An invisible player wears no cape, as vanilla's own layer has it; a cape a preview is
         // showing stays
 //? if <1.21.6 {
-        if (!quickskin$previewing && player.isInvisible()) {
+        if (!quickskin$previewing && (player.isInvisible()
+                || !com.quickskin.mod.client.compat.AccessoryCapeVisibility.rule().allows(player))) {
 //?} else {
-        if (!quickskin$previewing && renderState.isInvisible) {
+        if (!quickskin$previewing && (renderState.isInvisible
+                || !com.quickskin.mod.client.compat.AccessoryCapeVisibility.rule().allows(renderState))) {
 //?}
             quickskin$leaveNoCapeToVanilla(quickskin$wearer);
             return;
@@ -517,6 +524,11 @@ public class CapeLayerMixin {
         if (skinSwap != null) {
             SkinSwapPoser.transformCape(poseStack, skinSwap);
         }
+    //? if <1.21.2 {
+        // In the immersive view the player plays the menu's poses; the cape hangs from that body.
+        WorldPose.hangFromBody(player, ((CapeLayer)(Object)this).getParentModel(), poseStack);
+        WorldPose.clearSitBlock(player, ((CapeLayer)(Object)this).getParentModel(), poseStack, partialTicks);
+    //?}
         poseStack.translate(0.0D, 0.0D, 0.125D);
         double d0 = Mth.lerp(partialTicks, player.xCloakO, player.xCloak) - Mth.lerp(partialTicks, player.xo, player.getX());
         double d1 = Mth.lerp(partialTicks, player.yCloakO, player.yCloak) - Mth.lerp(partialTicks, player.yo, player.getY());

@@ -94,11 +94,15 @@ public final class PreviewEquipment {
 
     /**
      * What one draw needs: the renderer whose layers draw, what they draw from (the player before
-     * 1.21.2, a render state extracted from it after), and whether the player's elytra takes the
-     * cape's place.
+     * 1.21.2, a render state extracted from it after), whether the player's elytra takes the
+     * cape's place, and the sitting pose's block and jump the preview draws (null for none), which
+     * the folded wings are tilted back over.
      */
-    public record Worn(Object renderer, Object subject, boolean wings) {
+    public record Worn(Object renderer, Object subject, boolean wings, PlayerModelRenderer.PreviewSit sit) {
     }
+
+    // The sitting pose of the preview whose equipment was last drawn, for the wings ({@link #alongBody})
+    private static PlayerModelRenderer.PreviewSit drawnSit;
 
     /** Later than anything else the preview submits, so the ghost is drawn over the cape. */
     private static final int GHOST_ORDER = 64;
@@ -125,14 +129,41 @@ public final class PreviewEquipment {
     /** Where the skin menu's model last landed on screen, for {@link #outline}. */
     private static HumanoidModel<?> outlineModel;
     private static final Matrix4f OUTLINE_MATRIX = new Matrix4f();
+    /**
+     * In the immersive view, the projection from the camera's space, where {@link #OUTLINE_MATRIX}
+     * then takes the model, onto the GUI; null for a preview drawn flat on the GUI.
+     */
+    @Nullable
+    private static Matrix4f outlineProjection;
     private static boolean outlineSlim;
     /** Counts the skin menu's draws, so outlines computed for one frame are not reused in the next. */
     private static int outlineFrame;
     /** True while an outline capture draws a piece, which then shows even if it is hidden. */
     private static boolean capturing;
 
-    /** The skin menu's model as drawn this frame: the model, its transform to GUI space, its arms. */
-    record Placement(HumanoidModel<?> model, Matrix4f toGui, boolean slim) {
+    /**
+     * The skin menu's model as drawn this frame: the model, its transform to GUI space, its arms.
+     * In the immersive view {@code toGui} takes the model only to the camera's space, from which
+     * {@code projection} projects it onto the GUI ({@link #toGui(Matrix4f, Vector3f)}).
+     */
+    record Placement(HumanoidModel<?> model, Matrix4f toGui, boolean slim, @Nullable Matrix4f projection) {
+    }
+
+    /**
+     * Where a point {@code toGui} gave lands on the GUI, in place, as the silhouettes and outlines
+     * read it: x and y in GUI coordinates and z larger nearer the viewer. Without a projection the
+     * point already is there; with one it is in the camera's space and is projected, its depth
+     * kept in sixteenths of a block, a model pixel.
+     */
+    static Vector3f toGui(@Nullable Matrix4f projection, Vector3f point) {
+        if (projection == null) {
+            return point;
+        }
+        float depth = point.z * 16.0F;
+        org.joml.Vector4f projected = projection.transform(new org.joml.Vector4f(point, 1.0F));
+        // Nothing of the player is behind the camera; a point that is stays far off to one side
+        float w = Math.max(1.0E-3F, projected.w);
+        return point.set(projected.x / w, projected.y / w, depth);
     }
 
     /**
@@ -162,13 +193,30 @@ public final class PreviewEquipment {
     static void rememberPreview(HumanoidModel<?> model, Matrix4f toGui, boolean slim) {
         outlineModel = model;
         OUTLINE_MATRIX.set(toGui);
+        outlineProjection = null;
         outlineSlim = slim;
+        outlineFrame++;
+    }
+
+    /**
+     * Remembers where the immersive view drew the real player this frame, in place of a skin
+     * menu preview ({@code WorldArmor}): {@code toCamera} takes model space to the camera's,
+     * {@code projection} the camera's space to GUI coordinates, and {@code covered} names the
+     * pieces another mod took off for that draw ({@link #coveredPieces}).
+     */
+    static void rememberWorld(HumanoidModel<?> model, Matrix4f toCamera, Matrix4f projection, boolean slim, int covered) {
+        outlineModel = model;
+        OUTLINE_MATRIX.set(toCamera);
+        outlineProjection = new Matrix4f(projection);
+        outlineSlim = slim;
+        coveredPieces = covered;
         outlineFrame++;
     }
 
     /** Forgets the remembered preview, so a closed menu leaves no outline to draw and no ghost. */
     public static void forgetPreview() {
         outlineModel = null;
+        outlineProjection = null;
         outlineFrame++;
         ghostPiece = 0;
         ghostAlpha = 1.0F;
@@ -207,7 +255,7 @@ public final class PreviewEquipment {
     }
 
     /** The player's armour from head to feet, as {@link #emptied} compares it. */
-    private static net.minecraft.world.item.ItemStack[] armour(net.minecraft.world.entity.LivingEntity player) {
+    static net.minecraft.world.item.ItemStack[] armour(net.minecraft.world.entity.LivingEntity player) {
         return new net.minecraft.world.item.ItemStack[]{
                 player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD),
                 player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST),
@@ -216,7 +264,7 @@ public final class PreviewEquipment {
     }
 
     /** The pieces ({@code HiddenArmor} bits) that held an item {@code before} and are empty now. */
-    private static int emptied(net.minecraft.world.entity.LivingEntity player, net.minecraft.world.item.ItemStack[] before) {
+    static int emptied(net.minecraft.world.entity.LivingEntity player, net.minecraft.world.item.ItemStack[] before) {
         net.minecraft.world.item.ItemStack[] now = armour(player);
         int emptied = 0;
         for (int i = 0; i < now.length; i++) {
@@ -280,7 +328,8 @@ public final class PreviewEquipment {
     @Nullable
     static Placement placement() {
         HumanoidModel<?> model = outlineModel;
-        return model == null ? null : new Placement(model, new Matrix4f(OUTLINE_MATRIX), outlineSlim);
+        return model == null ? null : new Placement(model, new Matrix4f(OUTLINE_MATRIX), outlineSlim,
+                outlineProjection == null ? null : new Matrix4f(outlineProjection));
     }
 
     static int outlineFrame() {
@@ -359,6 +408,7 @@ public final class PreviewEquipment {
                 point.set((i & 1) == 0 ? box[1] : box[4], (i & 2) == 0 ? box[2] : box[5], (i & 4) == 0 ? box[3] : box[6]);
                 point.mul(1.0F / 16.0F);
                 transform.transformPosition(point);
+                toGui(outlineProjection, point);
                 corners[i * 2] = point.x;
                 corners[i * 2 + 1] = point.y;
             }
@@ -430,13 +480,13 @@ public final class PreviewEquipment {
 //? if <1.21.2 {
         boolean wings = (com.quickskin.mod.client.services.LocalHiddenArmor.inEffect() & 4) == 0
                 && CosmeticArmorPreview.wearing(player, () -> player.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA));
-        return new Worn(renderer, player, wings);
+        return new Worn(renderer, player, wings, PlayerModelRenderer.previewSit(playerData));
 //?} else {
         // The state takes the equipment as it is now, Cosmetic Armor Reworked's included
         @SuppressWarnings({"unchecked", "rawtypes"})
         Object state = CosmeticArmorPreview.wearing(player,
                 () -> ((LivingEntityRenderer) renderer).createRenderState(player, 1.0F));
-        return new Worn(renderer, state, wearsWings(state));
+        return new Worn(renderer, state, wearsWings(state), PlayerModelRenderer.previewSit(playerData));
 //?}
     }
 
@@ -466,6 +516,18 @@ public final class PreviewEquipment {
             }
         }
         return minecraft.getEntityRenderDispatcher().getRenderer(minecraft.player);
+    }
+
+    /** Whether a renderer is the dispatcher's player renderer of the slim model. */
+    static boolean isSlimRenderer(Minecraft minecraft, Object renderer) {
+        if (minecraft.getEntityRenderDispatcher() instanceof PlayerRenderers renderers) {
+            for (Map.Entry<?, ?> entry : renderers.quickskin$playerRenderers().entrySet()) {
+                if (entry.getValue() == renderer) {
+                    return isSlimKey(entry.getKey());
+                }
+            }
+        }
+        return false;
     }
 
     /** Whether a key of the dispatcher's player renderers names the slim model. */
@@ -532,7 +594,9 @@ public final class PreviewEquipment {
     /**
      * Runs a layer's draw, the elytra's from the preview's body. Vanilla hangs the wings from the
      * player's root, where the body always is in the world, but the preview's poses lean, lower and
-     * twist the body, and the cape already follows it.
+     * twist the body, and the cape already follows it. Sitting on the pose's block, the folded wings
+     * are tilted back over its edge, as the cape is; the outline of the wings follows the same
+     * preview's last draw.
      */
     static void alongBody(Object layer, HumanoidModel<?> preview, PoseStack poseStack, Runnable draw) {
 //? if <1.21.2 {
@@ -547,6 +611,7 @@ public final class PreviewEquipment {
         poseStack.pushPose();
         try {
             preview.body.translateAndRotate(poseStack);
+            PlayerModelRenderer.clearSitBlockWithWings(drawnSit, preview.body, poseStack);
             draw.run();
         } finally {
             poseStack.popPose();
@@ -636,6 +701,7 @@ public final class PreviewEquipment {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static void render(Worn worn, HumanoidModel<?> preview, PoseStack poseStack, MultiBufferSource buffers) {
+        drawnSit = worn.sit();
         Runnable giveBack = copyPose(preview, worn.renderer());
         List<?> layers = ((RendererLayers) worn.renderer()).quickskin$previewLayers();
 //? if <1.21.2 {
@@ -700,6 +766,7 @@ public final class PreviewEquipment {
         if (worn == null || !ghostShown()) {
             return;
         }
+        drawnSit = worn.sit();
         int piece = ghostPiece;
         float alpha = ghostAlpha;
         MultiBufferSource ghostBuffers = renderType -> {
@@ -873,6 +940,7 @@ public final class PreviewEquipment {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static void submit(Worn worn, HumanoidModel<?> preview, PoseStack poseStack, SubmitNodeCollector collector) {
+        drawnSit = worn.sit();
         copyPose(preview, worn.renderer());
         synchronized (BOUND_POSES) {
             BOUND_POSES.put(worn.subject(), storePose(preview));
@@ -905,6 +973,7 @@ public final class PreviewEquipment {
         if (worn == null || !ghostShown()) {
             return false;
         }
+        drawnSit = worn.sit();
         int piece = ghostPiece;
         copyPose(preview, worn.renderer());
         Object state;

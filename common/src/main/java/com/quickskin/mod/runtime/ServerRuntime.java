@@ -124,6 +124,8 @@ public final class ServerRuntime implements AutoCloseable {
                 com.quickskin.mod.platform.PlatformHelper.getConfigDirectory()
                         .resolve(com.quickskin.mod.server.data.SkinPoolFolder.DIRECTORY_NAME));
         ServerTextureIngressExecutor.getInstance().start();
+        // Immersive poses go only to the clients the game pairs with the posing player (ADR 0019)
+        com.quickskin.mod.networking.ServerImmersivePoses.bindViewers(ImmersivePoseViewers::of);
         AccountSkinProfileTarget accountSkinTarget = new AccountSkinProfileTarget(server);
         AccountSkinShareService.getInstance().start(accountSkinTarget);
         logAccountSkinSharing(server, accountSkinTarget);

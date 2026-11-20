@@ -199,7 +199,7 @@ public final class PlayerOwnSkinBootstrap {
             }
 
             // Apply transparency settings if needed
-            if (com.quickskin.mod.config.ClientConfig.getInstance().shouldDisableSkinTransparency()) {
+            if (com.quickskin.mod.config.ClientConfig.getInstance().shouldFlattenImportedSkins()) {
                 image = com.quickskin.mod.common.util.HDTextureProcessor.removeTransparency(image);
             }
 

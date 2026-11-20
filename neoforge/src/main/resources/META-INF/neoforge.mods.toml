@@ -38,6 +38,10 @@ config = "quickskin-input.mixins.json"
 [[mixins]]
 config = "quickskin-menu.mixins.json"
 
+# The immersive view: the menu floats round the player in the world
+[[mixins]]
+config = "quickskin-immersive.mixins.json"
+
 # Sharing the account skin with vanilla clients: the server accessors (ADR 0012)
 [[mixins]]
 config = "quickskin-account-skin.mixins.json"

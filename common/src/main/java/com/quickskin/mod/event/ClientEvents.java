@@ -82,6 +82,8 @@ public class ClientEvents {
             // The latest look choice between Quick Skin and CPM decides the local look.
             com.quickskin.mod.client.services.CpmLookArbiter.tick();
             com.quickskin.mod.client.compat.ReplayModHelper.tick();
+            // Other Quick Skin players see the pose of this client's immersive view (ADR 0019)
+            com.quickskin.mod.runtime.ImmersivePoseBroadcast.tick();
         });
 
         // Download player's own skin on startup (async, won't block). Platforms whose client entry
@@ -154,11 +156,12 @@ public class ClientEvents {
         //?}
 
             //? if <1.21 {
+            // A drag of the preview ends wherever the mouse is let go, so the preview hears of the
+            // release here. The screen still hears of it too: the skin menu takes a click on an
+            // armour piece at the release. Fabric keeps an interrupted release from the screen
+            // (Forge only one interrupted as false), which left the piece on there.
             if (activeWidget != null && activeWidget.isInteracting()) {
-                boolean handled = activeWidget.mouseReleased(mouseX, mouseY, button);
-                if (handled) {
-                    return EventResult.interruptTrue(); // Consume the event
-                }
+                activeWidget.mouseReleased(mouseX, mouseY, button);
             }
             //?} else {
         // Raw input (for global keybinds outside of screens)

@@ -222,6 +222,7 @@ public class PlayerWidget extends AbstractWidget {
     private Integer customCenterY = null;
     // Largest scale the host's layout leaves room for; null leaves the configured size alone
     private Float scaleCap = null;
+    private boolean leftOut;
 
 //? if <1.21 {
     // Priority areas (buttons that should take precedence over model interaction)
@@ -378,6 +379,22 @@ public class PlayerWidget extends AbstractWidget {
      * Caps the model scale at what the host's layout leaves room for, so a large configured size
      * cannot push the model off a small window. The configured size still applies below the cap.
      */
+    /** The look and the pose this preview shows, which the immersive view has the player in the world play. */
+    public PreviewPlayerData getPreviewData() {
+        return previewData;
+    }
+
+    /**
+     * Leaves the model out: it draws nothing and takes no input until it is let back in. The
+     * immersive view does this while the real player stands in the model's place.
+     */
+    public void setLeftOut(boolean leftOut) {
+        if (this.leftOut != leftOut) {
+            this.leftOut = leftOut;
+            this.active = !leftOut;
+        }
+    }
+
     public void setScaleCap(float maxScale) {
         this.scaleCap = maxScale;
     }
@@ -705,6 +722,9 @@ public class PlayerWidget extends AbstractWidget {
 //?} else {
     public void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
 //?}
+        if (leftOut) {
+            return;
+        }
         // Load and apply scale from config
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
         int savedPercentage = getSliderPercentageFromConfig(config);

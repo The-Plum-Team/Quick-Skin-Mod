@@ -139,6 +139,14 @@ package com.quickskin.mod.neoforge.mixin;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.player.AbstractClientPlayer;
+//? if >=26.1 {
+import com.quickskin.mod.client.immersive.ImmersiveMode;
+import com.quickskin.mod.client.immersive.ImmersiveScreen;
+import com.quickskin.mod.client.rendering.PreviewPlayerData;
+import com.quickskin.mod.client.rendering.WorldLook;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+//?}
 //? if <1.21.9 {
 import net.minecraft.client.resources.PlayerSkin;
 import net.minecraft.resources.ResourceLocation;
@@ -153,11 +161,28 @@ import net.minecraft.world.entity.player.PlayerModelType;
 import net.minecraft.world.entity.player.PlayerSkin;
 import net.minecraft.resources.Identifier;
 //?}
+//? if >=1.21.9 && <26.1 {
+import com.quickskin.mod.client.immersive.ImmersiveMode;
+import com.quickskin.mod.client.immersive.ImmersiveScreen;
+import com.quickskin.mod.client.rendering.PreviewPlayerData;
+import com.quickskin.mod.client.rendering.WorldLook;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+//?}
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+//? if >=1.21.6 && <1.21.9 {
+import com.quickskin.mod.client.compat.CPMCompatIntegration;
+import com.quickskin.mod.client.immersive.ImmersiveMode;
+import com.quickskin.mod.client.immersive.ImmersiveScreen;
+import com.quickskin.mod.client.rendering.PreviewPlayerData;
+import com.quickskin.mod.client.rendering.WorldLook;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+//?}
 
 import java.lang.reflect.Field;
 
@@ -173,6 +198,37 @@ public abstract class MixinAbstractClientPlayer {
 
     @Unique
     private static boolean quickskin$fieldSearched = false;
+//? if >=26.1 {
+
+    /**
+     * The skin the player in the world shows during the world's draw of the immersive view, as
+     * the cape menu opened for one skin previews it ({@link WorldLook#skinLook}), with its model
+     * and the cape and wings the player's own has, or null for their own.
+     */
+    @Unique
+    private static PlayerSkin quickskin$screenSkin(AbstractClientPlayer player) {
+        // From 26.1 the game reads the skin as it extracts the player's render state, before it
+        // draws the world, so the whole view is asked, not only its world pass
+        if (!ImmersiveMode.running()) {
+            return null;
+        }
+    //? if <26.2 {
+        Screen screen = Minecraft.getInstance().screen;
+    //?} else {
+        Screen screen = Minecraft.getInstance().gui.screen();
+    //?}
+        PreviewPlayerData look = WorldLook.skinLook(ImmersiveMode.session(), player, screen,
+                screen instanceof ImmersiveScreen);
+        PlayerInfo playerInfo = look == null ? null : quickskin$getPlayerInfo(player);
+        PlayerSkin worn = playerInfo == null ? null : playerInfo.getSkin();
+        if (worn == null) {
+            return null;
+        }
+        Identifier texture = look.getSkinLocation();
+        return new PlayerSkin(new ClientAsset.ResourceTexture(texture, texture), worn.cape(), worn.elytra(),
+                look.isSlim() ? PlayerModelType.SLIM : PlayerModelType.WIDE, worn.secure());
+    }
+//?}
 
     @Inject(
             method = "getSkin",
@@ -183,12 +239,34 @@ public abstract class MixinAbstractClientPlayer {
             allow = 1
     )
     private void quickskin$overrideSkinAtHead(CallbackInfoReturnable<PlayerSkin> cir) {
+        //? if >=1.21.6 && <1.21.9 {
+        if (quickskin$immersiveScreenSkin(cir)) {
+            return;
+        }
+        //?}
         PlayerAppearanceService service = PlayerAppearanceService.getInstance();
         if (service == null) {
             return;
         }
+//? if >=26.1 {
+        // The immersive view shows the skin a screen previews on the player in the world
+        PlayerSkin quickskin$look = quickskin$screenSkin((AbstractClientPlayer) (Object) this);
+        if (quickskin$look != null) {
+            cir.setReturnValue(quickskin$look);
+            return;
+        }
+//?}
 
         AbstractClientPlayer self = (AbstractClientPlayer) (Object) this;
+//? if >=1.21.9 && <26.1 {
+
+        // The immersive view shows the skin a screen previews on the player in the world
+        PlayerSkin quickskin$look = quickskin$screenSkin(self);
+        if (quickskin$look != null) {
+            cir.setReturnValue(quickskin$look);
+            return;
+        }
+//?}
 
         boolean hasCustomSkin = service.hasActiveSkin(self.getUUID());
         boolean hasCustomCape = service.hasActiveCape(self.getUUID());
@@ -303,6 +381,31 @@ public abstract class MixinAbstractClientPlayer {
 
         cir.setReturnValue(customSkin);
     }
+//? if >=1.21.9 && <26.1 {
+
+    /**
+     * The skin the player in the world shows during the world's draw of the immersive view, as
+     * the cape menu opened for one skin previews it ({@link WorldLook#skinLook}), with its model
+     * and the cape and wings the player's own has, or null for their own.
+     */
+    @Unique
+    private static PlayerSkin quickskin$screenSkin(AbstractClientPlayer player) {
+        if (!ImmersiveMode.posesPlayer()) {
+            return null;
+        }
+        Screen screen = Minecraft.getInstance().screen;
+        PreviewPlayerData look = WorldLook.skinLook(ImmersiveMode.session(), player, screen,
+                screen instanceof ImmersiveScreen);
+        PlayerInfo playerInfo = look == null ? null : quickskin$getPlayerInfo(player);
+        PlayerSkin worn = playerInfo == null ? null : playerInfo.getSkin();
+        if (worn == null) {
+            return null;
+        }
+        var texture = look.getSkinLocation();
+        return new PlayerSkin(new ClientAsset.ResourceTexture(texture, texture), worn.cape(), worn.elytra(),
+                look.isSlim() ? PlayerModelType.SLIM : PlayerModelType.WIDE, worn.secure());
+    }
+//?}
 
     @Unique
     private static PlayerInfo quickskin$getPlayerInfo(AbstractClientPlayer player) {
@@ -325,5 +428,30 @@ public abstract class MixinAbstractClientPlayer {
         }
         return null;
     }
+//? if >=1.21.6 && <1.21.9 {
+
+    /**
+     * The immersive view's cape menu opened for one skin shows that skin and its model on the
+     * player in the world ({@link WorldLook#skinLook}), during the world's draw only: the draw
+     * reads the skin here to choose the renderer of its model and to fill the render state. The
+     * common twin of this mixin does the same on Fabric.
+     */
+    @Unique
+    private boolean quickskin$immersiveScreenSkin(CallbackInfoReturnable<PlayerSkin> cir) {
+        if (!ImmersiveMode.posesPlayer() || CPMCompatIntegration.shouldDeferToCPM()) {
+            return false;
+        }
+        Screen screen = Minecraft.getInstance().screen;
+        PreviewPlayerData look = WorldLook.skinLook(ImmersiveMode.session(), (Object) this, screen,
+                screen instanceof ImmersiveScreen);
+        if (look == null) {
+            return false;
+        }
+        // The cape and the wings are the look's own, bound to the draw (WorldLook.beforeDraw)
+        cir.setReturnValue(new PlayerSkin(look.getSkinLocation(), null, null, null,
+                look.isSlim() ? PlayerSkin.Model.SLIM : PlayerSkin.Model.WIDE, true));
+        return true;
+    }
+//?}
 }
 //?}

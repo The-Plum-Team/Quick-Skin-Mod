@@ -6,6 +6,12 @@
   "plugin": "com.quickskin.mod.mixin.compat.EarsMixinPlugin",
   "client": [
     "EtfPlayerTextureMixin",
+    "SodiumPlayerLightMixin",
+    "SodiumTerrainShaderMixin",
+    "SodiumTerrainProgramMixin",
+    "SodiumTerrainPassMixin",
+    "IrisTerrainShaderMixin",
+    "IrisTerrainProgramMixin",
     "EarsLayerRendererMixin",
     "EarsModMixin",
     "EarsFiveMixin",

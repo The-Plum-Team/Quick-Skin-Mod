@@ -115,6 +115,8 @@ public final class ClientRuntime implements AutoCloseable {
                 localPlayerId, sessionIdentity, com.quickskin.mod.client.compat.ReplayModHelper.isInReplay());
         com.quickskin.mod.networking.HiddenArmorSyncService.getInstance().beginSession(
                 localPlayerId, sessionIdentity, com.quickskin.mod.client.compat.ReplayModHelper.isInReplay());
+        com.quickskin.mod.networking.ImmersivePoseSyncService.getInstance().beginSession(
+                localPlayerId, sessionIdentity, com.quickskin.mod.client.compat.ReplayModHelper.isInReplay());
         com.quickskin.mod.networking.NetworkSyncService.getInstance()
                 .beginAppearanceSnapshotRequest(localPlayerId, sessionIdentity);
     }
@@ -187,6 +189,12 @@ public final class ClientRuntime implements AutoCloseable {
                 com.quickskin.mod.networking.HiddenArmorSyncService.getInstance()::clearSession);
         runCleanup("clear player nicknames",
                 com.quickskin.mod.common.data.PlayerNicknameRepository.getInstance()::clear);
+        runCleanup("clear immersive pose session",
+                com.quickskin.mod.networking.ImmersivePoseSyncService.getInstance()::clearSession);
+        runCleanup("clear other players' immersive poses", () -> {
+            com.quickskin.mod.common.data.RemoteImmersivePoses.getInstance().clear();
+            com.quickskin.mod.client.rendering.WorldPose.clearOthers();
+        });
         runCleanup("clear assigned skins and skin admin state",
                 com.quickskin.mod.networking.SkinAdminClient.getInstance()::clearSession);
         runCleanup("clear the local player's assigned skin",

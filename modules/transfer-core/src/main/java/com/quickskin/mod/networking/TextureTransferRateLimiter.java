@@ -27,6 +27,9 @@ public final class TextureTransferRateLimiter {
     /** Matches the client's bounded retry count while preventing unbounded main-thread queues. */
     private static final int MAX_PROTOCOL_HELLO_TOKENS = 5;
     private static final long PROTOCOL_HELLO_REFILL_MILLIS = 2_000L;
+    /** Immersive poses queued for the server thread: a burst, then ten a second (ADR 0019). */
+    static final int MAX_IMMERSIVE_POSE_TOKENS = 20;
+    private static final long IMMERSIVE_POSE_REFILL_MILLIS = 100L;
 
     private final LinkedHashMap<SessionKey, SessionState> sessions =
             new LinkedHashMap<>(16, 0.75f, true);
@@ -109,6 +112,27 @@ public final class TextureTransferRateLimiter {
         refillProtocolHelloTokens(state, now);
         if (state.protocolHelloTokens < 1) return false;
         state.protocolHelloTokens--;
+        state.lastActivity = now;
+        return true;
+    }
+
+    /**
+     * Bounds the immersive poses one connection may queue for the server thread, apart from the
+     * storage budget, which a player browsing skins in that menu also spends. The server's own
+     * relay is stricter still; this only keeps a flooding client from filling the task queue.
+     */
+    public synchronized boolean allowImmersivePose(UUID playerId, Object session) {
+        long now = System.currentTimeMillis();
+        SessionState state = state(playerId, session, now);
+        if (state == null) return false;
+        long elapsed = now - state.immersivePoseRefillAt;
+        if (elapsed >= IMMERSIVE_POSE_REFILL_MILLIS) {
+            long tokens = elapsed / IMMERSIVE_POSE_REFILL_MILLIS;
+            state.immersivePoseTokens = (int) Math.min(MAX_IMMERSIVE_POSE_TOKENS, state.immersivePoseTokens + tokens);
+            state.immersivePoseRefillAt += tokens * IMMERSIVE_POSE_REFILL_MILLIS;
+        }
+        if (state.immersivePoseTokens < 1) return false;
+        state.immersivePoseTokens--;
         state.lastActivity = now;
         return true;
     }
@@ -282,6 +306,8 @@ public final class TextureTransferRateLimiter {
         private long downloadBytes;
         private int protocolHelloTokens;
         private long protocolHelloRefillAt;
+        private int immersivePoseTokens;
+        private long immersivePoseRefillAt;
         private long lastActivity;
 
         private SessionState(long now) {
@@ -289,6 +315,8 @@ public final class TextureTransferRateLimiter {
             requestWindowStarted = now;
             protocolHelloTokens = MAX_PROTOCOL_HELLO_TOKENS;
             protocolHelloRefillAt = now;
+            immersivePoseTokens = MAX_IMMERSIVE_POSE_TOKENS;
+            immersivePoseRefillAt = now;
             lastActivity = now;
         }
     }

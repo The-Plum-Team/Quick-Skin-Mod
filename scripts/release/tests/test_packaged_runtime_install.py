@@ -568,6 +568,7 @@ class PackagedRuntimeClientInstallTest(unittest.TestCase):
                 "activeSkinHash": "",
                 "configVersion": 1,
                 "enablePlayerOwnSkinSystem": False,
+                "immersiveMenu": False,
                 "menuBackgroundStyle": "opaque_stars",
                 "playerOwnSkinHash": "",
             },

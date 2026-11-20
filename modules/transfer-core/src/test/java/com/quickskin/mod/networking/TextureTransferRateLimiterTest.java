@@ -142,4 +142,18 @@ class TextureTransferRateLimiterTest {
         assertTrue(limiter.allowProtocolHello(player, firstConnection));
         assertTrue(limiter.allowProtocolHello(player, replacementConnection));
     }
+
+    @Test
+    void immersivePosesHaveTheirOwnBoundedBudget() {
+        UUID player = UUID.randomUUID();
+        Object connection = new Object();
+        Object replacement = new Object();
+
+        for (int pose = 0; pose < TextureTransferRateLimiter.MAX_IMMERSIVE_POSE_TOKENS; pose++) {
+            assertTrue(limiter.allowImmersivePose(player, connection));
+        }
+        assertFalse(limiter.allowImmersivePose(player, connection));
+        assertTrue(limiter.allowStorageMutation(player, connection), "poses never spend the storage budget");
+        assertTrue(limiter.allowImmersivePose(player, replacement));
+    }
 }

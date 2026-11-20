@@ -98,6 +98,7 @@ public class ClientConfig {
 
     // Menu Background Style
     public String menuBackgroundStyle = "vanilla_blur"; // "vanilla_blur" or "opaque_stars"
+    public boolean immersiveMenu = true; // In a world the skin menu floats round the player, seen from a camera in front of them
 
     // --- NEW --- Modpack Settings
     public boolean enablePlayerOwnSkinSystem = true; // When enabled, automatically downloads and protects the player's own skin.
@@ -282,9 +283,38 @@ public class ClientConfig {
         return serverOverride;
     }
 
+    /** Whether Ears is installed, asked of the loader once; null until then. */
+    private static volatile Boolean earsInstalled;
+
     /**
-     * Check if skin transparency should be disabled
-     * Uses OR logic: if either client OR server disables transparency, it's disabled
+     * Whether Ears is installed. Ears keeps extra data of a skin in the alpha of its body, where
+     * the game draws every pixel opaque whatever its alpha says. Drawn with that alpha the body
+     * looks half see-through, so with Ears skins are shown without transparency, as they are
+     * without Quick Skin; the outer layers keep theirs.
+     */
+    public static boolean isEarsInstalled() {
+        Boolean known = earsInstalled;
+        if (known == null) {
+            boolean found;
+            try {
+                found = PlatformHelper.isModLoaded("ears");
+            } catch (RuntimeException | AssertionError | LinkageError outsideTheGame) {
+                found = false;
+            }
+            known = found;
+            earsInstalled = known;
+        }
+        return known;
+    }
+
+    /** Says whether Ears is installed instead of asking the loader; null asks it again. */
+    static void assumeEarsInstalled(Boolean installed) {
+        earsInstalled = installed;
+    }
+
+    /**
+     * Whether skins are shown without transparency in their body: the player asked for it, the
+     * server did, or Ears is installed ({@link #isEarsInstalled}).
      */
     public boolean shouldDisableSkinTransparency() {
         // Client wants to disable transparency
@@ -297,7 +327,20 @@ public class ClientConfig {
             return true;
         }
 
-        return false;
+        return isEarsInstalled();
+    }
+
+    /**
+     * Whether a skin is saved without the transparency of its body when it is imported: when the
+     * player or the server turned transparency off. Never with Ears installed: the saved skin
+     * keeps the alpha Ears reads its data from, and is only shown opaque.
+     */
+    public boolean shouldFlattenImportedSkins() {
+        if (isEarsInstalled()) {
+            return false;
+        }
+        return disableSkinTransparency
+                || (serverOverride != null && serverOverride.disableSkinTransparency);
     }
 
     /**

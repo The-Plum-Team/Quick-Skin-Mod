@@ -142,6 +142,7 @@ public class SettingsScreen extends Screen {
     private Checkbox showTitlePreviewCheckbox;
     private Checkbox showPausePreviewCheckbox;
     private Checkbox compactChangeSkinButtonCheckbox;
+    private Checkbox immersiveMenuCheckbox;
     private Button keybindButton;
     private AbstractWidget keybindLabel;
     private Button fanKeybindButton;
@@ -366,10 +367,15 @@ public class SettingsScreen extends Screen {
         clientSettingWidgets.add(fanKeybindLabel);
 
         // Under it, the checkboxes
+        // With Ears installed skins are always shown opaque (it keeps data in the body's alpha),
+        // so the box shows that and cannot be changed; the player's own choice is kept as it was
+        boolean earsInstalled = ClientConfig.isEarsInstalled();
         disableSkinTransparencyCheckbox = checkbox(rightColumnX, currentRightY,
                 "quickskin.settings.disable_transparency",
-                config.disableSkinTransparency,
-                "quickskin.settings.disable_transparency.tooltip", this::applyClientSettings);
+                config.disableSkinTransparency || earsInstalled,
+                earsInstalled ? "quickskin.settings.disable_transparency.ears"
+                        : "quickskin.settings.disable_transparency.tooltip", this::applyClientSettings);
+        disableSkinTransparencyCheckbox.active = !earsInstalled;
         clientSettingWidgets.add(disableSkinTransparencyCheckbox);
         currentRightY += spacing;
 
@@ -392,6 +398,13 @@ public class SettingsScreen extends Screen {
                 config.compactChangeSkinButton,
                 "quickskin.settings.compact_change_skin_button.tooltip", this::applyClientSettings);
         clientSettingWidgets.add(compactChangeSkinButtonCheckbox);
+        currentRightY += spacing;
+
+        immersiveMenuCheckbox = checkbox(rightColumnX, currentRightY,
+                "quickskin.settings.immersive_menu",
+                config.immersiveMenu,
+                "quickskin.settings.immersive_menu.tooltip", this::applyClientSettings);
+        clientSettingWidgets.add(immersiveMenuCheckbox);
     }
 
     private static final int KEYBIND_BUTTON_WIDTH = 75;
@@ -995,13 +1008,16 @@ public class SettingsScreen extends Screen {
         boolean oldTransparencySetting = config.disableSkinTransparency;
 
         config.showSkinPreviewOverlay = showOverlayCheckbox.selected();
-        config.disableSkinTransparency = disableSkinTransparencyCheckbox.selected();
+        if (!ClientConfig.isEarsInstalled()) {
+            config.disableSkinTransparency = disableSkinTransparencyCheckbox.selected();
+        }
         config.enablePlayerPreviewCustomization = enablePlayerPreviewCustomizationCheckbox.selected();
         config.enablePlayerOwnSkinSystem = enablePlayerOwnSkinSystemCheckbox.selected();
         config.hideBuiltInCapes = hideBuiltInCapesCheckbox.selected();
         config.showTitleScreenPreview = showTitlePreviewCheckbox.selected();
         config.showPauseMenuPreview = showPausePreviewCheckbox.selected();
         config.compactChangeSkinButton = compactChangeSkinButtonCheckbox.selected();
+        config.immersiveMenu = immersiveMenuCheckbox.selected();
         config.setMenuBackgroundStyle(menuBackgroundCheckbox.selected()
                 ? BackgroundStyle.VANILLA_BLUR : BackgroundStyle.OPAQUE_STARS);
         config.save();

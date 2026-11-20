@@ -1263,7 +1263,9 @@ def write_e2e_client_config(game_dir: Path) -> Path:
     disposable, so disable that importer and start with no persisted selection before Minecraft
     loads the mod.
 
-    The menus keep the starred background that the contract's checkpoints describe; the settings
+    The menus are drawn flat, with the starred background that the contract's checkpoints
+    describe: the immersive view, where the menus float round the player in the world, is off,
+    so a menu opened in a world keeps its own model. The settings
     scenario switches to the blurred vanilla background itself. The current ``configVersion``
     stops the client's one-time migration from replacing that choice.
     """
@@ -1279,6 +1281,7 @@ def write_e2e_client_config(game_dir: Path) -> Path:
                 "activeCapeHash": "",
                 "playerOwnSkinHash": "",
                 "configVersion": E2E_CLIENT_CONFIG_VERSION,
+                "immersiveMenu": False,
                 "menuBackgroundStyle": "opaque_stars",
             },
             indent=2,

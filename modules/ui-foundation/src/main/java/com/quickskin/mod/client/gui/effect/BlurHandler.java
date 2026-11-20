@@ -88,6 +88,10 @@ public class BlurHandler {
     //?} else {
     private static void blur(GuiGraphicsExtractor graphics) {
     //?}
+        // The immersive view floats the screen over the world as it is: nothing behind it to blur
+        if (com.quickskin.mod.client.immersive.ImmersiveMode.active()) {
+            return;
+        }
         //? if <1.21.6 {
         Minecraft mc = Minecraft.getInstance();
         //?}

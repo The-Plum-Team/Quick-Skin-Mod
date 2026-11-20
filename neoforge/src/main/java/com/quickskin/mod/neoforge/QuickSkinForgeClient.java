@@ -2,6 +2,7 @@ package com.quickskin.mod.neoforge;
 
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.QuickSkinClient;
+import com.quickskin.mod.client.compat.AccessoryCapeVisibility;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
@@ -29,6 +30,7 @@ public class QuickSkinForgeClient {
     public static void onClientSetup(FMLClientSetupEvent event) {
         // Initialize client code on the main thread
         event.enqueueWork(() -> {
+            AccessoryCapeVisibility.useCaelus();
             QuickSkinClient.init();
         });
     }

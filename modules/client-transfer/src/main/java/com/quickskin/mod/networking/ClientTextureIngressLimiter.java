@@ -16,6 +16,12 @@ public final class ClientTextureIngressLimiter {
     private static final int MAX_CONTROL_PACKETS = 256;
     private static final long MAX_CONTROL_BYTES = 4L * 1024L * 1024L;
     private static final int MAX_CONFIG_PACKETS = 4;
+    /**
+     * Immersive poses (ADR 0019) have their own window, so a crowd of posing players cannot starve
+     * appearance packets: a server relays at most 10 and then 4 a second per posing player, plus one
+     * pose each as a viewer starts to see them, so this is about a hundred players posing at once.
+     */
+    static final int MAX_IMMERSIVE_POSE_PACKETS = 4096;
 
     private long windowStarted = System.currentTimeMillis();
     private int packets;
@@ -25,6 +31,7 @@ public final class ClientTextureIngressLimiter {
     private int controlPackets;
     private long controlBytes;
     private int configPackets;
+    private int immersivePosePackets;
 
     private ClientTextureIngressLimiter() {
     }
@@ -86,6 +93,14 @@ public final class ClientTextureIngressLimiter {
         return true;
     }
 
+    /** Admits one immersive pose of another player, before any work is queued for it. */
+    public synchronized boolean allowImmersivePosePacket() {
+        resetWindowIfNeeded(System.currentTimeMillis());
+        if (immersivePosePackets >= MAX_IMMERSIVE_POSE_PACKETS) return false;
+        immersivePosePackets++;
+        return true;
+    }
+
     public synchronized void clear() {
         windowStarted = System.currentTimeMillis();
         packets = 0;
@@ -95,6 +110,7 @@ public final class ClientTextureIngressLimiter {
         controlPackets = 0;
         controlBytes = 0;
         configPackets = 0;
+        immersivePosePackets = 0;
     }
 
     private void resetWindowIfNeeded(long now) {
@@ -107,5 +123,6 @@ public final class ClientTextureIngressLimiter {
         controlPackets = 0;
         controlBytes = 0;
         configPackets = 0;
+        immersivePosePackets = 0;
     }
 }

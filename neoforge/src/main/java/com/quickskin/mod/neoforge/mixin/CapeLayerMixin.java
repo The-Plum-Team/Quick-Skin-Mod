@@ -6,6 +6,7 @@ import com.quickskin.mod.platform.CapeRenderTypes;
 import com.quickskin.mod.client.rendering.CapeLayerTakeover;
 import com.quickskin.mod.client.rendering.PlayerModelRenderer;
 import com.quickskin.mod.client.rendering.PreviewCapeBindings;
+import com.quickskin.mod.client.rendering.WorldPose;
 import com.quickskin.mod.client.services.CapeAnimationHelper;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.util.TextureAlphaDetector;
@@ -76,7 +77,8 @@ public class CapeLayerMixin {
 
         // An invisible player wears no cape, as vanilla's own layer has it; a cape a preview is
         // showing stays
-        if (!quickskin$previewing && player.isInvisible()) {
+        if (!quickskin$previewing && (player.isInvisible()
+                || !com.quickskin.mod.client.compat.AccessoryCapeVisibility.rule().allows(player))) {
             quickskin$leaveNoCapeToVanilla(player);
             return;
         }
@@ -143,6 +145,10 @@ public class CapeLayerMixin {
         VertexConsumer vertexconsumer = buffer.getBuffer(renderType);
 
         poseStack.pushPose();
+        // In the immersive view the player plays the menu's poses; the cape hangs from that body,
+        // tilted back over the sit's block
+        WorldPose.hangFromBody(player, ((CapeLayer)(Object)this).getParentModel(), poseStack);
+        WorldPose.clearSitBlock(player, ((CapeLayer)(Object)this).getParentModel(), poseStack, partialTicks);
         poseStack.translate(0.0D, 0.0D, 0.125D);
         double d0 = Mth.lerp(partialTicks, player.xCloakO, player.xCloak) - Mth.lerp(partialTicks, player.xo, player.getX());
         double d1 = Mth.lerp(partialTicks, player.yCloakO, player.yCloak) - Mth.lerp(partialTicks, player.yo, player.getY());
@@ -306,7 +312,8 @@ public class CapeLayerMixin {
 
         // An invisible player wears no cape, as vanilla's own layer has it; a cape a preview is
         // showing stays
-        if (!previewing && renderState.isInvisible) {
+        if (!previewing && (renderState.isInvisible
+                || !com.quickskin.mod.client.compat.AccessoryCapeVisibility.rule().allows(renderState))) {
             quickskin$leaveNoCapeToVanilla(renderState);
             return;
         }
@@ -525,7 +532,8 @@ public class CapeLayerMixin {
 
         // An invisible player wears no cape, as vanilla's own layer has it; a cape a preview is
         // showing stays
-        if (!quickskin$previewing && renderState.isInvisible) {
+        if (!quickskin$previewing && (renderState.isInvisible
+                || !com.quickskin.mod.client.compat.AccessoryCapeVisibility.rule().allows(renderState))) {
             quickskin$leaveNoCapeToVanilla(renderState);
             return;
         }

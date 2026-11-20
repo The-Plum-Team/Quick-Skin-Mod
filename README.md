@@ -95,6 +95,10 @@ certify those images. Version-branch synchronization is retired under the shared
   server-configurable change cooldowns.
 - Choose automatic, classic, or slim player models.
 - Preview appearances in an interactive 3D player widget.
+- Open the immersive skin and cape menus in a world to see and turn your character where
+  they stand. The camera keeps its distance near walls. A circular opening reveals your
+  character through foreground blocks and grass. The rim has a fine, gently pulsing dither.
+  Your character’s lighting eases into the preview and back as the menu opens and closes.
 - Synchronize Quick Skin appearances between players who run Quick Skin when the mod is also
   installed on the server.
 - Pick a cosmetic nickname for roleplay by clicking your name above the model in the skin menu;

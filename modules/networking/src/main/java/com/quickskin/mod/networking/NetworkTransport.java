@@ -70,6 +70,7 @@ public interface NetworkTransport {
     void sendAccountSkinChangedToServer(UUID playerId);
     void sendNicknameToServer(UUID playerId, int requestId, String nickname);
     void sendArmorVisibilityToServer(UUID playerId, int hidden);
+    void sendImmersivePoseToServer(UUID playerId, int sequence, ImmersivePose pose);
     void sendAppearanceWithElytraToServer(
             UUID playerId, String skinId, String capeId, String elytraId, String model);
     void sendSkinAdminToServer(
@@ -83,6 +84,7 @@ public interface NetworkTransport {
     void sendNicknameResultToPlayer(
             ServerPlayer player, int requestId, int status, String nickname, long retryAfterMillis);
     void sendNicknamesToPlayer(ServerPlayer player, List<NicknameEntry> entries);
+    void sendImmersivePoseToPlayer(ServerPlayer player, UUID playerId, ImmersivePose pose);
     void sendAssignedSkinToPlayer(ServerPlayer player, String skinId, String model);
     void sendSkinAdminResultToPlayer(ServerPlayer player, int requestId, int status, int count);
     void sendSkinAdminStateToPlayer(ServerPlayer player, List<PoolSkinEntry> pool, List<UUID> assigned);
