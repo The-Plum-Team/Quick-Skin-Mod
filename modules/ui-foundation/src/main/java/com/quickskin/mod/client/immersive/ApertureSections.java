@@ -3,6 +3,14 @@ package com.quickskin.mod.client.immersive;
 //? if >=1.21.6 {
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+//? if <26.1 {
+import net.minecraft.client.renderer.block.model.BakedQuad;
+//?} else {
+import net.minecraft.client.resources.model.geometry.BakedQuad;
+//?}
+//? if >=1.21.11 {
+import net.minecraft.client.model.geom.builders.UVPair;
+//?}
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
@@ -12,6 +20,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
+import org.joml.Matrix3x2f;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -40,26 +49,63 @@ final class ApertureSections {
                 grown.put(vertices.flip());
                 vertices = grown;
             }
-            float u = (float)(face.getAxis() == Direction.Axis.X ? local.z : local.x);
-            float v = (float)(face.getAxis() == Direction.Axis.Y ? local.z : 1.0 - local.y);
-            if (face == Direction.NORTH || face == Direction.EAST) u = 1.0f - u;
+            float a = (float)(face.getAxis() == Direction.Axis.X ? local.z : local.x);
+            float b = (float)(face.getAxis() == Direction.Axis.Y ? local.z : local.y);
+            float u = m.uv.m00() * a + m.uv.m10() * b + m.uv.m20();
+            float v = m.uv.m01() * a + m.uv.m11() * b + m.uv.m21();
             vertices.putFloat((float)p.x).putFloat((float)p.y).putFloat((float)p.z)
-                    .putFloat(Mth.lerp(Mth.clamp(u, 0, 1), m.sprite.getU0(), m.sprite.getU1()))
-                    .putFloat(Mth.lerp(Mth.clamp(v, 0, 1), m.sprite.getV0(), m.sprite.getV1()))
+                    .putFloat(Mth.clamp(u, m.sprite.getU0(), m.sprite.getU1()))
+                    .putFloat(Mth.clamp(v, m.sprite.getV0(), m.sprite.getV1()))
                     .put((byte)(m.rgb >>> 16)).put((byte)(m.rgb >>> 8)).put((byte)m.rgb).put((byte)kind);
         }
 
         void polygon(List<Vec3> points, Vec3 block, Material material, Direction face, int kind) {
+            Vec3 first = points.getFirst();
             for (int i = 1; i + 1 < points.size(); i++) {
-                for (int j : new int[]{0,i,i+1}) {
-                    Vec3 local = points.get(j);
-                    vertex(block.add(local), material, face, local, kind);
-                }
+                Vec3 second = points.get(i);
+                Vec3 third = points.get(i + 1);
+                vertex(block.add(first), material, face, first, kind);
+                vertex(block.add(second), material, face, second, kind);
+                vertex(block.add(third), material, face, third, kind);
             }
         }
     }
 
-    private record Material(TextureAtlasSprite sprite, int rgb) {}
+    private record Material(TextureAtlasSprite sprite, Matrix3x2f uv, int rgb) {}
+
+    /** Map face-space coordinates into the actual rotated, flipped or cropped sprite UVs from the model. */
+    private static Matrix3x2f mapping(BakedQuad quad, Direction face, TextureAtlasSprite sprite) {
+        if (quad != null) {
+            int a = face.getAxis() == Direction.Axis.X ? 2 : 0;
+            int b = face.getAxis() == Direction.Axis.Y ? 2 : 1;
+            var plane = basis(quad, a, b);
+            if (Math.abs(plane.determinant()) > 1e-7f) return basis(quad, 3, 4).mul(plane.invert());
+        }
+        boolean flipU = face == Direction.NORTH || face == Direction.EAST;
+        boolean flipV = face != Direction.UP;
+        float u0 = flipU ? sprite.getU1() : sprite.getU0();
+        float v0 = flipV ? sprite.getV1() : sprite.getV0();
+        return new Matrix3x2f((flipU ? sprite.getU0() : sprite.getU1()) - u0, 0, 0,
+                (flipV ? sprite.getV0() : sprite.getV1()) - v0, u0, v0);
+    }
+
+    private static Matrix3x2f basis(BakedQuad quad, int a, int b) {
+        float x = coordinate(quad, 0, a);
+        float y = coordinate(quad, 0, b);
+        return new Matrix3x2f(coordinate(quad, 1, a) - x, coordinate(quad, 1, b) - y,
+                coordinate(quad, 3, a) - x, coordinate(quad, 3, b) - y, x, y);
+    }
+
+    private static float coordinate(BakedQuad quad, int vertex, int component) {
+        //? if <1.21.11 {
+        int[] data = quad.vertices();
+        int offset = vertex * (data.length / 4);
+        return Float.intBitsToFloat(data[offset + (component < 3 ? component : component + 1)]);
+        //?} else {
+        if (component < 3) return quad.position(vertex).get(component);
+        return component == 3 ? UVPair.unpackU(quad.packedUV(vertex)) : UVPair.unpackV(quad.packedUV(vertex));
+        //?}
+    }
 
     private static Material material(BlockState state, BlockPos pos, Direction face, int light) {
         var game = Minecraft.getInstance();
@@ -75,13 +121,16 @@ final class ApertureSections {
         var sprite = model.particleMaterial().sprite();
         //?}
         int tint = -1;
+        BakedQuad chosen = null;
         for (var part : parts) {
             var quads = part.getQuads(face);
             if (quads.isEmpty()) continue;
             //? if <26.1 {
-            var info = quads.getFirst();
+            chosen = quads.getFirst();
+            var info = chosen;
             //?} else {
-            var info = quads.getFirst().materialInfo();
+            chosen = quads.getFirst();
+            var info = chosen.materialInfo();
             //?}
             sprite = info.sprite();
             tint = info.tintIndex();
@@ -100,7 +149,7 @@ final class ApertureSections {
         float brightness = shade * (0.18f + 0.82f * light / 15f);
         int color = Math.round((rgb >> 16 & 255) * brightness) << 16 | Math.round((rgb >> 8 & 255) * brightness) << 8
                 | Math.round((rgb & 255) * brightness);
-        return new Material(sprite, color);
+        return new Material(sprite, mapping(chosen, face, sprite), color);
     }
 
     static void build(ImmersiveOpening opening, Vec3 eye, Vec3 feet, Matrix4f view) {

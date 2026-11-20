@@ -31,10 +31,14 @@ public final class ChunkApertureGl {
                 || name.equals("iris:sodium-shader-translucent");
     }
 
-    public static boolean irisTerrain(String name) {
+    // Iris retains the ShaderKey name when a pack falls back to a different program. Its
+    // dedicated block-entity and sign-text keys never draw players or shadow-map geometry.
+    public static boolean irisOccluder(String name) {
         return switch (name) {
             case "terrain_solid", "terrain_cutout", "terrain_translucent",
-                    "sodium_terrain_solid", "sodium_terrain_cutout", "sodium_terrain_translucent" -> true;
+                    "sodium_terrain_solid", "sodium_terrain_cutout", "sodium_terrain_translucent",
+                    "block_entity", "block_entity_bright", "block_entity_diffuse", "be_translucent",
+                    "text_be", "text_intensity_be" -> true;
             default -> false;
         };
     }

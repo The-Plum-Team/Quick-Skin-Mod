@@ -47,15 +47,18 @@ public abstract class ImmersiveTerrainShaderMixin {
             stored.set(1, source.replace("#define QUICKSKIN_APERTURE_FUNCTIONS", ModernApertureShader.fragmentTest()));
             return;
         }
+        //? if <26.3 {
+        boolean explicitLocations = false;
+        //?} else {
+        boolean explicitLocations = true;
+        //?}
         if (path.equals("minecraft:shaders/core/terrain.vsh") || path.equals("minecraft:shaders/core/terrain.fsh")
                 || path.equals("sodium:shaders/blocks/block_layer_opaque.vsh")
                 || path.equals("sodium:shaders/blocks/block_layer_opaque.fsh")) {
-            //? if <26.3 {
-            boolean explicitLocations = false;
-            //?} else {
-            boolean explicitLocations = true;
-            //?}
             stored.set(1, ModernApertureShader.wrap(stored.get(1), type == ShaderType.VERTEX, explicitLocations));
+        } else if (path.startsWith("minecraft:shaders/core/") && (path.endsWith(".vsh") || path.endsWith(".fsh"))
+                && ModernApertureShader.isBlockMaterial(path.substring("minecraft:shaders/".length(), path.length() - 4))) {
+            stored.set(1, ModernApertureShader.wrapBlockMaterial(stored.get(1), type == ShaderType.VERTEX, explicitLocations));
         }
     }
     //?}

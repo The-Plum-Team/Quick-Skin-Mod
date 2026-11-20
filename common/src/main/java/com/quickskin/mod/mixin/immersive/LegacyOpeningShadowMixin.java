@@ -19,7 +19,18 @@ import net.minecraft.client.renderer.entity.state.EntityRenderState;
 @Mixin(EntityRenderDispatcher.class)
 public abstract class LegacyOpeningShadowMixin {
     //? if <1.21.6 {
-    @ModifyArg(method = "render", at = @At(value = "INVOKE", target =
+    @ModifyArg(method =
+            //? if <1.21.2 {
+            "render(Lnet/minecraft/world/entity/Entity;DDDFFLcom/mojang/blaze3d/vertex/PoseStack;" +
+            "Lnet/minecraft/client/renderer/MultiBufferSource;I)V",
+            //?} else if <1.21.5 {
+            "render(Lnet/minecraft/world/entity/Entity;DDDFLcom/mojang/blaze3d/vertex/PoseStack;" +
+            "Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/renderer/entity/EntityRenderer;)V",
+            //?} else {
+            "render(Lnet/minecraft/client/renderer/entity/state/EntityRenderState;DDDLcom/mojang/blaze3d/vertex/PoseStack;" +
+            "Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/renderer/entity/EntityRenderer;)V",
+            //?}
+            at = @At(value = "INVOKE", target =
             "Lnet/minecraft/client/renderer/entity/EntityRenderDispatcher;renderShadow(" +
             "Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;" +
             //? if <1.21.2 {

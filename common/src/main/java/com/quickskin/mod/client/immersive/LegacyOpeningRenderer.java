@@ -17,6 +17,7 @@ import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL30;
 
 import java.io.IOException;
 import java.util.function.Consumer;
@@ -28,6 +29,9 @@ import java.util.function.BiFunction;
 //?} else {
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 //?}
+//? if >=1.21.5 {
+import com.mojang.blaze3d.opengl.GlStateManager;
+//?}
 //? if >=1.21.2 {
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
@@ -38,6 +42,7 @@ import net.minecraft.client.renderer.entity.state.PlayerRenderState;
 /** Bound to the normal camera around Minecraft's terrain and entity passes on legacy renderers. */
 public final class LegacyOpeningRenderer {
     //? if <1.21.6 {
+    private static final float[] FAR_DEPTH = {1.0f};
     private static LegacyOpeningTarget target;
     private static boolean failed, drawing, captured;
     private static ImmersiveOpening opening;
@@ -152,12 +157,15 @@ public final class LegacyOpeningRenderer {
             Matrix4f cropped = new Matrix4f().m22(1 / (1 - cut)).m32(-cut / (1 - cut)).mul(projection);
             target.snapshot(world);
             boolean complete = false;
+            boolean originalDepthWrites = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
             int[] priorScissor = restrictToOpening(opening);
             drawing = true;
             shadowQueued = false;
             try {
                 try {
                     target.selectWorld(world);
+                    depthWrites(true);
+                    clearOpeningDepth(opening);
                     RenderSystem.setProjectionMatrix(cropped, sorting);
                     GL11.glDepthRange(Mth.lerp(cut, range[0], range[1]), range[1]);
                     redraw.accept(cropped);
@@ -167,17 +175,21 @@ public final class LegacyOpeningRenderer {
                     RenderSystem.setProjectionMatrix(projection, sorting);
                 }
                 target.selectWorld(world);
+                // Iris finalizes its fullscreen colour pass with depth writes disabled.
+                // The skin must write depth before its cape and the other player layers draw.
+                depthWrites(true);
                 PoseStack poses = modelView();
                 LegacyTerrainGeometry.ground(camera.getPosition(), poses, opening, partial);
                 if (shadowQueued) flushShadow();
                 if (LegacyTerrainGeometry.section(camera.getPosition(), poses, opening, partial)) {
                     target.drawSection(opening);
                 }
-                if (opening.crossesPlayer()) drawPlayer(player, poses);
+                if (needsWholePlayer(opening)) drawPlayer(player, poses);
                 target.composite(opening, captured);
                 complete = true;
             } finally {
                 drawing = false;
+                depthWrites(originalDepthWrites);
                 RenderSystem.setProjectionMatrix(normal, sorting);
                 if (priorScissor == null) RenderSystem.disableScissor();
                 else RenderSystem.enableScissor(priorScissor[0], priorScissor[1], priorScissor[2], priorScissor[3]);
@@ -186,6 +198,32 @@ public final class LegacyOpeningRenderer {
             }
         } finally {
             redraw = null; opening = null;
+        }
+    }
+
+    private static void depthWrites(boolean writable) {
+        //? if >=1.21.5 {
+        GlStateManager._depthMask(writable);
+        //?} else {
+        RenderSystem.depthMask(writable);
+        //?}
+    }
+
+    /** Iris clears its colour attachments on a world pass but can retain the first camera's wall depth. */
+    public static void clearOpeningDepth(ImmersiveOpening opening) {
+        boolean scissor = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
+        int[] box = new int[4];
+        GL11.glGetIntegerv(GL11.GL_SCISSOR_BOX, box);
+        boolean depthWrite = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
+        try {
+            GL11.glEnable(GL11.GL_SCISSOR_TEST);
+            GL11.glScissor(opening.left(), opening.bottom(), opening.width(), opening.height());
+            GL11.glDepthMask(true);
+            GL30.glClearBufferfv(GL11.GL_DEPTH, 0, FAR_DEPTH);
+        } finally {
+            GL11.glDepthMask(depthWrite);
+            GL11.glScissor(box[0], box[1], box[2], box[3]);
+            if (!scissor) GL11.glDisable(GL11.GL_SCISSOR_TEST);
         }
     }
 
@@ -216,8 +254,14 @@ public final class LegacyOpeningRenderer {
         return previous;
     }
 
+    public static boolean needsWholePlayer(ImmersiveOpening opening) {
+        // Shader packs reconstruct entity depth using their original camera, even in the cropped terrain pass.
+        return opening.crossesPlayer() || ImmersiveShaderPacks.active();
+    }
+
     public static boolean omit(Object rendered) {
-        return drawing && opening != null && opening.crossesPlayer() && !drawingPlayer && local(rendered) && !ImmersiveShaderPacks.shadows();
+        return drawing && !drawingPlayer && opening != null && local(rendered)
+                && needsWholePlayer(opening) && !ImmersiveShaderPacks.shadows();
     }
 
     private static boolean drawingPlayer;

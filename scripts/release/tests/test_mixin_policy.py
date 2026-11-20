@@ -109,6 +109,9 @@ DEGRADABLE_MIXINS = {
     "main:com/quickskin/mod/mixin/immersive/ImmersiveTerrainShaderMixin.java",
     "main:com/quickskin/mod/mixin/immersive/ImmersiveTerrainChunksMixin.java",
     "main:com/quickskin/mod/mixin/immersive/ImmersiveTerrainProgramsMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveBlockEntityLightMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveBlockEntityMaterialMixin.java",
+    "main:com/quickskin/mod/mixin/immersive/ImmersiveSignTextMixin.java",
     "main:com/quickskin/mod/mixin/immersive/ImmersiveWorldViewMixin.java",
     # A hook that fails leaves the player in the world wearing their own cape and wings while the
     # cape menu or the cape editor floats round them.

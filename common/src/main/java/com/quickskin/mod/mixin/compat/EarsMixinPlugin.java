@@ -57,6 +57,11 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
         // loads that class only when Player Animator is installed.
         // Sodium owns standalone OpenGL programs up to 26.1.2. Newer Sodium uses the game's
         // render passes and Iris supplies its own compiled terrain program for an active pack.
+        //? if >=1.21.6 {
+        if (mixinNamed(mixinClassName, "IrisTerrainProgramMixin") || mixinNamed(mixinClassName, "IrisTerrainShaderMixin")) {
+            return classFileExists(targetClassName.replace('.', '/') + ".class");
+        }
+        //?}
         //? if >=1.21.9 {
         if (mixinNamed(mixinClassName, "SodiumPlayerLightMixin")) {
             return classFileExists(targetClassName.replace('.', '/') + ".class");
@@ -67,8 +72,7 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
             return classFileExists(targetClassName.replace('.', '/') + ".class");
         }
         //?} else if >=26.2 {
-        if (mixinNamed(mixinClassName, "SodiumTerrainPassMixin") || mixinNamed(mixinClassName, "IrisTerrainProgramMixin")
-                || mixinNamed(mixinClassName, "IrisTerrainShaderMixin")) {
+        if (mixinNamed(mixinClassName, "SodiumTerrainPassMixin")) {
             return classFileExists(targetClassName.replace('.', '/') + ".class");
         }
         //?}

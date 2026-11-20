@@ -329,10 +329,11 @@ public final class ImmersiveMode {
      * between ordinary frames is not passed on to the camera either. A lasting change of frame
      * rate takes over after three frames.
      */
-    private static float step(float measured) {
-        if (measured <= 0.0f || measured > 1.0f) {
-            // The first frame, or the game stood still: nothing to go by yet
+    static float step(float measured) {
+        if (!Float.isFinite(measured) || measured <= 0.0f) {
+            // A first or invalid clock sample has no duration. Refill the history from its start.
             framesKept = 0;
+            frameAt = 0;
             return 0.0f;
         }
         frameSeconds[frameAt] = Math.min(measured, LONGEST_FRAME);

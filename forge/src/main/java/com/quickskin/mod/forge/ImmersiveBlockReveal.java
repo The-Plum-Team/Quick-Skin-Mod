@@ -12,6 +12,7 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.quickskin.mod.client.immersive.ImmersiveMode;
 import com.quickskin.mod.client.immersive.ImmersiveOpening;
+import com.quickskin.mod.client.immersive.LegacyOpeningRenderer;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
@@ -204,6 +205,7 @@ public final class ImmersiveBlockReveal {
         RenderSystem.enableScissor(left, bottom, Math.max(0, right - left), Math.max(0, top - bottom));
         drawingOpening = true;
         try {
+            LegacyOpeningRenderer.clearOpeningDepth(opening);
             // Shader packs derive frame deltas from the engine clock supplied to renderLevel.
             Runnable drawWorld = () -> game.levelRenderer.renderLevel(worldView, event.getPartialTick(),
                     Util.getNanos(), false, event.getCamera(), game.gameRenderer, game.gameRenderer.lightTexture(), clipped);

@@ -36,6 +36,9 @@
     "ImmersiveTerrainShaderMixin",
     "ImmersiveTerrainChunksMixin",
     "ImmersiveTerrainProgramsMixin",
+    "ImmersiveBlockEntityLightMixin",
+    "ImmersiveBlockEntityMaterialMixin",
+    "ImmersiveSignTextMixin",
     "ImmersiveWorldViewMixin"
   ],
   "injectors": {

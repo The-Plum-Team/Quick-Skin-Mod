@@ -8,6 +8,37 @@ public final class ModernApertureShader {
 
     private ModernApertureShader() {}
 
+    /** Vanilla model and font programs that can carry a block entity's light coordinates. */
+    public static boolean isBlockMaterial(String path) {
+        return switch (path) {
+            case "core/entity", "core/block", "core/item", "core/text", "core/text_background",
+                    "core/rendertype_text", "core/rendertype_text_intensity", "core/rendertype_text_background",
+                    "core/rendertype_entity_decal", "core/rendertype_item_entity_translucent_cull",
+                    "core/rendertype_translucent_moving_block" -> true;
+            default -> false;
+        };
+    }
+
+    public static String wrapBlockMaterial(String source, boolean vertex, boolean explicitLocations) {
+        var main = MAIN.matcher(source);
+        if (!main.find()) return source;
+        String guard = "#if defined(QUICKSKIN_BLOCK_ENTITY) && !defined(IS_GUI) && !defined(IS_SEE_THROUGH)\n";
+        String location = explicitLocations ? "layout(location = 8) " : "";
+        StringBuilder header = new StringBuilder(guard);
+        if (vertex) {
+            if (!source.contains("UV2")) return source;
+            header.append("bool qsBlockVertex() { return all(equal(UV2 & ivec2(15), ivec2(2, 5))); }\n");
+            header.append("#define UV2 (qsBlockVertex() ? (UV2 & ~ivec2(15)) : UV2)\n");
+        }
+        header.append("#define main qsOriginalBlockMain\n#endif\n");
+        String code = vertex ? "#undef UV2\n" + location + "out vec4 qsBlockClip;\n"
+                + "void main() { qsOriginalBlockMain(); qsBlockClip = qsBlockVertex() ? gl_Position : vec4(0.0); }\n"
+                : location + "in vec4 qsBlockClip;\n" + fragmentTest()
+                + "void main() { if (qsClipTerrain(qsBlockClip)) discard; qsOriginalBlockMain(); }\n";
+        return source.substring(0, main.start()) + "\n" + header + source.substring(main.start())
+                + "\n" + guard + "#undef main\n" + code + "#endif\n";
+    }
+
     /** Depth is measured in view space. The same clip coordinates work with reversed Z and Vulkan. */
     public static String fragmentTest() {
         return fragmentTest(true);
