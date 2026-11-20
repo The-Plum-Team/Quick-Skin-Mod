@@ -4,16 +4,16 @@ import org.spongepowered.asm.mixin.Mixin;
 //? if >=1.21.6 {
 import com.quickskin.mod.client.immersive.ModernAperture;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 //? if <26.3 {
+import org.spongepowered.asm.mixin.injection.Redirect;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.systems.RenderPass;
 //?} else {
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.commands.RenderPass;
-import com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import net.minecraft.client.renderer.StagedVertexBuffer;
+import org.spongepowered.asm.mixin.injection.ModifyArgs;
+import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 //?}
 //? if <1.21.11 {
 @Mixin(targets = "net.minecraft.client.renderer.RenderType$CompositeRenderType")
@@ -40,14 +40,16 @@ public abstract class ImmersiveBlockEntityMaterialMixin {
         if (material != original) ModernAperture.bind(pass);
     }
     //?} else if >=26.3 {
-    @Redirect(method = "draw", at = @At(value = "INVOKE",
+    @ModifyArgs(method = "draw", at = @At(value = "INVOKE",
             target = "Lcom/mojang/blaze3d/systems/RenderSystem;getCompiledPipeline(Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;)Lcom/mojang/renderpearl/api/pipeline/CompiledRenderPipeline;"),
             require = 0, expect = 1, allow = 1)
-    private CompiledRenderPipeline quickskin$blockMaterial(RenderPipeline selected, StagedVertexBuffer.ExecuteInfo info,
+    private void quickskin$blockMaterial(Args compile, StagedVertexBuffer.ExecuteInfo info,
             RenderPass pass, RenderPipeline original) {
-        RenderPipeline material = ModernAperture.blockMaterial(selected);
-        if (material != selected) ModernAperture.bind(pass);
-        return RenderSystem.getCompiledPipeline(material);
+        RenderPipeline material = ModernAperture.blockMaterial(original);
+        if (material != original) {
+            ModernAperture.bind(pass);
+            compile.set(0, material);
+        }
     }
     //?}
 }

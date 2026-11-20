@@ -3,6 +3,8 @@ package com.quickskin.mod.forge;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.quickskin.mod.client.immersive.ImmersiveOpening;
 import com.quickskin.mod.client.immersive.LegacyOpeningRenderer;
+import com.quickskin.mod.client.immersive.LegacyDepthRange;
+import com.quickskin.mod.client.immersive.ImmersiveShaderPacks;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.quickskin.mod.platform.QuickSkinInfo;
@@ -54,8 +56,9 @@ public final class ImmersiveUnclippedPlayer {
         var buffers = Minecraft.getInstance().renderBuffers().bufferSource();
         boolean shadowFlushed = false;
         boolean wholePlayer = LegacyOpeningRenderer.needsWholePlayer(opening);
+        boolean pack = ImmersiveShaderPacks.active();
         try {
-            GL11.glDepthRange(Mth.lerp(opening.cut(), range[0], range[1]), range[1]);
+            if (!pack) GL11.glDepthRange(Mth.lerp(opening.cut(), range[0], range[1]), range[1]);
             clippedPlayer = player;
             omitModel = wholePlayer;
             try {
@@ -68,6 +71,7 @@ public final class ImmersiveUnclippedPlayer {
             }
             RenderSystem.setProjectionMatrix(normalProjection, sorting);
             Minecraft.getInstance().getMainRenderTarget().bindWrite(false);
+            if (pack) LegacyDepthRange.restore(opening, range[1]);
             // Oculus ends its fullscreen colour pass with depth writes disabled.
             RenderSystem.depthMask(true);
             ImmersiveTerrainInterior.drawGround(player, camera.getPosition(), worldView, partialTick, opening.cut());

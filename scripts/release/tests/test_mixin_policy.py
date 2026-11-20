@@ -241,8 +241,6 @@ ALTERNATIVE_HOOKS = {
 # TaCZ 1.1.8-hotfix asks for the camera type once in each of its four gun-event handlers; the one
 # redirect names all four and takes the first call of each, so four is also the most it can match.
 INJECTION_COUNT_OVERRIDES = {
-    ("main:com/quickskin/mod/mixin/compat/SodiumPlayerLightMixin.java",
-     "quickskin$preparePlayerNormals"): {2},
     # Audited mapped Minecraft JARs and their Forge/NeoForge builds: placeNewPlayer translates the
     # join message twice, once in each branch (the usual name and one renamed since last time).
     (

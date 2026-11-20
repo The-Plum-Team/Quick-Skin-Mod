@@ -83,7 +83,9 @@ public final class LegacyOpeningRenderer {
     }
 
     public static void releaseAfterMenu() {
-        if (target != null && !ImmersiveMode.running()) {
+        if (ImmersiveMode.running()) return;
+        LegacyDepthRange.release();
+        if (target != null) {
             target.close();
             target = null;
             redraw = null;
@@ -151,6 +153,7 @@ public final class LegacyOpeningRenderer {
             //?} else {
             var sorting = RenderSystem.getProjectionType();
             //?}
+            boolean pack = ImmersiveShaderPacks.active();
             double[] range = new double[2];
             GL11.glGetDoublev(GL11.GL_DEPTH_RANGE, range);
             float cut = opening.cut();
@@ -167,7 +170,9 @@ public final class LegacyOpeningRenderer {
                     depthWrites(true);
                     clearOpeningDepth(opening);
                     RenderSystem.setProjectionMatrix(cropped, sorting);
-                    GL11.glDepthRange(Mth.lerp(cut, range[0], range[1]), range[1]);
+                    // A shader pack reconstructs terrain positions using the cropped projection.
+                    // Its post-processes need ordinary [near,far] depths until the pack finishes.
+                    if (!pack) GL11.glDepthRange(Mth.lerp(cut, range[0], range[1]), range[1]);
                     redraw.accept(cropped);
                     game.renderBuffers().bufferSource().endBatch();
                 } finally {
@@ -175,6 +180,7 @@ public final class LegacyOpeningRenderer {
                     RenderSystem.setProjectionMatrix(projection, sorting);
                 }
                 target.selectWorld(world);
+                if (pack) LegacyDepthRange.restore(opening, range[1]);
                 // Iris finalizes its fullscreen colour pass with depth writes disabled.
                 // The skin must write depth before its cape and the other player layers draw.
                 depthWrites(true);

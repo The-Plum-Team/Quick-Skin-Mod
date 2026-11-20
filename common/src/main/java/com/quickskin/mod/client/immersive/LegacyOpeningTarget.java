@@ -53,6 +53,27 @@ final class LegacyOpeningTarget implements AutoCloseable {
     }
 
     private LegacyOpeningTarget(String fragment) {
+        try {
+            program = fullscreenProgram(fragment);
+            int previous = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
+            GL20.glUseProgram(program);
+            try {
+                for (int i = 0; i < 4; i++) GL20.glUniform1i(uniform("Sampler" + i), i);
+                uClip = uniform("FromClip");
+                uGrid = uniform("CameraInGrid");
+                uFloor = uniform("FloorY");
+                uBreath = uniform("Breath");
+                uOpening = uniform("Opening");
+            } finally {
+                GL20.glUseProgram(previous);
+            }
+        } catch (RuntimeException failure) {
+            deleteTargets();
+            throw failure;
+        }
+    }
+
+    static int fullscreenProgram(String fragment) {
         int linked = GL20.glCreateProgram();
         int vertex = 0, pixel = 0;
         try {
@@ -70,22 +91,9 @@ final class LegacyOpeningTarget implements AutoCloseable {
             if (GL20.glGetProgrami(linked, GL20.GL_LINK_STATUS) == GL11.GL_FALSE) {
                 throw new IllegalStateException(GL20.glGetProgramInfoLog(linked));
             }
-            program = linked;
-            int previous = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
-            GL20.glUseProgram(program);
-            try {
-                for (int i = 0; i < 4; i++) GL20.glUniform1i(uniform("Sampler" + i), i);
-                uClip = uniform("FromClip");
-                uGrid = uniform("CameraInGrid");
-                uFloor = uniform("FloorY");
-                uBreath = uniform("Breath");
-                uOpening = uniform("Opening");
-            } finally {
-                GL20.glUseProgram(previous);
-            }
+            return linked;
         } catch (RuntimeException failure) {
             GL20.glDeleteProgram(linked);
-            deleteTargets();
             throw failure;
         } finally {
             if (vertex != 0) GL20.glDeleteShader(vertex);
