@@ -74,7 +74,7 @@ final class LegacyOpeningTarget implements AutoCloseable {
         }
     }
 
-    static int fullscreenProgram(String fragment) {
+    private static int fullscreenProgram(String fragment) {
         int linked = GL20.glCreateProgram();
         int vertex = 0, pixel = 0;
         try {

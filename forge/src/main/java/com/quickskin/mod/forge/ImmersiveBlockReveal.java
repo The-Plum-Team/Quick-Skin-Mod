@@ -12,6 +12,7 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.quickskin.mod.client.immersive.ImmersiveMode;
 import com.quickskin.mod.client.immersive.ImmersiveOpening;
+import com.quickskin.mod.client.immersive.ImmersiveShaderPacks;
 import com.quickskin.mod.client.immersive.LegacyOpeningRenderer;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import net.minecraft.Util;
@@ -42,6 +43,7 @@ import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 
 import java.io.IOException;
+import java.util.function.Consumer;
 
 /** Opens a round window through foreground blocks in the Forge 1.20.1 immersive view. */
 @Mod.EventBusSubscriber(modid = QuickSkinInfo.MOD_ID, value = Dist.CLIENT)
@@ -190,25 +192,14 @@ public final class ImmersiveBlockReveal {
         float cut = opening.cut();
         // This remaps the original depth interval [cut, 1] to [0, 1] without moving a pixel in XY.
         Matrix4f clipped = new Matrix4f().m22(1 / (1 - cut)).m32(-cut / (1 - cut)).mul(event.getProjectionMatrix());
-        int[] priorScissor = null;
-        int left = opening.left(), bottom = opening.bottom();
-        int right = left + opening.width(), top = bottom + opening.height();
-        if (GL11.glIsEnabled(GL11.GL_SCISSOR_TEST)) {
-            priorScissor = new int[4];
-            GL11.glGetIntegerv(GL11.GL_SCISSOR_BOX, priorScissor);
-            left = Math.max(left, priorScissor[0]);
-            bottom = Math.max(bottom, priorScissor[1]);
-            right = Math.min(right, priorScissor[0] + priorScissor[2]);
-            top = Math.min(top, priorScissor[1] + priorScissor[3]);
-        }
+        int[] priorScissor = LegacyOpeningRenderer.beginOpeningScissor(opening, ImmersiveShaderPacks.active());
         RenderSystem.setProjectionMatrix(clipped, sorting);
-        RenderSystem.enableScissor(left, bottom, Math.max(0, right - left), Math.max(0, top - bottom));
         drawingOpening = true;
         try {
             LegacyOpeningRenderer.clearOpeningDepth(opening);
             // Shader packs derive frame deltas from the engine clock supplied to renderLevel.
-            Runnable drawWorld = () -> game.levelRenderer.renderLevel(worldView, event.getPartialTick(),
-                    Util.getNanos(), false, event.getCamera(), game.gameRenderer, game.gameRenderer.lightTexture(), clipped);
+            Consumer<Matrix4f> drawWorld = cameraProjection -> game.levelRenderer.renderLevel(worldView, event.getPartialTick(),
+                    Util.getNanos(), false, event.getCamera(), game.gameRenderer, game.gameRenderer.lightTexture(), cameraProjection);
             ImmersiveUnclippedPlayer.render(player, event.getCamera(), worldView, event.getPartialTick(),
                     previousProjection, opening, drawWorld);
         } finally {

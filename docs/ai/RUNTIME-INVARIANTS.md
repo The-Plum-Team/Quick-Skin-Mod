@@ -624,8 +624,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   Terrain searches reconstructed from a projection have a bounded number of block visits.
   The terrain depth copy restores the active read and draw framebuffers and viewport. The
   second world pass uses Minecraft's render clock so shader packs get consistent frame deltas
-  for exposure and other time filters. The renderer restores projection and depth before the
-  floating interface draws.
+  for exposure and other time filters. Iris and Oculus receive the original camera and render
+  their shadow and lighting targets at their own dimensions. The opening clips terrain after
+  the shadow pass. The player, equipment and supporting ground enter the shader pack together
+  so their lighting and contact shadow remain continuous at the edge. The final composition
+  limits the result to the opening and restores projection and depth before the interface draws.
 - From 1.21.6 the chunk renderer clips foreground fragments in its terrain pass, before the
   usual player and shadow draws. The section uses block textures and shapes where the near
   plane intersects terrain. The aperture uniforms and the section geometry share the world

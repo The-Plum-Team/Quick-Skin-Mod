@@ -1,5 +1,7 @@
 package com.quickskin.mod.forge;
 
+import com.quickskin.mod.client.immersive.ImmersiveOpening;
+
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -135,16 +137,15 @@ final class ImmersiveTerrainInterior {
     }
 
     /** Restore the real support surfaces removed by the clipped terrain pass, before the skin is drawn. */
-    static void drawGround(LocalPlayer player, Vec3 camera, PoseStack poses, float time, float cut) {
+    static void drawGround(LocalPlayer player, Vec3 camera, PoseStack poses, float time, ImmersiveOpening opening) {
+        float cut = opening.cut();
         double feet = Mth.lerp(time, player.yOld, player.getY());
         if (camera.y < feet || !(cut > 0 && cut < 1)) return;
         Minecraft game = Minecraft.getInstance();
         ClientLevel level = game.level;
         if (level == null) return;
         var target = game.getMainRenderTarget();
-        int[] box = new int[4];
-        GL11.glGetIntegerv(GL11.GL_SCISSOR_BOX, box);
-        if (box[2] <= 0 || box[3] <= 0) return;
+        int[] box = {opening.left(), opening.bottom(), opening.width(), opening.height()};
         // Map the scissored pixels and original depth interval [0, cut] to the full clip cube.
         Matrix4f aperture = new Matrix4f().scaling((float)target.width / box[2], (float)target.height / box[3], 1)
                 .m30((float)(target.width - 2 * box[0] - box[2]) / box[2])

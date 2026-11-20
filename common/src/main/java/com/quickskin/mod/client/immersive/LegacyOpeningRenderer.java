@@ -84,7 +84,6 @@ public final class LegacyOpeningRenderer {
 
     public static void releaseAfterMenu() {
         if (ImmersiveMode.running()) return;
-        LegacyDepthRange.release();
         if (target != null) {
             target.close();
             target = null;
@@ -119,7 +118,11 @@ public final class LegacyOpeningRenderer {
 
     /** Vertex buffers see the engine's model-view as well as their pose stack. */
     private static PoseStack modelView() {
-        Matrix4f local = new Matrix4f(RenderSystem.getModelViewMatrix()).invert().mul(view);
+        return modelView(view);
+    }
+
+    public static PoseStack modelView(Matrix4f cameraView) {
+        Matrix4f local = new Matrix4f(RenderSystem.getModelViewMatrix()).invert().mul(cameraView);
         PoseStack poses = new PoseStack();
         poses.last().pose().set(local);
         poses.last().normal().set(local).invert().transpose();
@@ -127,6 +130,7 @@ public final class LegacyOpeningRenderer {
     }
 
     public static void beforeLayer(RenderType layer) {
+        LegacyPackCamera.beforeTerrain();
         if (redraw == null || drawing || ImmersiveShaderPacks.shadows()) return;
         if (layer == RenderType.cutoutMipped()) {
             LegacyTerrainGeometry.interior(camera.getPosition(), modelView(), projection, view, partial);
@@ -134,6 +138,7 @@ public final class LegacyOpeningRenderer {
     }
 
     public static void beforeEntities() {
+        LegacyPackCamera.beforeEntities();
         if (opening == null || captured || drawing || ImmersiveShaderPacks.shadows()) return;
         target.terrain(Minecraft.getInstance().getMainRenderTarget(), opening);
         captured = true;
@@ -161,36 +166,42 @@ public final class LegacyOpeningRenderer {
             target.snapshot(world);
             boolean complete = false;
             boolean originalDepthWrites = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
-            int[] priorScissor = restrictToOpening(opening);
+            int[] priorScissor = beginOpeningScissor(opening, pack);
             drawing = true;
             shadowQueued = false;
+            boolean drawnInPack = false;
             try {
                 try {
                     target.selectWorld(world);
                     depthWrites(true);
                     clearOpeningDepth(opening);
                     RenderSystem.setProjectionMatrix(cropped, sorting);
-                    // A shader pack reconstructs terrain positions using the cropped projection.
-                    // Its post-processes need ordinary [near,far] depths until the pack finishes.
-                    if (!pack) GL11.glDepthRange(Mth.lerp(cut, range[0], range[1]), range[1]);
-                    redraw.accept(cropped);
+                    if (pack) {
+                        drawnInPack = LegacyPackCamera.render(opening, projection, cropped, range, redraw, () -> {
+                            PoseStack poses = modelView();
+                            LegacyTerrainGeometry.ground(camera.getPosition(), poses, opening, partial);
+                            drawPlayer(player, poses);
+                        });
+                    } else {
+                        GL11.glDepthRange(Mth.lerp(cut, range[0], range[1]), range[1]);
+                        redraw.accept(cropped);
+                    }
                     game.renderBuffers().bufferSource().endBatch();
                 } finally {
                     GL11.glDepthRange(range[0], range[1]);
                     RenderSystem.setProjectionMatrix(projection, sorting);
                 }
                 target.selectWorld(world);
-                if (pack) LegacyDepthRange.restore(opening, range[1]);
                 // Iris finalizes its fullscreen colour pass with depth writes disabled.
                 // The skin must write depth before its cape and the other player layers draw.
                 depthWrites(true);
                 PoseStack poses = modelView();
-                LegacyTerrainGeometry.ground(camera.getPosition(), poses, opening, partial);
+                if (!drawnInPack) LegacyTerrainGeometry.ground(camera.getPosition(), poses, opening, partial);
                 if (shadowQueued) flushShadow();
                 if (LegacyTerrainGeometry.section(camera.getPosition(), poses, opening, partial)) {
                     target.drawSection(opening);
                 }
-                if (needsWholePlayer(opening)) drawPlayer(player, poses);
+                if (!drawnInPack && needsWholePlayer(opening)) drawPlayer(player, poses);
                 target.composite(opening, captured);
                 complete = true;
             } finally {
@@ -207,7 +218,7 @@ public final class LegacyOpeningRenderer {
         }
     }
 
-    private static void depthWrites(boolean writable) {
+    static void depthWrites(boolean writable) {
         //? if >=1.21.5 {
         GlStateManager._depthMask(writable);
         //?} else {
@@ -233,7 +244,8 @@ public final class LegacyOpeningRenderer {
         }
     }
 
-    private static int[] restrictToOpening(ImmersiveOpening aperture) {
+    /** Shader packs build shadows and exposure in targets with their own sizes and coordinates. */
+    public static int[] beginOpeningScissor(ImmersiveOpening aperture, boolean shaderPack) {
         int[] previous = null;
         //? if >=1.21.5 {
         var state = RenderSystem.SCISSOR_STATE;
@@ -246,6 +258,10 @@ public final class LegacyOpeningRenderer {
             GL11.glGetIntegerv(GL11.GL_SCISSOR_BOX, previous);
         }
         //?}
+        if (shaderPack) {
+            RenderSystem.disableScissor();
+            return previous;
+        }
         int left = aperture.left();
         int bottom = aperture.bottom();
         int right = left + aperture.width();
@@ -261,7 +277,7 @@ public final class LegacyOpeningRenderer {
     }
 
     public static boolean needsWholePlayer(ImmersiveOpening opening) {
-        // Shader packs reconstruct entity depth using their original camera, even in the cropped terrain pass.
+        // The pack shades the complete model with its original camera during the entity stage.
         return opening.crossesPlayer() || ImmersiveShaderPacks.active();
     }
 
