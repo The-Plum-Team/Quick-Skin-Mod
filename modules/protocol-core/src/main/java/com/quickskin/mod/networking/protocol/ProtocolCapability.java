@@ -37,7 +37,13 @@ public enum ProtocolCapability {
      * and {@code sync_appearance_elytra}); a peer without it keeps the plain appearance packets
      * and sees the elytra wear the cape.
      */
-    ELYTRA_TEXTURE("elytra-texture", 1L << 9);
+    ELYTRA_TEXTURE("elytra-texture", 1L << 9),
+    /**
+     * The client may tell the server the pose it plays while its immersive skin menu floats round
+     * it ({@code immersive_pose}), and the server relays the poses of the players in a client's
+     * world to it ({@code sync_immersive_pose}), so other Quick Skin players see them too.
+     */
+    IMMERSIVE_POSES("immersive-poses", 1L << 10);
 
     private final String id;
     private final long mask;

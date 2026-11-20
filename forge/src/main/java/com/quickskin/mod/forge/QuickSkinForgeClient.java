@@ -2,6 +2,8 @@ package com.quickskin.mod.forge;
 
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.QuickSkinClient;
+import com.quickskin.mod.client.compat.AccessoryCapeVisibility;
+import com.quickskin.mod.client.immersive.LegacyOpeningRenderer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.GameShuttingDownEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -24,6 +26,8 @@ public class QuickSkinForgeClient {
     public static void onClientSetup(FMLClientSetupEvent event) {
         // Initialize client code on the main thread
         event.enqueueWork(() -> {
+            AccessoryCapeVisibility.useCaelus();
+            LegacyOpeningRenderer.useForgeShadows(ImmersiveUnclippedPlayer::shadowBuffers);
             QuickSkinClient.init();
         });
     }

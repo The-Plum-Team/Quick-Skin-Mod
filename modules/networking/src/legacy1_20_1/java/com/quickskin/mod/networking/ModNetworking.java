@@ -67,6 +67,8 @@ public class ModNetworking implements NetworkTransport {
         new ResourceLocation(QuickSkinInfo.MOD_ID, "armor_visibility");
     public static final ResourceLocation UPDATE_APPEARANCE_ELYTRA =
         new ResourceLocation(QuickSkinInfo.MOD_ID, "update_appearance_elytra");
+    public static final ResourceLocation IMMERSIVE_POSE =
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "immersive_pose");
 
     // Server to Client packets (S2C)
     public static final ResourceLocation SYNC_APPEARANCE =
@@ -112,6 +114,8 @@ public class ModNetworking implements NetworkTransport {
         new ResourceLocation(QuickSkinInfo.MOD_ID, "skin_admin_state");
     public static final ResourceLocation SYNC_APPEARANCE_ELYTRA =
         new ResourceLocation(QuickSkinInfo.MOD_ID, "sync_appearance_elytra");
+    public static final ResourceLocation SYNC_IMMERSIVE_POSE =
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "sync_immersive_pose");
 
     /**
      * Initializes networking (registers server-side receivers)
@@ -193,6 +197,8 @@ public class ModNetworking implements NetworkTransport {
             NetworkManager.c2s(), ARMOR_VISIBILITY, ServerNetworkHandler::handleArmorVisibility);
         NetworkManager.registerReceiver(
             NetworkManager.c2s(), UPDATE_APPEARANCE_ELYTRA, ServerNetworkHandler::handleUpdateAppearanceElytra);
+        NetworkManager.registerReceiver(
+            NetworkManager.c2s(), IMMERSIVE_POSE, ServerNetworkHandler::handleImmersivePose);
 
     }
 
@@ -259,6 +265,8 @@ public class ModNetworking implements NetworkTransport {
             NetworkManager.s2c(), SKIN_ADMIN_STATE, ClientNetworkHandler::handleSkinAdminState);
         NetworkManager.registerReceiver(
             NetworkManager.s2c(), SYNC_APPEARANCE_ELYTRA, ClientNetworkHandler::handleSyncAppearanceElytra);
+        NetworkManager.registerReceiver(
+            NetworkManager.s2c(), SYNC_IMMERSIVE_POSE, ClientNetworkHandler::handleSyncImmersivePose);
     }
 
     @Override
@@ -458,6 +466,23 @@ public class ModNetworking implements NetworkTransport {
         buffer.writeUUID(playerId);
         buffer.writeByte(hidden);
         NetworkManager.sendToServer(ARMOR_VISIBILITY, buffer);
+    }
+
+    @Override
+    public void sendImmersivePoseToServer(UUID playerId, int sequence, ImmersivePose pose) {
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        buffer.writeUUID(playerId);
+        buffer.writeInt(sequence);
+        ImmersivePoseCodec.write(buffer, pose);
+        NetworkManager.sendToServer(IMMERSIVE_POSE, buffer);
+    }
+
+    @Override
+    public void sendImmersivePoseToPlayer(ServerPlayer player, UUID playerId, ImmersivePose pose) {
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        buffer.writeUUID(playerId);
+        ImmersivePoseCodec.write(buffer, pose);
+        NetworkManager.sendToPlayer(player, SYNC_IMMERSIVE_POSE, buffer);
     }
 
     @Override

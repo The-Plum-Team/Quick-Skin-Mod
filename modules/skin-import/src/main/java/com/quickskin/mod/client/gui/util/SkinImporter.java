@@ -55,8 +55,8 @@ public class SkinImporter {
 
         try {
             // Process the skin using the new HDTextureProcessor
-            // Allow transparency unless disabled in config (client or server)
-            boolean allowTransparency = !ClientConfig.getInstance().shouldDisableSkinTransparency();
+            // The saved skin keeps its transparency unless the player or the server turned it off
+            boolean allowTransparency = !ClientConfig.getInstance().shouldFlattenImportedSkins();
             BufferedImage sourceImage = SafeImageReader.readSkin(sourcePath);
             byte[] processedImageBytes = HDTextureProcessor.processHDSkin(
                     sourceImage, allowTransparency);
@@ -174,7 +174,7 @@ public class SkinImporter {
             }
 
             // Apply transparency settings if needed
-            boolean disableTransparency = ClientConfig.getInstance().shouldDisableSkinTransparency();
+            boolean disableTransparency = ClientConfig.getInstance().shouldFlattenImportedSkins();
             if (disableTransparency) {
                 image = HDTextureProcessor.removeTransparency(image);
             }

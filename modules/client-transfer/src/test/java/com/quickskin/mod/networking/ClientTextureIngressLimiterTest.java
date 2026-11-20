@@ -47,6 +47,16 @@ class ClientTextureIngressLimiterTest {
     }
 
     @Test
+    void immersivePosesHaveABoundedWindowOfTheirOwn() {
+        for (int i = 0; i < ClientTextureIngressLimiter.MAX_IMMERSIVE_POSE_PACKETS; i++) {
+            assertTrue(limiter.allowImmersivePosePacket());
+        }
+        assertFalse(limiter.allowImmersivePosePacket(), "a flood of poses is dropped before any work is queued");
+        // and it spends nothing of the appearance packets' control budget
+        assertTrue(limiter.allowControlBytes(29));
+    }
+
+    @Test
     void rejectsInvalidImagePreflightWithoutSpendingAFullDecode() {
         assertFalse(limiter.allowDecode(new byte[33], "cape"));
         assertTrue(limiter.allowDecode(pngHeader(64, 32), "cape"));

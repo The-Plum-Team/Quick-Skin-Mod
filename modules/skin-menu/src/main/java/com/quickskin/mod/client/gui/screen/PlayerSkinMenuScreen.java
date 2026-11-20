@@ -26,6 +26,7 @@ import com.quickskin.mod.client.gui.widget.PlayerWidget;
 import com.quickskin.mod.client.gui.widget.SearchField;
 import com.quickskin.mod.client.gui.widget.SkinEntry;
 import com.quickskin.mod.client.gui.widget.SkinListWidget;
+import com.quickskin.mod.client.rendering.WorldArmor;
 import com.quickskin.mod.client.services.CooldownService;
 import com.quickskin.mod.client.services.LocalAssetFolderWatch;
 import com.quickskin.mod.client.services.LocalAssetManager;
@@ -81,7 +82,7 @@ import java.util.Locale;
  */
 @Environment(EnvType.CLIENT)
 public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.client.gui.RestylableScreen,
-        MenuGuiScale.Scaled {
+        MenuGuiScale.Scaled, com.quickskin.mod.client.immersive.ImmersiveScreen {
     @Override
     public Screen recreateForStyleChange() {
         return new PlayerSkinMenuScreen(null);
@@ -168,12 +169,21 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private long markedSinceNanos;
     /** The pieces nobody sees, lying on the floor round the turntable ring. */
     private final PedestalDrops pedestalDrops = new PedestalDrops();
+    /** In the immersive view, the same pieces lying on the real ground round the player. */
+    private final WorldPedestal worldPedestal = new WorldPedestal();
     /** How big a lying piece is drawn, and how far from the ring's centre lying pieces may reach. */
     private float pedestalItemSize = 16.0f;
     private float pedestalReach = 120.0f;
     private double rotationDragStartX;
     private float rotationDragStartYaw;
     private static final float ROTATION_DRAG_SENSITIVITY = 0.8f;
+
+    // The immersive view: where the model would stand, which is where the player is seen, and how
+    // far the skin column swings away from the flat menu
+    private float immersiveFeetX;
+    private float immersiveFeetY;
+    private float immersiveScale;
+    private static final float IMMERSIVE_COLUMN_SWING = 26.0f;
 
     // Error toasts
     private final List<ErrorToast> errorToasts = new ArrayList<>();
@@ -199,6 +209,32 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         super(Component.literal("Quick Skin"));
 //?}
         this.parent = parent;
+    }
+
+    /**
+     * In a world the menu floats round the player: the camera stands where the player fills the
+     * model's place, and the skin column swings away on its outer edge.
+     */
+    @Override
+    @Nullable
+    public com.quickskin.mod.client.immersive.ImmersiveLayout immersiveLayout() {
+        if (immersiveScale <= 0.0f) {
+            return null;
+        }
+        float columnRight = skinColumnX + skinColumnWidth + MARGIN;
+        List<com.quickskin.mod.client.immersive.ImmersiveLayout.Panel> panels = new ArrayList<>();
+        if (skinContextMenu != null && skinContextMenu.isOpen()) {
+            // A skin's menu reaches past the column it was opened from, and stands in its plane
+            panels.add(new com.quickskin.mod.client.immersive.ImmersiveLayout.Panel(
+                    skinContextMenu.getX() - 1.0f, skinContextMenu.getY() - 1.0f,
+                    skinContextMenu.getX() + skinContextMenu.getWidth() + 1.0f,
+                    skinContextMenu.getY() + skinContextMenu.getHeight() + 1.0f,
+                    com.quickskin.mod.client.immersive.ImmersiveLayout.Hinge.LEFT, 0.0f, IMMERSIVE_COLUMN_SWING));
+        }
+        panels.add(new com.quickskin.mod.client.immersive.ImmersiveLayout.Panel(0.0f, 0.0f, columnRight, this.height,
+                com.quickskin.mod.client.immersive.ImmersiveLayout.Hinge.LEFT, IMMERSIVE_COLUMN_SWING));
+        return new com.quickskin.mod.client.immersive.ImmersiveLayout(immersiveFeetX, immersiveFeetY, immersiveScale,
+                panels);
     }
 
     @Override
@@ -517,6 +553,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         float modelScale = playerPreviewPanel.getPlayerWidget() != null
                 ? playerPreviewPanel.getPlayerWidget().getEffectiveScale() : scaleCap;
         playerPreviewPanel.setModelBox(centerX, feetY, modelScale);
+        immersiveFeetX = centerX;
+        immersiveFeetY = feetY;
+        // The menu's model is two units tall where the player in the world is 1.875 blocks
+        immersiveScale = modelScale * (2.0f / 1.875f);
         // The turntable ring lies around the ankles, a little wider than the model
         int ringRadiusX = (int) (modelScale * 0.55f) + 8;
         // The ring's appearing animation plays when the menu opens, not on resizes or returns
@@ -879,8 +919,20 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         this.renderBackgroundEffects(graphics, partialTick);
 
 
+        // In the immersive view the player stands in the world where the model would be drawn
+        boolean immersive = com.quickskin.mod.client.immersive.ImmersiveMode.active();
+        if (playerPreviewPanel != null) {
+            playerPreviewPanel.setInWorld(immersive);
+            // The player in the world plays the model's pose: the idle, the walk, the sit, the moves
+            if (immersive && playerPreviewPanel.getPlayerWidget() != null) {
+                com.quickskin.mod.client.rendering.WorldPose.play(
+                        com.quickskin.mod.client.immersive.ImmersiveMode.session(),
+                        playerPreviewPanel.getPlayerWidget().getPreviewData());
+            }
+        }
+
         // The turntable ring goes behind the model, which stands inside it
-        if (playerPreviewPanel != null && playerPreviewPanel.getRotationArc() != null) {
+        if (!immersive && playerPreviewPanel != null && playerPreviewPanel.getRotationArc() != null) {
             playerPreviewPanel.getRotationArc().setHighlighted(rotatingModel);
             playerPreviewPanel.getRotationArc().renderRing(graphics, mouseX, mouseY);
         }
@@ -933,8 +985,12 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?} else {
         graphics.nextStratum();
 //?}
-        // Hidden pieces lie in front of the model, which stands inside the ring
-        renderPedestalDrops(graphics, mouseX, mouseY);
+        // Hidden pieces lie in front of the model, which stands inside the ring, or round the player
+        if (!immersive) {
+            renderPedestalDrops(graphics, mouseX, mouseY);
+        } else {
+            layWorldPedestal(mouseX, mouseY);
+        }
         for (AbstractWidget control : foregroundControls) {
             int controlMouseX = control == skinContextMenu ? menuMouseX : mouseX;
             int controlMouseY = control == skinContextMenu ? menuMouseY : mouseY;
@@ -946,10 +1002,18 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         }
 
         if (actionButtonsPanel != null) {
-            actionButtonsPanel.renderLeftTooltips(graphics, this.font, mouseX, mouseY);
+            int tooltipMouseX = mouseX;
+            int tooltipMouseY = mouseY;
+            com.quickskin.mod.client.immersive.ImmersiveMode.above(this,
+                    () -> actionButtonsPanel.renderLeftTooltips(graphics, this.font, tooltipMouseX, tooltipMouseY));
         }
-        renderArmorHover(graphics, mouseX, mouseY);
-        renderPedestalTooltip(graphics, mouseX, mouseY);
+        if (!immersive) {
+            renderArmorHover(graphics, mouseX, mouseY);
+            renderPedestalTooltip(graphics, mouseX, mouseY);
+        } else if (WorldArmor.placed(com.quickskin.mod.client.immersive.ImmersiveMode.session())) {
+            renderArmorHover(graphics, mouseX, mouseY);
+            renderWorldPedestalTooltip(graphics, mouseX, mouseY);
+        }
 
         // Render error toasts (on top of everything)
         renderErrorToasts(graphics);
@@ -970,7 +1034,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             return 0;
         }
         com.quickskin.mod.client.gui.widget.PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
-        if (widget == null || !widget.visible) {
+        if (widget == null || !playerPreviewPanel.isModelShown()) {
             return 0;
         }
         if (!com.quickskin.mod.client.rendering.PreviewEquipment.outline(LocalHiddenArmor.HEAD, false).isEmpty()) {
@@ -1046,8 +1110,99 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 
     /** The piece under the mouse: one lying on the floor, or else one the model wears. */
     private int pieceUnderMouse(double mouseX, double mouseY) {
+        // The immersive view has no model of its own to point at: the real player stands for it
+        if (com.quickskin.mod.client.immersive.ImmersiveMode.active()) {
+            double[] pointer = worldPointer(mouseX, mouseY);
+            if (pointer == null) {
+                return 0;
+            }
+            int lying = worldPedestal.pieceAt(pointer[0], pointer[1]);
+            return lying != 0 ? lying : armorPieceAt(pointer[0], pointer[1]);
+        }
         int lying = pedestalPieceAt(mouseX, mouseY);
         return lying != 0 ? lying : armorPieceAt(mouseX, mouseY);
+    }
+
+    /**
+     * In the immersive view, where the mouse really is on the GUI while it points past the floating
+     * menu's panels at the world behind them, where the player stands ({@code WorldArmor} traces
+     * the player as seen there); null while it points at a panel or a control, which come first, or
+     * when the player was not drawn. {@code mouseX} and {@code mouseY} are where it points on the screen.
+     */
+    @Nullable
+    private double[] worldPointer(double mouseX, double mouseY) {
+        if (!WorldArmor.placed(com.quickskin.mod.client.immersive.ImmersiveMode.session())
+                || mouseX < 0 || mouseY < 0 || mouseX >= this.width || mouseY >= this.height) {
+            return null;
+        }
+        for (com.quickskin.mod.client.immersive.ImmersiveLayout.Panel panel
+                : com.quickskin.mod.client.immersive.ImmersiveMode.panels()) {
+            if (panel.contains((float) mouseX, (float) mouseY)) {
+                return null;
+            }
+        }
+        // Nor while it is on one of the main sheet's controls, which takes the click: the buttons
+        // round the player, Confirm, the name tag, the pose list, the search bar
+        for (net.minecraft.client.gui.components.events.GuiEventListener child : children()) {
+            if (child.isMouseOver(mouseX, mouseY)) {
+                return null;
+            }
+        }
+        return new double[]{com.quickskin.mod.client.immersive.ImmersiveMode.realMouseX(),
+                com.quickskin.mod.client.immersive.ImmersiveMode.realMouseY()};
+    }
+
+    /**
+     * In the immersive view, lays the pieces nobody sees on the real ground round the player, as
+     * {@link #renderPedestalDrops} lays them round the ring, for the world's draw of the player.
+     */
+    private void layWorldPedestal(int mouseX, int mouseY) {
+        long now = Util.getMillis();
+        int[] pieces = pedestalPieces();
+        float ring = playerPreviewPanel == null || playerPreviewPanel.getPlayerWidget() == null ? 40.0f
+                : playerPreviewPanel.getPlayerWidget().getEffectiveScale() * 0.55f + 8.0f;
+        worldPedestal.update(pieces, Math.max(pieces.length, wornPieceCount()), ring, pedestalItemSize, pedestalReach,
+                immersiveScale, com.quickskin.mod.client.immersive.ImmersiveMode.faceYaw() + 180.0f
+                        + com.quickskin.mod.client.immersive.ImmersiveMode.orbit(), now);
+        double[] pointer = rotatingModel ? null : worldPointer(mouseX, mouseY);
+        int hovered = pointer == null ? 0 : worldPedestal.pieceAt(pointer[0], pointer[1]);
+        WorldArmor.show(com.quickskin.mod.client.immersive.ImmersiveMode.session(), worldPedestal.laid(hovered,
+                this::armorItem, PlayerSkinMenuScreen::covered, piece -> {
+                    int covering = coverer(piece);
+                    return covering == 0 ? net.minecraft.world.item.ItemStack.EMPTY : armorItem(covering);
+                }, PEDESTAL_HOVER_SCALE, COVERED_BADGE, DETERMINISTIC_E2E_RENDER, now));
+    }
+
+    /**
+     * In the immersive view, the lying piece's tooltip of {@link #renderPedestalTooltip}, under its
+     * item on the ground, drawn flat over the floating menu as its other tooltips are.
+     */
+//? if <26.1 {
+    private void renderWorldPedestalTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
+//?} else {
+    private void renderWorldPedestalTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+//?}
+        double[] pointer = worldPointer(mouseX, mouseY);
+        int piece = pointer == null || rotatingModel ? 0 : worldPedestal.pieceAt(pointer[0], pointer[1]);
+        List<Component> lines = piece == 0 ? null : pedestalTooltipLines(piece);
+        int[] box = lines == null ? null : worldPedestal.box(piece, PEDESTAL_HOVER_SCALE);
+        if (box == null) {
+            return;
+        }
+        int width = 0;
+        for (Component line : lines) {
+            width = Math.max(width, this.font.width(line));
+        }
+        // Where the mouse points on the screen, which is where the floating tooltips are placed
+        // from, is off where it really is while the camera travels
+        double offsetX = mouseX - pointer[0];
+        double offsetY = mouseY - pointer[1];
+        int left = (int) Math.round(Math.max(TOOLTIP_BORDER, Math.min(this.width - width - TOOLTIP_BORDER,
+                (box[0] + box[2]) / 2.0 - width / 2.0)) + offsetX);
+        int top = (int) Math.round(box[3] + TOOLTIP_BORDER + 1 + offsetY);
+        List<Component> shown = lines;
+        com.quickskin.mod.client.immersive.ImmersiveMode.above(this,
+                () -> GuiCompat.tooltip(graphics, this.font, shown, left - 12, top + 12));
     }
 
     /** The hidden piece lying on the floor under the mouse, or 0. */
@@ -1100,7 +1255,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         }
         com.quickskin.mod.client.gui.widget.PlayerWidget widget =
                 playerPreviewPanel == null ? null : playerPreviewPanel.getPlayerWidget();
-        if (widget == null || !widget.visible) {
+        if (widget == null || !playerPreviewPanel.isModelShown()) {
             return null;
         }
         return new float[]{widget.getLayoutCenterX(),
@@ -1182,12 +1337,38 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private void renderPedestalTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
 //?}
         int piece = pedestalPieceAt(mouseX, mouseY);
-        if (piece == 0 || this.minecraft == null || this.minecraft.player == null) {
+        List<Component> lines = piece == 0 ? null : pedestalTooltipLines(piece);
+        if (lines == null) {
             return;
+        }
+        PedestalDrops.Item lying = pedestalDrops.item(piece);
+        if (lying == null || playerPreviewPanel == null || playerPreviewPanel.getRotationArc() == null) {
+            GuiCompat.tooltip(graphics, this.font, lines, mouseX, mouseY);
+            return;
+        }
+        int width = 0;
+        for (Component line : lines) {
+            width = Math.max(width, this.font.width(line));
+        }
+        // Centred under the piece, within the screen; Minecraft draws a tooltip 12 right of and 12
+        // above the point it is given, its border 4 beyond its text
+        int left = Math.max(TOOLTIP_BORDER, Math.min(this.width - width - TOOLTIP_BORDER, Math.round(lying.x - width / 2.0f)));
+        int top = (int) Math.ceil(playerPreviewPanel.getRotationArc().bottom()) + TOOLTIP_BORDER + 1;
+        GuiCompat.tooltip(graphics, this.font, lines, left - 12, top + 12);
+    }
+
+    /**
+     * What a lying piece's tooltip says: its name and that a click puts it back on, or, for a
+     * covered one, what covers it and that a click hides that; null outside a world.
+     */
+    @Nullable
+    private List<Component> pedestalTooltipLines(int piece) {
+        if (this.minecraft == null || this.minecraft.player == null) {
+            return null;
         }
         net.minecraft.world.item.ItemStack stack = armorItem(piece);
         if (stack.isEmpty()) {
-            return;
+            return null;
         }
         List<Component> lines;
         if (!covered(piece)) {
@@ -1205,20 +1386,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                             Component.translatable("quickskin.armor.uncover", cover.getHoverName())
                                     .withStyle(net.minecraft.ChatFormatting.GRAY));
         }
-        PedestalDrops.Item lying = pedestalDrops.item(piece);
-        if (lying == null || playerPreviewPanel == null || playerPreviewPanel.getRotationArc() == null) {
-            GuiCompat.tooltip(graphics, this.font, lines, mouseX, mouseY);
-            return;
-        }
-        int width = 0;
-        for (Component line : lines) {
-            width = Math.max(width, this.font.width(line));
-        }
-        // Centred under the piece, within the screen; Minecraft draws a tooltip 12 right of and 12
-        // above the point it is given, its border 4 beyond its text
-        int left = Math.max(TOOLTIP_BORDER, Math.min(this.width - width - TOOLTIP_BORDER, Math.round(lying.x - width / 2.0f)));
-        int top = (int) Math.ceil(playerPreviewPanel.getRotationArc().bottom()) + TOOLTIP_BORDER + 1;
-        GuiCompat.tooltip(graphics, this.font, lines, left - 12, top + 12);
+        return lines;
     }
 
     /** The outline of a worn piece on the model, one convex polygon per box it covers. */
@@ -1413,16 +1581,49 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         // A covered piece is not seen on the model: the piece covering it is marked there
         int covering = covered(markedPiece) ? coverer(markedPiece) : 0;
         int[] onModel = covered(markedPiece) ? covering == 0 ? null : seenBox(covering) : seenBox(markedPiece);
+        int[] lyingBox = lyingBox(markedPiece);
+        if (com.quickskin.mod.client.immersive.ImmersiveMode.active()) {
+            // The boxes are where the player and the ground are seen in the window, which the
+            // floating screen only covers exactly once the camera rests: they are drawn flat over
+            // it, as its tooltips are, shifted the way those are shifted back
+            int shiftX = (int) Math.round(mouseX - com.quickskin.mod.client.immersive.ImmersiveMode.realMouseX());
+            int shiftY = (int) Math.round(mouseY - com.quickskin.mod.client.immersive.ImmersiveMode.realMouseY());
+            com.quickskin.mod.client.immersive.ImmersiveMode.above(this, () -> {
+                for (int[] box : new int[][]{onModel, lyingBox}) {
+                    if (box != null) {
+                        drawMarks(graphics, new int[]{box[0] + shiftX, box[1] + shiftY, box[2] + shiftX, box[3] + shiftY},
+                                grow, alpha);
+                    }
+                }
+            });
+            return;
+        }
         if (onModel != null) {
             drawMarks(graphics, onModel, grow, alpha);
         }
-        PedestalDrops.Item lying = pedestalDrops.item(markedPiece);
-        if (lying != null && !lying.dropping()) {
-            float half = pedestalItemSize * PEDESTAL_HOVER_SCALE / 2.0f;
-            float middle = lying.y - pedestalItemSize * PedestalDrops.LIFT;
-            drawMarks(graphics, new int[]{(int) Math.floor(lying.x - half), (int) Math.floor(middle - half),
-                    (int) Math.ceil(lying.x + half), (int) Math.ceil(middle + half)}, grow, alpha);
+        if (lyingBox != null) {
+            drawMarks(graphics, lyingBox, grow, alpha);
         }
+    }
+
+    /**
+     * The box round a lying piece's item as it is drawn under the mouse, {left, top, right,
+     * bottom} in GUI coordinates, on the floor round the ring or, in the immersive view, on the
+     * ground round the player; null when it is not lying there.
+     */
+    @Nullable
+    private int[] lyingBox(int piece) {
+        if (com.quickskin.mod.client.immersive.ImmersiveMode.active()) {
+            return worldPedestal.box(piece, PEDESTAL_HOVER_SCALE);
+        }
+        PedestalDrops.Item lying = pedestalDrops.item(piece);
+        if (lying == null || lying.dropping()) {
+            return null;
+        }
+        float half = pedestalItemSize * PEDESTAL_HOVER_SCALE / 2.0f;
+        float middle = lying.y - pedestalItemSize * PedestalDrops.LIFT;
+        return new int[]{(int) Math.floor(lying.x - half), (int) Math.floor(middle - half),
+                (int) Math.ceil(lying.x + half), (int) Math.ceil(middle + half)};
     }
 
     /**
@@ -1588,7 +1789,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         }
         com.quickskin.mod.client.gui.widget.PlayerWidget widget =
                 playerPreviewPanel != null ? playerPreviewPanel.getPlayerWidget() : null;
-        nameTagButton.visible = widget != null && widget.visible && this.minecraft != null;
+        nameTagButton.visible = widget != null && playerPreviewPanel.isModelShown() && this.minecraft != null;
         if (!nameTagButton.visible) {
             return;
         }
@@ -1721,6 +1922,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     public void removed() {
         BackgroundRenderer.cleanup();
         com.quickskin.mod.client.rendering.PreviewEquipment.forgetPreview();
+        WorldArmor.clear();
         // The next screen, a dialog or the world opens at the player's own scale
         if (this.minecraft != null) {
             MenuGuiScale.restore(this.minecraft);
@@ -1913,8 +2115,16 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         if (playerPreviewPanel == null) {
             return false;
         }
+        if (com.quickskin.mod.client.immersive.ImmersiveMode.active()) {
+            // The player is the model: a drag off the controls takes the camera round them. It
+            // goes by where the mouse really is, not by where it points on the floating screen
+            rotatingModel = true;
+            rotationDragStartX = com.quickskin.mod.client.immersive.ImmersiveMode.realMouseX();
+            rotationDragStartYaw = com.quickskin.mod.client.immersive.ImmersiveMode.orbit();
+            return true;
+        }
         com.quickskin.mod.client.gui.widget.PlayerWidget widget = playerPreviewPanel.getPlayerWidget();
-        if (widget == null || !widget.visible) {
+        if (widget == null || !playerPreviewPanel.isModelShown()) {
             return false;
         }
         com.quickskin.mod.client.gui.widget.RotationArcWidget arc = playerPreviewPanel.getRotationArc();
@@ -1973,6 +2183,12 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
         // Handle debug positioning mode
         if (com.quickskin.mod.client.rendering.PlayerModelRenderer.handleDebugMouseDragged((int)mouseX, (int)mouseY, button)) {
+            return true;
+        }
+        if (rotatingModel && com.quickskin.mod.client.immersive.ImmersiveMode.active()) {
+            com.quickskin.mod.client.immersive.ImmersiveMode.setOrbit(rotationDragStartYaw
+                    + (float) (com.quickskin.mod.client.immersive.ImmersiveMode.realMouseX() - rotationDragStartX)
+                    * ROTATION_DRAG_SENSITIVITY);
             return true;
         }
         if (rotatingModel && playerPreviewPanel != null && playerPreviewPanel.getPlayerWidget() != null) {
@@ -2423,8 +2639,10 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
                 showError(Component.translatable("quickskin.error.cpm_select_failed"));
                 return false;
             }
-            // A CPM model wears no Quick Skin cape
+            // A CPM model wears no Quick Skin cape, and the menu's model, which goes on showing
+            // the cape it was last handed, takes it off too
             com.quickskin.mod.client.services.SkinCapes.wearNone(localWearTarget());
+            previewCape("");
             // The model replaces the applied Quick Skin skin. Withdraw it here and on the
             // server, or other players keep drawing the old skin.
             if (this.minecraft != null && this.minecraft.player != null) {

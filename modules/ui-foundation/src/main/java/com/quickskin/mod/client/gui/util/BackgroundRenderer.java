@@ -93,6 +93,10 @@ public class BackgroundRenderer {
     //?} else {
     public static void renderBackground(Screen screen, GuiGraphicsExtractor graphics, float partialTick) {
     //?}
+        // In the immersive view the world is the background
+        if (com.quickskin.mod.client.immersive.ImmersiveMode.active()) {
+            return;
+        }
         BackgroundStyle style = ClientConfig.getInstance().getMenuBackgroundStyle();
 
         switch (style) {

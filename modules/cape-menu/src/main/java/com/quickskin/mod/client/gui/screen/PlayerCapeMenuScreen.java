@@ -93,7 +93,7 @@ import java.util.stream.Collectors;
  */
 @Environment(EnvType.CLIENT)
 public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.client.gui.RestylableScreen,
-        MenuGuiScale.Scaled {
+        MenuGuiScale.Scaled, com.quickskin.mod.client.immersive.ImmersiveScreen {
     @Override
     public Screen recreateForStyleChange() {
         return new PlayerCapeMenuScreen(null);
@@ -220,6 +220,16 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
     /** The player, wearing the cape under the mouse, or the worn one. */
     private PlayerWidget playerWidget;
+    // The immersive view: where the model would stand, which is where the player is seen, how far
+    // the list swings away from the flat menu, and the drag that takes the camera round the player
+    private float immersiveFeetX;
+    private float immersiveFeetY;
+    private float immersiveScale;
+    private static final float IMMERSIVE_COLUMN_SWING = 26.0f;
+    /** The player turns their back to the camera, with the cape, a little to the side as the model stands. */
+    private static final float IMMERSIVE_PLAYER_TURN = 200.0f;
+    private final com.quickskin.mod.client.immersive.ImmersiveOrbit immersiveOrbit =
+            new com.quickskin.mod.client.immersive.ImmersiveOrbit();
     private SpeedSlider animationSpeedSlider;
     private CapeContextMenu contextMenu;
 
@@ -302,6 +312,56 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     /** The menu that picks the cape {@code skin} puts on whenever it is worn. */
     public static PlayerCapeMenuScreen forSkin(@Nullable Screen parent, AssetMetadata skin) {
         return new PlayerCapeMenuScreen(parent, skin);
+    }
+
+    /**
+     * In a world the menu floats round the player: the camera stands where the player fills the
+     * model's place, and the list of capes, with its tabs and buttons, swings away on its outer
+     * edge, as the skin menu's column does.
+     */
+    @Override
+    @Nullable
+    public com.quickskin.mod.client.immersive.ImmersiveLayout immersiveLayout() {
+        if (this.immersiveScale <= 0.0f) {
+            return null;
+        }
+        float columnRight = Math.min(this.stageX, this.gridX + this.gridWidth + SCROLLBAR_ROOM + 4);
+        List<com.quickskin.mod.client.immersive.ImmersiveLayout.Panel> panels = new ArrayList<>();
+        if (this.contextMenu != null && this.contextMenu.isOpen()) {
+            // A cape's menu reaches past the list it was opened from, and stands in its plane
+            panels.add(new com.quickskin.mod.client.immersive.ImmersiveLayout.Panel(
+                    this.contextMenu.getX() - 1.0f, this.contextMenu.getY() - 1.0f,
+                    this.contextMenu.getX() + this.contextMenu.getWidth() + 1.0f,
+                    this.contextMenu.getY() + this.contextMenu.getHeight() + 1.0f,
+                    com.quickskin.mod.client.immersive.ImmersiveLayout.Hinge.LEFT, 0.0f, IMMERSIVE_COLUMN_SWING));
+        }
+        panels.add(new com.quickskin.mod.client.immersive.ImmersiveLayout.Panel(0.0f, 0.0f, columnRight, this.height,
+                com.quickskin.mod.client.immersive.ImmersiveLayout.Hinge.LEFT, IMMERSIVE_COLUMN_SWING));
+        return new com.quickskin.mod.client.immersive.ImmersiveLayout(this.immersiveFeetX, this.immersiveFeetY,
+                this.immersiveScale, panels);
+    }
+
+    /** The cape is on the player's back, so the player shows it to the camera, as the model does. */
+    @Override
+    public float immersivePlayerTurn() {
+        return IMMERSIVE_PLAYER_TURN;
+    }
+
+    /**
+     * In the immersive view the real player stands where the model would be drawn: the model is
+     * left out, and the player in the world wears what it would wear, the cape under the mouse or
+     * the one picked, or wings on the Elytra tab, until the menu is left. Opened for one skin, the
+     * player wears that skin too, as the model does.
+     */
+    private void dressPlayerInWorld(boolean immersive) {
+        if (this.playerWidget == null) {
+            return;
+        }
+        this.playerWidget.setLeftOut(immersive);
+        if (immersive) {
+            com.quickskin.mod.client.rendering.WorldLook.show(com.quickskin.mod.client.immersive.ImmersiveMode.session(),
+                    this, this.playerWidget.getPreviewData(), this.skinTarget != null);
+        }
     }
 
     @Override
@@ -568,6 +628,13 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
         // Restore saved rotation state
         this.playerWidget.setRotationState(this.savedBodyYaw, this.savedTargetRotation);
+
+        // The player in the world stands where the model is drawn; the model is two units tall
+        // where the player is 1.875 blocks
+        this.immersiveFeetX = this.playerWidget.getLayoutCenterX();
+        this.immersiveFeetY = this.playerWidget.getLayoutFeetY();
+        this.immersiveScale = this.playerWidget.getEffectiveScale() * (2.0f / 1.875f);
+        dressPlayerInWorld(com.quickskin.mod.client.immersive.ImmersiveMode.active());
     }
 
     /**
@@ -1459,6 +1526,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
         // Render the animated star background
         this.renderBackgroundEffects(graphics, partialTick);
+        dressPlayerInWorld(com.quickskin.mod.client.immersive.ImmersiveMode.active());
 
 //? if <1.21 {
 //?} else if <1.21.6 {
@@ -1528,7 +1596,17 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             return;
         }
 
-        // Tooltip logic
+        // The tooltip of the cape under the mouse, or of its button; floating beside the mouse in
+        // the immersive view
+        com.quickskin.mod.client.immersive.ImmersiveMode.above(this, () -> renderGridTooltip(graphics, mouseX, mouseY));
+    }
+
+    /** The tooltip of the cape under the mouse, or of the card's button under it. */
+//? if <26.1 {
+    private void renderGridTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
+//?} else {
+    private void renderGridTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+//?}
         if (isMouseOverGrid(mouseX, mouseY)) {
             CapeGridLayout.Hit hoveredHit = shelfHit(mouseX, mouseY);
             CapeEntry hoveredCape = hoveredHit == null || hoveredHit.importSlot() ? null
@@ -2126,7 +2204,8 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         }
 
         if (!isMouseOverGrid((int) mouseX, (int) mouseY)) {
-            return false;
+            // In the immersive view a drag off the controls takes the camera round the player
+            return button == InputConstants.MOUSE_BUTTON_LEFT && this.immersiveOrbit.press();
         }
         CapeGridLayout.Hit hit = shelfHit((int) mouseX, (int) mouseY);
         if (hit == null) {
@@ -2405,6 +2484,9 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
             updateScrollFromMouse(mouseY);
             return true;
         }
+        if (this.immersiveOrbit.drag()) {
+            return true;
+        }
 //? if <1.21.9 {
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
 //?} else {
@@ -2424,6 +2506,9 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 //?}
         if (button == InputConstants.MOUSE_BUTTON_LEFT) {
             this.isDraggingScrollbar = false;
+            if (this.immersiveOrbit.release()) {
+                return true;
+            }
         }
 //? if <1.21.9 {
         return super.mouseReleased(mouseX, mouseY, button);

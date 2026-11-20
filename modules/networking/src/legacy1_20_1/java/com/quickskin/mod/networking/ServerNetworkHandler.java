@@ -94,6 +94,7 @@ public class ServerNetworkHandler {
         sendAllAppearancesToPlayer(player);
         ServerNicknames.sendSnapshot(player);
         ServerSkinAssignments.sessionReady(player);
+        ServerImmersivePoses.sessionReady(player);
         sendServerConfigToPlayer(player);
         int cooldownSeconds = ServerConfig.getInstance().skinChangeCooldownSeconds;
         if (cooldownSeconds > 0
@@ -329,6 +330,20 @@ public class ServerNetworkHandler {
         UUID playerId = sender.getUUID();
         Object connection = sender.connection;
         context.queue(() -> ServerHiddenArmor.request(activePlayer(server, playerId, connection), hidden));
+    }
+
+    /** A Quick Skin client says what pose its player plays while its immersive skin menu is open. */
+    public static void handleImmersivePose(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
+        UUID reportedPlayerId = PacketHelper.readPlayerId(buf);
+        int sequence = buf.readInt();
+        ImmersivePose pose = ImmersivePoseCodec.read(buf);
+        ServerPlayer sender = (ServerPlayer) context.getPlayer();
+        if (!ServerImmersivePoses.admits(sender, reportedPlayerId)
+                || !TextureTransferRateLimiter.getInstance().allowImmersivePose(sender.getUUID(), sender.connection)) return;
+        MinecraftServer server = sender.server;
+        UUID playerId = sender.getUUID();
+        Object connection = sender.connection;
+        context.queue(() -> ServerImmersivePoses.request(activePlayer(server, playerId, connection), sequence, pose));
     }
 
     /** An admin's Quick Skin client hands out skins or keeps the skin pool. */
@@ -901,6 +916,7 @@ public class ServerNetworkHandler {
         tickAppearanceControls(server);
         ServerNicknames.tick(server);
         ServerSkinAssignments.tick(server);
+        ServerImmersivePoses.tick(server);
         drainPreparedTextureUploads(server);
         int packetsRemaining = MAX_RESPONSE_PACKETS_PER_TICK;
         int bytesRemaining = MAX_RESPONSE_BYTES_PER_TICK;
@@ -1264,6 +1280,7 @@ public class ServerNetworkHandler {
         ServerNicknames.playerLeft(playerId, connection);
         ServerSkinAssignments.playerLeft(playerId, connection);
         ServerHiddenArmor.playerLeft(playerId, connection);
+        ServerImmersivePoses.playerLeft(playerId, connection);
     }
 
     public static void clearTransientNetworkState() {
@@ -1278,6 +1295,7 @@ public class ServerNetworkHandler {
         ServerNicknames.clear();
         ServerSkinAssignments.clear();
         ServerHiddenArmor.clear();
+        ServerImmersivePoses.clear();
     }
 
     /**

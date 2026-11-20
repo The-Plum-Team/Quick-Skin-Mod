@@ -49,6 +49,10 @@ import java.util.regex.Pattern;
  * only repaint the armour's own surface, are left out. The silhouette decides what the mouse is
  * over, and with the ring of pixels around it, in the order a walk round it meets them, gives the
  * see-through ghost of the hovered piece its tint and faint edge.
+ *
+ * <p>In the immersive view the real player in the world stands for the model ({@code WorldArmor}):
+ * the draw then starts from the player's transform to the camera's space, and each vertex is
+ * projected onto the GUI as the world draw projects it ({@link PreviewEquipment#toGui}).
  */
 @Environment(EnvType.CLIENT)
 public final class PreviewArmorSilhouette {
@@ -273,7 +277,7 @@ public final class PreviewArmorSilhouette {
         }
         PoseStack poseStack = new PoseStack();
         poseStack.last().pose().set(placement.toGui());
-        Sink sink = new Sink();
+        Sink sink = new Sink(placement.projection());
         if (piece == BODY) {
             // The player's own model as the preview drew it, opaque
             VertexConsumer consumer = sink.opaque();
@@ -347,6 +351,18 @@ public final class PreviewArmorSilhouette {
     private static final class Sink {
         private final List<float[]> quads = new ArrayList<>();
         private final List<BufferedImage> textures = new ArrayList<>();
+        /** Projects the camera-space vertices of a world draw onto the GUI; null for a GUI draw. */
+        @Nullable
+        private final org.joml.Matrix4f projection;
+
+        Sink(@Nullable org.joml.Matrix4f projection) {
+            this.projection = projection;
+        }
+
+        /** Where a vertex the draw gave lands on the GUI, with its depth. */
+        org.joml.Vector3f onGui(float x, float y, float z) {
+            return PreviewEquipment.toGui(projection, new org.joml.Vector3f(x, y, z));
+        }
 
         VertexConsumer opaque() {
             return new Capture(this, OPAQUE);
@@ -692,9 +708,10 @@ public final class PreviewArmorSilhouette {
                 quad = new float[20];
                 vertex = 0;
             }
-            quad[vertex * 5] = x;
-            quad[vertex * 5 + 1] = y;
-            quad[vertex * 5 + 4] = z;
+            org.joml.Vector3f onGui = sink.onGui(x, y, z);
+            quad[vertex * 5] = onGui.x;
+            quad[vertex * 5 + 1] = onGui.y;
+            quad[vertex * 5 + 4] = onGui.z;
         }
 
         private void texel(float u, float v) {

@@ -53,8 +53,14 @@ public class PlayerPreviewPanel extends AbstractWidget {
     private boolean isCpmModel = false;
     // The model file CPM draws on the preview's own model while no world is loaded
     private java.nio.file.Path cpmModelFile;
+    // Whether the preview's model is what shows, as opposed to a CPM model's icon in its place
+    private boolean modelShown = true;
+    // How many times the preview has been drawn since a CPM model was picked for it
+    private int drawsSincePick;
     private long skinChangedAt = 0;
     private boolean lastCpmWearing = false;
+    // In the immersive view the player stands in the world where this panel would draw the model
+    private boolean inWorld;
 
     public PlayerPreviewPanel(int x, int y, int width, int height) {
         super(x, y, width, height, Component.empty());
@@ -109,6 +115,20 @@ public class PlayerPreviewPanel extends AbstractWidget {
         setY(feetY - boxHeight);
         this.width = boxWidth;
         this.height = boxHeight;
+    }
+
+    /**
+     * In the immersive view the real player stands where the model would be drawn: the model, its
+     * turntable ring and the CPM icon are left out, and the model takes no input.
+     */
+    public void setInWorld(boolean inWorld) {
+        this.inWorld = inWorld;
+        if (playerWidget != null) {
+            playerWidget.setLeftOut(inWorld);
+        }
+        if (rotationArc != null) {
+            rotationArc.visible = !inWorld;
+        }
     }
 
     /** Whether a point lies in the model's box. */
@@ -291,6 +311,7 @@ public class PlayerPreviewPanel extends AbstractWidget {
             // the model's icon shows only while it cannot
             cpmIconLocation = skinLocation;
             cpmModelFile = com.quickskin.mod.client.compat.CpmModelPreview.isAvailable() ? metadata.path() : null;
+            drawsSincePick = 0;
             playerWidget.setCpmModel(cpmModelFile, true);
             playerWidget.setModelType("classic");
             syncCpmModelPreview();
@@ -298,6 +319,7 @@ public class PlayerPreviewPanel extends AbstractWidget {
         }
         cpmIconLocation = null;
         cpmModelFile = null;
+        modelShown = true;
         playerWidget.setCpmModel(null, false);
         playerWidget.visible = true;
         playerWidget.setSkin(skinLocation);
@@ -376,15 +398,26 @@ public class PlayerPreviewPanel extends AbstractWidget {
 
     /**
      * On the title screen a CPM model shows as the model itself while CPM draws it or is still
-     * building it, and as its icon otherwise.
+     * building it, and as its icon otherwise, until CPM draws it after all.
      */
     private void syncCpmModelPreview() {
         if (playerWidget == null || cpmIconLocation == null) {
             return;
         }
-        boolean modelShown = cpmModelFile != null && (playerWidget.isCpmModelDrawn()
+        // A model just picked has not been asked for yet: it counts as on its way until the
+        // widget has drawn once, or the icon would show for a frame before a model CPM has ready
+        modelShown = cpmModelFile != null && (drawsSincePick < 2 || playerWidget.isCpmModelDrawn()
                 || com.quickskin.mod.client.compat.CpmModelPreview.isLoading(cpmModelFile));
-        playerWidget.visible = modelShown;
+        // The widget goes on being drawn while the icon stands in for the model. It draws nothing
+        // of its own for a model, and its draw is what asks CPM for the model: CPM may finish
+        // building one only after the wait for it ran out, and a widget left undrawn never asked
+        // again, so the icon stayed for the rest of the visit.
+        playerWidget.visible = cpmModelFile != null;
+    }
+
+    /** Whether the preview shows its model now: false while a CPM model's icon stands in for it. */
+    public boolean isModelShown() {
+        return playerWidget != null && playerWidget.visible && modelShown;
     }
 
     private void updateCpmWearingState() {
@@ -401,8 +434,11 @@ public class PlayerPreviewPanel extends AbstractWidget {
     protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
     //?}
         syncOwnPose();
+        if (drawsSincePick < 2) {
+            drawsSincePick++;
+        }
         syncCpmModelPreview();
-        if (cpmIconLocation == null || (playerWidget != null && playerWidget.visible)) {
+        if (inWorld || cpmIconLocation == null || modelShown) {
             return;
         }
         int iconSize = Math.min(getWidth(), getHeight()) - 16;

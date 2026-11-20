@@ -90,6 +90,15 @@ class WirePayloadBudgetTest {
     }
 
     @Test
+    void immersivePosePacketsFitTheirDirection() {
+        assertTrue(WirePayloadBudget.immersivePose() <= VANILLA_SERVERBOUND_PAYLOAD_BYTES);
+        assertTrue(WirePayloadBudget.syncImmersivePose() <= VANILLA_CLIENTBOUND_PAYLOAD_BYTES);
+        // Fixed size: player, sequence, pose, flags, yaw, swaps and variant, with no string or array
+        assertEquals(WirePayloadBudget.ENVELOPE_BYTES + 16 + 4 + 8, WirePayloadBudget.immersivePose());
+        assertEquals(WirePayloadBudget.ENVELOPE_BYTES + 16 + 8, WirePayloadBudget.syncImmersivePose());
+    }
+
+    @Test
     void aLegacyServerRelayOfTheLargestAllowedUploadFitsOneClientboundPayload() {
         // A 2.x server relays each stored texture whole as quickskin:send_texture.
         assertTrue(WirePayloadBudget.directTexture(TextureTransferLimits.MAX_LEGACY_UPLOAD_BYTES)

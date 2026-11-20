@@ -23,7 +23,10 @@ import java.util.function.IntFunction;
  * others, which the player may be about to click.
  *
  * <p>Positions are GUI coordinates and times are milliseconds. An item's place is the point on the
- * floor it stands on, and the item is drawn above that point.
+ * floor it stands on, and the item is drawn above that point. A place may also name a depth, a third
+ * coordinate towards the viewer, which a drop and a rise cross evenly: the immersive view lays the
+ * items on the real ground round the player ({@code WorldPedestal}), where the floor has depth. The
+ * flat menu's places have none, and every depth stays 0.
  */
 final class PedestalDrops {
     /** How long a dropped item flies, then bounces once and again, and how long a rising one flies. */
@@ -60,8 +63,11 @@ final class PedestalDrops {
         final int slot;
         float x;
         float y;
+        /** Towards the viewer, for places that name a depth; 0 otherwise. */
+        float z;
         private float fromX;
         private float fromY;
+        private float fromZ;
         /** When its drop started, or {@link Long#MIN_VALUE} once it lies still. */
         private long droppedAt = Long.MIN_VALUE;
         /** Whether it is dropping and has not reached the floor yet. */
@@ -84,10 +90,19 @@ final class PedestalDrops {
     }
 
     /** A piece put back on, flying from where it lay to where the model wears it. */
-    record Rise(int piece, float fromX, float fromY, float toX, float toY, long startedAt) {
+    record Rise(int piece, float fromX, float fromY, float toX, float toY, long startedAt, float fromZ, float toZ) {
+        Rise(int piece, float fromX, float fromY, float toX, float toY, long startedAt) {
+            this(piece, fromX, fromY, toX, toY, startedAt, 0.0f, 0.0f);
+        }
+
         /** Where it is drawn at {@code now}. */
         float[] at(long now) {
             return hop(fromX, fromY, toX, toY, inOut(progress(now)), RISE_HOP);
+        }
+
+        /** Its depth at {@code now}. */
+        float z(long now) {
+            return (float) (fromZ + (toZ - fromZ) * inOut(progress(now)));
         }
 
         /** Its size at {@code now}, as a share of a lying item's. */
@@ -198,7 +213,7 @@ final class PedestalDrops {
                 it.remove();
                 float[] to = worn.apply(item.piece);
                 if (to != null) {
-                    rises.add(new Rise(item.piece, item.x, item.y, to[0], to[1], now));
+                    rises.add(new Rise(item.piece, item.x, item.y, to[0], to[1], now, item.z, depth(to)));
                 }
             }
         }
@@ -209,10 +224,12 @@ final class PedestalDrops {
                 float[] place = places.apply(item.slot);
                 item.x = place[0];
                 item.y = place[1];
+                item.z = depth(place);
                 float[] from = primed ? worn.apply(piece) : null;
                 if (from != null) {
                     item.fromX = from[0];
                     item.fromY = from[1];
+                    item.fromZ = depth(from);
                     item.droppedAt = now;
                 }
                 items.put(piece, item);
@@ -228,9 +245,11 @@ final class PedestalDrops {
                             size * DROP_APEX);
                     item.x = at[0];
                     item.y = at[1];
+                    item.z = item.fromZ + (depth(place) - item.fromZ) * Math.min(1.0f, (float) elapsed / DROP_MILLIS);
                 } else {
                     long bouncing = elapsed - DROP_MILLIS;
                     item.x = place[0];
+                    item.z = depth(place);
                     item.y = place[1] - (bouncing < BOUNCE_MILLIS
                             ? bounce(bouncing, BOUNCE_MILLIS, size * BOUNCE_HEIGHT)
                             : bounce(bouncing - BOUNCE_MILLIS, SECOND_BOUNCE_MILLIS, size * SECOND_BOUNCE_HEIGHT));
@@ -242,11 +261,17 @@ final class PedestalDrops {
             } else {
                 item.x += (place[0] - item.x) * glide;
                 item.y += (place[1] - item.y) * glide;
+                item.z += (depth(place) - item.z) * glide;
             }
         }
         rises.removeIf(rise -> now - rise.startedAt() >= RISE_MILLIS);
         primed = true;
         lastUpdate = now;
+    }
+
+    /** The depth a point names, or 0 for a point of the flat menu, which has none. */
+    private static float depth(float[] point) {
+        return point.length > 2 ? point[2] : 0.0f;
     }
 
     /** The lowest place number no item lies in. */

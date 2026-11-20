@@ -132,6 +132,9 @@ public class ClientNetworking {
         NetworkManager.registerReceiver(
                 NetworkManager.s2c(), SyncAppearanceElytraPayload.TYPE,
                 SyncAppearanceElytraPayload.CODEC, ClientNetworkHandler::handleSyncAppearanceElytra);
+        NetworkManager.registerReceiver(
+                NetworkManager.s2c(), SyncImmersivePosePayload.TYPE,
+                SyncImmersivePosePayload.CODEC, ClientNetworkHandler::handleSyncImmersivePose);
         //?}
 
     }

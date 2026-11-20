@@ -138,6 +138,18 @@ requests with their uploads). appearance-services draws the assigned skin on the
 behind `RemoteAppearanceTarget.applyAssignedSkin`/`ownAppearance`, and settings-ui owns the
 `PlayerSkinsScreen` panel, opened from the Server tab of `SettingsScreen`.
 
+Immersive poses (ADR 0019) follow the same split. protocol-core owns the `immersive-poses` values
+and server rules: `ImmersivePose` (bounds and names), `ImmersivePoseRelay` (sequence, rate, repeat
+and expiry) and `ImmersivePoseAudience` (who was told as the tracked set changes); configuration
+owns `ServerConfig.allowImmersivePoses`, transfer-core the server's `allowImmersivePose` bucket and
+client-transfer the client's `allowImmersivePosePacket` window. Networking owns the payloads,
+`ImmersivePoseCodec`, the client's `ImmersivePoseSyncService` and `ServerImmersivePoses` (server
+thread: admission, relay to trackers, ends). client-foundation keeps the told poses
+(`RemoteImmersivePoses`) and preview-rendering's `WorldPose` plays them on other players. `common`
+owns `ImmersivePoseBroadcast` (the client tick that reads the immersive view) and
+`ImmersivePoseViewers`, which `ServerRuntime` binds to read the entity tracker's `seenBy` through
+the accessors of ADR 0012.
+
 `PlatformHelper` is now a stable API in `platform-api`; Architectury binds its loader methods
 after the modules are assembled. Its old rendering forwards belong to `MinecraftCompat` in
 `minecraft-adapter`. That facade selects four implementations by Minecraft API family: immediate

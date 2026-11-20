@@ -138,6 +138,7 @@ public class NetworkSyncService {
             snapshotRetryAtMillis = 0L;
             NicknameSyncService.getInstance().onProtocolAcknowledged(connection);
             HiddenArmorSyncService.getInstance().onProtocolAcknowledged(connection);
+            ImmersivePoseSyncService.getInstance().onProtocolAcknowledged(connection);
         }
     }
 

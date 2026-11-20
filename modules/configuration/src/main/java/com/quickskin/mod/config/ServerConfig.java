@@ -114,6 +114,14 @@ public class ServerConfig {
     public boolean allowHiddenArmor = true;
 
     /**
+     * Let other Quick Skin players see the poses a player plays while their immersive skin menu
+     * floats round them (ADR 0019). Only drawing changes, on Quick Skin clients: the player stands
+     * where they stand, with their own hitbox, and players without Quick Skin see nothing. Off,
+     * the server neither keeps nor relays a pose.
+     */
+    public boolean allowImmersivePoses = true;
+
+    /**
      * Runtime fact the server sends to Quick Skin clients, never read from or written to the
      * file: what players without Quick Skin on this server see after an upload to Mojang. One of
      * the {@code ACCOUNT_SKIN_*} values, or {@code null} when unknown (an older server).

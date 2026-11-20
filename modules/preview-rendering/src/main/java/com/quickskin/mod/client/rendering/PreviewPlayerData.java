@@ -131,6 +131,29 @@ public class PreviewPlayerData {
         idles.shuffle();
     }
 
+    /** The skin-change move playing, or null; it plays from {@link #getSkinSwapStartNanos()}. */
+    public SkinSwapAnimation.Variant getSkinSwapVariant() {
+        return skinSwapVariant;
+    }
+
+    /** When the latest skin-change move started, on {@link System#nanoTime()}. */
+    public long getSkinSwapStartNanos() {
+        return skinSwapStartNanos;
+    }
+
+    /**
+     * Plays the skin-change move {@code variant} from {@code nowNanos}, with another idle under
+     * it, as another player's client said that player made it; a move already playing finishes.
+     */
+    public void playSkinSwap(SkinSwapAnimation.Variant variant, long nowNanos) {
+        if (variant == null || skinSwapVariant != null) {
+            return;
+        }
+        skinSwapVariant = variant;
+        skinSwapStartNanos = nowNanos;
+        idles.shuffle();
+    }
+
     /**
      * Samples the skin-change move for the draw starting at {@code nowNanos}, which then reads it
      * through {@link #getSkinSwapPose()}. Also marks the preview as drawn.

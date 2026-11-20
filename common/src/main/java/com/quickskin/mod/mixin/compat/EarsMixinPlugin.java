@@ -55,6 +55,27 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
         // target that is absent costs a Mixin warning at every start of every client without TaCZ. The
         // resource is visible here on Forge 1.20.1, the lane official TaCZ exists for. TaCZ itself
         // loads that class only when Player Animator is installed.
+        // Sodium owns standalone OpenGL programs up to 26.1.2. Newer Sodium uses the game's
+        // render passes and Iris supplies its own compiled terrain program for an active pack.
+        //? if >=1.21.6 {
+        if (mixinNamed(mixinClassName, "IrisTerrainProgramMixin") || mixinNamed(mixinClassName, "IrisTerrainShaderMixin")) {
+            return classFileExists(targetClassName.replace('.', '/') + ".class");
+        }
+        //?}
+        //? if >=1.21.9 {
+        if (mixinNamed(mixinClassName, "SodiumPlayerLightMixin")) {
+            return classFileExists(targetClassName.replace('.', '/') + ".class");
+        }
+        //?}
+        //? if >=1.21.6 && <26.2 {
+        if (mixinNamed(mixinClassName, "SodiumTerrainShaderMixin") || mixinNamed(mixinClassName, "SodiumTerrainProgramMixin")) {
+            return classFileExists(targetClassName.replace('.', '/') + ".class");
+        }
+        //?} else if >=26.2 {
+        if (mixinNamed(mixinClassName, "SodiumTerrainPassMixin")) {
+            return classFileExists(targetClassName.replace('.', '/') + ".class");
+        }
+        //?}
         if (mixinNamed(mixinClassName, TACZ_PREVIEW_ANIMATION_MIXIN)) {
             return classFileExists(TACZ_ANIMATION_MANAGER);
         }

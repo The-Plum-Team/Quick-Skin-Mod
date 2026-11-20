@@ -142,12 +142,11 @@ public class GuiSkinRendererMixin {
         PlayerModelRenderer.renderPendingCpmModel(state.playerModel(), poseStack, collector);
 //?}
         // The sitting pose's block, where the inline draw before 1.21.6 puts it
+        PlayerModelRenderer.PreviewSit sit = PlayerModelRenderer.consumePendingSit(state.playerModel());
 //? if <26.2 {
-        PlayerModelRenderer.renderPendingSitBlock(
-                PlayerModelRenderer.consumePendingSit(state.playerModel()), poseStack, bufferSource);
+        PlayerModelRenderer.renderPendingSitBlock(sit, poseStack, bufferSource);
 //?} else {
-        PlayerModelRenderer.renderPendingSitBlock(
-                PlayerModelRenderer.consumePendingSit(state.playerModel()), poseStack, collector);
+        PlayerModelRenderer.renderPendingSitBlock(sit, poseStack, collector);
 //?}
         PlayerModelRenderer.PreviewCapeState cape =
 //? if <26.2 {
@@ -174,9 +173,9 @@ public class GuiSkinRendererMixin {
         }
         if (cape.texture() != null && cape.bodyModel() != null && cape.capeModel() != null) {
 //? if <26.2 {
-            quickskin$drawCape(cape, poseStack, bufferSource);
+            quickskin$drawCape(cape, sit, poseStack, bufferSource);
 //?} else {
-            quickskin$drawCape(cape, poseStack, collector);
+            quickskin$drawCape(cape, sit, poseStack, collector);
 //?}
         }
         if (cape.worn() != null && cape.bodyModel() != null) {
@@ -194,13 +193,16 @@ public class GuiSkinRendererMixin {
         }
     }
 
-    /** Draws the preview's cape, or its texture on folded elytra wings when the preview asked for them. */
+    /**
+     * Draws the preview's cape, tilted back over the edge of the sitting pose's block when
+     * {@code sit} draws one, or its texture on folded elytra wings when the preview asked for them.
+     */
 //? if <26.2 {
-    private static void quickskin$drawCape(PlayerModelRenderer.PreviewCapeState cape, PoseStack poseStack,
-                                           MultiBufferSource.BufferSource bufferSource) {
+    private static void quickskin$drawCape(PlayerModelRenderer.PreviewCapeState cape, PlayerModelRenderer.PreviewSit sit,
+                                           PoseStack poseStack, MultiBufferSource.BufferSource bufferSource) {
 //?} else {
-    private static void quickskin$drawCape(PlayerModelRenderer.PreviewCapeState cape, PoseStack poseStack,
-                                           SubmitNodeCollector collector) {
+    private static void quickskin$drawCape(PlayerModelRenderer.PreviewCapeState cape, PlayerModelRenderer.PreviewSit sit,
+                                           PoseStack poseStack, SubmitNodeCollector collector) {
 //?}
         RenderType capeRenderType = CapeRenderTypes.translucent(cape.texture());
 //? if <26.2 {
@@ -223,10 +225,12 @@ public class GuiSkinRendererMixin {
             poseStack.popPose();
             return;
         }
+        float tilt = sit == null ? 0.0F
+                : PlayerModelRenderer.sitCapeTilt(sit.jump(), sit.block(), cape.bodyModel().body, 2.0F);
 //? if <26.3 {
-        poseStack.mulPose(Axis.XP.rotationDegrees(6.0F));
+        poseStack.mulPose(Axis.XP.rotationDegrees(6.0F + tilt));
 //?} else {
-        poseStack.rotate(Axis.XP.rotationDegrees(6.0F));
+        poseStack.rotate(Axis.XP.rotationDegrees(6.0F + tilt));
 //?}
 //? if <26.2 {
         cape.capeModel().body.getChild("cape").render(

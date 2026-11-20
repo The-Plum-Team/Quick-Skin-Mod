@@ -29,6 +29,14 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+//? if >=1.21.6 && <1.21.9 {
+import com.quickskin.mod.client.immersive.ImmersiveMode;
+import com.quickskin.mod.client.immersive.ImmersiveScreen;
+import com.quickskin.mod.client.rendering.PreviewPlayerData;
+import com.quickskin.mod.client.rendering.WorldLook;
+import net.minecraft.client.gui.screens.Screen;
+import org.spongepowered.asm.mixin.Unique;
+//?}
 
 //? if >=1.21.2 {
 import java.util.UUID;
@@ -75,6 +83,19 @@ public class PlayerRendererMixin {
 
         PlayerAppearanceService service = PlayerAppearanceService.getInstance();
         if (service == null) return;
+//? if >=1.21.9 && <26.1 {
+        // The immersive cape menu opened for one skin shows that skin on the player in the world,
+        // which the skin lookup (MixinAbstractClientPlayer) already put in the state: asked by the
+        // same rule as that lookup, this one leaves it there
+        if (com.quickskin.mod.client.immersive.ImmersiveMode.posesPlayer()) {
+            net.minecraft.client.gui.screens.Screen quickskin$screen = Minecraft.getInstance().screen;
+            if (com.quickskin.mod.client.rendering.WorldLook.skinLookOf(
+                    com.quickskin.mod.client.immersive.ImmersiveMode.session(), renderState, quickskin$screen,
+                    quickskin$screen instanceof com.quickskin.mod.client.immersive.ImmersiveScreen) != null) {
+                return;
+            }
+        }
+//?}
 
 //? if <1.21.2 {
 //?} else {
@@ -94,6 +115,23 @@ public class PlayerRendererMixin {
         }
 //?}
         if (playerUUID == null) return;
+//? if >=26.1 {
+        // The immersive view's cape menu opened for one skin shows that skin on the player in the
+        // world (WorldLook.skinLook), which the player's skin lookup already put in the state
+        if (mc.player != null && renderState.id == mc.player.getId()
+                && com.quickskin.mod.client.immersive.ImmersiveMode.running()) {
+    //? if <26.2 {
+            net.minecraft.client.gui.screens.Screen quickskin$screen = mc.screen;
+    //?} else {
+            net.minecraft.client.gui.screens.Screen quickskin$screen = mc.gui.screen();
+    //?}
+            if (com.quickskin.mod.client.rendering.WorldLook.skinLook(
+                    com.quickskin.mod.client.immersive.ImmersiveMode.session(), mc.player, quickskin$screen,
+                    quickskin$screen instanceof com.quickskin.mod.client.immersive.ImmersiveScreen) != null) {
+                return;
+            }
+        }
+//?}
 
 //?}
         // Cancelling here skips the RETURN callbacks other mods attach to this lookup (Entity
@@ -110,6 +148,16 @@ public class PlayerRendererMixin {
 //?} else {
         Identifier vanillaSkin = renderState.skin == null || renderState.skin.body() == null
                 ? null : renderState.skin.body().texturePath();
+//?}
+//? if >=1.21.6 && <1.21.9 {
+        // The immersive view's cape menu opened for one skin shows that skin on the player. The
+        // render state took it from getSkin (MixinAbstractClientPlayer); a player class that
+        // answers getSkin itself (Essential) gets it here instead.
+        ResourceLocation screenSkin = quickskin$screenSkin(renderState);
+        if (screenSkin != null) {
+            if (!screenSkin.equals(vanillaSkin)) cir.setReturnValue(screenSkin);
+            return;
+        }
 //?}
 
         // Try service-based lookup (covers registered data from Essential compat or server sync)
@@ -153,5 +201,20 @@ public class PlayerRendererMixin {
             }
         }
     }
+//? if >=1.21.6 && <1.21.9 {
+
+    /** The skin an immersive screen shows on the local player's draw ({@link WorldLook#skinLook}), or null. */
+    @Unique
+    private static ResourceLocation quickskin$screenSkin(PlayerRenderState renderState) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!ImmersiveMode.posesPlayer() || minecraft.player == null || renderState.id != minecraft.player.getId()) {
+            return null;
+        }
+        Screen screen = minecraft.screen;
+        PreviewPlayerData look = WorldLook.skinLook(ImmersiveMode.session(), minecraft.player, screen,
+                screen instanceof ImmersiveScreen);
+        return look == null ? null : look.getSkinLocation();
+    }
+//?}
 }
 //?}

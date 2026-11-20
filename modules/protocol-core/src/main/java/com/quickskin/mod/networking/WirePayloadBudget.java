@@ -103,6 +103,16 @@ public final class WirePayloadBudget {
         return ENVELOPE_BYTES + UUID_BYTES + 1;
     }
 
+    /** {@code immersive_pose}: player, sequence number and the pose ({@link ImmersivePose#WIRE_BYTES}). */
+    public static int immersivePose() {
+        return ENVELOPE_BYTES + UUID_BYTES + INT_BYTES + ImmersivePose.WIRE_BYTES;
+    }
+
+    /** {@code sync_immersive_pose}: the posing player and the pose. */
+    public static int syncImmersivePose() {
+        return ENVELOPE_BYTES + UUID_BYTES + ImmersivePose.WIRE_BYTES;
+    }
+
     /** {@code nickname_result}: request number, status, the nickname kept and the wait. */
     public static int nicknameResult() {
         return ENVELOPE_BYTES + INT_BYTES + 1

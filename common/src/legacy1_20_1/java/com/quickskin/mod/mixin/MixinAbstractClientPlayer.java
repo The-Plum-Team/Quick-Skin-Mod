@@ -2,15 +2,21 @@ package com.quickskin.mod.mixin;
 
 import com.quickskin.mod.QuickSkin;
 import com.quickskin.mod.client.compat.CPMCompatIntegration;
+import com.quickskin.mod.client.immersive.ImmersiveMode;
+import com.quickskin.mod.client.immersive.ImmersiveScreen;
+import com.quickskin.mod.client.rendering.PreviewPlayerData;
+import com.quickskin.mod.client.rendering.WorldLook;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.data.AssetMetadata;
 import com.quickskin.mod.common.data.TextureQuality;
 import com.quickskin.mod.config.ClientConfig;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.resources.ResourceLocation;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -41,6 +47,13 @@ public class MixinAbstractClientPlayer {
         if (CPMCompatIntegration.shouldDeferToCPM()) return;
 
         AbstractClientPlayer self = (AbstractClientPlayer) (Object) this;
+
+        // The immersive view shows the skin a screen previews on the player in the world
+        PreviewPlayerData look = quickskin$screenSkin(self);
+        if (look != null) {
+            cir.setReturnValue(look.getSkinLocation());
+            return;
+        }
 
         // Get QuickSkin's texture for this player
         PlayerAppearanceService service = PlayerAppearanceService.getInstance();
@@ -84,6 +97,12 @@ public class MixinAbstractClientPlayer {
         if (CPMCompatIntegration.shouldDeferToCPM()) return;
 
         AbstractClientPlayer self = (AbstractClientPlayer) (Object) this;
+
+        PreviewPlayerData look = quickskin$screenSkin(self);
+        if (look != null) {
+            cir.setReturnValue(look.isSlim() ? "slim" : "default");
+            return;
+        }
 
         PlayerAppearanceService service = PlayerAppearanceService.getInstance();
 
@@ -209,5 +228,18 @@ public class MixinAbstractClientPlayer {
                 }
             }
         }
+    }
+
+    /**
+     * The preview whose skin the player in the world shows during the world's draw of the immersive
+     * view, as the cape menu opened for one skin does ({@link WorldLook#skinLook}), or null.
+     */
+    @Unique
+    private static PreviewPlayerData quickskin$screenSkin(AbstractClientPlayer player) {
+        if (!ImmersiveMode.posesPlayer()) {
+            return null;
+        }
+        Screen screen = Minecraft.getInstance().screen;
+        return WorldLook.skinLook(ImmersiveMode.session(), player, screen, screen instanceof ImmersiveScreen);
     }
 }
