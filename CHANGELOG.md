@@ -1,5 +1,37 @@
 # Changelog
 
+## 5.0.0 (2026-11-21)
+
+### Added
+
+- **An immersive skin menu**
+> In a world, opening the skin menu no longer covers the screen: the camera steps back in front of your character and the menu floats around them, tilted toward you. Your real player is the one you dress. They play the menu's poses (standing, walking, sitting on a block) and the little move when you pick a skin, and a click on an armour piece hides it, right on your character. The cape menu and the cape editor float the same way and turn your character round so you see the cape: the cape you point at or are editing is the one they wear, on elytra wings too in the Elytra tab. Going from the skin menu to the cape menu and back fades one into the other while the camera glides, and the dialogs (Delete, Rename, Nickname, Settings and the rest) open flat over the tilted menu. Near a wall the camera keeps its distance and opens a round window through the blocks between it and you, also with an Iris or Oculus shader pack. Outside a world the menus are as before. Turn it off with Immersive skin menu in Quick Skin's settings (Client tab). It works on every Minecraft version Quick Skin supports.
+
+- **Other players see your poses**
+> While you are in the immersive skin menu, other players with Quick Skin 5.0.0 see your character take the menu's pose, facing the way it faces there, and the pose ends when you close the menu. It needs Quick Skin 5.0.0 on the server too; a server turns it off with `allowImmersivePoses` in `quickskin-server.json`. Nothing you wear or save changes: it is only how your character is drawn.
+
+### Changed
+
+- **Skins are opaque with Ears**
+> The Ears mod keeps its extra data (ears, tail, wings and the rest) in the transparency of a skin's body, where Minecraft draws a skin opaque. Quick Skin showed those parts half see-through. With Ears installed, Quick Skin now always shows skins opaque there, its "Show transparent parts of skins as opaque" setting stays ticked and says why, and a skin you import keeps that data in its file. Your own choice for that setting comes back if you remove Ears.
+
+### Fixes
+
+- **No more crash with Touch'n Motion when you hide your chestplate**
+> On Minecraft 1.20.1 and 1.21.1, with Touch'n Motion and a Fresh Animations player pack, hiding your chestplate in the skin menu closed the game with "Pose stack not empty" as soon as you walked in third person. A hidden piece now leaves its layer drawing nothing instead of cutting that layer short, so what other mods do around it stays whole.
+
+- **Hiding armour from the skin menu works on Fabric 1.20.1**
+> On Fabric 1.20.1 a click on an armour piece of the skin menu's model did nothing; it now hides the piece, as it did on Forge.
+
+- **An elytra in an accessory slot hides your cape**
+> With an elytra in a Curios or Trinkets slot, your Quick Skin cape stayed on your back under the wings. It now hides while the elytra is worn there and comes back when you take it off, as with an elytra in the chest slot.
+
+- **A CPM model no longer keeps the last skin's cape**
+> In the skin menu, picking a CPM model right after a skin with a cape left that cape on the menu's model until you opened the menu again. The model now shows without it, as it is worn.
+
+- **A CPM model picked on the title screen shows as the model**
+> In the skin menu before you join a world, a CPM model picked a few seconds after opening the menu showed its icon instead of the model for the rest of the visit. It now shows the model.
+
 ## 4.2.0 (2026-11-15)
 
 ### Added
