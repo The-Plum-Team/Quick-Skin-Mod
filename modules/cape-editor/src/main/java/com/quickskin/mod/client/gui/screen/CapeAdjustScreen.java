@@ -257,10 +257,8 @@ public class CapeAdjustScreen extends Screen implements com.quickskin.mod.client
     private float immersiveScale;
     /** How far the canvas column and the right panel swing away from the flat screen, round the player. */
     private static final float IMMERSIVE_PANEL_SWING = 20.0f;
-    /** The room the player has between the canvas and the right panel, and its bounds. */
+    /** The room the player has between the canvas and the right panel; see {@link CapeEditorRoom}. */
     private int immersiveRoom;
-    private static final int IMMERSIVE_MIN_ROOM = 64;
-    private static final int IMMERSIVE_MAX_ROOM = 160;
     /** The player turns their back to the camera, with the cape, a little to the side as the model stands. */
     private static final float IMMERSIVE_PLAYER_TURN = 200.0f;
     private final com.quickskin.mod.client.immersive.ImmersiveOrbit immersiveOrbit =
@@ -426,7 +424,7 @@ public class CapeAdjustScreen extends Screen implements com.quickskin.mod.client
         // In the immersive view the player stands in the world between the canvas and the right
         // panel, which give up that room
         immersiveRoom = com.quickskin.mod.client.immersive.ImmersiveMode.active()
-                ? Mth.clamp(this.width / 5, IMMERSIVE_MIN_ROOM, IMMERSIVE_MAX_ROOM) : 0;
+                ? CapeEditorRoom.width(this.width) : 0;
         // An animation's timeline goes under the zoom panel, down to the bottom beside Cancel and Apply
         int leftBottom = timeline != null ? this.height - MARGIN : bodyBottom;
         int timelineRoom = timeline != null ? PANEL_GAP + TIMELINE_PANEL_H : 0;
@@ -1011,7 +1009,13 @@ public class CapeAdjustScreen extends Screen implements com.quickskin.mod.client
         // for the menu's jumps
         int floorRoom = inWorld ? areaHeight / 8 : 0;
         playerWidget.setCustomReferencePoint(modelX0 + modelWidth / 2, previewY1 - 2 - floorRoom);
-        playerWidget.setScaleCap((areaHeight - 4 - floorRoom) / (inWorld ? 2.2f : 1.95f));
+        float tallest = (areaHeight - 4 - floorRoom) / (inWorld ? 2.2f : 1.95f);
+        if (inWorld) {
+            // The player fills the room, whatever size the cape menu's model has
+            playerWidget.setLayoutScale(CapeEditorRoom.playerScale(immersiveRoom, tallest));
+        } else {
+            playerWidget.setScaleCap(tallest);
+        }
         // Face the player's back to the camera so the cape is visible (same default as cape menu).
         playerWidget.setRotationState(20.0f, 200.0f);
         playerWidget.setElytraPreview(elytraView);
