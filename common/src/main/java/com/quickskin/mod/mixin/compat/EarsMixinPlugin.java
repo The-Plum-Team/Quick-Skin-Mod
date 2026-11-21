@@ -58,7 +58,31 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
         // Sodium owns standalone OpenGL programs up to 26.1.2. Newer Sodium uses the game's
         // render passes and Iris supplies its own compiled terrain program for an active pack.
         //? if >=1.21.6 {
-        if (mixinNamed(mixinClassName, "IrisTerrainProgramMixin") || mixinNamed(mixinClassName, "IrisTerrainShaderMixin")) {
+        if (mixinNamed(mixinClassName, "IrisTerrainProgramMixin")) {
+            return classFileExists(targetClassName.replace('.', '/') + ".class");
+        }
+        //?}
+        // Shader packs discard the immersive opening in their own terrain programs. Iris 1.8 for
+        // 1.21.2 and later compiles each stage through ShaderCreator.createShader; older Iris and
+        // Oculus hand the patched sources to the game's shader loader instead.
+        //? if >=1.21.2 {
+        if (mixinNamed(mixinClassName, "IrisTerrainShaderMixin")) {
+            return classFileExists(targetClassName.replace('.', '/') + ".class");
+        }
+        //?} else {
+        if (mixinNamed(mixinClassName, "LegacyIrisTerrainShaderMixin")) {
+            return classFileExists(targetClassName.replace('.', '/') + ".class");
+        }
+        //?}
+        //? if <1.21.6 {
+        if (mixinNamed(mixinClassName, "LegacyIrisTerrainProgramMixin")) {
+            return classFileExists(targetClassName.replace('.', '/') + ".class");
+        }
+        //?}
+        // Sodium 0.5 and Embeddium (1.20.1) use the me.jellysquid package.
+        //? if <1.21 {
+        if (mixinNamed(mixinClassName, "LegacySodiumTerrainShaderMixin")
+                || mixinNamed(mixinClassName, "LegacySodiumTerrainProgramMixin")) {
             return classFileExists(targetClassName.replace('.', '/') + ".class");
         }
         //?}
@@ -67,7 +91,7 @@ public class EarsMixinPlugin implements IMixinConfigPlugin {
             return classFileExists(targetClassName.replace('.', '/') + ".class");
         }
         //?}
-        //? if >=1.21.6 && <26.2 {
+        //? if >=1.21 && <26.2 {
         if (mixinNamed(mixinClassName, "SodiumTerrainShaderMixin") || mixinNamed(mixinClassName, "SodiumTerrainProgramMixin")) {
             return classFileExists(targetClassName.replace('.', '/') + ".class");
         }

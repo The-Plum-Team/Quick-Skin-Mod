@@ -18,7 +18,11 @@
     "RealCameraTextureIdMixin",
     "JourneyMapIgnSkinMixin",
     "JourneyMapTextureCacheMixin",
-    "ReplayModCompatMixin"
+    "ReplayModCompatMixin",
+    "LegacySodiumTerrainShaderMixin",
+    "LegacySodiumTerrainProgramMixin",
+    "LegacyIrisTerrainShaderMixin",
+    "LegacyIrisTerrainProgramMixin"
   ],
   "injectors": {
     "defaultRequire": 0
