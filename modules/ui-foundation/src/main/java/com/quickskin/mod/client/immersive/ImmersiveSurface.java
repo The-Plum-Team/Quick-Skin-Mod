@@ -61,6 +61,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.gui.render.state.GuiElementRenderState;
@@ -75,6 +76,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.gui.render.state.GuiElementRenderState;
@@ -88,6 +90,7 @@ import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -140,6 +143,11 @@ public final class ImmersiveSurface {
     private static boolean captured;
     /** Whether the screen drew something above itself into the second picture this frame. */
     private static boolean aboveCaptured;
+    /**
+     * Whether the screen last drawn into the picture is a dialog over a floating screen, which
+     * left only that screen in the picture and drew itself flat over it ({@link #parentDrawn}).
+     */
+    private static boolean parentApart;
 
     private ImmersiveSurface() {
     }
@@ -149,12 +157,23 @@ public final class ImmersiveSurface {
         return capturing;
     }
 
+    /**
+     * Whether the screen last drawn is a dialog that drew itself flat over the floating screen it
+     * opened from ({@link #parentDrawn}): that screen then keeps its panels where they swing and
+     * the mouse points at the dialog where it is.
+     */
+    public static boolean parentApart() {
+        return parentApart;
+    }
+
 //? if <1.21.6 {
     @Nullable
     private static TextureTarget target;
     /** What the screen draws above itself, such as a tooltip, which is floated flat at the mouse. */
     @Nullable
     private static TextureTarget above;
+    /** Whether a dialog drew the picture under itself this frame ({@link #parentDrawn}), so the frame's later draw is skipped. */
+    private static boolean drawnEarly;
 
     /** From here on the screen draws into its own picture. */
     public static void begin(GuiGraphics graphics) {
@@ -166,6 +185,25 @@ public final class ImmersiveSurface {
         drawInto(target);
         capturing = true;
         aboveCaptured = false;
+        parentApart = false;
+        drawnEarly = false;
+    }
+
+    /**
+     * A dialog has drawn the floating screen it opened from as its background: only that screen
+     * goes into the picture, which floats at once, and the dialog draws itself, and its tooltip,
+     * flat over it on the game's own target. The screen behind keeps its panels where they swing,
+     * and the dialog is never cut where they meet.
+     */
+    public static void parentDrawn(GuiGraphics graphics) {
+        if (!capturing || target == null) return;
+        graphics.flush();
+        capturing = false;
+        captured = true;
+        parentApart = true;
+        backToTheGame();
+        ImmersiveMode.drawOverlay();
+        drawnEarly = true;
     }
 
     /**
@@ -197,6 +235,11 @@ public final class ImmersiveSurface {
      */
     public static void draw(ImmersiveFrame frame, float alpha, float guiWidth, float guiHeight,
                             float aboveX, float aboveY) {
+        if (drawnEarly) {
+            // A dialog drew the picture under itself already ({@link #parentDrawn})
+            drawnEarly = false;
+            return;
+        }
         if (target == null || !captured || alpha <= 0.0f) return;
         // Whatever the GUI still holds back is drawn first, under the floating screen
         Minecraft.getInstance().renderBuffers().bufferSource().endBatch();
@@ -547,6 +590,41 @@ public final class ImmersiveSurface {
         captured = true;
     }
 
+    /** The game's GUI pass into the picture that the screen being drawn hands {@link #begin(Runnable)}. */
+    @Nullable
+    private static Runnable screenPass;
+
+    /**
+     * From here on the screen is drawn into its own picture, by {@code guiPass} once it is
+     * extracted ({@link #drawScreenPass}), or earlier by a dialog over a floating screen
+     * ({@link #parentDrawn}).
+     */
+    public static void begin(Runnable guiPass) {
+        screenPass = guiPass;
+        parentApart = false;
+        begin();
+    }
+
+    /**
+     * A dialog has extracted the floating screen it opened from as its background: that alone is
+     * drawn into the picture now, the mesh goes into the emptied GUI, and the dialog, with its
+     * tooltip, is extracted flat over it in a stratum of its own. The screen behind keeps its
+     * panels where they swing, and the dialog is never cut where they meet.
+     */
+    //? if <26.1 {
+    public static void parentDrawn(GuiGraphics graphics) {
+    //?} else {
+    public static void parentDrawn(GuiGraphicsExtractor graphics) {
+    //?}
+        Runnable pass = screenPass;
+        if (!capturing || pass == null) return;
+        drawScreenPass(pass);
+        capturing = false;
+        parentApart = true;
+        ImmersiveMode.drawOverlay();
+        graphics.nextStratum();
+    }
+
     /** Hands the frame's GUI the mesh of the last picture where {@code frame} stands it. */
     public static void draw(ImmersiveFrame frame, float alpha, float guiWidth, float guiHeight,
                             float aboveX, float aboveY) {
@@ -580,7 +658,7 @@ public final class ImmersiveSurface {
      * From here on the screen extracts itself for its picture: what it holds back to draw above
      * itself ({@code ImmersiveMode.above}) waits until the picture is drawn.
      */
-    public static void begin() {
+    private static void begin() {
         capturing = true;
     }
 
@@ -675,7 +753,7 @@ public final class ImmersiveSurface {
      * The screen starts to extract itself into the floating picture: what it draws above itself
      * ({@link ImmersiveMode#above}) waits until the picture is drawn.
      */
-    public static void begin() {
+    private static void begin() {
         capturing = true;
     }
 
@@ -779,7 +857,7 @@ public final class ImmersiveSurface {
     }
 
     /** From here on the screen is drawn into its own picture, and what it draws above itself is held back. */
-    public static void begin() {
+    private static void begin() {
         capturing = true;
     }
 

@@ -107,6 +107,11 @@ public final class ImmersiveMode {
     private static ImmersiveLayout layout;
     private static float canvasWidth;
     private static float canvasHeight;
+    /**
+     * Whether the open screen is a dialog drawn flat over the floating screen it opened from
+     * ({@link ImmersiveSurface#parentApart}), as last frame drew it.
+     */
+    private static boolean dialogApart;
 
     @Nullable
     private static ImmersiveFrame frame;
@@ -293,6 +298,9 @@ public final class ImmersiveMode {
         }
         if (opening) {
             ImmersiveLayout declared = screen instanceof ImmersiveScreen immersive ? immersive.immersiveLayout() : null;
+            // A screen not drawn yet is taken to be a dialog drawn apart, so the panels do not
+            // start to fold for a frame before its first draw tells
+            dialogApart = declared == null && (screen != frameScreen || ImmersiveSurface.parentApart());
             if (declared != null) {
                 layout = declared;
                 tiltTarget = 1.0f;
@@ -305,8 +313,10 @@ public final class ImmersiveMode {
                     playerTurnTarget = asked == 0.0f ? 0.0f : asked + orbit;
                 }
             } else {
-                // A dialog over the screen: the panels fold flat behind it
-                tiltTarget = 0.0f;
+                // A dialog drawn flat over the screen (ImmersiveSurface.parentDrawn) leaves the
+                // panels where they swing. One drawn into the picture with the screen folds them
+                // flat behind it, so it is not cut where they meet.
+                tiltTarget = dialogApart ? 1.0f : 0.0f;
             }
             canvasWidth = minecraft.getWindow().getGuiScaledWidth();
             canvasHeight = minecraft.getWindow().getGuiScaledHeight();
@@ -384,6 +394,7 @@ public final class ImmersiveMode {
     private static void stop(Minecraft minecraft) {
         running = false;
         opening = false;
+        dialogApart = false;
         progress = 0.0f;
         frame = null;
         frameScreen = null;
@@ -618,6 +629,13 @@ public final class ImmersiveMode {
         Minecraft minecraft = Minecraft.getInstance();
         ImmersiveFrame current = frame;
         if (!active() || current == null) return false;
+        if (dialogApart) {
+            // The dialog is drawn flat where it is, over the floating screen it opened from
+            cursorPart = ImmersiveFrame.NONE;
+            aboveX = 0.0f;
+            aboveY = 0.0f;
+            return true;
+        }
         double windowWidth = Math.max(1, minecraft.getWindow().getScreenWidth());
         double windowHeight = Math.max(1, minecraft.getWindow().getScreenHeight());
         float x = (float) (position[0] * current.width() / windowWidth);
