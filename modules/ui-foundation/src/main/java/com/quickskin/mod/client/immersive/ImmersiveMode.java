@@ -113,6 +113,25 @@ public final class ImmersiveMode {
      */
     private static boolean dialogApart;
 
+    /** The screen whose layout the view stands by: a dialog over it leaves it so. */
+    @Nullable
+    private static Screen layoutScreen;
+    /**
+     * Seconds since a floating screen took another one's place ({@link ImmersiveSwitch}), or -1
+     * while none is on its way out.
+     */
+    private static float switchSeconds = -1.0f;
+    /** The panels of the screen on its way out, how much of it showed as it left, and where it stands this frame. */
+    private static List<ImmersiveLayout.Panel> outgoingPanels = List.of();
+    private static float outgoingShown;
+    @Nullable
+    private static ImmersiveFrame outgoingFrame;
+    /** Where the screen on its way out stood the player and how far it turned them, which the camera travels from. */
+    private static float switchFromFeetX;
+    private static float switchFromFeetY;
+    private static float switchFromScale;
+    private static float switchFromTurn;
+
     @Nullable
     private static ImmersiveFrame frame;
     @Nullable
@@ -302,6 +321,19 @@ public final class ImmersiveMode {
             // start to fold for a frame before its first draw tells
             dialogApart = declared == null && (screen != frameScreen || ImmersiveSurface.parentApart());
             if (declared != null) {
+                if (layout != null && layoutScreen != null && layoutScreen != screen && glided) {
+                    // Another floating screen takes this one's place: this one fades out from
+                    // however much of it showed, and the camera travels from where it stands
+                    outgoingShown = switchSeconds >= 0.0f ? ImmersiveSwitch.arriving(switchSeconds) : 1.0f;
+                    switchSeconds = 0.0f;
+                    outgoingPanels = layout.panels();
+                    switchFromFeetX = glideFeetX;
+                    switchFromFeetY = glideFeetY;
+                    switchFromScale = glideScale;
+                    switchFromTurn = playerTurn;
+                    ImmersiveSurface.holdOutgoing();
+                }
+                layoutScreen = screen;
                 layout = declared;
                 tiltTarget = 1.0f;
                 // The player turns as the screen asks, and keeps that turn through its dialogs. The
@@ -322,7 +354,19 @@ public final class ImmersiveMode {
             canvasHeight = minecraft.getWindow().getGuiScaledHeight();
         }
         tilt += (tiltTarget - tilt) * (1.0f - (float) Math.exp(-seconds * 10.0f));
-        playerTurn += (playerTurnTarget - playerTurn) * (1.0f - (float) Math.exp(-seconds * 6.0f));
+        if (switchSeconds >= 0.0f) {
+            switchSeconds += seconds;
+            if (switchSeconds >= ImmersiveSwitch.LENGTH) {
+                switchSeconds = -1.0f;
+                outgoingFrame = null;
+            }
+        }
+        if (switchSeconds >= 0.0f) {
+            // With the camera, the player turns from one screen's side to the other's
+            playerTurn = Mth.lerp(ImmersiveSwitch.travelled(switchSeconds), switchFromTurn, playerTurnTarget);
+        } else {
+            playerTurn += (playerTurnTarget - playerTurn) * (1.0f - (float) Math.exp(-seconds * 6.0f));
+        }
         if (layout == null || canvasWidth <= 0.0f || canvasHeight <= 0.0f) {
             frame = null;
             rigged = false;
@@ -395,6 +439,9 @@ public final class ImmersiveMode {
         running = false;
         opening = false;
         dialogApart = false;
+        layoutScreen = null;
+        switchSeconds = -1.0f;
+        outgoingFrame = null;
         progress = 0.0f;
         frame = null;
         frameScreen = null;
@@ -429,6 +476,12 @@ public final class ImmersiveMode {
             glideFeetX = shareX;
             glideFeetY = shareY;
             glideScale = shareScale;
+        } else if (switchSeconds >= 0.0f) {
+            // From one floating screen to the next the camera starts and stops gently
+            float travelled = ImmersiveSwitch.travelled(switchSeconds);
+            glideFeetX = Mth.lerp(travelled, switchFromFeetX, shareX);
+            glideFeetY = Mth.lerp(travelled, switchFromFeetY, shareY);
+            glideScale = Mth.lerp(travelled, switchFromScale, shareScale);
         } else {
             float glide = 1.0f - (float) Math.exp(-seconds * 8.0f);
             glideFeetX += (shareX - glideFeetX) * glide;
@@ -445,8 +498,10 @@ public final class ImmersiveMode {
         float room = revealThroughBlocks ? wantedDepth : room(minecraft, player, feetX, feetY, feetZ,
                 restForward, restRight, restUp, layoutFeetX, layoutFeetY, 1.0f / pixelsPerBlock, wantedDepth);
         float targetDepth = Math.max(MIN_DEPTH, Math.min(wantedDepth, room));
+        // During a switch the place already eases: the depth keeps up with it
         restDepth = restDepth < 0.0f ? targetDepth
-                : restDepth + (targetDepth - restDepth) * (1.0f - (float) Math.exp(-seconds * 8.0f));
+                : restDepth + (targetDepth - restDepth)
+                        * (1.0f - (float) Math.exp(-seconds * (switchSeconds >= 0.0f ? 30.0f : 8.0f)));
         depth = restDepth;
         // Nearer than it wants to be, the camera widens its view to keep the player's size
         float restFov = (float) Math.min(MAX_FOV,
@@ -505,6 +560,8 @@ public final class ImmersiveMode {
                 .mul(basis(restRight, restUp, restForward));
         ImmersiveFrame next = new ImmersiveFrame(canvasWidth, canvasHeight, fov, depth, unitsPerPixel, rigToCamera,
                 current.panels(), tilt);
+        outgoingFrame = switchSeconds < 0.0f ? null : new ImmersiveFrame(canvasWidth, canvasHeight, fov, depth,
+                unitsPerPixel, rigToCamera, outgoingPanels, tilt);
         Screen screen = openScreen(Minecraft.getInstance());
         cursorPart = frame != null && frameScreen == screen ? next.partFrom(frame, cursorPart) : ImmersiveFrame.NONE;
         frame = next;
@@ -541,6 +598,13 @@ public final class ImmersiveMode {
         float eased = ease(progress);
         // The screen takes shape once the camera has turned towards it, and leaves with the camera
         float alpha = opening ? Mth.clamp((eased - 0.35f) / 0.5f, 0.0f, 1.0f) : eased * eased;
+        ImmersiveFrame leaving = outgoingFrame;
+        if (switchSeconds >= 0.0f && leaving != null) {
+            // The screen this one took the place of fades out under it while it fades in
+            ImmersiveSurface.drawOutgoing(leaving, alpha * outgoingShown * ImmersiveSwitch.leaving(switchSeconds),
+                    minecraft.getWindow().getGuiScaledWidth(), minecraft.getWindow().getGuiScaledHeight());
+            alpha *= ImmersiveSwitch.arriving(switchSeconds);
+        }
         ImmersiveSurface.draw(frame, alpha, minecraft.getWindow().getGuiScaledWidth(),
                 minecraft.getWindow().getGuiScaledHeight(), opening ? aboveX : 0.0f, opening ? aboveY : 0.0f);
     }

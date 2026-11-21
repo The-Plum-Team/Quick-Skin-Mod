@@ -135,6 +135,10 @@ import org.joml.Vector4f;
  *   From 26.1 that pass runs while the frame is extracted, before any of it is drawn.</li>
  * </ul>
  * Every supported version fills its family's block, and {@link #SUPPORTED} is true on all of them.
+ *
+ * <p>When one floating screen takes another's place, the last picture of the one that leaves is
+ * kept apart ({@link #holdOutgoing}) and drawn under the new one's while it fades out
+ * ({@link #drawOutgoing}).
  */
 public final class ImmersiveSurface {
     /** Whether the screen is being drawn into its own picture now. */
@@ -148,6 +152,8 @@ public final class ImmersiveSurface {
      * left only that screen in the picture and drew itself flat over it ({@link #parentDrawn}).
      */
     private static boolean parentApart;
+    /** Whether {@link #holdOutgoing} kept a picture of the screen that left. */
+    private static boolean outgoingCaptured;
 
     private ImmersiveSurface() {
     }
@@ -174,6 +180,31 @@ public final class ImmersiveSurface {
     private static TextureTarget above;
     /** Whether a dialog drew the picture under itself this frame ({@link #parentDrawn}), so the frame's later draw is skipped. */
     private static boolean drawnEarly;
+    /** The last picture of the screen the open one took the place of. */
+    @Nullable
+    private static TextureTarget outgoing;
+
+    /**
+     * Another floating screen takes the place of the one in the picture: that picture is kept to
+     * be drawn on its way out, and the new screen draws into the other target.
+     */
+    public static void holdOutgoing() {
+        TextureTarget spare = outgoing;
+        outgoing = target;
+        target = spare;
+        outgoingCaptured = captured;
+        captured = false;
+    }
+
+    /** Draws the picture {@link #holdOutgoing} kept where {@code frame} stands it, faded by {@code alpha}. */
+    public static void drawOutgoing(ImmersiveFrame frame, float alpha, float guiWidth, float guiHeight) {
+        // A dialog drew both pictures under itself already this frame (parentDrawn)
+        if (drawnEarly || outgoing == null || !outgoingCaptured || alpha <= 0.0f) return;
+        Minecraft.getInstance().renderBuffers().bufferSource().endBatch();
+        drawState();
+        drawMesh(outgoing, ImmersiveMesh.sheet(frame, guiWidth, guiHeight), alpha);
+        gameState();
+    }
 
     /** From here on the screen draws into its own picture. */
     public static void begin(GuiGraphics graphics) {
@@ -632,6 +663,15 @@ public final class ImmersiveSurface {
         submitMesh(ImmersiveMesh.sheet(frame, guiWidth, guiHeight), alpha);
     }
 
+    /**
+     * Hands the frame's GUI the mesh of the picture {@link #holdOutgoing} kept, faded by
+     * {@code alpha}: called before {@link #draw}, so it lies under the open screen's.
+     */
+    public static void drawOutgoing(ImmersiveFrame frame, float alpha, float guiWidth, float guiHeight) {
+        if (!SUPPORTED || !outgoingCaptured || alpha <= 0.0f) return;
+        submitOutgoing(ImmersiveMesh.sheet(frame, guiWidth, guiHeight), alpha);
+    }
+
     //? if <1.21.9 {
     // 1.21.6 to 1.21.8: TextureTarget(name, width, height, depth) with its filter set on the target,
     // buildVertices(VertexConsumer, float z), GuiRenderState.submitGuiElement
@@ -644,6 +684,22 @@ public final class ImmersiveSurface {
     /** Counts the frames, so the mesh goes into a frame's GUI once. */
     private static int frameNumber;
     private static int submittedFrame = -1;
+    /** The last picture of the screen the open one took the place of, and the frame its mesh last went into. */
+    @Nullable
+    private static TextureTarget outgoing;
+    private static int outgoingFrame = -1;
+
+    /**
+     * Another floating screen takes the place of the one in the picture: that picture is kept to
+     * be drawn on its way out, and the new screen is drawn into the other target.
+     */
+    public static void holdOutgoing() {
+        TextureTarget spare = outgoing;
+        outgoing = target;
+        target = spare;
+        outgoingCaptured = captured;
+        captured = false;
+    }
 
     /**
      * A frame starts: {@code state} is the GUI state its screens extract into, which the game
@@ -695,10 +751,19 @@ public final class ImmersiveSurface {
      * closes, when no screen is drawn.
      */
     private static void submitMesh(float[] vertices, float alpha) {
-        GuiRenderState state = frameState;
-        TextureTarget picture = target;
-        if (state == null || picture == null || vertices.length == 0 || submittedFrame == frameNumber) return;
+        if (frameState == null || target == null || vertices.length == 0 || submittedFrame == frameNumber) return;
         submittedFrame = frameNumber;
+        submit(frameState, target, vertices, alpha);
+    }
+
+    /** As {@link #submitMesh}, the picture of the screen on its way out. */
+    private static void submitOutgoing(float[] vertices, float alpha) {
+        if (frameState == null || outgoing == null || vertices.length == 0 || outgoingFrame == frameNumber) return;
+        outgoingFrame = frameNumber;
+        submit(frameState, outgoing, vertices, alpha);
+    }
+
+    private static void submit(GuiRenderState state, TextureTarget picture, float[] vertices, float alpha) {
         int shade = Math.round(Math.max(0.0f, Math.min(1.0f, alpha)) * 255.0f);
         // The picture's colours are already multiplied by its alpha, and so is the tint
         int colour = shade << 24 | shade << 16 | shade << 8 | shade;
@@ -742,6 +807,22 @@ public final class ImmersiveSurface {
     /** Counts the frames, so the mesh goes into a frame's GUI once: the screen hook or, while closing, the toasts hook. */
     private static int frames;
     private static int submittedIn = -1;
+    /** The last picture of the screen the open one took the place of, and the frame its mesh last went into. */
+    @Nullable
+    private static TextureTarget outgoing;
+    private static int outgoingIn = -1;
+
+    /**
+     * Another floating screen takes the place of the one in the picture: that picture is kept to
+     * be drawn on its way out, and the new screen is drawn into the other target.
+     */
+    public static void holdOutgoing() {
+        TextureTarget spare = outgoing;
+        outgoing = picture;
+        picture = spare;
+        outgoingCaptured = captured;
+        captured = false;
+    }
 
     /** A frame starts, whose GUI is extracted into {@code gui}. */
     public static void newFrame(GuiRenderState gui) {
@@ -791,10 +872,19 @@ public final class ImmersiveSurface {
     }
 
     private static void submitMesh(float[] vertices, float alpha) {
-        GuiRenderState gui = frameGui;
-        TextureTarget shown = picture;
-        if (gui == null || shown == null || submittedIn == frames) return;
+        if (frameGui == null || picture == null || submittedIn == frames) return;
         submittedIn = frames;
+        submit(frameGui, picture, vertices, alpha);
+    }
+
+    /** As {@link #submitMesh}, the picture of the screen on its way out. */
+    private static void submitOutgoing(float[] vertices, float alpha) {
+        if (frameGui == null || outgoing == null || outgoingIn == frames) return;
+        outgoingIn = frames;
+        submit(frameGui, outgoing, vertices, alpha);
+    }
+
+    private static void submit(GuiRenderState gui, TextureTarget shown, float[] vertices, float alpha) {
         int a = Math.round(Math.max(0.0f, Math.min(1.0f, alpha)) * 255.0f);
         //? if <1.21.11 {
         TextureSetup texture = TextureSetup.singleTexture(shown.getColorTextureView());
@@ -841,6 +931,22 @@ public final class ImmersiveSurface {
     private static TextureTarget picture;
     /** Whether the mesh went into this frame's GUI already: the screen's hook and the toasts' both hand it. */
     private static boolean submitted;
+    /** The last picture of the screen the open one took the place of, and whether its mesh went into this frame's GUI. */
+    @Nullable
+    private static TextureTarget outgoing;
+    private static boolean outgoingSubmitted;
+
+    /**
+     * Another floating screen takes the place of the one in the picture: that picture is kept to
+     * be drawn on its way out, and the new screen is drawn into the other target.
+     */
+    public static void holdOutgoing() {
+        TextureTarget spare = outgoing;
+        outgoing = picture;
+        picture = spare;
+        outgoingCaptured = captured;
+        captured = false;
+    }
 
     /**
      * A frame's GUI is being extracted afresh ({@code GameRenderer.extractGui} to 26.1.2,
@@ -850,9 +956,17 @@ public final class ImmersiveSurface {
      */
     public static void newFrame() {
         submitted = false;
-        if (picture != null && !ImmersiveMode.running()) {
-            picture.destroyBuffers();
-            picture = null;
+        outgoingSubmitted = false;
+        if (!ImmersiveMode.running()) {
+            if (picture != null) {
+                picture.destroyBuffers();
+                picture = null;
+            }
+            if (outgoing != null) {
+                outgoing.destroyBuffers();
+                outgoing = null;
+                outgoingCaptured = false;
+            }
         }
     }
 
@@ -900,9 +1014,19 @@ public final class ImmersiveSurface {
     }
 
     private static void submitMesh(float[] vertices, float alpha) {
-        TextureTarget source = picture;
-        if (submitted || source == null || source.getColorTextureView() == null) return;
+        if (submitted || picture == null || picture.getColorTextureView() == null) return;
         submitted = true;
+        submit(picture, vertices, alpha);
+    }
+
+    /** As {@link #submitMesh}, the picture of the screen on its way out. */
+    private static void submitOutgoing(float[] vertices, float alpha) {
+        if (outgoingSubmitted || outgoing == null || outgoing.getColorTextureView() == null) return;
+        outgoingSubmitted = true;
+        submit(outgoing, vertices, alpha);
+    }
+
+    private static void submit(TextureTarget source, float[] vertices, float alpha) {
         Minecraft minecraft = Minecraft.getInstance();
         int a = Math.round(Math.max(0.0f, Math.min(1.0f, alpha)) * 255.0f);
         // The picture's colours are already multiplied by its alpha, and so is the tint
