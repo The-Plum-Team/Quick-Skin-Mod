@@ -4,6 +4,8 @@ package com.quickskin.mod.client.gui.effect;
 import com.mojang.blaze3d.systems.RenderSystem;
 //?}
 import com.quickskin.mod.client.gui.GuiCompat;
+import com.quickskin.mod.client.immersive.ImmersiveScreen;
+import com.quickskin.mod.client.immersive.ImmersiveSurface;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -65,7 +67,11 @@ public class BlurHandler {
         blur(graphics);
     }
 
-    /** Draws a dialog's parent screen without the parent's own background blur. */
+    /**
+     * Draws a dialog's parent screen without the parent's own background blur. In the immersive
+     * view a parent that floats round the player is left alone in the floating picture, with its
+     * panels where they swing, and the dialog is drawn flat over it.
+     */
     //? if <26.1 {
     public static void renderParent(Screen parent, GuiGraphics graphics, float partialTick) {
     //?} else {
@@ -80,6 +86,9 @@ public class BlurHandler {
             //?}
         } finally {
             parentDepth--;
+        }
+        if (parent instanceof ImmersiveScreen immersive && immersive.immersiveLayout() != null) {
+            ImmersiveSurface.parentDrawn(graphics);
         }
     }
 

@@ -222,6 +222,8 @@ public class PlayerWidget extends AbstractWidget {
     private Integer customCenterY = null;
     // Largest scale the host's layout leaves room for; null leaves the configured size alone
     private Float scaleCap = null;
+    // The scale the host's layout gives the model, whatever size is configured; null follows it
+    private Float layoutScale = null;
     private boolean leftOut;
 
 //? if <1.21 {
@@ -399,10 +401,28 @@ public class PlayerWidget extends AbstractWidget {
         this.scaleCap = maxScale;
     }
 
-    /** The scale the model is drawn at: the configured size, capped by {@link #setScaleCap}. */
+    /**
+     * Gives the model the scale its host's layout works out, whatever size is configured: for a
+     * host that stands the model in a room of its own, which the configured size of another
+     * screen's model would leave half empty or overflow.
+     */
+    public void setLayoutScale(float scale) {
+        this.layoutScale = scale;
+    }
+
+    /**
+     * The scale the model is drawn at: the one {@link #setLayoutScale} gave, or else the
+     * configured size, capped by {@link #setScaleCap}.
+     */
     public float getEffectiveScale() {
-        float configured = PreviewLayoutBox.scaleForPercentage(
-                getSliderPercentageFromConfig(com.quickskin.mod.config.ClientConfig.getInstance()));
+        return effectiveScale(com.quickskin.mod.config.ClientConfig.getInstance());
+    }
+
+    private float effectiveScale(com.quickskin.mod.config.ClientConfig config) {
+        if (layoutScale != null) {
+            return layoutScale;
+        }
+        float configured = PreviewLayoutBox.scaleForPercentage(getSliderPercentageFromConfig(config));
         return scaleCap != null ? Math.min(configured, scaleCap) : configured;
     }
 
@@ -486,10 +506,7 @@ public class PlayerWidget extends AbstractWidget {
      */
     private void syncNaturalBounds() {
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
-        float scaleForConfig = PreviewLayoutBox.scaleForPercentage(getSliderPercentageFromConfig(config));
-        if (scaleCap != null) {
-            scaleForConfig = Math.min(scaleForConfig, scaleCap);
-        }
+        float scaleForConfig = effectiveScale(config);
         PreviewLayoutBox.Box box = PreviewLayoutBox.natural(
                 layoutAnchorX + getPositionOffsetXFromConfig(config),
                 layoutAnchorFeetY + getPositionOffsetYFromConfig(config),
@@ -725,15 +742,7 @@ public class PlayerWidget extends AbstractWidget {
         if (leftOut) {
             return;
         }
-        // Load and apply scale from config
-        com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
-        int savedPercentage = getSliderPercentageFromConfig(config);
-
-        // Convert percentage (1-100%) to scale value
-        scale = PreviewLayoutBox.scaleForPercentage(savedPercentage);
-        if (scaleCap != null) {
-            scale = Math.min(scale, scaleCap);
-        }
+        scale = effectiveScale(com.quickskin.mod.config.ClientConfig.getInstance());
 
         // Ensure cape animation is registered before rendering
         if (previewData.getCapeId() != null && previewData.getCapeLocation() != null) {

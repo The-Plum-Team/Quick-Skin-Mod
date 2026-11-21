@@ -1,10 +1,12 @@
 package com.quickskin.mod.client.immersive.compat;
 
-//? if >=1.21.6 {
+import com.quickskin.mod.client.immersive.ImmersiveMode;
 import com.quickskin.mod.client.immersive.ImmersiveOpening;
 import com.quickskin.mod.client.immersive.ImmersiveShaderPacks;
-import com.quickskin.mod.client.immersive.ModernAperture;
 import com.quickskin.mod.client.immersive.ModernApertureShader;
+//? if >=1.21.6 {
+import com.quickskin.mod.client.immersive.ModernAperture;
+//?}
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL20C;
@@ -14,21 +16,43 @@ import org.lwjgl.system.MemoryStack;
 import java.nio.ByteBuffer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-//?}
 
 /** The terrain shaders that Sodium and Iris compile and bind themselves on OpenGL. */
 public final class ChunkApertureGl {
-    //? if >=1.21.6 {
     // Preserve comments (including examples of main) and preprocessor branches in pack sources.
     private static final Pattern MAIN = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\n]*|\\bvoid\\s+(main)\\s*\\(\\s*(?:void\\s*)?\\)\\s*\\{");
+    private static ImmersiveOpening legacyOpening;
+    private static float legacyWidth, legacyHeight, legacyBreath;
     private int aperture, fromClip, world, viewport, clipControl;
     private boolean inspected;
     private ImmersiveOpening uploaded;
+
+    /**
+     * The Sodium terrain shaders that carry the opening. From 1.21.6 Sodium's own program discards
+     * it too. Earlier versions open the vanilla and plain-Sodium view with a second world pass and
+     * wrap only the shader pack's G-buffer programs.
+     */
+    public static boolean wrapsSodium(String name) {
+        //? if >=1.21.6 {
+        return sodiumTerrain(name);
+        //?} else {
+        return name.startsWith("iris:") && (sodiumTerrain(name) || legacyPackTerrain(name));
+        //?}
+    }
 
     public static boolean sodiumTerrain(String name) {
         return name.equals("sodium:blocks/block_layer_opaque.fsh")
                 || name.equals("iris:sodium-shader-terrain") || name.equals("iris:sodium-shader-terrain_cutout")
                 || name.equals("iris:sodium-shader-translucent");
+    }
+
+    /**
+     * Before 1.21.6 Iris and Oculus name each Sodium/Embeddium shader after its terrain pass
+     * ({@code iris:sodium-terrain-gbuffer_solid.fsh}, {@code ..._cutout}, {@code ..._translucent}).
+     * The shadow-map passes keep every block.
+     */
+    public static boolean legacyPackTerrain(String name) {
+        return name.startsWith("iris:sodium-") && name.contains("gbuffer") && !name.contains("shadow");
     }
 
     // Iris retains the ShaderKey name when a pack falls back to a different program. Its
@@ -41,6 +65,34 @@ public final class ChunkApertureGl {
                     "text_be", "text_intensity_be" -> true;
             default -> false;
         };
+    }
+
+    /**
+     * Legacy renderers find the opening in their own world-render events. With a shader pack the
+     * pack's terrain programs then discard the circle themselves, like the 1.21.6+ path, instead
+     * of the whole world being drawn a second time through the pack.
+     */
+    public static void useLegacyOpening(ImmersiveOpening opening, int width, int height) {
+        legacyOpening = opening;
+        legacyWidth = width;
+        legacyHeight = height;
+        legacyBreath = (float)Math.sin((System.nanoTime() % 6_000_000_000L) * (2.0 * Math.PI / 6_000_000_000L));
+    }
+
+    public static boolean hasLegacyOpening() {
+        return currentLegacy() != null;
+    }
+
+    private static ImmersiveOpening currentLegacy() {
+        return ImmersiveMode.posesPlayer() && ImmersiveShaderPacks.active() ? legacyOpening : null;
+    }
+
+    private static ImmersiveOpening current() {
+        //? if >=1.21.6 {
+        ImmersiveOpening modern = ModernAperture.opening();
+        if (modern != null) return modern;
+        //?}
+        return currentLegacy();
     }
 
     public static String wrap(String source) {
@@ -88,7 +140,7 @@ public final class ChunkApertureGl {
             inspected = true;
         }
         if (aperture < 0) return;
-        ImmersiveOpening opening = ModernAperture.opening();
+        ImmersiveOpening opening = current();
         if (opening != null && ImmersiveShaderPacks.shadows()) opening = null;
         if (opening == uploaded) return;
         uploaded = opening;
@@ -98,7 +150,12 @@ public final class ChunkApertureGl {
         }
         try (MemoryStack stack = MemoryStack.stackPush()) {
             ByteBuffer data = stack.malloc(96);
-            ModernAperture.fillUniforms(data);
+            //? if >=1.21.6 {
+            if (opening != legacyOpening) ModernAperture.fillUniforms(data);
+            else fillLegacy(data, opening);
+            //?} else {
+            fillLegacy(data, opening);
+            //?}
             GL20C.glUniformMatrix4fv(fromClip, false, data.asFloatBuffer().limit(16));
             GL20C.glUniform4f(aperture, data.getFloat(64), data.getFloat(68), data.getFloat(72), data.getFloat(76));
             GL20C.glUniform4f(world, data.getFloat(80), data.getFloat(84), data.getFloat(88), data.getFloat(92));
@@ -112,5 +169,11 @@ public final class ChunkApertureGl {
             GL20C.glUniform2f(clipControl, topLeft ? -1 : 1, zeroToOne ? 1 : 0);
         }
     }
-    //?}
+
+    // Same layout as ModernAperture.fillUniforms.
+    private static void fillLegacy(ByteBuffer data, ImmersiveOpening opening) {
+        opening.fromClip().get(0, data);
+        data.putFloat(64, opening.x()).putFloat(68, opening.y()).putFloat(72, opening.radius()).putFloat(76, opening.distance());
+        data.putFloat(80, legacyWidth).putFloat(84, legacyHeight).putFloat(88, opening.floor()).putFloat(92, legacyBreath);
+    }
 }

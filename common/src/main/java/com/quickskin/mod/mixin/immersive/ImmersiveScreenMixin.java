@@ -177,7 +177,7 @@ public abstract class ImmersiveScreenMixin {
                                                    CallbackInfo callback) {
         quickskin$drawsPicture = ImmersiveMode.captures((Screen) (Object) this);
         if (quickskin$drawsPicture) {
-            ImmersiveSurface.begin();
+            ImmersiveSurface.begin(() -> quickskin$drawGuiIntoPicture());
         }
     }
 
@@ -197,18 +197,7 @@ public abstract class ImmersiveScreenMixin {
         if (!quickskin$drawsPicture || !ImmersiveSurface.capturing()) {
             return;
         }
-        Minecraft minecraft = Minecraft.getInstance();
-        ImmersiveSurface.drawScreenPass(() -> {
-            ImmersiveGameRendererAccessor renderer = (ImmersiveGameRendererAccessor) minecraft.gameRenderer;
-            ImmersiveTargetAccessor targets = (ImmersiveTargetAccessor) minecraft;
-            RenderTarget main = minecraft.getMainRenderTarget();
-            targets.quickskin$setMainRenderTarget(ImmersiveSurface.picture());
-            try {
-                renderer.quickskin$guiRenderer().render(renderer.quickskin$fogRenderer().getBuffer(FogRenderer.FogMode.NONE));
-            } finally {
-                targets.quickskin$setMainRenderTarget(main);
-            }
-        });
+        ImmersiveSurface.drawScreenPass(() -> quickskin$drawGuiIntoPicture());
         ImmersiveMode.drawOverlay();
         graphics.pose().pushMatrix();
         graphics.pose().translate(ImmersiveMode.aboveX(), ImmersiveMode.aboveY());
@@ -229,6 +218,25 @@ public abstract class ImmersiveScreenMixin {
             ImmersiveSurface.end();
         }
     }
+
+    /**
+     * Runs the game's GUI pass with the floating picture as the target it draws into: what was
+     * extracted so far, the screen alone with the HUD hidden, or a dialog's floating parent alone
+     * ({@code ImmersiveSurface.parentDrawn}).
+     */
+    @Unique
+    private static void quickskin$drawGuiIntoPicture() {
+        Minecraft minecraft = Minecraft.getInstance();
+        ImmersiveGameRendererAccessor renderer = (ImmersiveGameRendererAccessor) minecraft.gameRenderer;
+        ImmersiveTargetAccessor targets = (ImmersiveTargetAccessor) minecraft;
+        RenderTarget main = minecraft.getMainRenderTarget();
+        targets.quickskin$setMainRenderTarget(ImmersiveSurface.picture());
+        try {
+            renderer.quickskin$guiRenderer().render(renderer.quickskin$fogRenderer().getBuffer(FogRenderer.FogMode.NONE));
+        } finally {
+            targets.quickskin$setMainRenderTarget(main);
+        }
+    }
 //?} else if <26.1 {
     /** Whether the GUI's pose was moved for what the screen draws above itself, to be put back at the end. */
     @Unique
@@ -238,7 +246,7 @@ public abstract class ImmersiveScreenMixin {
     private void quickskin$drawIntoFloatingPicture(GuiGraphics graphics, int mouseX, int mouseY, float partialTick,
                                                    CallbackInfo callback) {
         if (ImmersiveMode.captures((Screen) (Object) this)) {
-            ImmersiveSurface.begin();
+            ImmersiveSurface.begin(() -> quickskin$drawGuiIntoPicture());
         }
     }
 
@@ -254,17 +262,7 @@ public abstract class ImmersiveScreenMixin {
         }
         // Everything extracted so far, the screen alone with the HUD hidden, is drawn into the
         // picture by the game's own GUI pass, which empties the frame's GUI for the rest
-        Minecraft minecraft = Minecraft.getInstance();
-        ImmersiveSurface.drawScreenPass(() -> {
-            ImmersiveGameRendererAccessor renderer = (ImmersiveGameRendererAccessor) minecraft.gameRenderer;
-            RenderTarget main = minecraft.getMainRenderTarget();
-            ((ImmersiveTargetAccessor) minecraft).quickskin$setMainRenderTarget(ImmersiveSurface.picture());
-            try {
-                renderer.quickskin$guiRenderer().render(renderer.quickskin$fogRenderer().getBuffer(FogRenderer.FogMode.NONE));
-            } finally {
-                ((ImmersiveTargetAccessor) minecraft).quickskin$setMainRenderTarget(main);
-            }
-        });
+        ImmersiveSurface.drawScreenPass(() -> quickskin$drawGuiIntoPicture());
         ImmersiveSurface.end();
         // The picture floats in the emptied GUI; the tooltip and whatever the screen held back
         // follow above it, moved from where the mouse points to where the mouse is
@@ -284,6 +282,24 @@ public abstract class ImmersiveScreenMixin {
         }
         ImmersiveSurface.end();
     }
+
+    /**
+     * Runs the game's GUI pass with the floating picture as the target it draws into: what was
+     * extracted so far, the screen alone with the HUD hidden, or a dialog's floating parent alone
+     * ({@code ImmersiveSurface.parentDrawn}).
+     */
+    @Unique
+    private static void quickskin$drawGuiIntoPicture() {
+        Minecraft minecraft = Minecraft.getInstance();
+        ImmersiveGameRendererAccessor renderer = (ImmersiveGameRendererAccessor) minecraft.gameRenderer;
+        RenderTarget main = minecraft.getMainRenderTarget();
+        ((ImmersiveTargetAccessor) minecraft).quickskin$setMainRenderTarget(ImmersiveSurface.picture());
+        try {
+            renderer.quickskin$guiRenderer().render(renderer.quickskin$fogRenderer().getBuffer(FogRenderer.FogMode.NONE));
+        } finally {
+            ((ImmersiveTargetAccessor) minecraft).quickskin$setMainRenderTarget(main);
+        }
+    }
 //?} else {
     /** Whether this screen's extraction moved what it draws above itself to the real mouse. */
     @Unique
@@ -293,7 +309,7 @@ public abstract class ImmersiveScreenMixin {
     private void quickskin$drawIntoFloatingPicture(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a,
                                                    CallbackInfo callback) {
         if (ImmersiveMode.captures((Screen) (Object) this)) {
-            ImmersiveSurface.begin();
+            ImmersiveSurface.begin(() -> quickskin$drawGuiIntoPicture());
         }
     }
 
