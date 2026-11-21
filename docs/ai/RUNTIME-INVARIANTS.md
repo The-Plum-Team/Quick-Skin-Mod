@@ -597,9 +597,13 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   skin menu's pose (riding, crouching, a CPM look; never lying, gliding, swimming or spinning,
   whose model is not upright), and the view glides the player's place and size from one screen to
   the next, so the skin menu, the cape menu and the editor never run the camera's opening or
-  closing again between them. The editor gives the player the room between its canvas and its
-  right panel, which swing away. The flat screens, and every screen outside a world, are
-  unchanged.
+  closing again between them. While it glides (0.65 s, `ImmersiveSwitch`) the screen that leaves
+  fades out and the next fades in over it. A dialog over a floating screen is no such change:
+  only the screen behind it stays in the floating picture, tilted as it was, and the dialog draws
+  flat over it (`ImmersiveSurface.parentDrawn`, `ImmersiveMode.dialogApart`). The editor gives the
+  player the room between its canvas and its right panel, which swing away: a fifth of the
+  screen's width, which the player fills whatever size the cape menu's model has
+  (`CapeEditorRoom`). The flat screens, and every screen outside a world, are unchanged.
 - A held mouse button in the immersive view stays on the panel it started on, even outside its
   edges and when opening or closing a context menu moves the panel to a different list index.
   If the panel disappears or the screen changes, the cursor picks a surface again on release.
