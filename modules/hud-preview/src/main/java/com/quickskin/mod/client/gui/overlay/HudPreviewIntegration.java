@@ -80,14 +80,14 @@ public final class HudPreviewIntegration {
         });
 
         // Use PRE event for scrolling so we can interrupt it
-        //? if <1.21 {
+        //? if <1.20.2 {
         ClientScreenInputEvent.MOUSE_SCROLLED_PRE.register((client, screen, mouseX, mouseY, amount) -> {
         //?} else {
         ClientScreenInputEvent.MOUSE_SCROLLED_PRE.register((client, screen, mouseX, mouseY, amountX, amountY) -> {
         //?}
             // Forward scroll events to the HUD overlay if the cursor is visible
             if (!client.mouseHandler.isMouseGrabbed()) {
-                //? if <1.21 {
+                //? if <1.20.2 {
                 return SkinPreviewOverlay.onMouseScrolled(mouseX, mouseY, amount);
                 //?} else {
                 return SkinPreviewOverlay.onMouseScrolled(mouseX, mouseY, amountY);

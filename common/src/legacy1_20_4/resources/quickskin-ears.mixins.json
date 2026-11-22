@@ -1,0 +1,35 @@
+{
+  "required": false,
+  "package": "com.quickskin.mod.mixin.compat",
+  "compatibilityLevel": "JAVA_17",
+  "minVersion": "0.8",
+  "plugin": "com.quickskin.mod.mixin.compat.EarsMixinPlugin",
+  "client": [
+    "EtfPlayerTextureMixin",
+    "SodiumPlayerLightMixin",
+    "SodiumTerrainShaderMixin",
+    "SodiumTerrainProgramMixin",
+    "SodiumTerrainPassMixin",
+    "IrisTerrainShaderMixin",
+    "IrisTerrainProgramMixin",
+    "LegacyIrisTerrainShaderMixin",
+    "LegacyIrisTerrainProgramMixin",
+    "LegacySodiumTerrainShaderMixin",
+    "LegacySodiumTerrainProgramMixin",
+    "EarsLayerRendererMixin",
+    "EarsModMixin",
+    "EarsFiveMixin",
+    "EarsFiveBuzzMixin",
+    "CpmModelDefinitionLoaderMixin",
+    "TaczPreviewAnimationMixin",
+    "CosmeticArmorRenderMixin",
+    "CpmRenderDepthMixin",
+    "CpmSubmitCollectorMixin",
+    "RealCameraTextureIdMixin",
+    "JourneyMapIgnSkinMixin",
+    "JourneyMapTextureCacheMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

@@ -1,6 +1,6 @@
 package com.quickskin.mod.networking.payloads;
 
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.ImmersivePose;
 import com.quickskin.mod.networking.ImmersivePoseCodec;
 import com.quickskin.mod.platform.QuickSkinInfo;
@@ -23,7 +23,9 @@ import java.util.UUID;
  */
 public record ImmersivePosePayload(UUID playerId, int sequence, ImmersivePose pose) implements CustomPacketPayload {
     public static final Type<ImmersivePosePayload> TYPE = new Type<>(
-            //? if <1.21.11 {
+            //? if <1.21 {
+            new ResourceLocation(QuickSkinInfo.MOD_ID, "immersive_pose")
+            //?} else if <1.21.11 {
             ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "immersive_pose")
             //?} else {
             Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "immersive_pose")

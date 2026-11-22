@@ -1,6 +1,6 @@
 package com.quickskin.mod.client.rendering;
 
-//? if <1.21 {
+//? if <1.20.2 {
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
@@ -210,7 +210,7 @@ public final class WorldArmor {
     private static boolean failed;
     /** The player's model space to the camera's, as the model was drawn. */
     private static final Matrix4f MODEL_TO_CAMERA = new Matrix4f();
-//? if <1.21 {
+//? if <1.20.2 {
     /** Copies of the player's model as it was posed, one per model type, the outlines are traced from. */
     @Nullable
     private static PlayerModel<?> classicCopy;
@@ -344,7 +344,7 @@ public final class WorldArmor {
         drops = List.of();
         dropsSession = -1;
         placedSession = -1;
-//? if <1.21 {
+//? if <1.20.2 {
         placedCopy = null;
         armourBefore = null;
         armourOf = null;
@@ -387,7 +387,7 @@ public final class WorldArmor {
      * that reach, or where the search starts inside a block (a wall).
      */
     public static float groundAt(float x, float z) {
-//? if <1.21 {
+//? if <1.20.2 {
         Minecraft minecraft = Minecraft.getInstance();
         if (failed || placedCopy == null || minecraft.level == null) {
             return 0.0f;
@@ -499,7 +499,7 @@ public final class WorldArmor {
      */
     @Nullable
     public static float[] wornPoint(int piece) {
-//? if <1.21 {
+//? if <1.20.2 {
         PlayerModel<?> model = placedCopy;
         if (model == null) {
             return null;
@@ -563,7 +563,7 @@ public final class WorldArmor {
 //?}
     }
 
-//? if <1.21 {
+//? if <1.20.2 {
     /** A point of a model part, in its own pixels, in the camera's space. */
     private static Vector3f onPart(ModelPart part, float x, float y, float z) {
         PoseStack poseStack = new PoseStack();

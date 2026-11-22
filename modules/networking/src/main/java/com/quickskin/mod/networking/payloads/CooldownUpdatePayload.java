@@ -1,4 +1,4 @@
-//? if >=1.21 {
+//? if >=1.20.5 {
 package com.quickskin.mod.networking.payloads;
 
 import com.quickskin.mod.platform.QuickSkinInfo;
@@ -18,7 +18,9 @@ import net.minecraft.resources.Identifier;
 public record CooldownUpdatePayload(long cooldownEndTime) implements CustomPacketPayload {
 
     public static final Type<CooldownUpdatePayload> TYPE = new Type<>(
-        //? if <1.21.11 {
+        //? if <1.21 {
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "cooldown_update")
+        //?} else if <1.21.11 {
         ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "cooldown_update")
         //?} else {
         Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "cooldown_update")

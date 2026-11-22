@@ -17,7 +17,7 @@ import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.client.gui.util.CapeEditorSources;
 import com.quickskin.mod.client.gui.util.CapeImportProcessor;
 import com.quickskin.mod.client.gui.util.CapeImportWorkflow;
-//? if <1.21 {
+//? if <1.20.2 {
 import com.quickskin.mod.client.gui.GuiCompat;
 //?} else if <26.1 {
 //?} else {
@@ -33,7 +33,7 @@ import com.quickskin.mod.client.concurrent.ClientIoExecutor;
 import com.quickskin.mod.client.services.LocalAssetFolderWatch;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
-//? if <1.21 {
+//? if <1.20.2 {
 //?} else if <1.21.11 {
 //?} else if <26.1 {
 import com.quickskin.mod.client.gui.GuiCompat;
@@ -515,7 +515,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
         // Second priority: Use current player skin (when in-game)
         if (skinLocation == null && player != null) {
-//? if <1.21 {
+//? if <1.20.2 {
             skinLocation = player.getSkinTextureLocation();
 //?} else if <1.21.9 {
             skinLocation = player.getSkin().texture();
@@ -535,7 +535,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                     modelType = metadata.skinModel();
                 } else {
                     // Fallback: detect from the vanilla player's model
-//? if <1.21 {
+//? if <1.20.2 {
                     modelType = player.getModelName(); // "default" or "slim"
                     // Convert Minecraft model names to our format
                     if ("default".equals(modelType)) {
@@ -553,7 +553,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                 }
             } else {
                 // No custom skin active, use the player's own model
-//? if <1.21 {
+//? if <1.20.2 {
                 modelType = player.getModelName(); // "default" or "slim"
                 // Convert Minecraft model names to our format
                 if ("default".equals(modelType)) {
@@ -961,7 +961,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         }
         java.util.UUID target = null;
         if (minecraft != null && minecraft.player != null) {
-//? if <1.21 {
+//? if <1.20.2 {
             target = com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
 //?} else {
             target = minecraft.player.getUUID();
@@ -1340,7 +1340,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         // Note: We use applyCape with empty string instead of removeCape
         // to avoid unregistering animations while the menu is open
         if (minecraft != null && minecraft.player != null) {
-//? if <1.21 {
+//? if <1.20.2 {
             // Use ReplayModHelper to get the correct player UUID (handles replay mode)
             java.util.UUID targetUUID = com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
             if (targetUUID != null) {
@@ -1528,7 +1528,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         this.renderBackgroundEffects(graphics, partialTick);
         dressPlayerInWorld(com.quickskin.mod.client.immersive.ImmersiveMode.active());
 
-//? if <1.21 {
+//? if <1.20.2 {
 //?} else if <1.21.6 {
         // Flush and ensure clean render state
         graphics.flush();
@@ -1540,7 +1540,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 //?} else {
 //?}
 
-//? if <1.21 {
+//? if <1.20.2 {
 //?} else if <1.21.6 {
         super.render(graphics, mouseX, mouseY, partialTick);
 
@@ -1577,7 +1577,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         }
 
         this.renderScrollbar(graphics);
-//? if <1.21 {
+//? if <1.20.2 {
         super.render(graphics, mouseX, mouseY, partialTick);
 //?} else if <1.21.6 {
 
@@ -1627,7 +1627,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                         actionTooltip = Component.translatable("quickskin.tooltip.edit_cape");
                     }
                     if (actionTooltip != null) {
-//? if <1.21 {
+//? if <1.20.2 {
                         GuiCompat.tooltip(
                                 graphics, this.font, actionTooltip,
                                 mouseX, mouseY);
@@ -1648,7 +1648,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
                     }
                 }
                 if (actionTooltip == null) {
-//? if <1.21 {
+//? if <1.20.2 {
                     GuiCompat.tooltip(graphics, this.font, getCapeTooltip(hoveredCape), mouseX, mouseY);
 //?} else if <1.21.6 {
                     graphics.renderTooltip(this.font, getCapeTooltip(hoveredCape), Optional.empty(), mouseX, mouseY);
@@ -1992,7 +1992,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
 //?}
-//? if <1.21 {
+//? if <1.20.2 {
         GuiCompat.blit(graphics, texture,
                 0, 0, 10, 16, u, v, uWidth, vHeight, textureWidth, textureHeight);
 //?} else if <1.21.11 {
@@ -2078,7 +2078,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         RenderSystem.defaultBlendFunc();
 //?}
         // The left wing reads its face backwards (a negative width), the right one as it is
-//? if <1.21 {
+//? if <1.20.2 {
         GuiCompat.blit(graphics, texture, 0, 0, 10, 20, u + uWidth, v, -uWidth, vHeight, textureWidth, textureHeight);
         GuiCompat.blit(graphics, texture, 11, 0, 10, 20, u, v, uWidth, vHeight, textureWidth, textureHeight);
 //?} else if <1.21.11 {
@@ -2334,7 +2334,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     @Nullable
     private java.util.UUID localPlayerTarget() {
         if (minecraft != null && minecraft.player != null) {
-//? if <1.21 {
+//? if <1.20.2 {
             return com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
 //?} else {
             return minecraft.player.getUUID();
@@ -2412,7 +2412,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
 
         // Apply to PlayerAppearanceService
         if (minecraft != null && minecraft.player != null) {
-//? if <1.21 {
+//? if <1.20.2 {
             // Use ReplayModHelper to get the correct player UUID (handles replay mode)
             java.util.UUID targetUUID = com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
             if (targetUUID != null) {
@@ -2518,7 +2518,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     @Override
-//? if <1.21 {
+//? if <1.20.2 {
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
 //?} else {
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
@@ -2526,7 +2526,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
         this.contextMenu.close();
         // The wheel scrolls the list wherever the mouse is, unless something under it, such as the
         // player preview's zoom, takes the notch
-//? if <1.21 {
+//? if <1.20.2 {
         if (!isMouseOverGrid((int) mouseX, (int) mouseY) && super.mouseScrolled(mouseX, mouseY, delta)) {
             return true;
         }
@@ -2719,7 +2719,14 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     public boolean isPauseScreen() {
         // Don't pause game when this screen is open
         return false;
-//? if <1.21 {
+//? if <1.20.2 {
+//?} else if <1.20.5 {
+    }
+
+    // From 1.20.2 the screen draws this itself before its widgets; the blur came with 1.20.5
+    @Override
+    public void renderBackground(net.minecraft.client.gui.GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // Disable the default dark background overlay - we render our own custom background
 //?} else if <1.21.6 {
     }
 

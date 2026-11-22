@@ -38,7 +38,7 @@ public final class GameProfileTextures {
         if (values.size() != 1) return null;
         Property property = values.iterator().next();
         try {
-            //? if <1.21 {
+            //? if <1.20.2 {
             return new SignedTextures(property.getValue(), property.getSignature());
             //?} else {
             return new SignedTextures(property.value(), property.signature());

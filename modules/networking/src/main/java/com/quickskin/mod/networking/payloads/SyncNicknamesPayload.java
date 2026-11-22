@@ -1,6 +1,6 @@
 package com.quickskin.mod.networking.payloads;
 
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.NicknameEntry;
 import com.quickskin.mod.networking.TextureTransferLimits;
 import com.quickskin.mod.platform.QuickSkinInfo;
@@ -25,7 +25,9 @@ import java.util.List;
  */
 public record SyncNicknamesPayload(List<NicknameEntry> entries) implements CustomPacketPayload {
     public static final Type<SyncNicknamesPayload> TYPE = new Type<>(
-            //? if <1.21.11 {
+            //? if <1.21 {
+            new ResourceLocation(QuickSkinInfo.MOD_ID, "sync_nicknames")
+            //?} else if <1.21.11 {
             ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "sync_nicknames")
             //?} else {
             Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "sync_nicknames")

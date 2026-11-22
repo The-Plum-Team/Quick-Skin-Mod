@@ -7,7 +7,7 @@ import com.quickskin.mod.config.ServerConfig;
 import com.quickskin.mod.networking.protocol.ProtocolCapability;
 import com.quickskin.mod.networking.protocol.ProtocolProfile;
 import com.quickskin.mod.networking.protocol.ProtocolSessions;
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.payloads.ArmorVisibilityPayload;
 //?}
 import net.fabricmc.api.EnvType;
@@ -108,7 +108,7 @@ public final class HiddenArmorSyncService {
 
     private void send(int hidden) {
         if (playerId == null) return;
-        //? if <1.21 {
+        //? if <1.20.5 {
         NetworkTransport.INSTANCE.sendArmorVisibilityToServer(playerId, hidden);
         //?} else {
         if (!NetworkTransport.INSTANCE.canServerReceive(ArmorVisibilityPayload.TYPE)) return;

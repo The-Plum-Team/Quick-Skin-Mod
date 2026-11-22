@@ -136,7 +136,8 @@ class VisualReviewTargetsTest(unittest.TestCase):
         self.assertEqual([f"mc{self.matrix['unit_test_version']}"],
                          [row["bundle_key"] for row in rows if row["review_mode"] == "anchor-semantic"])
         for row in rows:
-            self.assertEqual(2, len(row["artifact_inventory"]))
+            lanes = sum(artifact["artifact_version"] == row["minecraft_target"] for artifact in self.matrix["artifacts"])
+            self.assertEqual(lanes, len(row["artifact_inventory"]))
             validate_target_proof(self.proof(row))
 
     def test_scheduled_profile_uses_its_own_exact_lane_names(self) -> None:

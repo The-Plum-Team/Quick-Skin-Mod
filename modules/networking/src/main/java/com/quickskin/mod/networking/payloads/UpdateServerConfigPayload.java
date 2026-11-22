@@ -1,4 +1,4 @@
-//? if >=1.21 {
+//? if >=1.20.5 {
 package com.quickskin.mod.networking.payloads;
 
 import com.quickskin.mod.platform.QuickSkinInfo;
@@ -19,7 +19,9 @@ import net.minecraft.resources.Identifier;
 public record UpdateServerConfigPayload(String key, boolean value) implements CustomPacketPayload {
 
     public static final Type<UpdateServerConfigPayload> TYPE = new Type<>(
-        //? if <1.21.11 {
+        //? if <1.21 {
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "update_server_config")
+        //?} else if <1.21.11 {
         ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "update_server_config")
         //?} else {
         Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "update_server_config")

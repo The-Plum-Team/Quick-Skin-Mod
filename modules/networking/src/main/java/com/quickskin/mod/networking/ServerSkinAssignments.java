@@ -10,7 +10,7 @@ import com.quickskin.mod.server.data.ServerPlayerAppearanceRepository;
 import com.quickskin.mod.server.data.ServerSkinAssignmentStore;
 import com.quickskin.mod.server.data.SkinPoolFolder;
 import com.quickskin.mod.server.storage.ServerTextureCache;
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.payloads.AssignedSkinPayload;
 import com.quickskin.mod.networking.payloads.SkinAdminResultPayload;
 import com.quickskin.mod.networking.payloads.SkinAdminStatePayload;
@@ -559,7 +559,7 @@ public final class ServerSkinAssignments {
         String skinId = shown ? skin.skinId() : "";
         String model = shown ? skin.model() : "";
         try {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendAssignedSkinToPlayer(player, skinId, model);
             //?} else {
             NetworkTransport.INSTANCE.sendToPlayer(player, new AssignedSkinPayload(skinId, model));
@@ -577,7 +577,7 @@ public final class ServerSkinAssignments {
             assigned = assigned.subList(assigned.size() - TextureTransferLimits.MAX_ASSIGNED_SKIN_ENTRIES, assigned.size());
         }
         try {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendSkinAdminStateToPlayer(player, pool, List.copyOf(assigned));
             //?} else {
             NetworkTransport.INSTANCE.sendToPlayer(player, new SkinAdminStatePayload(pool, List.copyOf(assigned)));
@@ -590,7 +590,7 @@ public final class ServerSkinAssignments {
     private static void sendResult(ServerPlayer admin, int requestId, Outcome outcome) {
         if (!canReceive(admin)) return;
         try {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendSkinAdminResultToPlayer(
                     admin, requestId, outcome.status().code(), outcome.count());
             //?} else {

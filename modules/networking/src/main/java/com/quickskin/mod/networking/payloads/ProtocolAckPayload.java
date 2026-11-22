@@ -1,6 +1,6 @@
 package com.quickskin.mod.networking.payloads;
 
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.networking.protocol.ProtocolAcknowledgement;
 import io.netty.buffer.ByteBuf;
@@ -16,7 +16,9 @@ import net.minecraft.resources.Identifier;
 public record ProtocolAckPayload(long nonce, ProtocolAcknowledgement acknowledgement)
         implements CustomPacketPayload {
     public static final Type<ProtocolAckPayload> TYPE = new Type<>(
-            //? if <1.21.11 {
+            //? if <1.21 {
+            new ResourceLocation(QuickSkinInfo.MOD_ID, "protocol_ack")
+            //?} else if <1.21.11 {
             ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "protocol_ack")
             //?} else {
             Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "protocol_ack")

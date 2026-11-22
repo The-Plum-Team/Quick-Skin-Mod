@@ -1,12 +1,12 @@
 package com.quickskin.mod.event;
 
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.ServerNetworkHandler;
 //?}
 import com.quickskin.mod.networking.MissingModNotice;
 import com.quickskin.mod.networking.NetworkTransport;
 import com.quickskin.mod.networking.ProtocolNetwork;
-//? if <1.21 {
+//? if <1.20.5 {
 import com.quickskin.mod.networking.ServerNetworkHandler;
 //?} else {
 import com.quickskin.mod.networking.payloads.CooldownUpdatePayload;
@@ -18,7 +18,7 @@ import dev.architectury.event.events.common.CommandRegistrationEvent;
 import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.PlayerEvent;
 import dev.architectury.event.events.common.TickEvent;
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.payloads.SyncAppearancePayload;
 //?}
 import net.minecraft.server.level.ServerPlayer;
@@ -83,7 +83,7 @@ public class CommonEvents {
                         && ServerCooldownManager.getInstance()
                                 .isPlayerOnCooldown(player.getUUID())) {
                     long cooldownEndTime = ServerCooldownManager.getInstance().getCooldownEndTime(player.getUUID());
-                    //? if <1.21 {
+                    //? if <1.20.5 {
                     NetworkTransport.INSTANCE.sendCooldownToPlayer(serverPlayer, cooldownEndTime);
                     //?} else {
                     CooldownUpdatePayload payload = new CooldownUpdatePayload(cooldownEndTime);
@@ -118,7 +118,7 @@ public class CommonEvents {
         }));
 
         // Player respawns (after death)
-        //? if <1.21 {
+        //? if <1.20.2 {
         PlayerEvent.PLAYER_RESPAWN.register((player, conqueredEnd) -> GameCallbacks.guarded(
                 "send a player the appearances again after a respawn", () -> {
             if (player instanceof ServerPlayer) {

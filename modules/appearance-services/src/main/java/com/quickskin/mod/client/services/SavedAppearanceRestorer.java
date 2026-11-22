@@ -28,7 +28,7 @@ public final class SavedAppearanceRestorer {
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
         com.quickskin.mod.client.services.LocalAssetManager assetManager =
                 com.quickskin.mod.client.services.LocalAssetManager.getInstance();
-        //? if >=1.21 {
+        //? if >=1.20.2 {
 
         String skinId = null;
         String modelType = null;
@@ -40,7 +40,7 @@ public final class SavedAppearanceRestorer {
             com.quickskin.mod.common.data.AssetMetadata metadata = assetManager.getMetadata(config.activeSkinHash);
 
             if (metadata != null) {
-                //? if <1.21 {
+                //? if <1.20.2 {
                 String skinId = "local_skin:" + metadata.hash();
                 String modelType = assetManager.getSkinModelPreference(config.activeSkinHash);
                 com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
@@ -60,7 +60,7 @@ public final class SavedAppearanceRestorer {
                 config.activeSkinHash = config.playerOwnSkinHash;
                 config.save();
 
-                //? if <1.21 {
+                //? if <1.20.2 {
                 String skinId = "local_skin:" + metadata.hash();
                 String modelType = assetManager.getSkinModelPreference(config.playerOwnSkinHash);
                 //?} else {
@@ -72,7 +72,7 @@ public final class SavedAppearanceRestorer {
                 if ("auto".equals(modelType)) {
                     modelType = metadata.skinModel();
                 }
-                //? if <1.21 {
+                //? if <1.20.2 {
                 com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
                         .applySkin(targetPlayerId, skinId, modelType);
                 //?}
@@ -81,19 +81,19 @@ public final class SavedAppearanceRestorer {
 
         // Check if there's a saved cape
         if (!config.activeCapeHash.isEmpty()) {
-            //? if <1.21 {
+            //? if <1.20.2 {
             String capeId = config.activeCapeHash;
             //?} else {
             capeId = config.activeCapeHash;
         }
             //?}
 
-        //? if >=1.21 {
+        //? if >=1.20.2 {
         // Apply both skin and cape together in a single call to avoid multiple syncs
         if (skinId != null || capeId != null) {
         //?}
             com.quickskin.mod.client.services.PlayerAppearanceService.getInstance()
-                    //? if <1.21 {
+                    //? if <1.20.2 {
                     .applyCape(targetPlayerId, capeId);
                     //?} else {
                     .applyLook(targetPlayerId, skinId, capeId, modelType);

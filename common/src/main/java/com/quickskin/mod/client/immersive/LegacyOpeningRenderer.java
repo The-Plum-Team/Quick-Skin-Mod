@@ -318,7 +318,7 @@ public final class LegacyOpeningRenderer {
     // the global view matrix that was active when the entity layer queued them.
     private static void flushShadow() {
         var stack = RenderSystem.getModelViewStack();
-        //? if <1.21 {
+        //? if <1.20.5 {
         stack.pushPose();
         stack.last().pose().set(shadowView);
         //?} else {
@@ -331,7 +331,7 @@ public final class LegacyOpeningRenderer {
             shadow.endBatch();
             shadowQueued = false;
         } finally {
-            //? if <1.21 {
+            //? if <1.20.5 {
             stack.popPose();
             //?} else {
             stack.popMatrix();

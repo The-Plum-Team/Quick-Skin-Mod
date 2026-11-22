@@ -15,7 +15,7 @@ import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.client.gui.effect.BlurHandler;
 import com.quickskin.mod.config.ClientConfig;
 import com.quickskin.mod.common.data.BackgroundStyle;
-//? if <1.21 {
+//? if <1.20.2 {
 //?} else if <1.21.11 {
 //?} else {
 //?}
@@ -127,7 +127,7 @@ public class BackgroundRenderer {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShaderColor(0.0F, 0.0F, 0.0F, 0.75F);
-        //? if <1.21 {
+        //? if <1.20.2 {
         GuiCompat.blit(graphics, VIGNETTE_LOCATION, 0, 0, 0, 0.0f, 0.0f, screen.width, screen.height, screen.width, screen.height);
         //?} else {
         MinecraftCompat.INSTANCE.blit(graphics, VIGNETTE_LOCATION, 0, 0, 0, 0.0f, 0.0f, screen.width, screen.height, screen.width, screen.height);
@@ -283,7 +283,7 @@ public class BackgroundRenderer {
             // same one the title screen's panorama uses, so switching screens does not jump.
             float panoramaPartialTick = DETERMINISTIC_E2E_RENDER ? 0.0F : partialTick;
 
-            //? if <1.21 {
+            //? if <1.20.5 {
             GuiCompat.renderPanorama(panorama, panoramaPartialTick);
             //?} else if <1.21.6 {
             panorama.render(graphics, screen.width, screen.height, 1.0F, panoramaPartialTick);

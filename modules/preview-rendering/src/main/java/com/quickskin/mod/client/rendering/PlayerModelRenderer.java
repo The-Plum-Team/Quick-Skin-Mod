@@ -128,7 +128,7 @@ public class PlayerModelRenderer {
      */
     private static ModelPart elytraModel;
 
-//? if <1.21 {
+//? if <1.20.2 {
     private static PlayerModel<?> classicModel;
     private static PlayerModel<?> slimModel;
     /** The models' cloak parts, drawn directly instead of through {@code renderCloak}. */
@@ -1180,7 +1180,7 @@ public class PlayerModelRenderer {
         // Note: Shadow management removed - methods not available in Minecraft 1.21 with Mojang mappings
         // Performance impact is minimal in GUI previews
 
-//? if <1.21 {
+//? if <1.20.2 {
         // Cache the player when available for use on title screen
         if (mc.player != null) {
             cachedPlayer = mc.player;
@@ -1193,7 +1193,7 @@ public class PlayerModelRenderer {
             }
 //?}
 
-//? if <1.21 {
+//? if <1.20.2 {
         // Try to use cached player (works even on title screen after playing once)
         Player playerToRender = cachedPlayer;
 //?} else {
@@ -1201,7 +1201,7 @@ public class PlayerModelRenderer {
             Player playerToRender = cachedPlayer;
 //?}
 
-//? if <1.21 {
+//? if <1.20.2 {
         // If no cached player exists (fresh game launch), use manual rendering
         if (playerToRender == null) {
             renderPlayerModelManual(graphics, x, y, scale, yRotation, playerData, mouseX, mouseY, followMouse);
@@ -1255,7 +1255,7 @@ public class PlayerModelRenderer {
         if (DETERMINISTIC_E2E_RENDER) {
             playerToRender.tickCount = E2E_FIXED_PREVIEW_TICK;
         } else if (mc.level == null) {
-//? if <1.21 {
+//? if <1.20.2 {
             // Title screen: manually set tickCount to enable animation
             playerToRender.tickCount = mc.gui.getGuiTicks();
 //?} else if <26.2 {
@@ -1305,7 +1305,7 @@ public class PlayerModelRenderer {
 //?}
                 float scaleCasted = (float)(int)scale;
                 Matrix4f scaleMatrix = (new Matrix4f()).scaling(scaleCasted, scaleCasted, -scaleCasted);
-//? if <1.21 {
+//? if <1.20.5 {
                 poseStack.mulPoseMatrix(scaleMatrix);
 //?} else {
                 poseStack.mulPose(scaleMatrix);
@@ -1329,7 +1329,7 @@ public class PlayerModelRenderer {
                 poseStack.popPose();
             }
 
-//? if <1.21 {
+//? if <1.20.2 {
             // The entity render runs inline, so the previewed entity keys the preview cape and the
             // binding is released as soon as the call returns. Equipment suppression is scoped the
             // same way: the layers read the live entity during this call and nowhere else.
@@ -1360,7 +1360,11 @@ public class PlayerModelRenderer {
                     graphics,
                     (float) x,
                     (float) y,
+                    //? if <1.20.5 {
+                    (int) scale,
+                    //?} else {
                     (float) scale,
+                    //?}
                     new org.joml.Vector3f(0, 0, 0),  // translation offset
 //?} else if <26.1 {
             ensureModelsLoaded();
@@ -1549,7 +1553,7 @@ public class PlayerModelRenderer {
             renderPlayerModelManual(graphics, x, y, scale, yRotation, playerData, mouseX, mouseY, followMouse);
         }
 
-//? if <1.21 {
+//? if <1.20.2 {
         // Restore original rotation after rendering
         playerToRender.setYRot(originalYRot);
         playerToRender.setXRot(originalXRot);
@@ -1673,7 +1677,7 @@ public class PlayerModelRenderer {
         PlayerModel model = "slim".equals(playerData.getModelType() != null ? playerData.getModelType().toLowerCase(Locale.ROOT) : null) ? slimModel : classicModel;
 //?}
 
-//? if <1.21 {
+//? if <1.20.5 {
         PoseStack poseStack = graphics.pose();
         poseStack.pushPose();
 
@@ -1976,7 +1980,7 @@ public class PlayerModelRenderer {
         }
 //?}
 
-//? if <1.21 {
+//? if <1.20.2 {
         poseStack.popPose();
 
         Lighting.setupFor3DItems();
@@ -2217,6 +2221,11 @@ public class PlayerModelRenderer {
         var capeConsumer = bufferSource.getBuffer(capeRenderType);
 
         PoseStack.Pose pose = poseStack.last();
+        //? if <1.20.5 {
+        var normalPose = pose.normal();
+        //?} else {
+        var normalPose = pose;
+        //?}
         Matrix4f matrix = pose.pose();
 
         // UV coordinates
@@ -2231,7 +2240,7 @@ public class PlayerModelRenderer {
                 .uv(u0, v0)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), 0.0f, 0.0f, 1.0f)
+                .normal(normalPose, 0.0f, 0.0f, 1.0f)
                 .endVertex();
 
         capeConsumer.vertex(matrix, xOffset, capeHeight, 0.0f)
@@ -2239,7 +2248,7 @@ public class PlayerModelRenderer {
                 .uv(u0, v1)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), 0.0f, 0.0f, 1.0f)
+                .normal(normalPose, 0.0f, 0.0f, 1.0f)
                 .endVertex();
 
         capeConsumer.vertex(matrix, xOffset + capeWidth, capeHeight, 0.0f)
@@ -2247,7 +2256,7 @@ public class PlayerModelRenderer {
                 .uv(u1, v1)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), 0.0f, 0.0f, 1.0f)
+                .normal(normalPose, 0.0f, 0.0f, 1.0f)
                 .endVertex();
 
         capeConsumer.vertex(matrix, xOffset + capeWidth, 0.0f, 0.0f)
@@ -2255,7 +2264,7 @@ public class PlayerModelRenderer {
                 .uv(u1, v0)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), 0.0f, 0.0f, 1.0f)
+                .normal(normalPose, 0.0f, 0.0f, 1.0f)
                 .endVertex();
 
         poseStack.popPose();
@@ -3004,7 +3013,7 @@ public class PlayerModelRenderer {
             poseStack.translate(-0.5f, 0.0f, -0.5f);
         }
 
-//? if <1.21 {
+//? if <1.20.2 {
         // Build cache on first render
         if (!grassBlockCacheBuilt) {
             grassBlockCacheBuilt = true;
@@ -3133,6 +3142,11 @@ public class PlayerModelRenderer {
 //?}
 
 //? if <1.21 {
+        //? if <1.20.5 {
+        var normalPose = pose.normal();
+        //?} else {
+        var normalPose = pose;
+        //?}
         // Calculate the 4 corners of the face
         float minX = Math.min(x1, x2);
         float maxX = Math.max(x1, x2);
@@ -3150,7 +3164,7 @@ public class PlayerModelRenderer {
                 .uv(0, 0)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), nx, ny, nz)
+                .normal(normalPose, nx, ny, nz)
                 .endVertex();
             // Top-left
             vertexConsumer.vertex(matrix, minX, y, maxZ)
@@ -3158,7 +3172,7 @@ public class PlayerModelRenderer {
                 .uv(0, 1)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), nx, ny, nz)
+                .normal(normalPose, nx, ny, nz)
                 .endVertex();
             // Top-right
             vertexConsumer.vertex(matrix, maxX, y, maxZ)
@@ -3166,7 +3180,7 @@ public class PlayerModelRenderer {
                 .uv(1, 1)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), nx, ny, nz)
+                .normal(normalPose, nx, ny, nz)
                 .endVertex();
             // Bottom-right
             vertexConsumer.vertex(matrix, maxX, y, minZ)
@@ -3174,7 +3188,7 @@ public class PlayerModelRenderer {
                 .uv(1, 0)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), nx, ny, nz)
+                .normal(normalPose, nx, ny, nz)
                 .endVertex();
         } else if (nx != 0) { // Left or right face (X constant)
             float x = x1;
@@ -3183,28 +3197,28 @@ public class PlayerModelRenderer {
                 .uv(0, 0)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), nx, ny, nz)
+                .normal(normalPose, nx, ny, nz)
                 .endVertex();
             vertexConsumer.vertex(matrix, x, maxY, minZ)
                 .color(255, 255, 255, 255)
                 .uv(0, 1)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), nx, ny, nz)
+                .normal(normalPose, nx, ny, nz)
                 .endVertex();
             vertexConsumer.vertex(matrix, x, maxY, maxZ)
                 .color(255, 255, 255, 255)
                 .uv(1, 1)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), nx, ny, nz)
+                .normal(normalPose, nx, ny, nz)
                 .endVertex();
             vertexConsumer.vertex(matrix, x, minY, maxZ)
                 .color(255, 255, 255, 255)
                 .uv(1, 0)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), nx, ny, nz)
+                .normal(normalPose, nx, ny, nz)
                 .endVertex();
         } else { // Front or back face (Z constant)
             float z = z1;
@@ -3213,28 +3227,28 @@ public class PlayerModelRenderer {
                 .uv(0, 0)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), nx, ny, nz)
+                .normal(normalPose, nx, ny, nz)
                 .endVertex();
             vertexConsumer.vertex(matrix, minX, maxY, z)
                 .color(255, 255, 255, 255)
                 .uv(0, 1)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), nx, ny, nz)
+                .normal(normalPose, nx, ny, nz)
                 .endVertex();
             vertexConsumer.vertex(matrix, maxX, maxY, z)
                 .color(255, 255, 255, 255)
                 .uv(1, 1)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), nx, ny, nz)
+                .normal(normalPose, nx, ny, nz)
                 .endVertex();
             vertexConsumer.vertex(matrix, maxX, minY, z)
                 .color(255, 255, 255, 255)
                 .uv(1, 0)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
                 .uv2(15728880)
-                .normal(pose.normal(), nx, ny, nz)
+                .normal(normalPose, nx, ny, nz)
                 .endVertex();
         }
     }
@@ -3688,7 +3702,7 @@ public class PlayerModelRenderer {
 //?}
         cachedPlayer = null;
         clearPreviewCapes();
-//? if <1.21 {
+//? if <1.20.2 {
     }
 
     /**

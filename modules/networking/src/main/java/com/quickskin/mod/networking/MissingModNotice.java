@@ -19,7 +19,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-//? if <1.21 {
+//? if <1.20.5 {
 import java.util.WeakHashMap;
 //?}
 //? if >=1.21.5 {
@@ -46,7 +46,7 @@ public final class MissingModNotice {
 
     /** Exact connections awaiting the check; they leave on disconnect, at the check or at stop. */
     private static final Map<Object, Pending> PENDING = new HashMap<>();
-    //? if <1.21 {
+    //? if <1.20.5 {
     /** The language each client reported; 1.20.1 servers keep no copy of it. */
     private static final Map<ServerPlayer, String> LANGUAGES = new WeakHashMap<>();
     //?}
@@ -74,12 +74,12 @@ public final class MissingModNotice {
 
     public static void clear() {
         PENDING.clear();
-        //? if <1.21 {
+        //? if <1.20.5 {
         LANGUAGES.clear();
         //?}
     }
 
-    //? if <1.21 {
+    //? if <1.20.5 {
     /** Called by {@code ServerPlayerLanguageMixin} with each language the client reports. */
     public static void languageReported(ServerPlayer player, String language) {
         if (language != null) LANGUAGES.put(player, language);
@@ -156,7 +156,7 @@ public final class MissingModNotice {
     }
 
     private static String language(ServerPlayer player) {
-        //? if <1.21 {
+        //? if <1.20.5 {
         return LANGUAGES.get(player);
         //?} else {
         return player.clientInformation().language();

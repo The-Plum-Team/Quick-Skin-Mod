@@ -12,8 +12,10 @@ import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-//? if <1.21 {
+//? if <1.20.5 {
 import com.mojang.blaze3d.vertex.PoseStack;
+//?}
+//? if <1.21 {
 import net.minecraft.Util;
 //?} else {
 import net.minecraft.client.DeltaTracker;
@@ -28,7 +30,7 @@ import com.mojang.blaze3d.resource.GraphicsResourceAllocator;
 
 @Mixin(value = LevelRenderer.class, priority = 2100)
 public abstract class LegacyOpeningLevelMixin {
-    //? if <1.21 {
+    //? if <1.20.5 {
     @Inject(method = "renderLevel", at = @At("HEAD"), require = 0, expect = 1, allow = 1)
     private void quickskin$opening(PoseStack stack, float time, long frame, boolean outline, Camera camera,
                                    GameRenderer game, LightTexture lights, Matrix4f projection, CallbackInfo ci) {
@@ -41,9 +43,32 @@ public abstract class LegacyOpeningLevelMixin {
                         camera, game, lights, cut));
     }
 
-    @Inject(method = "renderChunkLayer", at = @At("HEAD"), require = 0, expect = 1, allow = 1)
+    // 1.20.2 renamed the chunk layers to section layers
+    @Inject(method =
+            //? if <1.20.2 {
+            "renderChunkLayer",
+            //?} else {
+            "renderSectionLayer",
+            //?}
+            at = @At("HEAD"), require = 0, expect = 1, allow = 1)
     private void quickskin$terrain(RenderType layer, PoseStack poses, double x, double y, double z,
                                   Matrix4f projection, CallbackInfo ci) {
+        LegacyOpeningRenderer.beforeLayer(layer);
+    }
+    //?} else if <1.21 {
+    // 1.20.5 and 1.20.6: the view arrives as a matrix, the frame still as a partial tick
+    @Inject(method = "renderLevel", at = @At("HEAD"), require = 0, expect = 1, allow = 1)
+    private void quickskin$opening(float time, long frame, boolean outline, Camera camera, GameRenderer game,
+                                   LightTexture lights, Matrix4f view, Matrix4f projection, CallbackInfo ci) {
+        if (!LegacyOpeningRenderer.beforeWorld()) return;
+        LegacyOpeningRenderer.begin(camera, time, view, projection,
+                cut -> ((LevelRenderer)(Object)this).renderLevel(time, Util.getNanos(), false,
+                        camera, game, lights, view, cut));
+    }
+
+    @Inject(method = "renderSectionLayer", at = @At("HEAD"), require = 0, expect = 1, allow = 1)
+    private void quickskin$terrain(RenderType layer, double x, double y, double z,
+                                  Matrix4f view, Matrix4f projection, CallbackInfo ci) {
         LegacyOpeningRenderer.beforeLayer(layer);
     }
     //?} else if <1.21.6 {

@@ -164,7 +164,7 @@ COMMON_HAND_RENDERER_PATH = (
     "common/src/main/java/com/quickskin/mod/mixin/ItemInHandRendererMixin.java"
 )
 COMMON_HAND_RENDERER_SHA256 = (
-    "55fffbeb1f1b948cbe826f87610c18eaddab784dfea1bbc3b276f9c6fd638e33"
+    "44ecfcfaaf720dc622bd92d7aec8e3cbdcabb176d6d45b15e9ec035dc3fb68c3"
 )
 COMMON_HAND_MULTIPLICITY_POLICY_MARKERS = (
     b"def test_immediate_hand_redirect_matches_vanilla_multiplicity",

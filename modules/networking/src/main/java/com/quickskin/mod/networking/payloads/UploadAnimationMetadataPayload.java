@@ -1,4 +1,4 @@
-//? if >=1.21 {
+//? if >=1.20.5 {
 package com.quickskin.mod.networking.payloads;
 
 import com.quickskin.mod.platform.QuickSkinInfo;
@@ -19,7 +19,9 @@ import net.minecraft.resources.Identifier;
 public record UploadAnimationMetadataPayload(String hash, String metadataJson) implements CustomPacketPayload {
 
     public static final Type<UploadAnimationMetadataPayload> TYPE = new Type<>(
-        //? if <1.21.11 {
+        //? if <1.21 {
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "upload_animation_metadata")
+        //?} else if <1.21.11 {
         ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "upload_animation_metadata")
         //?} else {
         Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "upload_animation_metadata")

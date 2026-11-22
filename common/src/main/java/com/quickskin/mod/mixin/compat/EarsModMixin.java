@@ -46,7 +46,7 @@ public class EarsModMixin {
     private static void quickskin$getEarsFeatures(AvatarRenderState peer, CallbackInfoReturnable<Object> cir) {
     //?}
         if (EarsCompatIntegration.isDisabledResult(cir.getReturnValue())) {
-            //? if <1.21 {
+            //? if <1.20.2 {
             ResourceLocation skin = peer.getSkinTextureLocation();
             //?} else if <1.21.2 {
             ResourceLocation skin = peer.getSkin().texture();

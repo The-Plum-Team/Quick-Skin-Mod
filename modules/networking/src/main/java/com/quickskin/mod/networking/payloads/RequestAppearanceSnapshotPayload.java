@@ -1,6 +1,6 @@
 package com.quickskin.mod.networking.payloads;
 
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.platform.QuickSkinInfo;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -17,7 +17,9 @@ import java.util.UUID;
 public record RequestAppearanceSnapshotPayload(UUID playerId, long requestId)
         implements CustomPacketPayload {
     public static final Type<RequestAppearanceSnapshotPayload> TYPE = new Type<>(
-            //? if <1.21.11 {
+            //? if <1.21 {
+            new ResourceLocation(QuickSkinInfo.MOD_ID, "request_appearance_snapshot")
+            //?} else if <1.21.11 {
             ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "request_appearance_snapshot")
             //?} else {
             Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "request_appearance_snapshot")

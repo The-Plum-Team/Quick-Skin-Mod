@@ -1,6 +1,6 @@
 package com.quickskin.mod.networking.payloads;
 
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.TextureTransferLimits;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import io.netty.buffer.ByteBuf;
@@ -22,7 +22,9 @@ import java.util.UUID;
 public record SetNicknamePayload(UUID playerId, int requestId, String nickname)
         implements CustomPacketPayload {
     public static final Type<SetNicknamePayload> TYPE = new Type<>(
-            //? if <1.21.11 {
+            //? if <1.21 {
+            new ResourceLocation(QuickSkinInfo.MOD_ID, "set_nickname")
+            //?} else if <1.21.11 {
             ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "set_nickname")
             //?} else {
             Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "set_nickname")

@@ -963,7 +963,7 @@ public class CapeAdjustScreen extends Screen implements com.quickskin.mod.client
         }
         if (skinLocation == null && player != null) {
             //? if <1.21.9 {
-                //? if <1.21 {
+                //? if <1.20.2 {
             skinLocation = player.getSkinTextureLocation();
                 //?} else {
             skinLocation = player.getSkin().texture();
@@ -973,7 +973,7 @@ public class CapeAdjustScreen extends Screen implements com.quickskin.mod.client
             //?}
             // The player's own skin is drawn, so its model is the player's too.
             //? if <1.21.9 {
-                //? if <1.21 {
+                //? if <1.20.2 {
             String vanillaModel = player.getModelName(); // "default" or "slim"
             modelType = "slim".equals(vanillaModel) ? "slim" : "classic";
                 //?} else {
@@ -2411,7 +2411,7 @@ public class CapeAdjustScreen extends Screen implements com.quickskin.mod.client
     }
 
     @Override
-    //? if <1.21 {
+    //? if <1.20.2 {
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
     //?} else {
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
@@ -2420,14 +2420,14 @@ public class CapeAdjustScreen extends Screen implements com.quickskin.mod.client
         if (isInPicker(mouseX, mouseY)) {
             return true;
         }
-        //? if <1.21 {
+        //? if <1.20.2 {
         if (zoomAtCursor(mouseX, mouseY, delta > 0)) {
         //?} else {
         if (zoomAtCursor(mouseX, mouseY, deltaY > 0)) {
         //?}
             return true;
         }
-        //? if <1.21 {
+        //? if <1.20.2 {
         return super.mouseScrolled(mouseX, mouseY, delta);
         //?} else {
         return super.mouseScrolled(mouseX, mouseY, deltaX, deltaY);
@@ -2507,7 +2507,7 @@ public class CapeAdjustScreen extends Screen implements com.quickskin.mod.client
         return false;
     }
 
-    //? if >=1.21 {
+    //? if >=1.20.2 {
         //? if <1.21.2 {
     @Override
     public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {

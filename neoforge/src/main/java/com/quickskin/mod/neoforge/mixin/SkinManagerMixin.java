@@ -609,10 +609,16 @@ public class SkinManagerMixin {
 
         // Create an HttpTexture pointing to the local file
         File skinFile = sourcePath.toFile();
+        //? if <1.21 {
+        ResourceLocation location = new ResourceLocation(QuickSkinInfo.MOD_ID, "cpm_bridge/" + hash);
+        ResourceLocation fallback = new ResourceLocation("textures/entity/player/wide/steve.png");
+        //?} else {
         ResourceLocation location = ResourceLocation.fromNamespaceAndPath(
                 QuickSkinInfo.MOD_ID,
                 "cpm_bridge/" + hash
         );
+        ResourceLocation fallback = ResourceLocation.withDefaultNamespace("textures/entity/player/wide/steve.png");
+        //?}
 
         // The HttpTexture constructor: (File file, String urlString, ResourceLocation fallback, boolean processLegacySkin, Runnable onDownloaded)
         // - file: the local skin file CPM will read
@@ -623,7 +629,7 @@ public class SkinManagerMixin {
         HttpTexture httpTexture = new HttpTexture(
                 skinFile,
                 "file:///" + skinFile.getAbsolutePath().replace('\\', '/'),
-                ResourceLocation.withDefaultNamespace("textures/entity/player/wide/steve.png"),
+                fallback,
                 true,
                 () -> {}
         );

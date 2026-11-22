@@ -3,7 +3,7 @@ package com.quickskin.mod.networking;
 import com.quickskin.mod.config.ServerConfig;
 import com.quickskin.mod.networking.protocol.ProtocolCapability;
 import com.quickskin.mod.networking.protocol.ProtocolProfile;
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.payloads.SyncImmersivePosePayload;
 //?}
 import net.minecraft.server.MinecraftServer;
@@ -226,7 +226,7 @@ public final class ServerImmersivePoses {
 
     private static void send(ServerPlayer recipient, UUID subject, ImmersivePose pose) {
         try {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendImmersivePoseToPlayer(recipient, subject, pose);
             //?} else {
             NetworkTransport.INSTANCE.sendToPlayer(recipient, new SyncImmersivePosePayload(subject, pose));

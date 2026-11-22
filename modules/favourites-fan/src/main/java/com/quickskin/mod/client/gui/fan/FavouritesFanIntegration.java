@@ -46,7 +46,7 @@ public final class FavouritesFanIntegration {
         ClientRawInputEvent.MOUSE_CLICKED_PRE.register((client, info, action) -> onButton(client, info.button(), action));
         //?}
 
-        //? if <1.21 {
+        //? if <1.20.2 {
         ClientRawInputEvent.MOUSE_SCROLLED.register((client, amount) -> onScroll(amount));
         //?} else {
         ClientRawInputEvent.MOUSE_SCROLLED.register((client, amountX, amountY) -> onScroll(amountY));

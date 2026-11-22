@@ -11,7 +11,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
 // The body chain's imports (beforeModel, pose, hangFromBody), one block per version family
-//? if <1.21 {
+//? if <1.20.2 {
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.PlayerModel;
@@ -60,7 +60,7 @@ import net.minecraft.world.entity.Entity;
 //?}
 // The sit-clearance chain's imports (clearSitBlock, clearSitBlockWithWings); a type both chains
 // import on one version is imported twice, which Java allows
-//? if <1.21 {
+//? if <1.20.2 {
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.HumanoidModel;
@@ -520,7 +520,7 @@ public final class WorldPose {
         return true;
     }
 
-//? if <1.21 {
+//? if <1.20.2 {
     /**
      * Prepares the player's draw in the world, in the model's own space, right before the game
      * poses the model ({@link #bind}, then {@link #transform}), with the block drawn in the
@@ -862,7 +862,7 @@ public final class WorldPose {
 
     // The sit clearance of what hangs from the posed body: a chain of its own, so the port of the
     // cape over the sit block (capesit) and the port of the body's entry points edit different blocks
-//? if <1.21 {
+//? if <1.20.2 {
     /**
      * Tilts the cape hung from the posed body ({@link #hangFromBody}) back about its hinge, so it
      * clears the sit's block as the menu's own cape does (see {@link SitClearance}), for the draw

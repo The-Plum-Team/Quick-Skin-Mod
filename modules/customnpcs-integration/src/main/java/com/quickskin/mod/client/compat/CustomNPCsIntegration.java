@@ -6,7 +6,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.AbstractClientPlayer;
-//? if <1.21 {
+//? if <1.20.2 {
 import net.minecraft.resources.ResourceLocation;
 //?} else if <1.21.9 {
 import net.minecraft.client.resources.PlayerSkin;
@@ -249,7 +249,7 @@ public class CustomNPCsIntegration {
         return defaultSkin;
     }
 
-//? if <1.21 {
+//? if <1.20.2 {
 //?} else if <1.21.9 {
     /**
      * Gets the Quick-Skin-Mod PlayerSkin, ensuring CustomNPCs doesn't override it.

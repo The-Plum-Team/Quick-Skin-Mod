@@ -13,7 +13,7 @@ import com.quickskin.mod.networking.protocol.ProtocolAcknowledgement;
 import com.quickskin.mod.networking.protocol.ProtocolCapability;
 import com.quickskin.mod.networking.protocol.ProtocolProfile;
 import com.quickskin.mod.networking.protocol.ProtocolSessions;
-//? if <1.21 {
+//? if <1.20.5 {
 import com.quickskin.mod.networking.packets.PacketHelper;
 //?} else {
 import com.quickskin.mod.networking.payloads.*;
@@ -24,7 +24,7 @@ import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-//? if <1.21 {
+//? if <1.20.5 {
 import net.minecraft.network.FriendlyByteBuf;
 //?}
 
@@ -50,7 +50,7 @@ public class ClientNetworkHandler {
     private static final long TRANSPARENCY_RELOAD_INTERVAL_MILLIS = 30_000L;
 
     /** Accepts only an acknowledgement tied to this exact live connection and hello nonce. */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleProtocolAck(
             FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         long nonce = buf.readLong();
@@ -84,7 +84,7 @@ public class ClientNetworkHandler {
     /**
      * Handles appearance sync from server
      */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleSyncAppearance(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         UUID playerId = PacketHelper.readPlayerId(buf);
         String skinId = PacketHelper.readString(buf, TextureTransferLimits.MAX_APPEARANCE_ID_BYTES);
@@ -98,7 +98,7 @@ public class ClientNetworkHandler {
         Object sourceConnection = packetConnectionIdentity(context);
         if (sourceConnection == null || !isCurrentConnection(sourceConnection)
                 || !acceptsWireMode(sourceConnection, false)) return;
-        //? if <1.21 {
+        //? if <1.20.5 {
         if (!NetworkSecurity.isValidLegacyAppearanceId(skinId, "skin")
                 || !NetworkSecurity.isValidLegacyAppearanceId(capeId, "cape")
                 || !NetworkSecurity.isValidModel(model)
@@ -113,7 +113,7 @@ public class ClientNetworkHandler {
         //?}
         context.queue(() -> {
             if (!isCurrentConnection(sourceConnection)) return;
-            //? if <1.21 {
+            //? if <1.20.5 {
             if (!NetworkSecurity.isValidLegacyAppearanceId(skinId, "skin")
                     || !NetworkSecurity.isValidLegacyAppearanceId(capeId, "cape")
                     || !NetworkSecurity.isValidModel(model)) return;
@@ -122,12 +122,12 @@ public class ClientNetworkHandler {
                     || !NetworkSecurity.isValidLegacyAppearanceId(payload.capeId(), "cape")
                     || !NetworkSecurity.isValidModel(payload.model())) return;
             //?}
-            //? if <1.21 {
+            //? if <1.20.5 {
             org.slf4j.LoggerFactory.getLogger("QuickSkin-CPM").info(
                     "handleSyncAppearance EXECUTING on main thread for {}", playerId);
             //?}
             Minecraft minecraft = Minecraft.getInstance();
-            //? if <1.21 {
+            //? if <1.20.5 {
             boolean ownPlayerUpdate = minecraft.player != null
                     && playerId.equals(minecraft.player.getUUID());
             if (ownPlayerUpdate) {
@@ -143,7 +143,7 @@ public class ClientNetworkHandler {
             //?}
             if (ownPlayerUpdate) return;
             // Apply appearance through service
-            //? if <1.21 {
+            //? if <1.20.5 {
             appearanceTarget().applyLookFromNetwork(
                     playerId, skinId, capeId, model);
             //?} else {
@@ -154,7 +154,7 @@ public class ClientNetworkHandler {
         });
     }
 
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleSyncAppearanceV2(
             FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         UUID receivedPlayerId = PacketHelper.readPlayerId(buf);
@@ -197,7 +197,7 @@ public class ClientNetworkHandler {
     }
 
     /** An appearance with the elytra's own cape, from a server that negotiated elytra-texture. */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleSyncAppearanceElytra(
             FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         UUID receivedPlayerId = PacketHelper.readPlayerId(buf);
@@ -290,7 +290,7 @@ public class ClientNetworkHandler {
     /**
      * Handles texture data from server
      */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleSendTexture(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         String textureType = PacketHelper.readString(buf, TextureTransferLimits.MAX_TEXTURE_TYPE_BYTES);
         String hash = PacketHelper.readString(buf, TextureTransferLimits.CONTENT_ID_LENGTH);
@@ -305,7 +305,7 @@ public class ClientNetworkHandler {
         Object sourceConnection = packetConnectionIdentity(context);
         if (sourceConnection == null || !isCurrentConnection(sourceConnection)
                 || !acceptsWireMode(sourceConnection, false)) return;
-        //? if <1.21 {
+        //? if <1.20.5 {
         if (!NetworkSecurity.isValidTextureType(textureType)
                 || !NetworkSecurity.isValidLegacyContentId(hash)
                 || !ClientTextureIngressLimiter.getInstance()
@@ -324,7 +324,7 @@ public class ClientNetworkHandler {
         //?}
         context.queue(() -> {
             if (!isCurrentConnection(sourceConnection)) return;
-            //? if <1.21 {
+            //? if <1.20.5 {
             org.slf4j.LoggerFactory.getLogger("QuickSkin-CPM").info(
                     "handleSendTexture EXECUTING on main thread hash={}", hash);
             //?}
@@ -363,7 +363,7 @@ public class ClientNetworkHandler {
         });
     }
 
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleSendTextureV2(
             FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         String receivedTextureType = PacketHelper.readString(
@@ -430,14 +430,14 @@ public class ClientNetworkHandler {
     /**
      * Handles animation metadata from server
      */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleSendAnimationMetadata(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         String hash = PacketHelper.readString(buf, TextureTransferLimits.CONTENT_ID_LENGTH);
         String metadataJson = PacketHelper.readString(buf, TextureTransferLimits.MAX_JSON_BYTES);
     //?} else {
     public static void handleSendAnimationMetadata(SendAnimationMetadataPayload payload, NetworkManager.PacketContext context) {
     //?}
-        //? if <1.21 {
+        //? if <1.20.5 {
         String receivedHash = hash;
         String receivedMetadataJson = metadataJson;
         //?} else {
@@ -476,7 +476,7 @@ public class ClientNetworkHandler {
         });
     }
 
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleSendAnimationMetadataV2(
             FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         String receivedHash = PacketHelper.readString(
@@ -606,13 +606,13 @@ public class ClientNetworkHandler {
     /**
      * Handles server config sync (server sends full config to client on join)
      */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleSyncServerConfig(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         String configJson = PacketHelper.readString(buf, TextureTransferLimits.MAX_JSON_BYTES);
     //?} else {
     public static void handleSyncServerConfig(SyncServerConfigPayload payload, NetworkManager.PacketContext context) {
     //?}
-        //? if <1.21 {
+        //? if <1.20.5 {
         String receivedConfigJson = configJson;
         //?} else {
         String receivedConfigJson = payload.configJson();
@@ -731,7 +731,7 @@ public class ClientNetworkHandler {
     /**
      * Handles texture chunk from server (for large textures)
      */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleSendTextureChunk(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         String hash = buf.readUtf(TextureTransferLimits.CONTENT_ID_LENGTH);
         String textureType = buf.readUtf(TextureTransferLimits.MAX_TEXTURE_TYPE_BYTES);
@@ -744,7 +744,7 @@ public class ClientNetworkHandler {
         Object sourceConnection = packetConnectionIdentity(context);
         if (sourceConnection == null || !isCurrentConnection(sourceConnection)
                 || !acceptsWireMode(sourceConnection, false)) return;
-        //? if <1.21 {
+        //? if <1.20.5 {
         if (!NetworkSecurity.isValidTextureType(textureType)
                 || !NetworkSecurity.isValidLegacyContentId(hash)
                 || !ClientTextureIngressLimiter.getInstance().allowWireBytes(chunkData.length)) return;
@@ -754,7 +754,7 @@ public class ClientNetworkHandler {
                 || !ClientTextureIngressLimiter.getInstance()
                         .allowWireBytes(payload.chunkData().length)) return;
         //?}
-        //? if <1.21 {
+        //? if <1.20.5 {
         String receivedHash = hash;
         String receivedTextureType = textureType;
         int receivedChunkIndex = chunkIndex;
@@ -776,7 +776,7 @@ public class ClientNetworkHandler {
         });
     }
 
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleSendTextureChunkV2(
             FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         String receivedHash = buf.readUtf(TextureTransferLimits.MAX_CONTENT_ID_BYTES);
@@ -827,7 +827,7 @@ public class ClientNetworkHandler {
     /**
      * Handles cooldown update from server
      */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleCooldownUpdate(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         long cooldownEndTime = buf.readLong();
         //?} else {
@@ -839,7 +839,7 @@ public class ClientNetworkHandler {
         if (!ClientTextureIngressLimiter.getInstance().allowControlBytes(Long.BYTES)) return;
         context.queue(() -> {
             if (!isCurrentConnection(sourceConnection)) return;
-            //? if <1.21 {
+            //? if <1.20.5 {
             com.quickskin.mod.client.services.CooldownService.getInstance().setCooldownEndTime(cooldownEndTime);
             //?} else {
             com.quickskin.mod.client.services.CooldownService.getInstance().setCooldownEndTime(payload.cooldownEndTime());
@@ -848,7 +848,7 @@ public class ClientNetworkHandler {
     }
 
     /** Completes only the exact retryable appearance snapshot request for this connection. */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleAppearanceSnapshotComplete(
             FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         long requestId = buf.readLong();
@@ -864,7 +864,7 @@ public class ClientNetworkHandler {
                         .allowControlBytes(Long.BYTES)) return;
         context.queue(() -> {
             if (!isCurrentConnection(sourceConnection)) return;
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkSyncService.getInstance().confirmAppearanceSnapshot(
                     sourceConnection, requestId);
             //?} else {
@@ -883,7 +883,7 @@ public class ClientNetworkHandler {
     }
 
     /** The server's answer to this session's latest nickname request. */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleNicknameResult(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         int requestId = buf.readInt();
         int statusCode = buf.readUnsignedByte();
@@ -913,7 +913,7 @@ public class ClientNetworkHandler {
     }
 
     /** The nicknames of players on the server, which name tags show instead of their names. */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleSyncNicknames(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         int count = buf.readInt();
         if (count < 0 || count > TextureTransferLimits.MAX_NICKNAME_ENTRIES) return;
@@ -959,7 +959,7 @@ public class ClientNetworkHandler {
      * by this client alone; one about the local player is ignored, since it plays its own. Poses
      * spend a window of their own, never the appearance packets' control budget.
      */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleSyncImmersivePose(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         java.util.UUID playerId = PacketHelper.readPlayerId(buf);
         ImmersivePose pose = ImmersivePoseCodec.read(buf);
@@ -992,7 +992,7 @@ public class ClientNetworkHandler {
     }
 
     /** The skin an admin gave the local player on this server ({@code ""}: none any more). */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleAssignedSkin(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         String skinId = PacketHelper.readString(buf, TextureTransferLimits.MAX_APPEARANCE_ID_BYTES);
         String model = PacketHelper.readString(buf, TextureTransferLimits.MAX_MODEL_BYTES);
@@ -1016,7 +1016,7 @@ public class ClientNetworkHandler {
     }
 
     /** The server's answer to a skin request this admin's client made. */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleSkinAdminResult(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         int requestId = buf.readInt();
         int statusCode = buf.readUnsignedByte();
@@ -1040,7 +1040,7 @@ public class ClientNetworkHandler {
     }
 
     /** The server's skin pool and who has an assigned skin, for an admin's client. */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void handleSkinAdminState(FriendlyByteBuf buf, NetworkManager.PacketContext context) {
         int poolSize = buf.readInt();
         if (poolSize < 0 || poolSize > TextureTransferLimits.MAX_POOL_SKINS) return;

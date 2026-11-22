@@ -71,7 +71,7 @@ public class SkinService implements ISkinService {
             // Return the default skin based on UUID
             // In a full implementation, this would fetch from Mojang's API
             // using the PlayerInfo or SkinManager to get the actual player skin
-            //? if <1.21 {
+            //? if <1.20.2 {
             ResourceLocation defaultSkin = DefaultPlayerSkin.getDefaultSkin(uuid);
             //?} else if <1.21.9 {
             ResourceLocation defaultSkin = DefaultPlayerSkin.get(uuid).texture();

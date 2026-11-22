@@ -1,4 +1,4 @@
-//? if >=1.21 {
+//? if >=1.20.5 {
 package com.quickskin.mod.networking.payloads;
 
 import io.netty.buffer.ByteBuf;

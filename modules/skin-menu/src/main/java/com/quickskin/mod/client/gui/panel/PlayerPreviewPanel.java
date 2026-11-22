@@ -145,7 +145,7 @@ public class PlayerPreviewPanel extends AbstractWidget {
                              int centerX, int ringCenterY, int ringRadiusX, boolean ringIntro) {
         rotationArc = new RotationArcWidget(centerX, ringCenterY, ringRadiusX, ringIntro);
         screen.registerWidget(rotationArc);
-        //? if <1.21 {
+        //? if <1.20.2 {
         if (playerWidget != null) {
             playerWidget.clearPriorityWidgets();
         }
@@ -268,7 +268,7 @@ public class PlayerPreviewPanel extends AbstractWidget {
      * itself takes clicks to rotate).
      */
     public void addPriorityControl(AbstractWidget control) {
-        //? if <1.21 {
+        //? if <1.20.2 {
         if (playerWidget != null) {
             playerWidget.addPriorityWidget(control);
         }

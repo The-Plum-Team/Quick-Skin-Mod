@@ -6,7 +6,7 @@ import com.quickskin.mod.networking.protocol.ProtocolChannelContract;
 import com.quickskin.mod.networking.protocol.ProtocolProfile;
 import com.quickskin.mod.networking.protocol.ProtocolSessions;
 import com.quickskin.mod.server.storage.ServerTextureCache;
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.payloads.*;
 //?}
 import net.minecraft.server.level.ServerPlayer;
@@ -44,7 +44,7 @@ public final class ProtocolNetwork {
     private static boolean canReceiveAppearancePacket(ServerPlayer player, boolean v2) {
         if (ProtocolChannelContract.guarantees(
                 profile(player), ProtocolChannelContract.ServerPacket.APPEARANCE)) return true;
-        //? if <1.21 {
+        //? if <1.20.5 {
         return NetworkTransport.INSTANCE.canPlayerReceive(
                 player,
                 v2 ? NetworkTransport.ServerPacket.APPEARANCE_V2
@@ -59,7 +59,7 @@ public final class ProtocolNetwork {
     private static boolean canReceiveTexturePacket(ServerPlayer player, boolean v2) {
         if (ProtocolChannelContract.guarantees(
                 profile(player), ProtocolChannelContract.ServerPacket.TEXTURE)) return true;
-        //? if <1.21 {
+        //? if <1.20.5 {
         return NetworkTransport.INSTANCE.canPlayerReceive(
                 player,
                 v2 ? NetworkTransport.ServerPacket.TEXTURE_V2
@@ -74,7 +74,7 @@ public final class ProtocolNetwork {
     private static boolean canReceiveTextureChunkPacket(ServerPlayer player, boolean v2) {
         if (ProtocolChannelContract.guarantees(
                 profile(player), ProtocolChannelContract.ServerPacket.TEXTURE_CHUNK)) return true;
-        //? if <1.21 {
+        //? if <1.20.5 {
         return NetworkTransport.INSTANCE.canPlayerReceive(
                 player,
                 v2 ? NetworkTransport.ServerPacket.TEXTURE_CHUNK_V2
@@ -91,7 +91,7 @@ public final class ProtocolNetwork {
         if (ProtocolChannelContract.guarantees(
                 profile(player),
                 ProtocolChannelContract.ServerPacket.ANIMATION_METADATA)) return true;
-        //? if <1.21 {
+        //? if <1.20.5 {
         return NetworkTransport.INSTANCE.canPlayerReceive(
                 player,
                 v2 ? NetworkTransport.ServerPacket.ANIMATION_METADATA_V2
@@ -109,7 +109,7 @@ public final class ProtocolNetwork {
         if (player == null || !isReady(player)) return false;
         if (ProtocolChannelContract.guarantees(
                 profile(player), ProtocolChannelContract.ServerPacket.SERVER_CONFIG)) return true;
-        //? if <1.21 {
+        //? if <1.20.5 {
         return NetworkTransport.INSTANCE.canPlayerReceive(
                 player, NetworkTransport.ServerPacket.SERVER_CONFIG);
         //?} else {
@@ -121,7 +121,7 @@ public final class ProtocolNetwork {
         if (player == null || !isReady(player)) return false;
         if (ProtocolChannelContract.guarantees(
                 profile(player), ProtocolChannelContract.ServerPacket.COOLDOWN)) return true;
-        //? if <1.21 {
+        //? if <1.20.5 {
         return NetworkTransport.INSTANCE.canPlayerReceive(
                 player, NetworkTransport.ServerPacket.COOLDOWN);
         //?} else {
@@ -137,7 +137,7 @@ public final class ProtocolNetwork {
         if (ProtocolChannelContract.guarantees(
                 profile,
                 ProtocolChannelContract.ServerPacket.APPEARANCE_SNAPSHOT_COMPLETE)) return true;
-        //? if <1.21 {
+        //? if <1.20.5 {
         return NetworkTransport.INSTANCE.canPlayerReceive(
                 player, NetworkTransport.ServerPacket.APPEARANCE_SNAPSHOT_COMPLETE);
         //?} else {
@@ -162,7 +162,7 @@ public final class ProtocolNetwork {
 
     /** Whether the peer currently registers the immutable v1 receivers but no protocol ACK. */
     public static boolean advertisesOnlyLegacyChannels(ServerPlayer player) {
-        //? if <1.21 {
+        //? if <1.20.5 {
         boolean helloCapable = NetworkTransport.INSTANCE.canPlayerReceiveProtocolAck(player);
         boolean legacyCapable = NetworkTransport.INSTANCE.canPlayerReceiveLegacyProtocol(player);
         //?} else {
@@ -174,7 +174,7 @@ public final class ProtocolNetwork {
 
     /** Whether the peer registers a receiver of either protocol, so it runs some Quick Skin. */
     public static boolean advertisesQuickSkinChannels(ServerPlayer player) {
-        //? if <1.21 {
+        //? if <1.20.5 {
         return NetworkTransport.INSTANCE.canPlayerReceiveProtocolAck(player)
                 || NetworkTransport.INSTANCE.canPlayerReceiveLegacyProtocol(player);
         //?} else {
@@ -232,7 +232,7 @@ public final class ProtocolNetwork {
             // An elytra cape the cache cannot name for this peer goes as the cape's, not lost
             String wireElytra = translateAppearanceId(recipient, elytraId != null ? elytraId : "", "local_cape:");
             if (wireElytra == null) wireElytra = "";
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendAppearanceWithElytraToPlayer(
                     recipient, playerId, wireSkin, wireCape, wireElytra, model);
             //?} else {
@@ -243,7 +243,7 @@ public final class ProtocolNetwork {
             return true;
         }
         if (acceptsV2(recipient)) {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendAppearanceV2ToPlayer(
                     recipient, playerId, wireSkin, wireCape, model);
             //?} else {
@@ -252,7 +252,7 @@ public final class ProtocolNetwork {
                     new SyncAppearanceV2Payload(playerId, wireSkin, wireCape, model));
             //?}
         } else {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendAppearanceToPlayer(
                     recipient, playerId, wireSkin, wireCape, model);
             //?} else {
@@ -274,7 +274,7 @@ public final class ProtocolNetwork {
         String wireId = translateContentId(recipient, contentId);
         if (wireId == null) return false;
         if (acceptsV2(recipient)) {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendAnimationMetadataV2ToPlayer(
                     recipient, wireId, metadataJson);
             //?} else {
@@ -282,7 +282,7 @@ public final class ProtocolNetwork {
                     recipient, new SendAnimationMetadataV2Payload(wireId, metadataJson));
             //?}
         } else {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendAnimationMetadataToPlayer(
                     recipient, wireId, metadataJson);
             //?} else {
@@ -301,7 +301,7 @@ public final class ProtocolNetwork {
         String wireId = translateContentId(recipient, contentId);
         if (wireId == null) return false;
         if (v2) {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendTextureV2ToPlayer(
                     recipient, textureType, wireId, data);
             //?} else {
@@ -309,7 +309,7 @@ public final class ProtocolNetwork {
                     recipient, new SendTextureV2Payload(textureType, wireId, data));
             //?}
         } else {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendTextureToPlayer(
                     recipient, textureType, wireId, data);
             //?} else {
@@ -329,7 +329,7 @@ public final class ProtocolNetwork {
         String wireId = translateContentId(recipient, contentId);
         if (wireId == null) return false;
         if (v2) {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendTextureChunkV2ToPlayer(
                     recipient, wireId, textureType, chunkIndex, totalChunks, data);
             //?} else {
@@ -339,7 +339,7 @@ public final class ProtocolNetwork {
                             wireId, textureType, chunkIndex, totalChunks, data));
             //?}
         } else {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendTextureChunkToPlayer(
                     recipient, wireId, textureType, chunkIndex, totalChunks, data);
             //?} else {

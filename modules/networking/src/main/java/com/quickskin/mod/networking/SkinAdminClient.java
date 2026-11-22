@@ -10,7 +10,7 @@ import com.quickskin.mod.networking.protocol.ProtocolCapability;
 import com.quickskin.mod.networking.protocol.ProtocolProfile;
 import com.quickskin.mod.networking.protocol.ProtocolSessions;
 import com.quickskin.mod.platform.QuickSkinInfo;
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.payloads.SkinAdminPayload;
 import com.quickskin.mod.networking.payloads.TextureChunkV2Payload;
 //?}
@@ -331,7 +331,7 @@ public final class SkinAdminClient {
     }
 
     private void sendChunk(String contentId, int index, int total, byte[] chunk) {
-        //? if <1.21 {
+        //? if <1.20.5 {
         NetworkTransport.INSTANCE.sendTextureChunkV2ToServer(contentId, "skin", index, total, chunk);
         //?} else {
         NetworkTransport.INSTANCE.sendToServer(new TextureChunkV2Payload(contentId, "skin", index, total, chunk));
@@ -346,7 +346,7 @@ public final class SkinAdminClient {
         }
         int requestId = nextRequestId++;
         if (nextRequestId <= 0) nextRequestId = 1;
-        //? if <1.21 {
+        //? if <1.20.5 {
         NetworkTransport.INSTANCE.sendSkinAdminToServer(requestId, action.code(), List.copyOf(targets), skinId, model, name);
         //?} else {
         if (!NetworkTransport.INSTANCE.canServerReceive(SkinAdminPayload.TYPE)) {

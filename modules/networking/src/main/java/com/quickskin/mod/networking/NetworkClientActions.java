@@ -37,7 +37,7 @@ public final class NetworkClientActions implements ClientNetworkActions {
 
     @Override
     public void updateServerConfig(String key, boolean value) {
-        //? if <1.21 {
+        //? if <1.20.5 {
         NetworkTransport.INSTANCE.sendServerConfigUpdateToServer(key, value);
         //?} else {
         NetworkTransport.INSTANCE.sendToServer(
@@ -61,7 +61,7 @@ public final class NetworkClientActions implements ClientNetworkActions {
         ProtocolProfile profile = ProtocolSessions.getInstance().clientProfile(connection);
         if (profile.negotiated() && profile.supports(ProtocolCapability.ACCOUNT_SKIN_REFRESH)) {
             UUID playerId = minecraft.player.getUUID();
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendAccountSkinChangedToServer(playerId);
             //?} else {
             if (NetworkTransport.INSTANCE.canServerReceive(

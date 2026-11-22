@@ -437,7 +437,7 @@ public class PlayerSkinsScreen extends Screen {
     //?} else {
     private static Identifier playerSkin(PlayerInfo info) {
     //?}
-        //? if <1.21 {
+        //? if <1.20.2 {
         return info.getSkinLocation();
         //?} else if <1.21.9 {
         return info.getSkin().texture();
@@ -554,7 +554,7 @@ public class PlayerSkinsScreen extends Screen {
     }
 
     @Override
-    //? if <1.21 {
+    //? if <1.20.2 {
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaY) {
     //?} else {
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
@@ -570,7 +570,7 @@ public class PlayerSkinsScreen extends Screen {
                 return true;
             }
         }
-        //? if <1.21 {
+        //? if <1.20.2 {
         return super.mouseScrolled(mouseX, mouseY, deltaY);
         //?} else {
         return super.mouseScrolled(mouseX, mouseY, deltaX, deltaY);
@@ -602,7 +602,13 @@ public class PlayerSkinsScreen extends Screen {
             //?}
         }
     }
-    //? if >=1.21 && <26.1 {
+    //? if >=1.20.2 && <1.20.5 {
+    @Override
+    public void renderBackground(net.minecraft.client.gui.GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // From 1.20.2 the screen draws its dark background itself, after this modal has been drawn
+    }
+    //?}
+    //? if >=1.20.5 && <26.1 {
         //? if <1.21.2 {
     @Override
     public void renderBlurredBackground(float partialTick) {

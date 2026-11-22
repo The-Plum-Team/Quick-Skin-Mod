@@ -28,7 +28,7 @@ import net.minecraft.util.Mth;
 @Environment(EnvType.CLIENT)
 public class SkinPreviewOverlay {
 
-    //? if >=1.21 {
+    //? if >=1.20.2 {
     private static final int PADDING = 10;
 
     // Overlay position (default: bottom-right)
@@ -60,7 +60,7 @@ public class SkinPreviewOverlay {
     //?}
     private static String cachedModelType = "classic";
     private static String lastCheckedSkinHash = null; // Use null to force initial update
-    //? if >=1.21 {
+    //? if >=1.20.2 {
 
     public enum OverlayPosition {
         TOP_LEFT,
@@ -85,7 +85,7 @@ public class SkinPreviewOverlay {
         if (player == null) {
             return;
         }
-        //? if <1.21 {
+        //? if <1.20.2 {
         if (mc.screen != null) {
             boolean isChatOpen = mc.screen instanceof net.minecraft.client.gui.screens.ChatScreen;
             if (!isChatOpen) {
@@ -126,7 +126,7 @@ public class SkinPreviewOverlay {
             } else {
                 // Use vanilla skin
                 //? if <1.21.9 {
-                    //? if <1.21 {
+                    //? if <1.20.2 {
                 cachedSkinLocation = player.getSkinTextureLocation();
                 cachedModelType = player.getModelName(); // "default" or "slim"
                     //?} else {
@@ -146,7 +146,7 @@ public class SkinPreviewOverlay {
         // Fallback if cached skin is somehow still null
         if (cachedSkinLocation == null) {
             //? if <1.21.9 {
-                //? if <1.21 {
+                //? if <1.20.2 {
             cachedSkinLocation = player.getSkinTextureLocation();
                 //?} else {
             cachedSkinLocation = player.getSkin().texture();
@@ -163,7 +163,7 @@ public class SkinPreviewOverlay {
         float percentageAsFloat = (percentage - 1) / 99.0f;
         float scale = 20.0f + percentageAsFloat * (200.0f - 20.0f); // Replicating PlayerWidget's scale logic
 
-        //? if <1.21 {
+        //? if <1.20.2 {
         int screenWidth = mc.getWindow().getGuiScaledWidth();
         int screenHeight = mc.getWindow().getGuiScaledHeight();
         //?} else {
@@ -171,7 +171,7 @@ public class SkinPreviewOverlay {
         int PREVIEW_SIZE = (int)(scale * 0.8f);
         //?}
 
-        //? if <1.21 {
+        //? if <1.20.2 {
         int hotbarCenterX = screenWidth / 2;
         int hotbarCenterY = screenHeight - 22; // Hotbar is typically 22 pixels from bottom
         //?} else {
@@ -180,7 +180,7 @@ public class SkinPreviewOverlay {
         int baseY = calculateY(mc.getWindow().getGuiScaledHeight(), PREVIEW_SIZE);
         //?}
 
-        //? if <1.21 {
+        //? if <1.20.2 {
         int modelCenterX = hotbarCenterX + config.positionOffsetXHudOverlay;
         int modelCenterY = hotbarCenterY + config.positionOffsetYHudOverlay;
         //?} else {
@@ -250,7 +250,7 @@ public class SkinPreviewOverlay {
         graphics.fill(centerX - 1, centerY - crosshairSize, centerX + 1, centerY + crosshairSize, crosshairColor);
     }
 
-    //? if >=1.21 {
+    //? if >=1.20.2 {
     /**
      * Calculate X position based on overlay position
      */
@@ -336,7 +336,7 @@ public class SkinPreviewOverlay {
         if (lastDrawnNanos == 0L || System.nanoTime() - lastDrawnNanos > DRAWN_INPUT_WINDOW_NANOS) {
             return false;
         }
-        //? if <1.21 {
+        //? if <1.20.2 {
         net.minecraft.client.gui.screens.Screen screen = Minecraft.getInstance().screen;
         return screen == null || screen instanceof net.minecraft.client.gui.screens.ChatScreen;
         //?} else {
@@ -444,7 +444,7 @@ public class SkinPreviewOverlay {
         }
         return EventResult.pass();
     }
-    //? if >=1.21 {
+    //? if >=1.20.2 {
 
     /**
      * Set the overlay position
