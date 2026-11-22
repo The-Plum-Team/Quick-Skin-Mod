@@ -75,7 +75,7 @@ class SharedTargetsTest(unittest.TestCase):
         rows = inventory()["include"]
         versions = sorted({row["artifact_version"] for row in MATRIX["artifacts"]},
                           key=lambda version: tuple(map(int, version.split("."))))
-        self.assertEqual(17, len(rows))
+        self.assertEqual(20, len(rows))
         self.assertEqual([f"mc{version}" for version in versions], [row["bundle_key"] for row in rows])
         for row, version in zip(rows, versions):
             self.assertEqual({"bundle_key": f"mc{version}", "source_branch": "master", "minecraft_target": version,

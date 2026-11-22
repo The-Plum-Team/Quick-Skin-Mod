@@ -82,6 +82,140 @@
         ]
       ]
     },
+    "fabric-1.20.4": {
+      "minecraft": "1.20.4",
+      "loaders": [
+        "fabric"
+      ],
+      "game_versions": [
+        "1.20.4"
+      ],
+      "version_type": "release",
+      "modrinth_dependencies": [
+        [
+          "architectury-api",
+          "required"
+        ],
+        [
+          "fabric-api",
+          "required"
+        ]
+      ],
+      "curseforge_relations": [
+        [
+          "architectury-api",
+          "requiredDependency"
+        ],
+        [
+          "fabric-api",
+          "requiredDependency"
+        ]
+      ]
+    },
+    "fabric-1.20.6": {
+      "minecraft": "1.20.6",
+      "loaders": [
+        "fabric"
+      ],
+      "game_versions": [
+        "1.20.6"
+      ],
+      "version_type": "release",
+      "modrinth_dependencies": [
+        [
+          "architectury-api",
+          "required"
+        ],
+        [
+          "fabric-api",
+          "required"
+        ]
+      ],
+      "curseforge_relations": [
+        [
+          "architectury-api",
+          "requiredDependency"
+        ],
+        [
+          "fabric-api",
+          "requiredDependency"
+        ]
+      ]
+    },
+    "neoforge-1.20.6": {
+      "minecraft": "1.20.6",
+      "loaders": [
+        "neoforge"
+      ],
+      "game_versions": [
+        "1.20.6"
+      ],
+      "version_type": "release",
+      "modrinth_dependencies": [
+        [
+          "architectury-api",
+          "required"
+        ]
+      ],
+      "curseforge_relations": [
+        [
+          "architectury-api",
+          "requiredDependency"
+        ]
+      ]
+    },
+    "fabric-1.21": {
+      "minecraft": "1.21",
+      "loaders": [
+        "fabric"
+      ],
+      "game_versions": [
+        "1.21"
+      ],
+      "version_type": "release",
+      "modrinth_dependencies": [
+        [
+          "architectury-api",
+          "required"
+        ],
+        [
+          "fabric-api",
+          "required"
+        ]
+      ],
+      "curseforge_relations": [
+        [
+          "architectury-api",
+          "requiredDependency"
+        ],
+        [
+          "fabric-api",
+          "requiredDependency"
+        ]
+      ]
+    },
+    "neoforge-1.21": {
+      "minecraft": "1.21",
+      "loaders": [
+        "neoforge"
+      ],
+      "game_versions": [
+        "1.21"
+      ],
+      "version_type": "release",
+      "modrinth_dependencies": [
+        [
+          "architectury-api",
+          "required"
+        ]
+      ],
+      "curseforge_relations": [
+        [
+          "architectury-api",
+          "requiredDependency"
+        ]
+      ]
+    },
     "fabric-1.21.1": {
       "minecraft": "1.21.1",
       "loaders": [

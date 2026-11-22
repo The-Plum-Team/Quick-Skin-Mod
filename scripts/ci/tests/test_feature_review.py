@@ -71,6 +71,10 @@ class FeatureReviewTest(unittest.TestCase):
                          "selection_sha256": self.selected.sha256, "baseline": {"id": 9000}}
         matrix, _digest, rows = review.targets._inventory(review.coverage.DEFAULT_MATRIX, "pr-anchors")
         self.targets = review.coverage.inventory(review.coverage.DEFAULT_MATRIX)["include"]
+        # The paired cases address one later target built for two loaders as targets[1]
+        paired = next(index for index, item in enumerate(self.targets) if index and sum(
+            row["runtime_version"] == item["minecraft_target"] for row in rows) == 2)
+        self.targets.insert(1, self.targets.pop(paired))
         self.records = [{"id": index + 1, "name": "packaged-e2e-" + row["id"], "size_in_bytes": 1024,
             "digest": "sha256:" + "a" * 64, "expired": False,
             "workflow_run": {"id": 55, "head_branch": "master", "head_sha": self.source}}

@@ -99,8 +99,9 @@ class FeatureCoverageTest(unittest.TestCase):
             record = self.validate(files, target)
             captures = [item for item in self.contract.captures
                         if item.scenario in self.contract.scenarios_for_profile("pr")]
-            self.assertEqual(len(captures) * 2, record["frame_count"])
-            self.assertEqual(2, len(record["artifact_nodes"]))
+            lanes = len(target["artifact_inventory"])
+            self.assertEqual(len(captures) * lanes, record["frame_count"])
+            self.assertEqual(lanes, len(record["artifact_nodes"]))
             reviews[target["bundle_key"]] = files
         with patch.object(coverage, "policy_fingerprint", return_value="c" * 64), \
              patch.object(coverage, "module_fingerprints", return_value={"fixture": "d" * 64}):
@@ -268,7 +269,7 @@ class FeatureCoverageTest(unittest.TestCase):
             "artifact": reference, "artifact_node": "fabric-1.20.1", "source_sha": self.source,
             "source_run_id": self.run_id})
         self.write(files, proof, manifest, report)
-        self.assertEqual(182, self.validate(files, target)["frame_count"])
+        self.assertEqual(91 * len(target["artifact_inventory"]), self.validate(files, target)["frame_count"])
         proof["visual_reference"]["source_run_id"] += 1
         self.write(files, proof, manifest, report)
         with self.assertRaises(ValueError): self.validate(files, target)

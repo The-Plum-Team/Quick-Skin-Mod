@@ -270,6 +270,20 @@ JAR. Loader source trees are mutually exclusive artifacts. Schema 3 permits seve
 replacements within one owner, since each target selects only its declared family. Newer-only
 canonical classes use whole-file Stonecutter guards, without per-version exclusion maps in Gradle.
 
+The targets between 1.20.1 and 1.21.1 share the canonical sources through three boundaries.
+`<1.20.2` is the 1.20.1 edition: skins before `PlayerSkin`, its overlay mixins, its ReplayMod
+helper and the behaviour only that edition has. `<1.20.5` is the Architectury networking before
+payload codecs and the rendering signatures that still take a `PoseStack`. `<1.21` is the
+identifier constructor, the chained vertex builder and the partial tick before `DeltaTracker`. A
+guard takes the oldest boundary its API needs, so a target takes the modern branch wherever it
+compiles; a mixin's string descriptors do not fail to compile and are checked against the target's
+own Minecraft. Minecraft 1.20.4 routes to `legacy1_20_4`: its own mixin lists for Java 17 and a
+copy of the 1.20.1 networking overlay, because an overlay is copied without version conditions and
+a target follows exactly one route. `test_shared_legacy_networking_policy` keeps that copy
+byte-identical to `legacy1_20_1`; change both together. 1.20.4 is built for Fabric only: NeoForge
+20.4 reads `META-INF/mods.toml`, which the matrix validator and the sealed harness tree do not
+describe, and the Forge module's sources are not preprocessed.
+
 Keep overlays narrow. Prefer a small adapter or a Stonecutter version branch over copying an entire
 service, screen, or handler. When a class exists in an active overlay:
 

@@ -289,6 +289,11 @@ class RequestTests(unittest.TestCase):
 
 
 class CanonicalRequestTests(unittest.TestCase):
+    @staticmethod
+    def lane_count() -> int:
+        import json
+        return json.loads(Path(scheduler.coverage.DEFAULT_MATRIX).read_text(encoding="utf-8"))["lane_count"]
+
     @classmethod
     def setUpClass(cls):
         import test_feature_coverage_consumer as fixtures
@@ -380,8 +385,8 @@ class CanonicalRequestTests(unittest.TestCase):
             directory=directory)
         targets = scheduler.coverage.inventory(scheduler.coverage.DEFAULT_MATRIX)["include"]
         self.assertEqual(len(targets), len(result["targets"]))
-        # Every target publishes the same contracted 182 frames (the 16-target baseline had 2,880).
-        self.assertEqual(182 * len(targets), sum(target["frame_count"] for target in result["targets"]))
+        # Every lane publishes the same contracted 91 frames (the 16-target baseline had 2,880).
+        self.assertEqual(91 * self.lane_count(), sum(target["frame_count"] for target in result["targets"]))
         key = name.split("--", 1)[1]
         self.assertEqual(replacement["id"], result["review_artifacts"][key]["id"])
         self.assertNotIn(original["id"], inner.downloaded)
@@ -414,8 +419,8 @@ class CanonicalRequestTests(unittest.TestCase):
             directory=directory)
         targets = scheduler.coverage.inventory(scheduler.coverage.DEFAULT_MATRIX)["include"]
         self.assertEqual(len(targets), len(result["targets"]))
-        # Every target publishes the same contracted 182 frames (the 16-target baseline had 2,880).
-        self.assertEqual(182 * len(targets), sum(target["frame_count"] for target in result["targets"]))
+        # Every lane publishes the same contracted 91 frames (the 16-target baseline had 2,880).
+        self.assertEqual(91 * self.lane_count(), sum(target["frame_count"] for target in result["targets"]))
         self.assertEqual({8000}, {record["owner_run_id"] for record in result["public_artifacts"].values()})
 
 

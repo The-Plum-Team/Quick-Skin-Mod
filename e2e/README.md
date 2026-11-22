@@ -22,6 +22,11 @@ This `master` shared source exercises the following exact packaged lanes:
 |---|---:|---|---:|---:|
 | `fabric-1.20.1` | `1.20.1` | Fabric | `17` | `11` |
 | `forge-1.20.1` | `1.20.1` | Forge | `17` | `11` |
+| `fabric-1.20.4` | `1.20.4` | Fabric | `17` | `11` |
+| `fabric-1.20.6` | `1.20.6` | Fabric | `21` | `11` |
+| `neoforge-1.20.6` | `1.20.6` | NeoForge | `21` | `11` |
+| `fabric-1.21` | `1.21` | Fabric | `21` | `11` |
+| `neoforge-1.21` | `1.21` | NeoForge | `21` | `11` |
 | `fabric-1.21.1` | `1.21.1` | Fabric | `21` | `11` |
 | `neoforge-1.21.1` | `1.21.1` | NeoForge | `21` | `11` |
 | `fabric-1.21.2` | `1.21.2` | Fabric | `21` | `11` |

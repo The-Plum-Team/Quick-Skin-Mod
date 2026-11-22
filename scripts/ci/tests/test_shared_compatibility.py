@@ -66,7 +66,7 @@ class SharedCompatibilityTest(unittest.TestCase):
         result = self.admit()
         self.assertEqual(10, len(self.payload))  # GitHub's repository_dispatch payload property limit.
         self.assertEqual(self.target["bundle_key"], result["bundle_key"])
-        self.assertEqual("1.21.1", result["minecraft_target"])
+        self.assertEqual(self.target["minecraft_target"], result["minecraft_target"])
         self.assertEqual(self.fixture.source, result["target_sha"])
         self.assertEqual([self.record["id"]], self.api.downloaded)
 

@@ -234,7 +234,7 @@ class TargetsHookTest(Scratch):
         matrix = json.loads(MATRIX.read_bytes())
         versions = sorted({row["artifact_version"] for row in matrix["artifacts"]},
                           key=lambda version: tuple(map(int, version.split("."))), reverse=True)
-        self.assertEqual(17, len(targets))
+        self.assertEqual(20, len(targets))
         self.assertEqual([f"mc{version}" for version in versions], [target["key"] for target in targets])
         self.assertEqual(NEWEST, targets[0]["key"])
         self.assertEqual([f"Minecraft {version}" for version in versions], [target["label"] for target in targets])
@@ -259,13 +259,16 @@ class TargetsHookTest(Scratch):
 class ExpectationHookTest(Scratch):
     def test_real_contract_expectations_for_every_key(self) -> None:
         frames = 0
+        artifacts = json.loads(MATRIX.read_bytes())["artifacts"]
         for target in run_hook("targets", {"branches": None}, scratch=self.scratch):
             with self.subTest(key=target["key"]):
                 value = run_hook("expectation", {"target": target, "tested_run": {"event": "pull_request",
                                                                                   "branch": "feature/x"},
                                                  "extensions": {}}, scratch=self.scratch)
                 validate_expectation(value, image_policy=CONFIG.image_policy())
-                self.assertEqual((14, 182, 76),
+                # Seven lanes, 91 captures and 38 comparisons for each loader the target is built for
+                loaders = sum(f"mc{row['artifact_version']}" == target["key"] for row in artifacts)
+                self.assertEqual((7 * loaders, 91 * loaders, 38 * loaders),
                                  (len(value["lanes"]), len(value["captures"]), len(value["comparisons"])))
                 self.assertEqual({"kind": "complete"}, value["scope"])
                 self.assertEqual(REPOSITORY, value["repository"])
