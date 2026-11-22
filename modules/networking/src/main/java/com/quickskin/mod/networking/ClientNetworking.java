@@ -1,6 +1,6 @@
 package com.quickskin.mod.networking;
 
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.payloads.*;
 //?}
 import dev.architectury.networking.NetworkManager;
@@ -22,7 +22,7 @@ public class ClientNetworking {
         // Register S2C (Server to Client) payload receivers
         NetworkManager.registerReceiver(
             NetworkManager.s2c(),
-            //? if <1.21 {
+            //? if <1.20.5 {
             ModNetworking.SYNC_APPEARANCE,
             //?} else {
             SyncAppearancePayload.TYPE,
@@ -33,7 +33,7 @@ public class ClientNetworking {
 
         NetworkManager.registerReceiver(
             NetworkManager.s2c(),
-            //? if <1.21 {
+            //? if <1.20.5 {
             ModNetworking.SEND_TEXTURE,
             //?} else {
             SendTexturePayload.TYPE,
@@ -44,7 +44,7 @@ public class ClientNetworking {
 
         NetworkManager.registerReceiver(
             NetworkManager.s2c(),
-            //? if <1.21 {
+            //? if <1.20.5 {
             ModNetworking.SEND_TEXTURE_CHUNK,
             //?} else {
             SendTextureChunkPayload.TYPE,
@@ -55,7 +55,7 @@ public class ClientNetworking {
 
         NetworkManager.registerReceiver(
             NetworkManager.s2c(),
-            //? if <1.21 {
+            //? if <1.20.5 {
             ModNetworking.SEND_ANIMATION_METADATA,
             //?} else {
             SendAnimationMetadataPayload.TYPE,
@@ -66,7 +66,7 @@ public class ClientNetworking {
 
         NetworkManager.registerReceiver(
             NetworkManager.s2c(),
-            //? if <1.21 {
+            //? if <1.20.5 {
             ModNetworking.SYNC_SERVER_CONFIG,
             //?} else {
             SyncServerConfigPayload.TYPE,
@@ -77,7 +77,7 @@ public class ClientNetworking {
 
         NetworkManager.registerReceiver(
             NetworkManager.s2c(),
-            //? if <1.21 {
+            //? if <1.20.5 {
             ModNetworking.COOLDOWN_UPDATE,
             //?} else {
             CooldownUpdatePayload.TYPE,
@@ -88,7 +88,7 @@ public class ClientNetworking {
 
         NetworkManager.registerReceiver(
             NetworkManager.s2c(),
-            //? if <1.21 {
+            //? if <1.20.5 {
             ModNetworking.APPEARANCE_SNAPSHOT_COMPLETE,
             //?} else {
             AppearanceSnapshotCompletePayload.TYPE,
@@ -97,7 +97,7 @@ public class ClientNetworking {
             ClientNetworkHandler::handleAppearanceSnapshotComplete
         );
 
-        //? if >=1.21 {
+        //? if >=1.20.5 {
         NetworkManager.registerReceiver(
                 NetworkManager.s2c(), ProtocolAckPayload.TYPE,
                 ProtocolAckPayload.CODEC, ClientNetworkHandler::handleProtocolAck);

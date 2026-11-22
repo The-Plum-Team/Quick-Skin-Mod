@@ -19,7 +19,7 @@ import com.quickskin.mod.client.gui.widget.FieldIconButton;
 import com.quickskin.mod.client.gui.widget.IconButton;
 import com.quickskin.mod.client.gui.widget.ImportTileButton;
 import com.quickskin.mod.client.gui.widget.NameTagButton;
-//? if <1.21 {
+//? if <1.20.2 {
 //?} else {
 import com.quickskin.mod.client.gui.widget.PlayerWidget;
 //?}
@@ -34,7 +34,7 @@ import com.quickskin.mod.client.services.LocalHiddenArmor;
 import com.quickskin.mod.client.services.LocalNicknameService;
 import com.quickskin.mod.client.api.ClientNetworkActions;
 import com.quickskin.mod.client.services.MojangApiService;
-//? if <1.21 {
+//? if <1.20.2 {
 //?} else {
 //?}
 import net.minecraft.client.Minecraft;
@@ -203,7 +203,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private long lastEnterKeyAt;
 
     public PlayerSkinMenuScreen(@Nullable Screen parent) {
-//? if <1.21 {
+//? if <1.20.2 {
         super(Component.translatable("quickskin.screen.skin_menu.title"));
 //?} else {
         super(Component.literal("Quick Skin"));
@@ -937,7 +937,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             playerPreviewPanel.getRotationArc().renderRing(graphics, mouseX, mouseY);
         }
 
-//? if <1.21 {
+//? if <1.20.2 {
 //?} else if <1.21.6 {
         // Push pose
         graphics.pose().pushPose();
@@ -951,7 +951,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         layoutNameTag();
 
         // Render widgets (buttons, etc.)
-//? if <1.21 {
+//? if <1.20.2 {
         super.render(graphics, mouseX, mouseY, partialTick);
 //?} else if <1.21.6 {
         super.render(graphics, mouseX, mouseY, partialTick);
@@ -1949,7 +1949,15 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     @Override
-//? if <1.21 {
+//? if <1.20.2 {
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+//?} else if <1.20.5 {
+    // From 1.20.2 the screen draws this itself before its widgets; the blur came with 1.20.5
+    public void renderBackground(net.minecraft.client.gui.GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // Disable the default dark background overlay - we render our own custom background
+    }
+
+    @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
 //?} else if <1.21.6 {
 //? if <1.21.2 {
@@ -2029,7 +2037,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     }
 
     @Override
-//? if <1.21 {
+//? if <1.20.2 {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (clickForegroundControls(button, control -> control.mouseClicked(mouseX, mouseY, button))) return true;
 //?} else if <1.21.9 {
@@ -2129,7 +2137,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         }
         com.quickskin.mod.client.gui.widget.RotationArcWidget arc = playerPreviewPanel.getRotationArc();
         boolean onArc = arc != null && arc.isOnArc(mouseX, mouseY);
-//? if <1.21 {
+//? if <1.20.2 {
         boolean onModel = false;
 //?} else {
         boolean onModel = playerPreviewPanel.isOverModelBox(mouseX, mouseY);
@@ -2235,7 +2243,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             rotatingModel = false;
             return true;
         }
-//? if <1.21 {
+//? if <1.20.2 {
         return super.mouseReleased(mouseX, mouseY, button);
 //?} else if <1.21.9 {
         return super.mouseReleased(mouseX, mouseY, button);
@@ -2646,7 +2654,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
             // The model replaces the applied Quick Skin skin. Withdraw it here and on the
             // server, or other players keep drawing the old skin.
             if (this.minecraft != null && this.minecraft.player != null) {
-//? if <1.21 {
+//? if <1.20.2 {
                 java.util.UUID targetUUID = com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
 //?} else {
                 java.util.UUID targetUUID = this.minecraft.player.getUUID();
@@ -2691,7 +2699,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
         // title screen. In a world it is also applied to the player entity.
         if (this.minecraft != null && this.minecraft.player != null) {
             String skinId = "local_skin:" + metadata.hash();
-//? if <1.21 {
+//? if <1.20.2 {
             // Use ReplayModHelper to get the correct player UUID (handles replay mode)
             java.util.UUID targetUUID = com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
             if (targetUUID != null) {
@@ -2730,7 +2738,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     /** The player a look applies to: the local player in a world, the title screen's model outside. */
     private java.util.UUID localWearTarget() {
         if (this.minecraft != null && this.minecraft.player != null) {
-//? if <1.21 {
+//? if <1.20.2 {
             return com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
 //?} else {
             return this.minecraft.player.getUUID();
@@ -2746,7 +2754,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private void wearSkinCape(AssetMetadata metadata) {
         java.util.UUID target;
         if (this.minecraft != null && this.minecraft.player != null) {
-//? if <1.21 {
+//? if <1.20.2 {
             target = com.quickskin.mod.client.compat.ReplayModHelper.getTargetPlayerUUID();
 //?} else {
             target = this.minecraft.player.getUUID();

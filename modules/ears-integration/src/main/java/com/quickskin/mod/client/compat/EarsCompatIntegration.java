@@ -316,7 +316,7 @@ public class EarsCompatIntegration {
             return null;
         }
         try {
-            //? if <1.21 {
+            //? if <1.20.2 {
             Method getSkinTexture = player.getClass().getMethod("getSkinTexture");
             return (ResourceLocation) getSkinTexture.invoke(player);
             //?} else if <1.21.9 {
@@ -348,7 +348,7 @@ public class EarsCompatIntegration {
             // Ignore
         }
         try {
-            //? if <1.21 {
+            //? if <1.20.2 {
             Method getSkinTextureLocation = player.getClass().getMethod("getSkinTextureLocation");
             return (ResourceLocation) getSkinTextureLocation.invoke(player);
             //?} else if <1.21.11 {

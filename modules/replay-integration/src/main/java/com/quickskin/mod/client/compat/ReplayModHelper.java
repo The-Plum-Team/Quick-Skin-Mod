@@ -1,4 +1,4 @@
-//? if >=1.21 {
+//? if >=1.20.2 {
 package com.quickskin.mod.client.compat;
 
 import com.quickskin.mod.platform.QuickSkinInfo;

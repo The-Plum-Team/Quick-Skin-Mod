@@ -219,9 +219,12 @@ final class LegacyTerrainGeometry {
 
     private static void emit(VertexConsumer out, PoseStack.Pose pose, float x, float y, float z,
                              float u, float v, int rgb, int light, Direction direction) {
-        //? if <1.21 {
+        //? if <1.20.5 {
         out.vertex(pose.pose(), x, y, z).color(rgb >> 16 & 255, rgb >> 8 & 255, rgb & 255, 255)
                 .uv(u,v).uv2(light).normal(pose.normal(), direction.getStepX(), direction.getStepY(), direction.getStepZ()).endVertex();
+        //?} else if <1.21 {
+        out.vertex(pose.pose(), x, y, z).color(rgb >> 16 & 255, rgb >> 8 & 255, rgb & 255, 255)
+                .uv(u,v).uv2(light).normal(pose, direction.getStepX(), direction.getStepY(), direction.getStepZ()).endVertex();
         //?} else {
         out.addVertex(pose,x,y,z).setColor(rgb).setUv(u,v).setLight(light)
                 .setNormal(pose,direction.getStepX(),direction.getStepY(),direction.getStepZ());

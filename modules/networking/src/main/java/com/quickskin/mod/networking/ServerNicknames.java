@@ -4,7 +4,7 @@ import com.quickskin.mod.config.ServerConfig;
 import com.quickskin.mod.networking.protocol.ProtocolCapability;
 import com.quickskin.mod.networking.protocol.ProtocolProfile;
 import com.quickskin.mod.server.data.ServerNicknameStore;
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.payloads.NicknameResultPayload;
 import com.quickskin.mod.networking.payloads.SyncNicknamesPayload;
 //?}
@@ -411,7 +411,7 @@ public final class ServerNicknames {
         // What the player shows now, which the client puts on its own name tag
         String shown = displayedNickname(player.getUUID());
         try {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendNicknameResultToPlayer(
                     player, requestId, status.code(), shown, retryAfterMillis);
             //?} else {
@@ -581,7 +581,7 @@ public final class ServerNicknames {
     }
 
     static MinecraftServer server(ServerPlayer player) {
-        //? if <1.21 {
+        //? if <1.20.5 {
         return player.server;
         //?} else {
         return player.level().getServer();
@@ -612,7 +612,7 @@ public final class ServerNicknames {
             for (int start = 0; start < entries.size(); start += TextureTransferLimits.MAX_NICKNAME_ENTRIES) {
                 List<NicknameEntry> packet = List.copyOf(entries.subList(
                         start, Math.min(entries.size(), start + TextureTransferLimits.MAX_NICKNAME_ENTRIES)));
-                //? if <1.21 {
+                //? if <1.20.5 {
                 NetworkTransport.INSTANCE.sendNicknamesToPlayer(recipient, packet);
                 //?} else {
                 NetworkTransport.INSTANCE.sendToPlayer(recipient, new SyncNicknamesPayload(packet));

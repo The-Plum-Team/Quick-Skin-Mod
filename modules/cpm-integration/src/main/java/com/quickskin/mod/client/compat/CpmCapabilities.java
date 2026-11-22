@@ -95,7 +95,7 @@ public final class CpmCapabilities {
     }
 
     public static Band currentBand() {
-        //? if <1.21 {
+        //? if <1.20.2 {
         return Band.MC_1_20_1;
         //?} else if <1.21.4 {
         return Band.MC_1_21_1;

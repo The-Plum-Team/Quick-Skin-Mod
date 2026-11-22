@@ -8,7 +8,7 @@ import com.quickskin.mod.config.ServerConfig;
 import com.quickskin.mod.networking.protocol.ProtocolCapability;
 import com.quickskin.mod.networking.protocol.ProtocolProfile;
 import com.quickskin.mod.networking.protocol.ProtocolSessions;
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.payloads.SetNicknamePayload;
 //?}
 import net.fabricmc.api.EnvType;
@@ -200,7 +200,7 @@ public final class NicknameSyncService {
         if (playerId == null || !NetworkSecurity.isValidNickname(nickname)) return;
         int requestId = nextRequestId++;
         if (nextRequestId <= 0) nextRequestId = 1;
-        //? if <1.21 {
+        //? if <1.20.5 {
         NetworkTransport.INSTANCE.sendNicknameToServer(playerId, requestId, nickname);
         //?} else {
         if (!NetworkTransport.INSTANCE.canServerReceive(SetNicknamePayload.TYPE)) return;

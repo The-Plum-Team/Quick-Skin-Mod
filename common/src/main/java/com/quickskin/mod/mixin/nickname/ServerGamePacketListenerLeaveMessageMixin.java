@@ -18,7 +18,7 @@ public abstract class ServerGamePacketListenerLeaveMessageMixin {
     public ServerPlayer player;
 
     @ModifyArg(
-            //? if <1.21 {
+            //? if <1.20.2 {
             method = "onDisconnect",
             //?} else {
             method = "removePlayerFromWorld",

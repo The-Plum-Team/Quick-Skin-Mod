@@ -40,7 +40,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-//? if <1.21 {
+//? if <1.20.2 {
 //?} else {
 import java.lang.ref.SoftReference;
 //?}
@@ -78,7 +78,7 @@ public class LocalAssetManager {
     private final Map<String, Map<TextureQuality, Identifier>> textureRegistry = new ConcurrentHashMap<>();
 //?}
 
-//? if <1.21 {
+//? if <1.20.2 {
 //?} else if <1.21.11 {
     // F8: GC-friendly cache of decoded source BufferedImages
     private final Map<String, SoftReference<BufferedImage>> sourceImageCache = new ConcurrentHashMap<>();
@@ -561,7 +561,7 @@ public class LocalAssetManager {
                 else if (fileName.endsWith(".gif") && "cape".equals(type)) {
                     AssetMetadata metadata = processGifAsset(path, scanned);
                     if (metadata != null) {
-//? if <1.21 {
+//? if <1.20.2 {
                         scanned.put(metadata, path);
 //?} else {
                         // Point to the cached PNG atlas so loadTexture/getSourceImage get the
@@ -704,7 +704,7 @@ public class LocalAssetManager {
                     animMeta = readAnimationMetadataFile(rawLegacyHash);
                 }
                 if (animMeta == null) {
-//? if <1.21 {
+//? if <1.20.2 {
                     int candidateWidth = image.getWidth();
                     int candidateHeight = image.getHeight();
                     int candidateFrameHeight = candidateWidth / 2;
@@ -723,7 +723,7 @@ public class LocalAssetManager {
                         if (fc > 1 && fc <= MAX_ANIMATION_FRAMES) {
 //?}
                             List<AnimationMetadata.FrameData> frames = new ArrayList<>();
-//? if <1.21 {
+//? if <1.20.2 {
                             for (int i = 0; i < candidateFrames; i++) {
 //?} else {
                             for (int i = 0; i < fc; i++) {
@@ -731,7 +731,7 @@ public class LocalAssetManager {
 //?}
                                 frames.add(new AnimationMetadata.FrameData(50, i));
                             }
-//? if <1.21 {
+//? if <1.20.2 {
                             animMeta = new AnimationMetadata(frames, candidateFrames);
 //?} else {
                             animMeta = new AnimationMetadata(frames, fc);
@@ -870,7 +870,7 @@ public class LocalAssetManager {
         com.quickskin.mod.common.util.StbGifLoader.GifLoadResult result = null;
         try {
             byte[] sourceBytes = BoundedFileReader.readBytes(path, MAX_ASSET_BYTES);
-//? if <1.21 {
+//? if <1.20.2 {
             // Load GIF using STB Image
             try (var inputStream = new ByteArrayInputStream(sourceBytes)) {
                 result = com.quickskin.mod.common.util.StbGifLoader.loadGif(inputStream);
@@ -886,7 +886,7 @@ public class LocalAssetManager {
                 return null;
             }
             scanned.registerAliases(hash, rawLegacyHash, roleLegacyHash);
-//? if <1.21 {
+//? if <1.20.2 {
 //?} else {
 
             // F7: cache-hit fast path. Skip STB decode if cached atlas + metadata
@@ -943,7 +943,7 @@ public class LocalAssetManager {
                     NativeImage frame = result.frames()[i];
                     for (int y = 0; y < height; y++) {
                         for (int x = 0; x < width; x++) {
-//? if <1.21 {
+//? if <1.20.2 {
                             MinecraftCompat.INSTANCE.setPixel(
                                     atlas, x, i * height + y, MinecraftCompat.INSTANCE.getPixel(frame, x, y));
 //?} else if <1.21.11 {
@@ -964,7 +964,7 @@ public class LocalAssetManager {
             } finally {
                 atlas.close();
             }
-//? if <1.21 {
+//? if <1.20.2 {
 //?} else {
 
             // Composite vanilla elytra on cache atlas if elytra area is transparent
@@ -988,7 +988,7 @@ public class LocalAssetManager {
             // Get resolution from first frame
             SkinResolution resolution = SkinResolution.fromDimensions(width, height);
             if (resolution == null) {
-//? if <1.21 {
+//? if <1.20.2 {
                 resolution = SkinResolution.findNearest(width, height);
                 if (resolution == null) {
                     return null;
@@ -1016,7 +1016,7 @@ public class LocalAssetManager {
                 resolution = SkinResolution.STANDARD;
 //?}
             }
-//? if <1.21 {
+//? if <1.20.2 {
 
             // Composite vanilla elytra on cache atlas if elytra area is transparent
             compositeElytraOnAtlasIfNeeded(atlasPath, frameCount);
@@ -1420,7 +1420,7 @@ public class LocalAssetManager {
             return null;
         }
 
-//? if <1.21 {
+//? if <1.20.2 {
         // For GIF source files, use the cached PNG atlas (ImageIO only reads first GIF frame)
         Path readPath = sourcePath;
         if (sourcePath.toString().toLowerCase(Locale.ROOT).endsWith(".gif")) {
@@ -1434,7 +1434,7 @@ public class LocalAssetManager {
 //?} else {
 //?}
         try {
-//? if <1.21 {
+//? if <1.20.2 {
             byte[] sourceBytes = BoundedFileReader.readBytes(readPath, MAX_ASSET_BYTES);
             BufferedImage image = SafeImageReader.readPng(sourceBytes);
             if (image == null) {
@@ -1676,7 +1676,7 @@ public class LocalAssetManager {
             }
             catalog = snapshot.without(primary);
             invalidatePendingScans();
-//? if <1.21 {
+//? if <1.20.2 {
 //?} else {
             sourceImageCache.remove(primary);
 //?}
@@ -2066,7 +2066,7 @@ public class LocalAssetManager {
                     try {
                         for (int y = 0; y < frameHeight; y++) {
                             for (int x = 0; x < nativeImage.getWidth(); x++) {
-//? if <1.21 {
+//? if <1.20.2 {
                                 MinecraftCompat.INSTANCE.setPixel(
                                         firstFrame, x, y, MinecraftCompat.INSTANCE.getPixel(nativeImage, x, y));
 //?} else if <1.21.11 {
@@ -2110,7 +2110,7 @@ public class LocalAssetManager {
             boolean hasAlpha = false;
             for (int y = 0; y < nativeImage.getHeight() && !hasAlpha; y++) {
                 for (int x = 0; x < nativeImage.getWidth() && !hasAlpha; x++) {
-//? if <1.21 {
+//? if <1.20.2 {
                     int pixel = MinecraftCompat.INSTANCE.getPixel(nativeImage, x, y);
 //?} else if <1.21.11 {
                     int pixel = MinecraftCompat.INSTANCE.getPixel(nativeImage, x, y);
@@ -2170,7 +2170,7 @@ public class LocalAssetManager {
         if (!NetworkSecurity.isValidContentId(hash)) return null;
         String primary = catalog.resolve(hash);
         if (primary == null) return null;
-//? if <1.21 {
+//? if <1.20.2 {
         Path sourcePath = getSourcePath(primary);
 
         // For GIF source files, always use the cached PNG atlas
@@ -2189,12 +2189,12 @@ public class LocalAssetManager {
                 return cached;
 //?}
             }
-//? if <1.21 {
+//? if <1.20.2 {
 //?} else {
             sourceImageCache.remove(primary, ref);
 //?}
         }
-//? if <1.21 {
+//? if <1.20.2 {
 //?} else {
         Path sourcePath = getSourcePath(primary);
 //?}
@@ -2209,7 +2209,7 @@ public class LocalAssetManager {
             }
         }
         try {
-//? if <1.21 {
+//? if <1.20.2 {
             return SafeImageReader.readPng(sourcePath);
 //?} else {
             BufferedImage decoded = SafeImageReader.readPng(sourcePath);
@@ -2262,7 +2262,7 @@ public class LocalAssetManager {
                 int g = (argb >> 8) & 0xFF;
                 int b = argb & 0xFF;
                 int abgr = (a << 24) | (b << 16) | (g << 8) | r;
-//? if <1.21 {
+//? if <1.20.2 {
                 MinecraftCompat.INSTANCE.setPixel(nativeImage, x, y, abgr);
 //?} else if <1.21.11 {
                 MinecraftCompat.INSTANCE.setPixel(nativeImage, x, y, abgr);

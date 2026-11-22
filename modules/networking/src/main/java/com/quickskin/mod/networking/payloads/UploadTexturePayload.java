@@ -1,4 +1,4 @@
-//? if >=1.21 {
+//? if >=1.20.5 {
 package com.quickskin.mod.networking.payloads;
 
 import com.quickskin.mod.platform.QuickSkinInfo;
@@ -21,7 +21,9 @@ import java.util.UUID;
 public record UploadTexturePayload(UUID playerId, String textureType, byte[] imageData) implements CustomPacketPayload {
 
     public static final Type<UploadTexturePayload> TYPE = new Type<>(
-        //? if <1.21.11 {
+        //? if <1.21 {
+        new ResourceLocation(QuickSkinInfo.MOD_ID, "upload_texture")
+        //?} else if <1.21.11 {
         ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "upload_texture")
         //?} else {
         Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "upload_texture")

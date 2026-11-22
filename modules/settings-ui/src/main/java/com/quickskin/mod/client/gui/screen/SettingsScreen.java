@@ -4,7 +4,7 @@ import com.quickskin.mod.client.gui.util.MenuGuiScale;
 import com.quickskin.mod.client.gui.GuiCompat;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.quickskin.mod.client.gui.effect.BlurHandler;
-//? if <1.21 {
+//? if <1.20.2 {
 import com.quickskin.mod.client.gui.GuiCompat;
 //?}
 import com.quickskin.mod.client.gui.util.ButtonFactory;
@@ -273,7 +273,7 @@ public class SettingsScreen extends Screen {
     private Checkbox checkbox(int x, int y, String translationKey, boolean selected,
                               @Nullable String tooltipKey, Runnable onChange) {
         Component label = Component.translatable(translationKey);
-        //? if <1.21 {
+        //? if <1.20.3 {
         Checkbox checkbox = new Checkbox(x, y, contentWidth, 20, label, selected) {
             @Override
             public void onPress() {
@@ -883,7 +883,7 @@ public class SettingsScreen extends Screen {
     }
 
     @Override
-    //? if <1.21 {
+    //? if <1.20.2 {
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
     //?} else {
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
@@ -891,7 +891,7 @@ public class SettingsScreen extends Screen {
         // Allow scrolling only within modal
         if (mouseX >= dialogX && mouseX <= dialogX + dialogWidth &&
                 mouseY >= dialogY && mouseY <= dialogY + dialogHeight) {
-            //? if <1.21 {
+            //? if <1.20.2 {
             return super.mouseScrolled(mouseX, mouseY, delta);
             //?} else {
             return super.mouseScrolled(mouseX, mouseY, deltaX, deltaY);
@@ -969,7 +969,7 @@ public class SettingsScreen extends Screen {
     // Minecraft 1.21.1 calls renderBackground() from Screen.render() before it renders widgets.
     // This screen has already drawn and blurred its parent by then, so allowing that second
     // background pass would blur the modal panel while leaving the later widgets sharp.
-    //? if >=1.21 {
+    //? if >=1.20.2 {
         //? if <1.21.2 {
     @Override
     public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {

@@ -52,7 +52,7 @@ public class PlayerWidget extends AbstractWidget {
     private int dragStartY = 0;
     private int dragStartOffsetX = 0;
     private int dragStartOffsetY = 0;
-//? if <1.21 {
+//? if <1.20.2 {
 
     // Rotation drag state (works when NOT in customization mode)
     private boolean isRotating = false;
@@ -226,7 +226,7 @@ public class PlayerWidget extends AbstractWidget {
     private Float layoutScale = null;
     private boolean leftOut;
 
-//? if <1.21 {
+//? if <1.20.2 {
     // Priority areas (buttons that should take precedence over model interaction)
     private java.util.List<net.minecraft.client.gui.components.AbstractWidget> priorityWidgets = new java.util.ArrayList<>();
 
@@ -446,7 +446,7 @@ public class PlayerWidget extends AbstractWidget {
      * happens only before 1.21, where the model turns itself.
      */
     public void setRestingYRotation(float yaw) {
-//? if <1.21 {
+//? if <1.20.2 {
         this.originalYRotation = yaw;
         this.shouldReturnToOriginal = false;
 //?}
@@ -457,7 +457,7 @@ public class PlayerWidget extends AbstractWidget {
      * back to the resting yaw ({@link #setRestingYRotation}); otherwise it stays turned.
      */
     public void setReturnsToRest(boolean returnsToRest) {
-//? if <1.21 {
+//? if <1.20.2 {
         this.returnsToRest = returnsToRest;
 //?}
     }
@@ -549,7 +549,7 @@ public class PlayerWidget extends AbstractWidget {
         // and hold (ADR 0017); the cape menus show the cape
         this.previewData.setEquipmentVisible(
                 context == WidgetContext.PAUSE_MENU || context == WidgetContext.SKIN_MENU);
-//? if <1.21 {
+//? if <1.20.2 {
     }
 
     /**
@@ -780,7 +780,7 @@ public class PlayerWidget extends AbstractWidget {
         // smoothly as the screen draws. Only the client tick counts slot ticks: counting frames
         // there would shrink the slot policy's grace and retry windows to frames.
         com.quickskin.mod.client.services.AnimatedTextureManager.getInstance().tickFrames();
-//? if <1.21 {
+//? if <1.20.2 {
 
         // Handle return-to-original animation when not rotating
         if (shouldReturnToOriginal && !isRotating) {
@@ -922,7 +922,7 @@ public class PlayerWidget extends AbstractWidget {
 
         // Draw instructional text above the border
         net.minecraft.client.gui.Font font = net.minecraft.client.Minecraft.getInstance().font;
-//? if <1.21 {
+//? if <1.20.2 {
 
         // Different instructions based on customization mode
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
@@ -1009,7 +1009,7 @@ public class PlayerWidget extends AbstractWidget {
      */
     public void toggleRotation() {
         targetYRotation += 180.0f;
-//? if <1.21 {
+//? if <1.20.2 {
         originalYRotation += 180.0f; // Update the "return-to" position
         shouldReturnToOriginal = false; // Cancel any ongoing return animation
 //?} else {
@@ -1140,7 +1140,7 @@ public class PlayerWidget extends AbstractWidget {
     }
 
     @Override
-//? if <1.21 {
+//? if <1.20.2 {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         // Priority check: If clicking on a priority widget (like rotate/animation buttons),
         // let that widget handle it instead
@@ -1178,7 +1178,7 @@ public class PlayerWidget extends AbstractWidget {
             return false;
         }
 
-//? if <1.21 {
+//? if <1.20.2 {
         com.quickskin.mod.config.ClientConfig config = com.quickskin.mod.config.ClientConfig.getInstance();
 //?} else {
         // Start dragging
@@ -1189,7 +1189,7 @@ public class PlayerWidget extends AbstractWidget {
         dragStartOffsetY = getPositionOffsetYFromConfig(config);
 //?}
 
-//? if <1.21 {
+//? if <1.20.2 {
         // Left-click: Position dragging (only in customization mode) OR rotation (always)
         if (button == InputConstants.MOUSE_BUTTON_LEFT) {
             // In customization mode: left-click drags position
@@ -1229,7 +1229,7 @@ public class PlayerWidget extends AbstractWidget {
     }
 
     @Override
-//? if <1.21 {
+//? if <1.20.2 {
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         boolean handled = false;
 
@@ -1257,7 +1257,7 @@ public class PlayerWidget extends AbstractWidget {
 //?}
         }
 
-//? if <1.21 {
+//? if <1.20.2 {
         // Handle rotation dragging release (left-click in normal mode, or right-click in any mode)
         if (isRotating && (button == InputConstants.MOUSE_BUTTON_LEFT || button == InputConstants.MOUSE_BUTTON_RIGHT)) {
             isRotating = false;
@@ -1281,7 +1281,7 @@ public class PlayerWidget extends AbstractWidget {
     }
 
     @Override
-//? if <1.21 {
+//? if <1.20.2 {
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         // Handle position dragging (left-click in customization mode)
         if (isDragging && button == InputConstants.MOUSE_BUTTON_LEFT) {
@@ -1316,7 +1316,7 @@ public class PlayerWidget extends AbstractWidget {
 //?}
         }
 
-//? if <1.21 {
+//? if <1.20.2 {
         // Handle rotation dragging (left-click in normal mode, or right-click in any mode)
         if (isRotating && (button == InputConstants.MOUSE_BUTTON_LEFT || button == InputConstants.MOUSE_BUTTON_RIGHT)) {
             // Calculate rotation based on horizontal mouse movement
@@ -1328,7 +1328,7 @@ public class PlayerWidget extends AbstractWidget {
         int deltaY = (int)mouseY - dragStartY;
 //?}
 
-//? if <1.21 {
+//? if <1.20.2 {
             // Update target rotation
             targetYRotation = rotationDragStartYaw - rotationDelta; // Negative for natural rotation direction
 //?} else {
@@ -1336,7 +1336,7 @@ public class PlayerWidget extends AbstractWidget {
         int newOffsetY = dragStartOffsetY + deltaY;
 //?}
 
-//? if <1.21 {
+//? if <1.20.2 {
             return true;
         }
 //?} else {
@@ -1344,7 +1344,7 @@ public class PlayerWidget extends AbstractWidget {
         savePositionOffsetsToConfig(newOffsetX, newOffsetY);
 //?}
 
-//? if <1.21 {
+//? if <1.20.2 {
         return false;
 //?} else {
         return true;
@@ -1352,7 +1352,7 @@ public class PlayerWidget extends AbstractWidget {
     }
 
     @Override
-//? if <1.21 {
+//? if <1.20.2 {
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
 //?} else {
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
@@ -1375,7 +1375,7 @@ public class PlayerWidget extends AbstractWidget {
 
         // Adjust scale based on scroll direction
         float oldScale = scale;
-//? if <1.21 {
+//? if <1.20.2 {
         scale += (float)delta * SCALE_STEP;
 //?} else {
         scale += (float)deltaY * SCALE_STEP;
@@ -1408,7 +1408,7 @@ public class PlayerWidget extends AbstractWidget {
         if (!this.active) {
             return false;
         }
-//? if <1.21 {
+//? if <1.20.2 {
         // If we're actively dragging or rotating, we need to receive all mouse events
         // regardless of where the cursor is
         if (isDragging || isRotating) {
@@ -1422,7 +1422,7 @@ public class PlayerWidget extends AbstractWidget {
 //?}
         }
 
-//? if <1.21 {
+//? if <1.20.2 {
         // Always check if mouse is inside the model area (green border)
         // This ensures consistent interaction whether in customization mode or normal mode
         return !isMouseOutsideModelArea(mouseX, mouseY, cachedModelCenterX, cachedModelCenterY, cachedScale);

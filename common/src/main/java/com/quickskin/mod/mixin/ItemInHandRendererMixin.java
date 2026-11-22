@@ -82,7 +82,7 @@ public class ItemInHandRendererMixin {
             return instance.getBuffer(renderType);
         }
 
-//? if <1.21 {
+//? if <1.20.2 {
         ResourceLocation skinTexture = player.getSkinTextureLocation();
 //?} else if <1.21.2 {
         ResourceLocation skinTexture = player.getSkin().texture();

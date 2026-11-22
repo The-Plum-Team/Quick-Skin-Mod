@@ -53,7 +53,7 @@ public final class PreviewLighting {
     private static final Object[] boundSubjects = new Object[BOUND_SUBJECTS];
     private static int nextBinding;
 
-//? if <1.21 {
+//? if <1.20.2 {
     // Before 1.21 a GUI model's normals keep pointing into the screen when its pose flips z
     private static final Vector3f LAMP_0 = new Vector3f(SIDE, -ABOVE, -FRONT);
     private static final Vector3f LAMP_1 = new Vector3f(-SIDE, -ABOVE, -FRONT);

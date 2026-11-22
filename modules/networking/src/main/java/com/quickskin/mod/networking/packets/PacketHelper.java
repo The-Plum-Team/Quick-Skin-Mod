@@ -4,7 +4,7 @@ import com.quickskin.mod.networking.TextureTransferLimits;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.EncoderException;
 import net.minecraft.network.FriendlyByteBuf;
-//? if >=1.21 {
+//? if >=1.20.5 {
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.core.RegistryAccess;
 //?}
@@ -21,7 +21,7 @@ public class PacketHelper {
      * Creates a packet for uploading skin/cape texture
      * Format: UUID (player) + String (textureType) + byte[] (imageData)
      */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static FriendlyByteBuf createUploadTexturePacket(UUID playerId, String textureType, byte[] imageData) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
     //?} else {
@@ -38,7 +38,7 @@ public class PacketHelper {
      * Creates a packet for updating player appearance
      * Format: UUID (player) + String (skinId) + String (capeId) + String (model)
      */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static FriendlyByteBuf createUpdateAppearancePacket(UUID playerId, String skinId, String capeId, String model) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
     //?} else {
@@ -56,7 +56,7 @@ public class PacketHelper {
      * Creates a packet for syncing appearance to clients
      * Format: UUID (player) + String (skinId) + String (capeId) + String (model)
      */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static FriendlyByteBuf createSyncAppearancePacket(UUID playerId, String skinId, String capeId, String model) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
     //?} else {
@@ -70,7 +70,7 @@ public class PacketHelper {
         return buf;
     }
 
-    //? if <1.21 {
+    //? if <1.20.5 {
     /**
      * An appearance with the elytra's own cape, for a session that negotiated elytra-texture.
      * Format: UUID (player) + String (skinId) + String (capeId) + String (elytraId) + String (model)
@@ -91,7 +91,7 @@ public class PacketHelper {
      * Creates a packet for requesting a texture from server
      * Format: UUID (player) + String (textureType) + String (hash)
      */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static FriendlyByteBuf createRequestTexturePacket(UUID playerId, String textureType, String hash) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
     //?} else {
@@ -108,7 +108,7 @@ public class PacketHelper {
      * Creates a packet for sending texture data to client
      * Format: String (textureType) + String (hash) + byte[] (imageData)
      */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static FriendlyByteBuf createSendTexturePacket(String textureType, String hash, byte[] imageData) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
     //?} else {
@@ -129,7 +129,7 @@ public class PacketHelper {
      * Create server config sync packet (Phase 9)
      * Sends full server config as JSON to client
      */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static FriendlyByteBuf createSyncServerConfigPacket(String configJson) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
     //?} else {
@@ -140,7 +140,7 @@ public class PacketHelper {
         return buf;
     }
 
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static FriendlyByteBuf createRequestAppearanceSnapshotPacket(
             UUID playerId, long requestId) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
@@ -160,7 +160,7 @@ public class PacketHelper {
      * Creates a packet for sending animation metadata to client
      * Format: String (hash) + String (metadataJson)
      */
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static FriendlyByteBuf createSendAnimationMetadataPacket(String hash, String metadataJson) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
     //?} else {

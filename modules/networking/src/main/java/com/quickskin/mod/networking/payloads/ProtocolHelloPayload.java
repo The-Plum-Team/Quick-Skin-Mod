@@ -1,6 +1,6 @@
 package com.quickskin.mod.networking.payloads;
 
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.platform.QuickSkinInfo;
 import com.quickskin.mod.networking.protocol.ProtocolOffer;
 import io.netty.buffer.ByteBuf;
@@ -15,7 +15,9 @@ import net.minecraft.resources.Identifier;
 /** C2S application-level negotiation offer, bound to one client-generated nonce. */
 public record ProtocolHelloPayload(long nonce, ProtocolOffer offer) implements CustomPacketPayload {
     public static final Type<ProtocolHelloPayload> TYPE = new Type<>(
-            //? if <1.21.11 {
+            //? if <1.21 {
+            new ResourceLocation(QuickSkinInfo.MOD_ID, "protocol_hello")
+            //?} else if <1.21.11 {
             ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "protocol_hello")
             //?} else {
             Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "protocol_hello")

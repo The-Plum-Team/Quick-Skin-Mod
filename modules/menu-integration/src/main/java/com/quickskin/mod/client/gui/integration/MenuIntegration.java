@@ -280,7 +280,7 @@ public final class MenuIntegration {
                 // Second priority: Use current player skin (when in-game)
                 if (skinLocation == null && player != null) {
                     //? if <1.21.9 {
-                        //? if <1.21 {
+                        //? if <1.20.2 {
                     skinLocation = player.getSkinTextureLocation();
                         //?} else {
                     skinLocation = player.getSkin().texture();
@@ -302,7 +302,7 @@ public final class MenuIntegration {
                         } else {
                             // Fallback: detect from the vanilla player's model
                             //? if <1.21.9 {
-                                //? if <1.21 {
+                                //? if <1.20.2 {
                             modelType = player.getModelName(); // "default" or "slim"
                                 //?} else {
                             modelType = player.getSkin().model().id(); // "default" or "slim"
@@ -317,7 +317,7 @@ public final class MenuIntegration {
                     } else {
                         // No custom skin active, use the player's own model
                         //? if <1.21.9 {
-                            //? if <1.21 {
+                            //? if <1.20.2 {
                         modelType = player.getModelName(); // "default" or "slim"
                             //?} else {
                         modelType = player.getSkin().model().id(); // "default" or "slim"
@@ -414,7 +414,7 @@ public final class MenuIntegration {
                 screenAccess.addRenderableWidget(newRotateButton);
                 rotateButton = newRotateButton;
 
-                //? if <1.21 {
+                //? if <1.20.2 {
                 playerWidget.clearPriorityWidgets(); // Clear old priorities
                 playerWidget.addPriorityWidget(changeSkinButton); // Change Skin button
                 playerWidget.addPriorityWidget(newRotateButton); // Rotate button
@@ -437,7 +437,7 @@ public final class MenuIntegration {
                     ).bounds(animToggleX, animToggleY, animToggleWidth, rotateButtonSize).build();
                     FancyMenuWidgets.setIdentifier(animationToggleButton, FancyMenuWidgets.ANIMATION_TOGGLE_ID);
                     screenAccess.addRenderableWidget(animationToggleButton);
-                    //? if <1.21 {
+                    //? if <1.20.2 {
                     playerWidget.addPriorityWidget(animationToggleButton);
                     //?}
 
@@ -465,7 +465,7 @@ public final class MenuIntegration {
                         FancyMenuWidgets.setIdentifier(animButton, FancyMenuWidgets.animationButtonId(animName));
                         animationButtons.add(animButton);
                         screenAccess.addRenderableWidget(animButton);
-                        //? if <1.21 {
+                        //? if <1.20.2 {
                         playerWidget.addPriorityWidget(animButton);
                         //?}
                     }
@@ -604,7 +604,7 @@ public final class MenuIntegration {
                 || config.positionOffsetYTitleScreen != 0) {
             return;
         }
-        //? if >=1.21 {
+        //? if >=1.20.2 {
         boolean splashShown = !Minecraft.getInstance().options.hideSplashTexts().get();
         //?} else {
         boolean splashShown = true;
@@ -648,7 +648,7 @@ public final class MenuIntegration {
      * opens. Before 1.21 the flag has no accessor, but the menu-less screen has no buttons.
      */
     private static boolean showsPauseMenu(PauseScreen pauseScreen) {
-        //? if <1.21 {
+        //? if <1.20.2 {
         for (net.minecraft.client.gui.components.events.GuiEventListener listener : pauseScreen.children()) {
             if (listener instanceof Button) {
                 return true;

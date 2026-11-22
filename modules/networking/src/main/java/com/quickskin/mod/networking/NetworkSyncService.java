@@ -12,7 +12,7 @@ import com.quickskin.mod.networking.protocol.HandshakeProtocolEvidence;
 import com.quickskin.mod.networking.protocol.ProtocolCapability;
 import com.quickskin.mod.networking.protocol.ProtocolProfile;
 import com.quickskin.mod.networking.protocol.ProtocolSessions;
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.payloads.*;
 //?}
 import net.fabricmc.api.EnvType;
@@ -173,12 +173,12 @@ public class NetworkSyncService {
             }
             return;
         }
-        //? if >=1.21 {
+        //? if >=1.20.5 {
         if (protocolProfile.negotiated()
                 && (!NetworkTransport.INSTANCE.canServerReceive(UpdateAppearanceV2Payload.TYPE)
                 || !NetworkTransport.INSTANCE.canServerReceive(TextureChunkV2Payload.TYPE))) return;
         //?}
-        //? if >=1.21 {
+        //? if >=1.20.5 {
         if (protocolProfile.supports(ProtocolCapability.ELYTRA_TEXTURE)
                 && !NetworkTransport.INSTANCE.canServerReceive(UpdateAppearanceElytraPayload.TYPE)) return;
         //?}
@@ -637,7 +637,7 @@ public class NetworkSyncService {
     }
 
     private boolean serverAcceptsProtocolHello() {
-        //? if <1.21 {
+        //? if <1.20.5 {
         return NetworkTransport.INSTANCE.canServerReceiveProtocolHello()
                 || handshakeDeclaresProtocolHello();
         //?} else {
@@ -645,7 +645,7 @@ public class NetworkSyncService {
         //?}
     }
 
-    //? if <1.21 {
+    //? if <1.20.5 {
     /**
      * Forge learns the server's mods during the FML login, long before Architectury's channel
      * list, which a busy client may process only after other mods finish loading. A server that
@@ -669,7 +669,7 @@ public class NetworkSyncService {
     //?}
 
     private boolean serverAcceptsLegacyProtocol() {
-        //? if <1.21 {
+        //? if <1.20.5 {
         return NetworkTransport.INSTANCE.canServerReceiveLegacyProtocol();
         //?} else {
         return NetworkTransport.INSTANCE.canServerReceive(UpdateAppearancePayload.TYPE)
@@ -740,7 +740,7 @@ public class NetworkSyncService {
         }
         if (now < protocolHelloRetryAtMillis) return;
         try {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendProtocolHelloToServer(hello.nonce(), hello.offer());
             //?} else {
             NetworkTransport.INSTANCE.sendToServer(
@@ -774,7 +774,7 @@ public class NetworkSyncService {
         }
         long now = System.currentTimeMillis();
         if (now < snapshotRetryAtMillis) return;
-        //? if <1.21 {
+        //? if <1.20.5 {
         // The acknowledged v2 profile already asserts the server's snapshot receiver, while
         // Architectury's channel list may still be on its way.
         if (!profile.negotiated()
@@ -787,7 +787,7 @@ public class NetworkSyncService {
             return;
         }
         try {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.requestAppearanceSnapshotFromServer(
                     snapshotPlayerId, snapshotRequestId);
             //?} else {
@@ -886,7 +886,7 @@ public class NetworkSyncService {
     private void sendTextureChunk(
             PreparedUpload upload, int chunkIndex, byte[] chunk) {
         if (upload.protocolProfile.negotiated()) {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendTextureChunkV2ToServer(
                     upload.networkHash, upload.textureType,
                     chunkIndex, upload.chunks.length, chunk);
@@ -897,7 +897,7 @@ public class NetworkSyncService {
             //?}
             return;
         }
-        //? if <1.21 {
+        //? if <1.20.5 {
         NetworkTransport.INSTANCE.sendTextureChunkToServer(
                 upload.networkHash, upload.textureType, chunkIndex, upload.chunks.length, chunk);
         //?} else {
@@ -910,7 +910,7 @@ public class NetworkSyncService {
     private void sendAnimationMetadata(
             PreparedMetadata metadata, ProtocolProfile protocolProfile) {
         if (protocolProfile.negotiated()) {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendAnimationMetadataV2ToServer(
                     metadata.networkHash, metadata.json);
             //?} else {
@@ -919,7 +919,7 @@ public class NetworkSyncService {
             //?}
             return;
         }
-        //? if <1.21 {
+        //? if <1.20.5 {
         NetworkTransport.INSTANCE.sendAnimationMetadataToServer(
                 metadata.networkHash, metadata.json);
         //?} else {
@@ -931,7 +931,7 @@ public class NetworkSyncService {
     private void sendAppearance(PreparedSync sync) {
         if (sync.protocolProfile.negotiated()
                 && sync.protocolProfile.supports(ProtocolCapability.ELYTRA_TEXTURE)) {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendAppearanceWithElytraToServer(
                     sync.playerId, sync.serverSkinId, sync.serverCapeId, sync.serverElytraId, sync.model);
             //?} else {
@@ -941,7 +941,7 @@ public class NetworkSyncService {
             return;
         }
         if (sync.protocolProfile.negotiated()) {
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.sendAppearanceV2ToServer(
                     sync.playerId, sync.serverSkinId, sync.serverCapeId, sync.model);
             //?} else {
@@ -950,7 +950,7 @@ public class NetworkSyncService {
             //?}
             return;
         }
-        //? if <1.21 {
+        //? if <1.20.5 {
         NetworkTransport.INSTANCE.sendAppearanceToServer(
                 sync.playerId, sync.serverSkinId, sync.serverCapeId, sync.model);
         //?} else {
@@ -1263,7 +1263,7 @@ public class NetworkSyncService {
 
         if (profile.negotiated()) {
             if (!NetworkSecurity.isValidStrongContentId(hash)) return;
-            //? if <1.21 {
+            //? if <1.20.5 {
             NetworkTransport.INSTANCE.requestTextureV2FromServer(
                     playerId, textureType, hash);
             //?} else {
@@ -1275,7 +1275,7 @@ public class NetworkSyncService {
         }
         if (!NetworkSecurity.isValidLegacyContentId(hash)) return;
 
-        //? if <1.21 {
+        //? if <1.20.5 {
         NetworkTransport.INSTANCE.requestTextureFromServer(playerId, textureType, hash);
         //?} else {
         // Check if server supports QuickSkin packets

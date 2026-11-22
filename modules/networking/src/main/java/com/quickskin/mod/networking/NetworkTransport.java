@@ -3,17 +3,17 @@ package com.quickskin.mod.networking;
 import com.quickskin.mod.networking.protocol.ProtocolAcknowledgement;
 import com.quickskin.mod.networking.protocol.ProtocolOffer;
 
-//? if >=1.21 {
+//? if >=1.20.5 {
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 //?}
 import net.minecraft.server.level.ServerPlayer;
 
-//? if <1.21 {
+//? if <1.20.5 {
 import java.util.List;
 import java.util.UUID;
 //?}
 public interface NetworkTransport {
-    //? if <1.21 {
+    //? if <1.20.5 {
     NetworkTransport INSTANCE = new ModNetworking();
     //?} else {
         //? if <26.1 {
@@ -26,7 +26,7 @@ public interface NetworkTransport {
     void init();
 
     void initClient();
-    //? if <1.21 {
+    //? if <1.20.5 {
     /** Logical S2C packets mapped to their exact registered legacy channel. */
     enum ServerPacket {
         APPEARANCE_V1,
@@ -53,7 +53,7 @@ public interface NetworkTransport {
     boolean canPlayerReceiveLegacyProtocol(ServerPlayer player);
     //?}
 
-    //? if <1.21 {
+    //? if <1.20.5 {
     void sendAppearanceToServer(UUID playerId, String skinId, String capeId, String model);
     void sendTextureChunkToServer(
             String hash, String textureType, int chunkIndex, int totalChunks, byte[] chunkData);
@@ -79,7 +79,7 @@ public interface NetworkTransport {
     boolean canServerReceive(CustomPacketPayload.Type<?> type);
     //?}
 
-    //? if <1.21 {
+    //? if <1.20.5 {
     void sendCooldownToPlayer(ServerPlayer player, long cooldownEndTime);
     void sendNicknameResultToPlayer(
             ServerPlayer player, int requestId, int status, String nickname, long retryAfterMillis);

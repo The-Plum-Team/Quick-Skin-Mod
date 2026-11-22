@@ -1,6 +1,6 @@
 package com.quickskin.mod.networking.payloads;
 
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.TextureTransferLimits;
 import com.quickskin.mod.platform.QuickSkinInfo;
 import io.netty.buffer.ByteBuf;
@@ -18,7 +18,9 @@ import net.minecraft.resources.Identifier;
  */
 public record AssignedSkinPayload(String skinId, String model) implements CustomPacketPayload {
     public static final Type<AssignedSkinPayload> TYPE = new Type<>(
-            //? if <1.21.11 {
+            //? if <1.21 {
+            new ResourceLocation(QuickSkinInfo.MOD_ID, "assigned_skin")
+            //?} else if <1.21.11 {
             ResourceLocation.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "assigned_skin")
             //?} else {
             Identifier.fromNamespaceAndPath(QuickSkinInfo.MOD_ID, "assigned_skin")

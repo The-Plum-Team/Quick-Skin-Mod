@@ -100,12 +100,12 @@ import org.spongepowered.asm.mixin.Mixin;
 public abstract class ImmersiveWorldViewMixin {
 //? if <1.21 {
     @Inject(method = "renderLevel", at = @At("HEAD"), require = 0, expect = 1, allow = 1)
-    private void quickskin$worldPassBegins(float partialTick, long nanoTime, PoseStack poseStack, CallbackInfo callback) {
+    private void quickskin$worldPassBegins(CallbackInfo callback) {
         ImmersiveMode.worldPass(true);
     }
 
     @Inject(method = "renderLevel", at = @At("RETURN"), require = 0, expect = 1)
-    private void quickskin$worldPassEnds(float partialTick, long nanoTime, PoseStack poseStack, CallbackInfo callback) {
+    private void quickskin$worldPassEnds(CallbackInfo callback) {
         ImmersiveMode.worldPass(false);
     }
 

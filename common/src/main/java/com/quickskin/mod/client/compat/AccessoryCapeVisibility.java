@@ -41,7 +41,7 @@ public final class AccessoryCapeVisibility {
     /** Caelus publishes an optional render event on Forge and NeoForge. */
     public static void useCaelus() {
         if (!PlatformHelper.isModLoaded("caelus")) return;
-//? if <1.21 {
+//? if <1.20.2 {
         String owner = "top.theillusivec4.caelus.mixin.util.ClientMixinHooks";
         Class<?> subject = Player.class;
 //?} else if <1.21.2 {

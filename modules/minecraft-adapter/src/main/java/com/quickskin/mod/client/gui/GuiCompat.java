@@ -71,7 +71,7 @@ public final class GuiCompat {
     //?}
     }
 
-    //? if <1.21 {
+    //? if <1.20.5 {
     public static void renderPanorama(PanoramaRenderer panorama, float partialTick) {
         panorama.render(partialTick, 1.0F);
     //?} else if <1.21.6 {

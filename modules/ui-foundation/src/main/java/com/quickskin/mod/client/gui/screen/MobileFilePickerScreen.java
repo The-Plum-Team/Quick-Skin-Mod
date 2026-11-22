@@ -195,7 +195,13 @@ public final class MobileFilePickerScreen extends Screen {
         super.removed();
     }
 
-    //? if >=1.21 && <26.1 {
+    //? if >=1.20.2 && <1.20.5 {
+    @Override
+    public void renderBackground(net.minecraft.client.gui.GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // From 1.20.2 the screen draws its dark background itself, after this modal has been drawn
+    }
+    //?}
+    //? if >=1.20.5 && <26.1 {
         //? if <1.21.2 {
     @Override
     public void renderBlurredBackground(float partialTick) {

@@ -209,14 +209,12 @@ import com.quickskin.mod.client.rendering.SkinSwapPoser;
 import com.quickskin.mod.client.services.CapeAnimationHelper;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.util.TextureAlphaDetector;
-//? if <1.21 {
+//? if <1.21.2 {
 import com.quickskin.mod.client.rendering.WorldPose;
-//?} else {
+//?}
+//? if >=1.20.2 {
 import com.quickskin.mod.config.ClientConfig;
 import net.minecraft.client.Minecraft;
-//?}
-//? if >=1.21 && <1.21.2 {
-import com.quickskin.mod.client.rendering.WorldPose;
 //?}
 import com.mojang.blaze3d.vertex.PoseStack;
 //? if <1.21.6 {
@@ -408,7 +406,7 @@ public class CapeLayerMixin {
         // The appearance lookup below already resolves the current frame; remember it so the
         // frame is not resolved a second time for the draw.
         CapeAnimationHelper.beginCapeLookup();
-//? if <1.21 {
+//? if <1.20.2 {
         // A bound preview replaces the worn cape outright; otherwise resolve the applied one.
         ResourceLocation capeTexture = quickskin$previewing
                 ? quickskin$preview.texture()

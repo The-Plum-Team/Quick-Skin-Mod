@@ -1,4 +1,4 @@
-//? if >=1.21 && <26.1 {
+//? if >=1.20.5 && <26.1 {
 package com.quickskin.mod.networking;
 
 import dev.architectury.networking.NetworkManager;

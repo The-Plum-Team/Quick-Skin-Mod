@@ -42,7 +42,7 @@ public class EarsFiveBuzzMixin {
         // Buzz applies its invisibility rule inside this method, so keep it here: an invisible
         // player falls through to Ears, which reports no features for a QuickSkin texture.
         // Buzz does not exist from 1.21.9 onward; those branches only keep the class compiling.
-        //? if <1.21 {
+        //? if <1.20.2 {
         ResourceLocation skin = peer instanceof AbstractClientPlayer player && !player.isInvisible()
                 ? player.getSkinTextureLocation() : null;
         //?} else if <1.21.2 {

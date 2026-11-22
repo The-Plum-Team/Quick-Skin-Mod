@@ -5,7 +5,7 @@ import com.quickskin.mod.config.ServerConfig;
 import com.quickskin.mod.networking.protocol.ProtocolCapability;
 import com.quickskin.mod.networking.protocol.ProtocolProfile;
 import com.quickskin.mod.networking.protocol.ProtocolSessions;
-//? if >=1.21 {
+//? if >=1.20.5 {
 import com.quickskin.mod.networking.payloads.ImmersivePosePayload;
 //?}
 import net.fabricmc.api.EnvType;
@@ -111,7 +111,7 @@ public final class ImmersivePoseSyncService {
     private void send(ImmersivePose pose, long now) {
         if (playerId == null) return;
         int next = sequence + 1;
-        //? if <1.21 {
+        //? if <1.20.5 {
         NetworkTransport.INSTANCE.sendImmersivePoseToServer(playerId, next, pose);
         //?} else {
         if (!NetworkTransport.INSTANCE.canServerReceive(ImmersivePosePayload.TYPE)) return;

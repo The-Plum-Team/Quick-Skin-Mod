@@ -4,7 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.LivingEntity;
-//? if <1.21 {
+//? if <1.20.2 {
 import com.quickskin.mod.client.services.CapeAnimationHelper;
 import net.minecraft.resources.ResourceLocation;
 //?} else if <1.21.2 {
@@ -644,7 +644,7 @@ public final class WorldLook {
     /** The player's draw is over: nothing else drawn takes the look. */
     public static void drawn() {
         if (dressed != null) {
-//? if <1.21 {
+//? if <1.20.2 {
             PlayerModelRenderer.releaseWorldCape(dressedPlayer);
             wings = null;
 //?}

@@ -98,7 +98,7 @@ public class ClientEvents {
                     player != null ? player.connection : Minecraft.getInstance().getConnection());
             resetSessionUiState();
 
-            //? if <1.21 {
+            //? if <1.20.2 {
             Minecraft minecraft = Minecraft.getInstance();
             if (minecraft != null && minecraft.hasSingleplayerServer()) {
                 com.quickskin.mod.config.ServerConfig serverConfig = com.quickskin.mod.config.ServerConfig.getInstance();
@@ -138,7 +138,7 @@ public class ClientEvents {
         com.quickskin.mod.client.gui.overlay.HudPreviewIntegration.init();
         com.quickskin.mod.client.gui.fan.FavouritesFanIntegration.init();
 
-        //? if <1.21 {
+        //? if <1.20.2 {
         ClientScreenInputEvent.MOUSE_RELEASED_PRE.register((client, screen, mouseX, mouseY, button) -> {
             com.quickskin.mod.client.gui.widget.PlayerWidget activeWidget =
                 com.quickskin.mod.client.gui.widget.PlayerWidget.getActiveInteractionWidget();
@@ -155,7 +155,7 @@ public class ClientEvents {
         });
         //?}
 
-            //? if <1.21 {
+            //? if <1.20.2 {
             // A drag of the preview ends wherever the mouse is let go, so the preview hears of the
             // release here. The screen still hears of it too: the skin menu takes a click on an
             // armour piece at the release. Fabric keeps an interrupted release from the screen
@@ -197,7 +197,7 @@ public class ClientEvents {
         INTERNAL_SUBSCRIPTIONS.add(eventBus.register(
                 ServerConfigSyncEvent.class,
                 ClientEvents::onServerConfigSynced));
-        //? if >=1.21 {
+        //? if >=1.20.2 {
         INTERNAL_SUBSCRIPTIONS.add(eventBus.register(
                 com.quickskin.mod.common.event.NetworkAppearanceAppliedEvent.class,
                 event -> com.quickskin.mod.client.compat.ReplayModHelper.noteNetworkAppearance(event.playerId())));
