@@ -183,7 +183,7 @@ public class PlayerSkinMenuScreen extends Screen implements com.quickskin.mod.cl
     private float immersiveFeetX;
     private float immersiveFeetY;
     private float immersiveScale;
-    private static final float IMMERSIVE_COLUMN_SWING = 26.0f;
+    private static final float IMMERSIVE_COLUMN_SWING = 13.0f;
 
     // Error toasts
     private final List<ErrorToast> errorToasts = new ArrayList<>();

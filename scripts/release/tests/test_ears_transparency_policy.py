@@ -42,6 +42,24 @@ class EarsTransparencyPolicyTest(unittest.TestCase):
                 self.assertIn("shouldDisableSkinTransparency()", source)
                 self.assertNotIn("shouldFlattenImportedSkins(", source)
 
+    def test_a_skin_shown_opaque_for_ears_is_shown_as_ears_shows_it(self) -> None:
+        # Vanilla's opaque regions also cover the unused corners Ears draws its features from, so
+        # flattening those turned their clear texels into black panels round the ears and tail.
+        for name in (
+            "client/services/LocalAssetManager.java",
+            "client/storage/NetworkTextureCache.java",
+        ):
+            with self.subTest(source=name):
+                source = code(name)
+                ears = re.search(r"EarsCompatIntegration\s*\.presentAsEars\(", source)
+                flat = re.search(r"\.removeTransparency\(", source)
+                self.assertIsNotNone(ears)
+                self.assertIsNotNone(flat)
+                self.assertLess(ears.start(), flat.start(), "Ears' own presentation must be tried first")
+        bridge = code("client/compat/EarsCompatIntegration.java")
+        self.assertIn('getField("FORCED_OPAQUE_REGIONS")', bridge)
+        self.assertIn("preprocessSkinMethod.invoke(null, rawImage);", bridge)
+
     def test_ears_shows_skins_opaque_and_never_flattens_what_is_saved(self) -> None:
         source = code("config/ClientConfig.java")
         shown = source[source.index("public boolean shouldDisableSkinTransparency()") :]

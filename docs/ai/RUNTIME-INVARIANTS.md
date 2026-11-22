@@ -503,6 +503,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   are 50 to 100 percent opaque in the file. Drawn with that alpha the body looks half see-through.
   With Ears installed (`ClientConfig.isEarsInstalled`) every skin is therefore shown without
   transparency in its body, as without Quick Skin, and the settings box says so and is locked.
+  A 64x64 skin is then shown exactly as Ears hands one to the game
+  (`EarsCompatIntegration.presentAsEars`): Ears' eraser applied, and only Ears' own
+  `FORCED_OPAQUE_REGIONS` made opaque, never vanilla's wider regions, whose unused corners Ears
+  draws ears, tails and claws from; made opaque, their clear texels showed as black panels. Other
+  sizes, or an Ears build the bridge cannot read, keep `HDTextureProcessor.removeTransparency`.
   The saved file is never flattened for it: `shouldFlattenImportedSkins` answers no with Ears
   installed, whatever the player or the server chose, because the bridge parses Ears' features
   from the stored original (`EarsCompatIntegration.parseAndStoreFeatures`). Only the places that
@@ -604,6 +609,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   player the room between its canvas and its right panel, which swing away: a fifth of the
   screen's width, which the player fills whatever size the cape menu's model has
   (`CapeEditorRoom`). The flat screens, and every screen outside a world, are unchanged.
+- A panel of the immersive view that swings off the flat screen keeps the shape of what is drawn
+  on it. The view is wide, so a panel at its edge is seen from the side, and one turned as a
+  stiff card, by the cosine of its angle, came out up to a quarter wider than tall beside its
+  hinge. `ImmersiveFrame.rigPoint` runs a swung panel across the view by `along` instead: a
+  square on the panel is about a square on the screen, and the panel only grows smaller away
+  from its hinge. That factor goes by the hinge and the angle alone, so panels that share a
+  hinge stay in one plane, and the mesh and the mouse both go through `rigPoint`. The skin and
+  cape menus swing their column 13 degrees, the cape editor its panels 10.
 - A held mouse button in the immersive view stays on the panel it started on, even outside its
   edges and when opening or closing a context menu moves the panel to a different list index.
   If the panel disappears or the screen changes, the cursor picks a surface again on release.

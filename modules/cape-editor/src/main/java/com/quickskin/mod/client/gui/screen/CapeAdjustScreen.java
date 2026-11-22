@@ -256,7 +256,7 @@ public class CapeAdjustScreen extends Screen implements com.quickskin.mod.client
     private float immersiveFeetY;
     private float immersiveScale;
     /** How far the canvas column and the right panel swing away from the flat screen, round the player. */
-    private static final float IMMERSIVE_PANEL_SWING = 20.0f;
+    private static final float IMMERSIVE_PANEL_SWING = 10.0f;
     /** The room the player has between the canvas and the right panel; see {@link CapeEditorRoom}. */
     private int immersiveRoom;
     /** The player turns their back to the camera, with the cape, a little to the side as the model stands. */

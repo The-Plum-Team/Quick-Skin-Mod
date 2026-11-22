@@ -51,6 +51,39 @@ class ImmersiveFrameTest {
     }
 
     @Test
+    void whatIsOnASwungPanelKeepsItsShape() {
+        // A square of the panel is drawn about as wide as tall wherever it is on the panel: the
+        // panel grows smaller away from its hinge, and nothing on it is stretched. Turned as a
+        // stiff card, its squares came out a quarter wider than tall beside the hinge.
+        ImmersiveFrame frame = atRest(1.0f);
+        float widest = 0.0f;
+        float narrowest = Float.MAX_VALUE;
+        for (float x = 4.0f; x <= 150.0f; x += 8.0f) {
+            float[] corner = new float[2];
+            float[] right = new float[2];
+            float[] below = new float[2];
+            assertTrue(frame.project(0, x, 176.0f, corner));
+            assertTrue(frame.project(0, x + 6.0f, 176.0f, right));
+            assertTrue(frame.project(0, x, 182.0f, below));
+            float shape = (right[0] - corner[0]) / (below[1] - corner[1]);
+            widest = Math.max(widest, shape);
+            narrowest = Math.min(narrowest, shape);
+        }
+        assertTrue(widest < 1.13f, "widest " + widest);
+        assertTrue(narrowest > 0.87f, "narrowest " + narrowest);
+        // And both ways of swinging do the same: a panel hinged on the right edge mirrors it
+        ImmersiveLayout.Panel mirrored =
+                new ImmersiveLayout.Panel(WIDTH - 160.0f, 0.0f, WIDTH, HEIGHT, ImmersiveLayout.Hinge.RIGHT, 30.0f);
+        ImmersiveFrame other = new ImmersiveFrame(WIDTH, HEIGHT, FOV, DEPTH, UNIT, new Matrix4f(), List.of(mirrored), 1.0f);
+        float[] left = new float[2];
+        float[] here = new float[2];
+        assertTrue(frame.project(0, 40.0f, 100.0f, left));
+        assertTrue(other.project(0, WIDTH - 40.0f, 100.0f, here));
+        assertEquals(WIDTH - left[0], here[0], 0.01f);
+        assertEquals(left[1], here[1], 0.01f);
+    }
+
+    @Test
     void theMouseFindsThePointItPointsAtOnAPanel() {
         ImmersiveFrame frame = atRest(1.0f);
         float[] seen = new float[2];
@@ -77,7 +110,7 @@ class ImmersiveFrameTest {
         assertTrue(frame.project(0, 160.0f, 0.0f, corner));
         // Above the panel's shortened free edge, where the flat column used to be: neither the
         // panel, whose top edge now slopes down to that corner, nor the sheet
-        float x = 150.0f;
+        float x = corner[0] - 10.0f;
         float slopeAtX = corner[1] * x / corner[0];
         float[] found = new float[2];
         assertEquals(ImmersiveFrame.NONE, frame.unproject(x, slopeAtX - 3.0f, ImmersiveFrame.NONE, found));

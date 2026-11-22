@@ -75,18 +75,19 @@ class ImmersiveMeshTest {
     void aSwungPanelsFreeEdgeRecedesWhileTheSheetBesideItStaysFlat() {
         float[] mesh = ImmersiveMesh.sheet(frame(List.of(COLUMN), 1.0f, new Matrix4f()), WIDTH, HEIGHT);
         float edge = COLUMN.right() / WIDTH;
-        float sheetEdge = Float.MAX_VALUE;
-        float freeEdge = -Float.MAX_VALUE;
+        float sheetEdge = -Float.MAX_VALUE;
+        float freeEdge = Float.MAX_VALUE;
         for (int i = 0; i < mesh.length; i += ImmersiveMesh.STRIDE) {
             if (Math.abs(mesh[i + 2] - edge) < 1.0e-5f) {
-                sheetEdge = Math.min(sheetEdge, mesh[i]);
-                freeEdge = Math.max(freeEdge, mesh[i]);
+                sheetEdge = Math.max(sheetEdge, mesh[i]);
+                freeEdge = Math.min(freeEdge, mesh[i]);
             }
         }
         // The flat sheet's edge is drawn where the screen has it; the column swings away from the
-        // camera about its left hinge, so its free edge is seen nearer the middle of the view
+        // camera about its left hinge and is drawn smaller without being stretched, so its free
+        // edge is seen short of where it lay flat
         assertEquals(COLUMN.right(), sheetEdge, 0.05f);
-        assertTrue(freeEdge > COLUMN.right() + 1.0f, "free edge at " + freeEdge);
+        assertTrue(freeEdge < COLUMN.right() - 1.0f, "free edge at " + freeEdge);
     }
 
     @Test

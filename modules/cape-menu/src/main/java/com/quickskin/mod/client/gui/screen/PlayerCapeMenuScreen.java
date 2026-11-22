@@ -225,7 +225,7 @@ public class PlayerCapeMenuScreen extends Screen implements com.quickskin.mod.cl
     private float immersiveFeetX;
     private float immersiveFeetY;
     private float immersiveScale;
-    private static final float IMMERSIVE_COLUMN_SWING = 26.0f;
+    private static final float IMMERSIVE_COLUMN_SWING = 13.0f;
     /** The player turns their back to the camera, with the cape, a little to the side as the model stands. */
     private static final float IMMERSIVE_PLAYER_TURN = 200.0f;
     private final com.quickskin.mod.client.immersive.ImmersiveOrbit immersiveOrbit =
