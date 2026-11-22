@@ -1,8 +1,8 @@
 # CI status snapshots
 
 Repository: [The-Plum-Team/Quick-Skin-Mod](https://github.com/The-Plum-Team/Quick-Skin-Mod).
-Covered commit: `77d040ad7bac0ad66741107d45472a955b3b4f00`.
-Observed: 2026-11-22T18:28:25Z (UTC).
+Covered commit: `0037f3d117550a420902b348a120af217d2d782a`.
+Observed: 2026-11-22T19:15:49Z (UTC).
 
 Each row summarizes target jobs and shared prerequisites. Open a target for the separate overall workflow result and original execution provenance. Snapshots update on CI transitions; caching may delay displayed badges. A badge is a status summary, not an acceptance certificate.
 
@@ -24,4 +24,7 @@ Each row summarizes target jobs and shared prerequisites. Open a target for the 
 | [1.21.3](targets/1.21.3.md) | [![Build](badges/1.21.3/build.svg)](targets/1.21.3.md#build) | [![E2E](badges/1.21.3/e2e.svg)](targets/1.21.3.md#e2e) |
 | [1.21.2](targets/1.21.2.md) | [![Build](badges/1.21.2/build.svg)](targets/1.21.2.md#build) | [![E2E](badges/1.21.2/e2e.svg)](targets/1.21.2.md#e2e) |
 | [1.21.1](targets/1.21.1.md) | [![Build](badges/1.21.1/build.svg)](targets/1.21.1.md#build) | [![E2E](badges/1.21.1/e2e.svg)](targets/1.21.1.md#e2e) |
+| [1.21](targets/1.21.md) | [![Build](badges/1.21/build.svg)](targets/1.21.md#build) | [![E2E](badges/1.21/e2e.svg)](targets/1.21.md#e2e) |
+| [1.20.6](targets/1.20.6.md) | [![Build](badges/1.20.6/build.svg)](targets/1.20.6.md#build) | [![E2E](badges/1.20.6/e2e.svg)](targets/1.20.6.md#e2e) |
+| [1.20.4](targets/1.20.4.md) | [![Build](badges/1.20.4/build.svg)](targets/1.20.4.md#build) | [![E2E](badges/1.20.4/e2e.svg)](targets/1.20.4.md#e2e) |
 | [1.20.1](targets/1.20.1.md) | [![Build](badges/1.20.1/build.svg)](targets/1.20.1.md#build) | [![E2E](badges/1.20.1/e2e.svg)](targets/1.20.1.md#e2e) |
