@@ -23,6 +23,8 @@ public final class ImmersiveFrame {
     public static final int BASE = -1;
     /** No part of the screen. */
     public static final int NONE = -2;
+    /** Where between the middle of the view (0) and a panel's hinge (1) what is on the panel is drawn in its true shape. */
+    static final float TRUE_AT = 0.7f;
     /** Nothing nearer the camera than this is drawn or picked. */
     static final float NEAR = 0.05f;
 
@@ -91,33 +93,53 @@ public final class ImmersiveFrame {
         float rz = -depth;
         if (part >= 0) {
             ImmersiveLayout.Panel panel = panels.get(part);
-            double angle = Math.toRadians(panel.degrees() * tilt);
-            float cos = (float) Math.cos(angle);
-            float sin = (float) Math.sin(angle);
+            float sin = (float) Math.sin(Math.toRadians(panel.degrees() * tilt));
             switch (panel.hinge()) {
                 case LEFT -> {
                     float reach = (x - panel.hingeAt()) * s;
-                    rx = (panel.hingeAt() - width / 2.0f) * s + reach * cos;
+                    float hinge = (panel.hingeAt() - width / 2.0f) * s;
+                    rx = hinge + reach * along(hinge, sin);
                     rz = -depth - reach * sin;
                 }
                 case RIGHT -> {
                     float reach = (panel.hingeAt() - x) * s;
-                    rx = (panel.hingeAt() - width / 2.0f) * s - reach * cos;
+                    float hinge = (panel.hingeAt() - width / 2.0f) * s;
+                    rx = hinge - reach * along(-hinge, sin);
                     rz = -depth - reach * sin;
                 }
                 case TOP -> {
                     float reach = (y - panel.hingeAt()) * s;
-                    ry = (height / 2.0f - panel.hingeAt()) * s - reach * cos;
+                    float hinge = (height / 2.0f - panel.hingeAt()) * s;
+                    ry = hinge - reach * along(-hinge, sin);
                     rz = -depth - reach * sin;
                 }
                 case BOTTOM -> {
                     float reach = (panel.hingeAt() - y) * s;
-                    ry = (height / 2.0f - panel.hingeAt()) * s + reach * cos;
+                    float hinge = (height / 2.0f - panel.hingeAt()) * s;
+                    ry = hinge + reach * along(hinge, sin);
                     rz = -depth - reach * sin;
                 }
             }
         }
         out.set(rx, ry, rz);
+    }
+
+    /**
+     * How far a swung panel runs across the view for each unit it runs along its own surface,
+     * given where its hinge stands from the middle of the view, toward the side the panel swings
+     * from ({@code hinge}, negative: a panel hinged on the left edge), and the sine of its angle.
+     *
+     * <p>A panel turned as a stiff card would be, by the cosine, is seen stretched: the view is
+     * wide, so a panel at its edge is looked at from the side, and swinging it away turns it to
+     * face the camera, which draws what is on it wider while its far end is drawn smaller. Letters
+     * came out up to a quarter wider than tall. Here the panel runs less far across, by what makes
+     * a square on it a square on the screen where the panel's middle usually is ({@link #TRUE_AT}
+     * of the way from the middle of the view to the hinge), so what is on it keeps its shape and
+     * only grows smaller away from the hinge. It depends on the hinge and the angle alone, so
+     * panels that share a hinge stay in one plane.
+     */
+    private float along(float hinge, float sin) {
+        return Math.max(0.2f, 1.0f + TRUE_AT * hinge * sin / depth);
     }
 
     /**

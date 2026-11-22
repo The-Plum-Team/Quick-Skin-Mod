@@ -604,6 +604,14 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   player the room between its canvas and its right panel, which swing away: a fifth of the
   screen's width, which the player fills whatever size the cape menu's model has
   (`CapeEditorRoom`). The flat screens, and every screen outside a world, are unchanged.
+- A panel of the immersive view that swings off the flat screen keeps the shape of what is drawn
+  on it. The view is wide, so a panel at its edge is seen from the side, and one turned as a
+  stiff card, by the cosine of its angle, came out up to a quarter wider than tall beside its
+  hinge. `ImmersiveFrame.rigPoint` runs a swung panel across the view by `along` instead: a
+  square on the panel is about a square on the screen, and the panel only grows smaller away
+  from its hinge. That factor goes by the hinge and the angle alone, so panels that share a
+  hinge stay in one plane, and the mesh and the mouse both go through `rigPoint`. The skin and
+  cape menus swing their column 13 degrees, the cape editor its panels 10.
 - A held mouse button in the immersive view stays on the panel it started on, even outside its
   edges and when opening or closing a context menu moves the panel to a different list index.
   If the panel disappears or the screen changes, the cursor picks a surface again on release.
