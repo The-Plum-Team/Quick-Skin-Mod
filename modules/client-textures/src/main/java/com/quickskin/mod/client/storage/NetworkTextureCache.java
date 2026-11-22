@@ -120,8 +120,11 @@ public class NetworkTextureCache {
         if (shouldRemoveTransparency || "cape".equals(textureType)) {
             try {
                 if (shouldRemoveTransparency) {
-                    decoded = com.quickskin.mod.common.util.HDTextureProcessor
-                            .removeTransparency(decoded);
+                    // With Ears, opaque only where Ears itself makes a skin opaque
+                    BufferedImage asEars = com.quickskin.mod.client.compat.EarsCompatIntegration
+                            .presentAsEars(decoded);
+                    decoded = asEars != null ? asEars
+                            : com.quickskin.mod.common.util.HDTextureProcessor.removeTransparency(decoded);
                 } else {
                     int frameHeight = decoded.getWidth() / 2;
                     int frameCount = frameHeight > 0 && decoded.getHeight() % frameHeight == 0

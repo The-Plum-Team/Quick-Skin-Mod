@@ -503,6 +503,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   are 50 to 100 percent opaque in the file. Drawn with that alpha the body looks half see-through.
   With Ears installed (`ClientConfig.isEarsInstalled`) every skin is therefore shown without
   transparency in its body, as without Quick Skin, and the settings box says so and is locked.
+  A 64x64 skin is then shown exactly as Ears hands one to the game
+  (`EarsCompatIntegration.presentAsEars`): Ears' eraser applied, and only Ears' own
+  `FORCED_OPAQUE_REGIONS` made opaque, never vanilla's wider regions, whose unused corners Ears
+  draws ears, tails and claws from; made opaque, their clear texels showed as black panels. Other
+  sizes, or an Ears build the bridge cannot read, keep `HDTextureProcessor.removeTransparency`.
   The saved file is never flattened for it: `shouldFlattenImportedSkins` answers no with Ears
   installed, whatever the player or the server chose, because the bridge parses Ears' features
   from the stored original (`EarsCompatIntegration.parseAndStoreFeatures`). Only the places that

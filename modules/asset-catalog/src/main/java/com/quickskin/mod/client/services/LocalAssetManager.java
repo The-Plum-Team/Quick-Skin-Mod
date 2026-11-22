@@ -1474,9 +1474,10 @@ public class LocalAssetManager {
             }
 //?}
 
-            // Apply transparency removal if needed
+            // Apply transparency removal if needed; with Ears, opaque only where Ears makes a skin opaque
             if (shouldRemoveTransparency) {
-                image = HDTextureProcessor.removeTransparency(image);
+                BufferedImage asEars = com.quickskin.mod.client.compat.EarsCompatIntegration.presentAsEars(image);
+                image = asEars != null ? asEars : HDTextureProcessor.removeTransparency(image);
             }
             boolean capePresentationChanged = false;
             if (isCape) {
