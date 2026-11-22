@@ -1,5 +1,25 @@
 # Changelog
 
+## 5.0.1 (2026-11-22)
+
+### Added
+
+- **Minecraft 1.20.4, 1.20.6 and 1.21**
+> Quick Skin now has builds for three more Minecraft versions: 1.20.4 (Fabric), 1.20.6 (Fabric and NeoForge) and 1.21 (Fabric and NeoForge). They have everything the 1.21.1 build has, the immersive skin menu included.
+
+### Changed
+
+- **The immersive menu's panels tilt half as much**
+> In the immersive skin menu, the skin list, the cape list and the cape editor's panels swung far enough toward you to look exaggerated. They now turn half as much.
+
+### Fixes
+
+- **What is on a tilted immersive panel is no longer stretched**
+> The further a panel of the immersive menu swung toward you, the wider everything on it was drawn: skins, capes, text and buttons looked stretched sideways. A swung panel now keeps the shape of what is on it.
+
+- **Ears skins no longer show black patches**
+> With Ears installed, a skin that keeps Ears data in its transparency showed black panels on the body since 5.0.0. Quick Skin now shows the skin the way Ears itself does: the data texels are erased and only the parts Minecraft always draws opaque are made opaque.
+
 ## 5.0.0 (2026-11-21)
 
 ### Added
