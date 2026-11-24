@@ -87,6 +87,16 @@ public class PlayerAppearance {
         this.elytraLocation = elytraLocation;
     }
 
+    /**
+     * The name Minecraft itself uses for a model: {@code "slim"} or {@code "default"}. Quick Skin
+     * calls the wide model {@code "classic"}, a name the game does not know. Vanilla falls back to
+     * the wide model for a name it does not know, but other mods look their own models up by this
+     * name and find nothing, so every model name handed to the game goes through here.
+     */
+    public static String vanillaModelName(@Nullable String model) {
+        return "slim".equalsIgnoreCase(model) ? "slim" : "default";
+    }
+
     public String getModel() {
         return model;
     }

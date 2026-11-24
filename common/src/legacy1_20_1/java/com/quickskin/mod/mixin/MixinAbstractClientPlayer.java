@@ -9,6 +9,7 @@ import com.quickskin.mod.client.rendering.WorldLook;
 import com.quickskin.mod.client.services.LocalAssetManager;
 import com.quickskin.mod.client.services.PlayerAppearanceService;
 import com.quickskin.mod.common.data.AssetMetadata;
+import com.quickskin.mod.common.data.PlayerAppearance;
 import com.quickskin.mod.common.data.TextureQuality;
 import com.quickskin.mod.config.ClientConfig;
 import net.minecraft.client.Minecraft;
@@ -110,7 +111,8 @@ public class MixinAbstractClientPlayer {
         if (service.hasActiveSkin(self.getUUID()) || service.hasModelOverride(self.getUUID())) {
             String customModel = service.getModelName(self.getUUID());
             if (customModel != null) {
-                cir.setReturnValue(customModel);
+                // Quick Skin's "classic" is "default" to the game and to every mod that reads this
+                cir.setReturnValue(PlayerAppearance.vanillaModelName(customModel));
                 return;
             }
         }
@@ -128,9 +130,7 @@ public class MixinAbstractClientPlayer {
                     }
                 }
                 if (modelType != null) {
-                    // Convert to Minecraft model names: "classic" -> "default", "slim" stays "slim"
-                    String mcModel = "classic".equals(modelType) ? "default" : modelType;
-                    cir.setReturnValue(mcModel);
+                    cir.setReturnValue(PlayerAppearance.vanillaModelName(modelType));
                 }
             }
         }

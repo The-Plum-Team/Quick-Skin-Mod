@@ -278,7 +278,11 @@ public final class VanillaShim {
                     p.getClass(), "getModelName", "method_3121", "m_108564_"
             );
             if (direct != null) {
-                return normalizePlayerModel(direct.invoke(p));
+                // The game knows only these two names, and other mods look their own models up
+                // by them; any other name, Quick Skin's own "classic" included, is not a model
+                Object name = direct.invoke(p);
+                if ("slim".equals(name)) return "slim";
+                return "default".equals(name) ? "classic" : null;
             }
 
             // 1.21.x/26.x: the renderer consumes the model component of PlayerSkin.
