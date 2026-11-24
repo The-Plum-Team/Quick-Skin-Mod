@@ -1,6 +1,6 @@
 {
   "coverage_sha": "573e5f685a80099d48620b407d87ffe0d1c94d74",
-  "observed_at": "2026-11-24T20:58:34Z",
+  "observed_at": "2026-11-24T20:58:53Z",
   "repository": "The-Plum-Team/Quick-Skin-Mod",
   "schema_version": 1,
   "targets": [
@@ -112,11 +112,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -241,11 +248,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -370,11 +384,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -499,11 +520,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -628,11 +656,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -757,11 +792,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -886,11 +928,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -1015,11 +1064,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -1144,11 +1200,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -1273,11 +1336,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -1402,11 +1472,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -1531,11 +1608,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -1660,11 +1744,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -1789,11 +1880,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -1918,11 +2016,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -2047,11 +2152,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -2176,11 +2288,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -2305,11 +2424,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -2433,11 +2559,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
@@ -2561,11 +2694,18 @@
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772358557"
           },
           {
-            "conclusion": null,
+            "conclusion": "success",
             "id": 138772451441,
             "name": "Resolve the exact source Build bundle",
-            "status": "in_progress",
+            "status": "completed",
             "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772451441"
+          },
+          {
+            "conclusion": null,
+            "id": 138772571120,
+            "name": "Build immutable E2E input bundle",
+            "status": "in_progress",
+            "url": "https://github.com/The-Plum-Team/Quick-Skin-Mod/actions/runs/45486262771/job/138772571120"
           }
         ],
         "reason": "Required target jobs or shared prerequisites are running.",
