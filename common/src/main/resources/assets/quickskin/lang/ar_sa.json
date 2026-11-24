@@ -264,6 +264,8 @@
   "quickskin.settings.show_pause_preview.tooltip": "شخصيتك وأزرارها بجانب قائمة الإيقاف المؤقت.",
   "quickskin.settings.compact_change_skin_button": "تصغير زر «تغيير المظهر» ليصبح أصغر حجمًا",
   "quickskin.settings.compact_change_skin_button.tooltip": "عرض زر تغيير المظهر في شاشة العنوان وقائمة اللعبة كأيقونة صغيرة.",
+  "quickskin.settings.hide_change_skin_button": "إخفاء زر «تغيير المظهر»",
+  "quickskin.settings.hide_change_skin_button.tooltip": "يزيل زر تغيير المظهر من شاشة العنوان وقائمة اللعبة. عندها تُفتح قائمة المظاهر بمفتاحها فقط أثناء اللعب، لذا عيّن مفتاحًا أولًا.",
   "quickskin.settings.immersive_menu": "قائمة مظاهر غامرة",
   "quickskin.settings.immersive_menu.tooltip": "داخل العالم تتراجع الكاميرا لتُظهر شخصيتك، وتطفو قائمة المظاهر من حولها.",
   "quickskin.settings.disable_transparency_server": "إيقاف نظام الشفافية في Quick Skin لجميع اللاعبين",

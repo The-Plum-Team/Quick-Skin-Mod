@@ -264,6 +264,8 @@
   "quickskin.settings.show_pause_preview.tooltip": "Duraklatma menüsünün yanında karakterin ve düğmeleri.",
   "quickskin.settings.compact_change_skin_button": "\"Skin Değiştir\" düğmesini küçültüp kompakt yap",
   "quickskin.settings.compact_change_skin_button.tooltip": "Başlık ekranındaki ve oyun menüsündeki Skin Değiştir düğmesini küçük bir simge olarak gösterir.",
+  "quickskin.settings.hide_change_skin_button": "\"Skin Değiştir\" düğmesini gizle",
+  "quickskin.settings.hide_change_skin_button.tooltip": "Skin Değiştir düğmesini başlık ekranından ve oyun menüsünden kaldırır. Skin menüsü o zaman yalnızca oyun sırasında kendi tuşuyla açılır, bu yüzden önce bir tuş ata.",
   "quickskin.settings.immersive_menu": "Sürükleyici skin menüsü",
   "quickskin.settings.immersive_menu.tooltip": "Bir dünyadayken kamera geri çekilip karakterini gösterir ve skin menüsü onun etrafında süzülür.",
   "quickskin.settings.disable_transparency_server": "Quick Skin'in şeffaflık sistemini tüm oyuncular için kapat",

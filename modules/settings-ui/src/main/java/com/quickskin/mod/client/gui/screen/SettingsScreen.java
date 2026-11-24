@@ -142,6 +142,7 @@ public class SettingsScreen extends Screen {
     private Checkbox showTitlePreviewCheckbox;
     private Checkbox showPausePreviewCheckbox;
     private Checkbox compactChangeSkinButtonCheckbox;
+    private Checkbox hideChangeSkinButtonCheckbox;
     private Checkbox immersiveMenuCheckbox;
     private Button keybindButton;
     private AbstractWidget keybindLabel;
@@ -400,6 +401,16 @@ public class SettingsScreen extends Screen {
         clientSettingWidgets.add(compactChangeSkinButtonCheckbox);
         currentRightY += spacing;
 
+        // Without the button only the key opens the skin menu, and these settings with it, so
+        // the box takes a change only while a key is assigned; the menus keep the same rule
+        hideChangeSkinButtonCheckbox = checkbox(rightColumnX, currentRightY,
+                "quickskin.settings.hide_change_skin_button",
+                config.hideChangeSkinButton,
+                "quickskin.settings.hide_change_skin_button.tooltip", this::applyClientSettings);
+        hideChangeSkinButtonCheckbox.active = KeybindRegistry.skinMenuKeyAssigned();
+        clientSettingWidgets.add(hideChangeSkinButtonCheckbox);
+        currentRightY += spacing;
+
         immersiveMenuCheckbox = checkbox(rightColumnX, currentRightY,
                 "quickskin.settings.immersive_menu",
                 config.immersiveMenu,
@@ -650,6 +661,7 @@ public class SettingsScreen extends Screen {
         // Update keybind button text before rendering
         this.keybindButton.setMessage(keybindButtonText(KeybindRegistry.OPEN_SKIN_MENU));
         this.fanKeybindButton.setMessage(keybindButtonText(KeybindRegistry.FAVOURITES_FAN));
+        this.hideChangeSkinButtonCheckbox.active = KeybindRegistry.skinMenuKeyAssigned();
         //? if <1.21.6 {
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 100); // Move modal forward in Z
@@ -1017,6 +1029,7 @@ public class SettingsScreen extends Screen {
         config.showTitleScreenPreview = showTitlePreviewCheckbox.selected();
         config.showPauseMenuPreview = showPausePreviewCheckbox.selected();
         config.compactChangeSkinButton = compactChangeSkinButtonCheckbox.selected();
+        config.hideChangeSkinButton = hideChangeSkinButtonCheckbox.selected();
         config.immersiveMenu = immersiveMenuCheckbox.selected();
         config.setMenuBackgroundStyle(menuBackgroundCheckbox.selected()
                 ? BackgroundStyle.VANILLA_BLUR : BackgroundStyle.OPAQUE_STARS);

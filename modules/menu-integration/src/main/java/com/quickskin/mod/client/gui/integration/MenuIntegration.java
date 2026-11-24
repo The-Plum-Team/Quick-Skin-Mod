@@ -41,8 +41,15 @@ public final class MenuIntegration {
     private MenuIntegration() {
     }
 
-    public static synchronized void init(java.util.function.Consumer<Screen> openSkinMenu) {
+    /**
+     * @param menuKeyAssigned whether a key opens the skin menu now. The Change Skin button can be
+     *                        hidden in settings only while one does: with the button gone the key
+     *                        is the only way to the skin menu, and to the settings themselves.
+     */
+    public static synchronized void init(java.util.function.Consumer<Screen> openSkinMenu,
+                                         java.util.function.BooleanSupplier menuKeyAssigned) {
         java.util.Objects.requireNonNull(openSkinMenu, "openSkinMenu");
+        java.util.Objects.requireNonNull(menuKeyAssigned, "menuKeyAssigned");
         if (initialized) return;
         initialized = true;
 
@@ -194,11 +201,18 @@ public final class MenuIntegration {
                 }
             }
 
-            // Create and add the "Change Skin" button
+            // Create and add the "Change Skin" button, unless the player hid it in settings
             final Button changeSkinButton;
-            boolean compactButton = !essentialPresent
-                    && com.quickskin.mod.config.ClientConfig.getInstance().compactChangeSkinButton;
-            if (essentialPresent || compactButton) {
+            boolean hideButton = ChangeSkinButton.hidden(
+                    com.quickskin.mod.config.ClientConfig.getInstance().hideChangeSkinButton,
+                    menuKeyAssigned.getAsBoolean());
+            // Without the button the preview's controls stack as they do above a compact one,
+            // one row lower: the rotate control stands where the icon would
+            boolean compactButton = !essentialPresent && (hideButton
+                    || com.quickskin.mod.config.ClientConfig.getInstance().compactChangeSkinButton);
+            if (hideButton) {
+                changeSkinButton = null;
+            } else if (essentialPresent || compactButton) {
                 // An icon the size of vanilla's language and accessibility buttons, beside Essential's
                 // rail or, when chosen in settings, at the start of the full button's slot. A compact
                 // button stacks the preview's controls above it and moves the preview beside them.
@@ -223,8 +237,10 @@ public final class MenuIntegration {
                 ).bounds(buttonX, buttonY, buttonWidth, buttonHeight).build();
             }
 
-            FancyMenuWidgets.setIdentifier(changeSkinButton, FancyMenuWidgets.CHANGE_SKIN_ID);
-            screenAccess.addRenderableWidget(changeSkinButton);
+            if (changeSkinButton != null) {
+                FancyMenuWidgets.setIdentifier(changeSkinButton, FancyMenuWidgets.CHANGE_SKIN_ID);
+                screenAccess.addRenderableWidget(changeSkinButton);
+            }
 
             // Skip PlayerWidget, rotate button, and animation buttons when Essential is present
             // (Essential has its own player model rendering) or the preview is hidden in settings
@@ -401,7 +417,7 @@ public final class MenuIntegration {
                 // Create and add rotate button (above Change Skin button, aligned to the left edge)
                 int rotateButtonSize = 20;
                 int rotateButtonX = buttonX;
-                int rotateButtonY = buttonY - rotateButtonSize - spacing;
+                int rotateButtonY = hideButton ? buttonY : buttonY - rotateButtonSize - spacing;
 
                 com.quickskin.mod.client.gui.widget.RotateButton newRotateButton =
                         new com.quickskin.mod.client.gui.widget.RotateButton(
@@ -416,7 +432,9 @@ public final class MenuIntegration {
 
                 //? if <1.20.2 {
                 playerWidget.clearPriorityWidgets(); // Clear old priorities
-                playerWidget.addPriorityWidget(changeSkinButton); // Change Skin button
+                if (changeSkinButton != null) {
+                    playerWidget.addPriorityWidget(changeSkinButton); // Change Skin button
+                }
                 playerWidget.addPriorityWidget(newRotateButton); // Rotate button
                 //?}
                 // Clear animation buttons from previous screen

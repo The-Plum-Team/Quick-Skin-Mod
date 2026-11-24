@@ -59,6 +59,16 @@ class PlayerAppearanceTest {
         assertSame(cape, appearance.getCapeLocation());
     }
 
+    @Test
+    void theGameIsHandedItsOwnModelNames() {
+        assertEquals("default", PlayerAppearance.vanillaModelName("classic"));
+        assertEquals("default", PlayerAppearance.vanillaModelName("default"));
+        assertEquals("default", PlayerAppearance.vanillaModelName("auto"));
+        assertEquals("default", PlayerAppearance.vanillaModelName(null));
+        assertEquals("slim", PlayerAppearance.vanillaModelName("slim"));
+        assertEquals("slim", PlayerAppearance.vanillaModelName("SLIM"));
+    }
+
     private record Texture(String namespace, String path) implements TextureReference {
     }
 }

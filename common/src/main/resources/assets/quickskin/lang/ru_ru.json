@@ -264,6 +264,8 @@
   "quickskin.settings.show_pause_preview.tooltip": "Ваш персонаж и его кнопки рядом с меню паузы.",
   "quickskin.settings.compact_change_skin_button": "Сделать кнопку «Сменить скин» компактнее",
   "quickskin.settings.compact_change_skin_button.tooltip": "Показывать кнопку «Сменить скин» на титульном экране и в меню паузы маленьким значком.",
+  "quickskin.settings.hide_change_skin_button": "Скрыть кнопку «Сменить скин»",
+  "quickskin.settings.hide_change_skin_button.tooltip": "Убирает кнопку «Сменить скин» с титульного экрана и из меню паузы. Меню скинов тогда открывается только своей клавишей во время игры, поэтому сначала назначьте клавишу.",
   "quickskin.settings.immersive_menu": "Иммерсивное меню скинов",
   "quickskin.settings.immersive_menu.tooltip": "В мире камера отходит назад и показывает вашего персонажа, а меню скинов парит вокруг него.",
   "quickskin.settings.disable_transparency_server": "Отключить прозрачность Quick Skin для всех игроков",

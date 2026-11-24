@@ -264,6 +264,8 @@
   "quickskin.settings.show_pause_preview.tooltip": "Je personage en zijn knoppen naast het pauzemenu.",
   "quickskin.settings.compact_change_skin_button": "De knop 'Skin wijzigen' compact en kleiner maken",
   "quickskin.settings.compact_change_skin_button.tooltip": "Toont de knop Skin wijzigen op het titelscherm en in het pauzemenu als een klein pictogram.",
+  "quickskin.settings.hide_change_skin_button": "De knop 'Skin wijzigen' verbergen",
+  "quickskin.settings.hide_change_skin_button.tooltip": "Haalt de knop Skin wijzigen weg van het titelscherm en uit het pauzemenu. Het skinmenu opent dan alleen nog met zijn toets terwijl je speelt, dus wijs eerst een toets toe.",
   "quickskin.settings.immersive_menu": "Meeslepend skinmenu",
   "quickskin.settings.immersive_menu.tooltip": "In een wereld stapt de camera achteruit om je personage te tonen en zweeft het skinmenu eromheen.",
   "quickskin.settings.disable_transparency_server": "Transparantie van Quick Skin uitzetten voor alle spelers",

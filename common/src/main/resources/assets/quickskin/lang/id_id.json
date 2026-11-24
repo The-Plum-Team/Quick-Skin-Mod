@@ -264,6 +264,8 @@
   "quickskin.settings.show_pause_preview.tooltip": "Karaktermu dan tombol-tombolnya di samping menu jeda.",
   "quickskin.settings.compact_change_skin_button": "Ringkas tombol \"Ganti Skin\" agar lebih kecil",
   "quickskin.settings.compact_change_skin_button.tooltip": "Tampilkan tombol Ganti Skin di layar judul dan menu jeda sebagai ikon kecil.",
+  "quickskin.settings.hide_change_skin_button": "Sembunyikan tombol \"Ganti Skin\"",
+  "quickskin.settings.hide_change_skin_button.tooltip": "Menghapus tombol Ganti Skin dari layar judul dan menu jeda. Menu skin lalu hanya terbuka dengan tombol keyboard-nya saat bermain, jadi atur tombolnya dulu.",
   "quickskin.settings.immersive_menu": "Menu skin imersif",
   "quickskin.settings.immersive_menu.tooltip": "Di dalam dunia, kamera mundur untuk memperlihatkan karaktermu dan menu skin melayang di sekitarnya.",
   "quickskin.settings.disable_transparency_server": "Matikan sistem transparansi Quick Skin untuk semua pemain",
