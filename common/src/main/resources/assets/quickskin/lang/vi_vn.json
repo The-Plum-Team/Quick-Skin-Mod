@@ -264,6 +264,8 @@
   "quickskin.settings.show_pause_preview.tooltip": "Nhân vật của bạn và các nút của nó bên cạnh menu tạm dừng.",
   "quickskin.settings.compact_change_skin_button": "Thu gọn nút \"Đổi Skin\" cho nhỏ hơn",
   "quickskin.settings.compact_change_skin_button.tooltip": "Hiển thị nút Đổi Skin ở màn hình chính và menu tạm dừng dưới dạng biểu tượng nhỏ.",
+  "quickskin.settings.hide_change_skin_button": "Ẩn nút \"Đổi Skin\"",
+  "quickskin.settings.hide_change_skin_button.tooltip": "Bỏ nút Đổi Skin khỏi màn hình chính và menu tạm dừng. Khi đó menu skin chỉ mở bằng phím của nó trong lúc chơi, nên hãy gán phím trước.",
   "quickskin.settings.immersive_menu": "Menu skin nhập vai",
   "quickskin.settings.immersive_menu.tooltip": "Trong thế giới, camera lùi lại để nhìn nhân vật của bạn và menu skin lơ lửng xung quanh nhân vật.",
   "quickskin.settings.disable_transparency_server": "Tắt hệ thống trong suốt của Quick Skin cho mọi người chơi",

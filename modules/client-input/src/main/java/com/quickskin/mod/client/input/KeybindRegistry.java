@@ -49,6 +49,11 @@ public class KeybindRegistry {
         FAVOURITES_FAN = register("favourites_fan");
     }
 
+    /** Whether the player gave the skin menu a key, which is the menu's only other way in. */
+    public static boolean skinMenuKeyAssigned() {
+        return OPEN_SKIN_MENU != null && !OPEN_SKIN_MENU.isUnbound();
+    }
+
     /** A Quick Skin key, unbound until the player binds it, in Quick Skin's category of the controls. */
     private static KeyMapping register(String name) {
         KeyMapping key = new KeyMapping(

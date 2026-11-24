@@ -1166,6 +1166,11 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   the file without bringing the own skin back; a stale saved skin id whose file vanished must
   fall back to the vanilla default without a manual reset. The catalog checkpoints run on the
   menu instance that the Rename and Delete dialogs return to.
+- The Change Skin button of the title screen and the pause menu can be hidden in settings
+  (`ClientConfig.hideChangeSkinButton`), but it is left out only while the skin menu's key is
+  assigned (`ChangeSkinButton.hidden`): the button and the key are the only ways into the skin
+  menu, and the settings open from that menu. The settings box takes a change only while a key
+  is assigned, and a player who hid the button and then lost the key gets the button back.
 - A model name handed to the game is the game's own: `slim` or `default`
   (`PlayerAppearance.vanillaModelName`). On 1.20.1 the model is a string
   (`AbstractClientPlayer.getModelName`, `PlayerInfo.getModelName`) that vanilla tolerates when

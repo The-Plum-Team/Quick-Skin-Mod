@@ -264,6 +264,8 @@
   "quickskin.settings.show_pause_preview.tooltip": "ตัวละครและปุ่มของมันข้างเมนูหยุดเกม",
   "quickskin.settings.compact_change_skin_button": "ย่อปุ่ม \"เปลี่ยนสกิน\" ให้เล็กลง",
   "quickskin.settings.compact_change_skin_button.tooltip": "แสดงปุ่มเปลี่ยนสกินบนหน้าจอหลักและเมนูหยุดชั่วคราวเป็นไอคอนขนาดเล็ก",
+  "quickskin.settings.hide_change_skin_button": "ซ่อนปุ่ม \"เปลี่ยนสกิน\"",
+  "quickskin.settings.hide_change_skin_button.tooltip": "นำปุ่มเปลี่ยนสกินออกจากหน้าจอหลักและเมนูหยุดชั่วคราว จากนั้นเมนูสกินจะเปิดได้ด้วยปุ่มลัดระหว่างเล่นเท่านั้น จึงควรกำหนดปุ่มก่อน",
   "quickskin.settings.immersive_menu": "เมนูสกินแบบสมจริง",
   "quickskin.settings.immersive_menu.tooltip": "เมื่ออยู่ในโลก กล้องจะถอยออกมาให้เห็นตัวละครของคุณ และเมนูสกินจะลอยอยู่รอบตัวละคร",
   "quickskin.settings.disable_transparency_server": "ปิดระบบความโปร่งใสของ Quick Skin สำหรับผู้เล่นทุกคน",

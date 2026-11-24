@@ -264,6 +264,8 @@
   "quickskin.settings.show_pause_preview.tooltip": "己身及其鈕，列於暫停選單之側。",
   "quickskin.settings.compact_change_skin_button": "縮「易膚」之鈕使小",
   "quickskin.settings.compact_change_skin_button.tooltip": "以小徽示首頁與暫停選單之易膚鈕。",
+  "quickskin.settings.hide_change_skin_button": "隱「易膚」之鈕",
+  "quickskin.settings.hide_change_skin_button.tooltip": "去首頁與暫停選單之易膚鈕。此後唯戲中以鍵啟膚選單，故宜先設鍵。",
   "quickskin.settings.immersive_menu": "臨境膚選單",
   "quickskin.settings.immersive_menu.tooltip": "身在世間，鏡退而觀己身，膚選單浮於其周。",
   "quickskin.settings.disable_transparency_server": "為諸玩家止Quick Skin之透明",

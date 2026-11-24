@@ -264,6 +264,8 @@
   "quickskin.settings.show_pause_preview.tooltip": "Seu personagem e os botões dele ao lado do menu de pausa.",
   "quickskin.settings.compact_change_skin_button": "Compactar o botão \"Trocar Skin\" para deixá-lo menor",
   "quickskin.settings.compact_change_skin_button.tooltip": "Mostra o botão Trocar Skin da tela inicial e do menu de pausa como um ícone pequeno.",
+  "quickskin.settings.hide_change_skin_button": "Ocultar o botão \"Trocar Skin\"",
+  "quickskin.settings.hide_change_skin_button.tooltip": "Remove o botão Trocar Skin da tela inicial e do menu de pausa. O menu de skins passa a abrir só pela tecla enquanto você joga, então defina uma tecla antes.",
   "quickskin.settings.immersive_menu": "Menu de skins imersivo",
   "quickskin.settings.immersive_menu.tooltip": "Em um mundo, a câmera se afasta para mostrar seu personagem e o menu de skins flutua ao redor dele.",
   "quickskin.settings.disable_transparency_server": "Desativar o sistema de transparência do Quick Skin para todos",

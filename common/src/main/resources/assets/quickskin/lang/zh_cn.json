@@ -264,6 +264,8 @@
   "quickskin.settings.show_pause_preview.tooltip": "在暂停菜单旁显示你的角色及其按钮。",
   "quickskin.settings.compact_change_skin_button": "压缩“更换皮肤”按钮，让它更小",
   "quickskin.settings.compact_change_skin_button.tooltip": "在标题界面和暂停菜单中将“更换皮肤”按钮显示为小图标。",
+  "quickskin.settings.hide_change_skin_button": "隐藏“更换皮肤”按钮",
+  "quickskin.settings.hide_change_skin_button.tooltip": "从标题界面和暂停菜单中移除“更换皮肤”按钮。之后只能在游戏中用按键打开皮肤菜单，所以请先设置按键。",
   "quickskin.settings.immersive_menu": "沉浸式皮肤菜单",
   "quickskin.settings.immersive_menu.tooltip": "在世界中，镜头会后退以显示你的角色，皮肤菜单则悬浮在角色周围。",
   "quickskin.settings.disable_transparency_server": "为所有玩家关闭 Quick Skin 的透明系统",
