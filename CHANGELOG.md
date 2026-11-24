@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.0.2 (2026-11-24)
+
+### Added
+
+- **Hide the Change Skin button**
+> Settings › Client has a new option that removes the Change Skin button from the title screen and the pause menu. The skin menu then opens with its key, so the option works once a key is assigned to it.
+
+### Fixes
+
+- **First-person arms are drawn again by mods that look them up by skin model on 1.20.1**
+> On Minecraft 1.20.1 Quick Skin told the game "classic" instead of Minecraft's own "default" as the player's model. Minecraft did not mind, but mods that pick their own models by that name found nothing: Iron's Arms 'n Artifice drew no arms holding its guns with a wide skin. Quick Skin now always hands the game "default" or "slim".
+
 ## 5.0.1 (2026-11-22)
 
 ### Added
