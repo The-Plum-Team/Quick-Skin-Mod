@@ -2,12 +2,15 @@ package com.quickskin.mod.client.input;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.quickskin.mod.platform.QuickSkinInfo;
+import dev.architectury.event.EventResult;
+import dev.architectury.event.events.client.ClientScreenInputEvent;
 import dev.architectury.event.events.client.ClientTickEvent;
 import dev.architectury.registry.client.keymappings.KeyMappingRegistry;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 //? if >=1.21.9 && <1.21.11 {
 import net.minecraft.resources.ResourceLocation;
 //?} else if >=1.21.11 {
@@ -77,6 +80,24 @@ public class KeybindRegistry {
         ClientTickEvent.CLIENT_POST.register(client -> {
             handleKeyPresses(client, openSkinMenu);
         });
+
+        // Over a screen the game hands no key to its key mappings, so the title screen and the
+        // pause menu read the skin menu's key here, before the screen sees it
+        //? if <1.21.9 {
+        ClientScreenInputEvent.KEY_PRESSED_PRE.register((client, screen, keyCode, scanCode, modifiers) ->
+                onScreenKey(screen, OPEN_SKIN_MENU.matches(keyCode, scanCode), openSkinMenu));
+        //?} else {
+        ClientScreenInputEvent.KEY_PRESSED_PRE.register((client, screen, keyEvent) ->
+                onScreenKey(screen, OPEN_SKIN_MENU.matches(keyEvent), openSkinMenu));
+        //?}
+    }
+
+    private static EventResult onScreenKey(Screen screen, boolean skinMenuKey, Runnable openSkinMenu) {
+        if (!skinMenuKey || OPEN_SKIN_MENU.isUnbound() || !ScreenKeys.opensSkinMenuOver(screen)) {
+            return EventResult.pass();
+        }
+        openSkinMenu.run();
+        return EventResult.interruptTrue();
     }
 
     /**
