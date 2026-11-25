@@ -60,8 +60,8 @@ This `master` shared source exercises the following exact packaged lanes:
 | `fabric-26.3` | `26.3` | Fabric | `25` | `11` |
 | `neoforge-26.3` | `26.3` | NeoForge | `25` | `11` |
 
-Scenario contract SHA-256: `b6f540378322a04a968802917ba02af4c1ebc81557f2e51724d439d95996044a`
-Contract totals: `130` ordered steps, `99` captures.
+Scenario contract SHA-256: `ac9c1c95f94df8764a9ed88b8f8fedba07c599dfcea299189c122b1d34b8cb90`
+Contract totals: `136` ordered steps, `99` captures.
 
 | Scenario | Profiles | Orchestration | Roles | Ordered steps | Captures |
 |---|---|---|---|---:|---:|
@@ -75,7 +75,7 @@ Contract totals: `130` ordered steps, `99` captures.
 | `mod-compatibility-remote` | `compatibility-remote` | `concurrent-two-client` | `client_a`, `client_b` | `8` | `2` |
 | `mod-compatibility-late-join` | `compatibility-remote` | `sequential-two-client` | `client_a`, `client_b` | `5` | `1` |
 | `mod-compatibility-cpm-first-person` | `compatibility-cpm` | `single-client` | `client_a` | `5` | `3` |
-| `feature-navigation` | `pr`, `release` | `single-client` | `client_a` | `4` | `4` |
+| `feature-navigation` | `pr`, `release` | `single-client` | `client_a` | `10` | `4` |
 
 `e2e/scenario-contract.json` is the sole source for scenario ids, execution profiles, launch topology, steps, assertions, captures, probes, and comparisons. Screenshot emission is exact: each role step must emit a screenshot if and only if its contract entry declares `capture`. Version/loader/Java/runtime pins come only from this branch's validated release matrix.
 <!-- e2e-branch-profile:end -->

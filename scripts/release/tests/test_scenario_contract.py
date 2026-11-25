@@ -17,7 +17,18 @@ import scenario_contract  # noqa: E402
 
 
 EXPECTED_STEPS = {
-    ("feature-navigation", "client_a"): ("open_skin_menu_using_key", "open_skin_menu_using_vanilla_button", "skin_menu_settings_return", "cape_menu_settings_return"),
+    ("feature-navigation", "client_a"): (
+        "open_skin_menu_using_key",
+        "open_skin_menu_using_vanilla_button",
+        "skin_menu_settings_return",
+        "cape_menu_settings_return",
+        "hidden_change_skin_button_without_a_key",
+        "open_skin_menu_using_key_on_title_screen",
+        "skin_menu_key_while_typing",
+        "open_skin_menu_using_key_on_pause_menu",
+        "favourites_key_on_pause_menu",
+        "open_skin_menu_from_mod_list",
+    ),
     ("phase0-smoke", "client_a"): ("baseline", "apply_local_skin"),
     ("propagation", "client_a"): ("baseline", "apply_local_look"),
     ("propagation", "client_b"): (
