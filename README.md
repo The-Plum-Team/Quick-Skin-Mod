@@ -112,8 +112,9 @@ certify those images. Version-branch synchronization is retired under the shared
   armour there to hide it from everyone, players without Quick Skin included.
 - Use optional integrations with Customizable Player Models (`.cpmmodel`), Ears, 3D Skin Layers,
   CustomNPCs, Essential, ReplayMod, FancyMenu (whose layouts can hide, move, and resize the
-  title and pause player preview) and JourneyMap (whose player icons show the Quick Skin face)
-  when the matching third-party mod is installed.
+  title and pause player preview), JourneyMap (whose player icons show the Quick Skin face) and
+  Mod Menu (whose Config button opens the skin menu) when the matching third-party mod is
+  installed.
 
 Quick Skin does not declare these integrations as required dependencies. If an optional mod or API
 is unavailable, its integration disables itself and normal skin/cape behavior remains available.
@@ -284,7 +285,10 @@ on the server; a server owner who prefers everyone's armour to show, for example
 
 ## Using Quick Skin
 
-1. Open the Quick Skin menu from the title or pause screen, or bind its configurable key.
+1. Open the Quick Skin menu from the title or pause screen, from the mod list's Config button
+   (Mod Menu on Fabric, the Mods list on NeoForge and Forge), or with its configurable key, which
+   also works on the title screen and in the pause menu. The Change Skin button can be hidden in
+   Settings › Client; the other ways stay.
 2. Import a skin or place it under `.minecraft/quickskin/skins/`.
 3. Import a cape or place it under `.minecraft/quickskin/capes/`.
 4. Select an appearance, preview it, and choose automatic, classic, or slim arms.

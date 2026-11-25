@@ -187,8 +187,12 @@ Settings reconstruct their parent through `RestylableScreen`; key handling recei
 callback from bootstrap. Neither mechanism introduces a settings-to-skin-menu compile dependency.
 `menu-integration` owns injected title/pause controls, preview rotation/animation state and deferred
 menu rendering. Its skin-menu action is another bootstrap callback, covered by
-`vanilla-menu-navigation`; it does not compile against the skin menu. Whether the skin menu's key
-is assigned reaches it the same way, without a dependency on `client-input`.
+`vanilla-menu-navigation`; it does not compile against the skin menu. `client-input` also owns
+`ScreenKeys`, the screens over which Quick Skin's keys work, which `favourites-fan` reads for its
+own key. The loaders' mod lists open the skin menu through `QuickSkinClient.skinMenu` in `common`:
+the Fabric Mod Menu entry in `fabric/src/main`, compiled against the compile-only
+`fabric/src/modmenuApi` source set, and the NeoForge and Forge configuration-screen extension
+points registered by their client entry classes.
 At its default size and place the title preview shrinks only as far as the window and GUI
 scale need to keep it below the logo and the splash text (`TitleSplashClearance`); a size or
 position the player set is drawn as configured. `hud-preview` owns its overlay,

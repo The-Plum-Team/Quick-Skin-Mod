@@ -496,8 +496,17 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 
 ## Optional integrations
 
-- CPM, Ears, CustomNPCs, 3D Skin Layers, Essential, ReplayMod, and FancyMenu are optional. Guard
-  their entry points and preserve the normal skin/cape path when an optional mod or API is absent.
+- CPM, Ears, CustomNPCs, 3D Skin Layers, Essential, ReplayMod, FancyMenu and Mod Menu are
+  optional. Guard their entry points and preserve the normal skin/cape path when an optional mod
+  or API is absent.
+- Mod Menu's Config button for Quick Skin opens the skin menu (`QuickSkinClient.skinMenu`), whose
+  settings button leads on to the settings, as SkinShuffle and Skin Overrides do; NeoForge's
+  `IConfigScreenFactory` and Forge's `ConfigScreenHandler` give their Mods lists the same screen.
+  The Fabric entry point (`QuickSkinModMenu`, the `modmenu` entry of `fabric.mod.json`) compiles
+  against the two Mod Menu interfaces in `fabric/src/modmenuApi`, a source set on no
+  configuration whose classes never enter a JAR: Mod Menu brings the real ones, and without Mod
+  Menu Fabric never loads the entry point. Never package them, or Quick Skin's copy could shadow
+  Mod Menu's. Those interfaces have kept their package and shape since Mod Menu 2.0.
 - Ears keeps extra data of a skin (wings, a cape, erased rectangles) in the low seven bits of the
   alpha of the body regions the game always draws opaque, with the high bit set, so those texels
   are 50 to 100 percent opaque in the file. Drawn with that alpha the body looks half see-through.
@@ -1031,6 +1040,15 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
 - Quick Skin's keys are registered while the mod is built on Forge and NeoForge
   (`KeybindRegistry.registerKeys`), before Minecraft registers the controls and reads their
   saved bindings; a key registered later works but forgets its binding at every restart.
+- Minecraft hands a key to its key mappings only while no screen is open, so over a screen Quick
+  Skin reads its keys from Architectury's `ClientScreenInputEvent.KEY_PRESSED_PRE`, before the
+  screen does, and only over the screens `ScreenKeys` allows: the skin menu's key over the title
+  screen and the pause menu, the favourites key over the pause menu, which it closes to open the
+  fan in the world. Nowhere else: chat, a world's name, search boxes and other mods' fields
+  (JEI's search is not even a widget of its screen) take letters, and over Quick Skin's own
+  screens the key must not open a menu over itself. Even on an allowed screen a focused
+  `EditBox` or `MultiLineEditBox`, followed through nested containers, keeps the key, since
+  another mod may add one. Widen that list only for a screen that holds no text input.
 
 ## Public E2E evidence
 
@@ -1167,10 +1185,13 @@ This file is part of the repository-wide instruction set imported by `AGENTS.md`
   fall back to the vanilla default without a manual reset. The catalog checkpoints run on the
   menu instance that the Rename and Delete dialogs return to.
 - The Change Skin button of the title screen and the pause menu can be hidden in settings
-  (`ClientConfig.hideChangeSkinButton`), but it is left out only while the skin menu's key is
-  assigned (`ChangeSkinButton.hidden`): the button and the key are the only ways into the skin
-  menu, and the settings open from that menu. The settings box takes a change only while a key
-  is assigned, and a player who hid the button and then lost the key gets the button back.
+  (`ClientConfig.hideChangeSkinButton`) whether or not a key is bound. The skin menu, and the
+  settings that open from it, stay reachable without the button: from the loader's mod list
+  (Mod Menu on Fabric, the Mods list on NeoForge and Forge) and with the skin menu's key, which
+  works over the title screen and the pause menu and which vanilla's Controls screen can always
+  bind, so a player with neither Mod Menu nor a key is not locked out. The `feature-navigation`
+  scenario proves the button goes with no key bound, the key over both screens, the key typed
+  into a focused text field, and the mod list's lookup.
 - A model name handed to the game is the game's own: `slim` or `default`
   (`PlayerAppearance.vanillaModelName`). On 1.20.1 the model is a string
   (`AbstractClientPlayer.getModelName`, `PlayerInfo.getModelName`) that vanilla tolerates when
