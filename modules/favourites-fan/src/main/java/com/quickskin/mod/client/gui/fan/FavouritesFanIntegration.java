@@ -3,16 +3,19 @@ package com.quickskin.mod.client.gui.fan;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.quickskin.mod.client.gui.GuiCompat;
 import com.quickskin.mod.client.input.KeybindRegistry;
+import com.quickskin.mod.client.input.ScreenKeys;
 import dev.architectury.event.CompoundEventResult;
 import dev.architectury.event.EventResult;
 import dev.architectury.event.events.client.ClientGuiEvent;
 import dev.architectury.event.events.client.ClientRawInputEvent;
+import dev.architectury.event.events.client.ClientScreenInputEvent;
 import dev.architectury.event.events.client.ClientTickEvent;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.gui.screens.Screen;
 
 /**
  * Registers the favourites fan: its key, the mouse buttons, wheel and Esc it takes while open, and
@@ -58,6 +61,17 @@ public final class FavouritesFanIntegration {
         ClientRawInputEvent.KEY_PRESSED.register((client, action, keyEvent) -> onKey(GuiCompat.keyCode(keyEvent), action));
         //?}
 
+        // The fan is a layer over the world, never over a screen: from the pause menu its key goes
+        // back to the game and opens it there. The game hands no key to its key mappings while a
+        // screen is open, so the pause menu's key is read here, before the menu sees it
+        //? if <1.21.9 {
+        ClientScreenInputEvent.KEY_PRESSED_PRE.register((client, screen, keyCode, scanCode, modifiers) ->
+                onScreenKey(client, screen, key.matches(keyCode, scanCode)));
+        //?} else {
+        ClientScreenInputEvent.KEY_PRESSED_PRE.register((client, screen, keyEvent) ->
+                onScreenKey(client, screen, key.matches(keyEvent)));
+        //?}
+
         // Esc reaches the fan here only on some loaders (Forge reports keys after the game handled
         // them); elsewhere PauseGameMixin keeps the game from pausing. Should that hook not apply,
         // the pause menu Esc opens is what closes the fan
@@ -101,6 +115,15 @@ public final class FavouritesFanIntegration {
             return EventResult.interruptTrue();
         }
         return EventResult.pass();
+    }
+
+    private static EventResult onScreenKey(Minecraft client, Screen screen, boolean fanKey) {
+        if (!fanKey || key.isUnbound() || client.player == null || !ScreenKeys.opensFavouritesOver(screen)) {
+            return EventResult.pass();
+        }
+        GuiCompat.openScreen(null);
+        FavouritesFan.toggle(client);
+        return EventResult.interruptTrue();
     }
 
     /** Puts the fan away with the session, as leaving a world does. */

@@ -265,7 +265,7 @@
   "quickskin.settings.compact_change_skin_button": "Gör knappen \"Byt skin\" kompakt och mindre",
   "quickskin.settings.compact_change_skin_button.tooltip": "Visar knappen Byt skin på titelskärmen och i pausmenyn som en liten ikon.",
   "quickskin.settings.hide_change_skin_button": "Dölj knappen \"Byt skin\"",
-  "quickskin.settings.hide_change_skin_button.tooltip": "Tar bort knappen Byt skin från titelskärmen och pausmenyn. Skinmenyn öppnas då bara med sin tangent medan du spelar, så tilldela en tangent först.",
+  "quickskin.settings.hide_change_skin_button.tooltip": "Tar bort knappen Byt skin från titelskärmen och pausmenyn. Skinmenyn öppnas fortfarande från modlistan (Mod Menu på Fabric) och med sin tangent, som du ställer in under Alternativ › Kontroller och som även fungerar på de skärmarna.",
   "quickskin.settings.immersive_menu": "Uppslukande skinmeny",
   "quickskin.settings.immersive_menu.tooltip": "I en värld backar kameran för att visa din figur, och skinmenyn svävar runt den.",
   "quickskin.settings.disable_transparency_server": "Stäng av Quick Skins transparens för alla spelare",

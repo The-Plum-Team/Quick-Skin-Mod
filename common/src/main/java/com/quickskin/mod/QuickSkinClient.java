@@ -47,12 +47,22 @@ public class QuickSkinClient {
         // Register client events and keybinds after all their dependencies are available.
         ClientEvents.init(RUNTIME);
         KeybindRegistry.init(() -> com.quickskin.mod.client.gui.GuiCompat.openScreen(
-                new com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen(
-                        com.quickskin.mod.client.gui.GuiCompat.currentScreen())));
+                skinMenu(com.quickskin.mod.client.gui.GuiCompat.currentScreen())));
 
         // Auto-select player's own skin if no skin is currently selected.
         ClientEvents.autoSelectPlayerOwnSkin();
         initialized = true;
+    }
+
+    /**
+     * The skin menu, which returns to {@code parent} when it closes. The loaders' mod lists open it
+     * as Quick Skin's configuration screen (Mod Menu on Fabric, the Mods list on NeoForge and
+     * Forge): the settings are reached from it, and so is the skin menu itself while the Change
+     * Skin button is hidden and no key is bound.
+     */
+    public static net.minecraft.client.gui.screens.Screen skinMenu(
+            @org.jetbrains.annotations.Nullable net.minecraft.client.gui.screens.Screen parent) {
+        return new com.quickskin.mod.client.gui.screen.PlayerSkinMenuScreen(parent);
     }
 
     /** Explicit cleanup hook for client platforms that expose one. */

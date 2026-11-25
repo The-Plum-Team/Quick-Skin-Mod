@@ -22,6 +22,9 @@
     ],
     "client": [
       "com.quickskin.mod.fabric.QuickSkinFabricClient"
+    ],
+    "modmenu": [
+      "com.quickskin.mod.fabric.QuickSkinModMenu"
     ]
   },
   "mixins": [

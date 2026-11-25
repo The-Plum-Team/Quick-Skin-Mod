@@ -4741,6 +4741,88 @@
                 "expectation": "Closing settings after hiding the official Minecraft capes returns to a new cape menu that lists no built-in capes, with its grey Import and Remove buttons, its green Done button and its large player.",
                 "probes": []
               }
+            },
+            {
+              "id": "hidden_change_skin_button_without_a_key",
+              "assertion_required": true,
+              "requires": [],
+              "requires_captures": [],
+              "covers": {
+                "modules": [
+                  "configuration",
+                  "menu-integration",
+                  "settings-ui"
+                ],
+                "bindings": []
+              }
+            },
+            {
+              "id": "open_skin_menu_using_key_on_title_screen",
+              "assertion_required": true,
+              "requires": [],
+              "requires_captures": [],
+              "covers": {
+                "modules": [
+                  "client-input",
+                  "skin-menu"
+                ],
+                "bindings": [
+                  "open-skin-menu"
+                ]
+              }
+            },
+            {
+              "id": "skin_menu_key_while_typing",
+              "assertion_required": true,
+              "requires": [],
+              "requires_captures": [],
+              "covers": {
+                "modules": [
+                  "client-input"
+                ],
+                "bindings": []
+              }
+            },
+            {
+              "id": "open_skin_menu_using_key_on_pause_menu",
+              "assertion_required": true,
+              "requires": [],
+              "requires_captures": [],
+              "covers": {
+                "modules": [
+                  "client-input",
+                  "skin-menu"
+                ],
+                "bindings": [
+                  "open-skin-menu"
+                ]
+              }
+            },
+            {
+              "id": "favourites_key_on_pause_menu",
+              "assertion_required": true,
+              "requires": [],
+              "requires_captures": [],
+              "covers": {
+                "modules": [
+                  "client-input",
+                  "favourites-fan"
+                ],
+                "bindings": []
+              }
+            },
+            {
+              "id": "open_skin_menu_from_mod_list",
+              "assertion_required": true,
+              "requires": [],
+              "requires_captures": [],
+              "covers": {
+                "modules": [
+                  "common",
+                  "skin-menu"
+                ],
+                "bindings": []
+              }
             }
           ],
           "comparisons": []

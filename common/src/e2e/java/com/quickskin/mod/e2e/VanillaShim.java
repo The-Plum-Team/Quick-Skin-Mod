@@ -1992,6 +1992,19 @@ public final class VanillaShim {
                 return "Screen.keyPressed failed: " + t;
             }
         }
+        return pressKeyThroughKeyboard(mc, keyCode, scanCode, modifiers);
+    }
+
+    /**
+     * Presses and releases a key as the window reports one, through {@code KeyboardHandler}'s
+     * window callback on every version, so the loaders' screen key events and the game's own
+     * routing see it before the screen does. {@link #pressKey} instead calls an old screen's
+     * {@code keyPressed} directly, which nothing else hears of. The callback returns nothing:
+     * assert on the state the key leaves.
+     *
+     * @return {@code null} when the key was dispatched, or a message explaining why not
+     */
+    public static String pressKeyThroughKeyboard(Minecraft mc, int keyCode, int scanCode, int modifiers) {
         Object handler = mc.keyboardHandler;
         if (handler == null) return "keyboardHandler is null";
         Method sdlKeyPress = sdlBackend() ? findEventCallback(handler, 2, "keyPress") : null;

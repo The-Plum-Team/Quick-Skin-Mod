@@ -20,6 +20,7 @@ public class QuickSkinForge {
         // Quick Skin's keys must exist before NeoForge registers the controls and reads their bindings
         if (dist.isClient()) {
             QuickSkinForgeClient.registerKeys();
+            QuickSkinForgeClient.registerConfigScreen();
         }
     }
 

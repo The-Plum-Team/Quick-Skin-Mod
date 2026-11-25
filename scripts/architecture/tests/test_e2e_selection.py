@@ -105,8 +105,11 @@ class E2ESelectionTest(unittest.TestCase):
         self.assertEqual(self.contract.expected_steps("session", "client_a"), session.steps)
         self.assertEqual(("pause_menu_preview", "inventory_paper_doll", "quit_to_title"), session.captures)
         navigation = plan.role("feature-navigation", "client_a")
-        self.assertEqual(("open_skin_menu_using_vanilla_button",), navigation.steps)
-        self.assertEqual(navigation.steps, navigation.captures)
+        self.assertEqual(
+            ("open_skin_menu_using_vanilla_button", "hidden_change_skin_button_without_a_key"),
+            navigation.steps,
+        )
+        self.assertEqual(("open_skin_menu_using_vanilla_button",), navigation.captures)
         self.assertEqual(5, len(project_contract(self.contract, plan).captures))
 
     def test_hud_preview_uses_its_own_control_without_selecting_menus_or_capes(self):

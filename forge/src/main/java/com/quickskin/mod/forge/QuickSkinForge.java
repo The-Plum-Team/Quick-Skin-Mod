@@ -27,6 +27,7 @@ public class QuickSkinForge {
         // Quick Skin's keys must exist before Forge registers the controls and reads their bindings
         if (FMLEnvironment.dist == Dist.CLIENT) {
             QuickSkinForgeClient.registerKeys();
+            QuickSkinForgeClient.registerConfigScreen();
         }
     }
 

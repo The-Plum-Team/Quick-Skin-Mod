@@ -265,7 +265,7 @@
   "quickskin.settings.compact_change_skin_button": "Den Button „Skin ändern“ kompakter und kleiner machen",
   "quickskin.settings.compact_change_skin_button.tooltip": "Zeigt die Schaltfläche „Skin ändern“ im Hauptmenü und im Pausenmenü als kleines Symbol an.",
   "quickskin.settings.hide_change_skin_button": "Die Schaltfläche „Skin ändern“ ausblenden",
-  "quickskin.settings.hide_change_skin_button.tooltip": "Entfernt die Schaltfläche „Skin ändern“ aus dem Hauptmenü und dem Pausenmenü. Das Skin-Menü öffnet sich dann nur noch im Spiel über seine Taste, weise also zuerst eine Taste zu.",
+  "quickskin.settings.hide_change_skin_button.tooltip": "Entfernt die Schaltfläche „Skin ändern“ aus dem Hauptmenü und dem Pausenmenü. Das Skin-Menü öffnet sich weiterhin über die Modliste (Mod Menu auf Fabric) und über seine Taste, die du unter Optionen › Steuerung festlegen kannst und die auch auf diesen Bildschirmen funktioniert.",
   "quickskin.settings.immersive_menu": "Immersives Skin-Menü",
   "quickskin.settings.immersive_menu.tooltip": "In einer Welt tritt die Kamera zurück und zeigt deine Figur, und das Skin-Menü schwebt um sie herum.",
   "quickskin.settings.disable_transparency_server": "Quick Skins Transparenz für alle Spieler abschalten",

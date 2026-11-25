@@ -265,7 +265,7 @@
   "quickskin.settings.compact_change_skin_button": "'스킨 변경' 버튼을 작게 줄이기",
   "quickskin.settings.compact_change_skin_button.tooltip": "타이틀 화면과 일시정지 메뉴의 스킨 변경 버튼을 작은 아이콘으로 표시합니다.",
   "quickskin.settings.hide_change_skin_button": "'스킨 변경' 버튼 숨기기",
-  "quickskin.settings.hide_change_skin_button.tooltip": "타이틀 화면과 일시정지 메뉴에서 스킨 변경 버튼을 없앱니다. 그러면 스킨 메뉴는 플레이 중에 지정한 키로만 열리므로 먼저 키를 지정하세요.",
+  "quickskin.settings.hide_change_skin_button.tooltip": "타이틀 화면과 일시정지 메뉴에서 스킨 변경 버튼을 없앱니다. 스킨 메뉴는 계속 모드 목록(Fabric에서는 Mod Menu)과 지정한 키로 열 수 있으며, 키는 설정 › 조작에서 지정할 수 있고 이 화면들에서도 작동합니다.",
   "quickskin.settings.immersive_menu": "몰입형 스킨 메뉴",
   "quickskin.settings.immersive_menu.tooltip": "월드 안에서는 카메라가 뒤로 물러나 캐릭터를 비추고, 스킨 메뉴가 그 주위에 떠 있습니다.",
   "quickskin.settings.disable_transparency_server": "모든 플레이어의 Quick Skin 투명도 시스템 끄기",

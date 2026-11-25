@@ -41,15 +41,8 @@ public final class MenuIntegration {
     private MenuIntegration() {
     }
 
-    /**
-     * @param menuKeyAssigned whether a key opens the skin menu now. The Change Skin button can be
-     *                        hidden in settings only while one does: with the button gone the key
-     *                        is the only way to the skin menu, and to the settings themselves.
-     */
-    public static synchronized void init(java.util.function.Consumer<Screen> openSkinMenu,
-                                         java.util.function.BooleanSupplier menuKeyAssigned) {
+    public static synchronized void init(java.util.function.Consumer<Screen> openSkinMenu) {
         java.util.Objects.requireNonNull(openSkinMenu, "openSkinMenu");
-        java.util.Objects.requireNonNull(menuKeyAssigned, "menuKeyAssigned");
         if (initialized) return;
         initialized = true;
 
@@ -201,11 +194,11 @@ public final class MenuIntegration {
                 }
             }
 
-            // Create and add the "Change Skin" button, unless the player hid it in settings
+            // Create and add the "Change Skin" button, unless the player hid it in settings. The
+            // skin menu stays reachable without it: through its key, which works on this screen,
+            // and through the loader's mod list (Mod Menu on Fabric)
             final Button changeSkinButton;
-            boolean hideButton = ChangeSkinButton.hidden(
-                    com.quickskin.mod.config.ClientConfig.getInstance().hideChangeSkinButton,
-                    menuKeyAssigned.getAsBoolean());
+            boolean hideButton = com.quickskin.mod.config.ClientConfig.getInstance().hideChangeSkinButton;
             // Without the button the preview's controls stack as they do above a compact one,
             // one row lower: the rotate control stands where the icon would
             boolean compactButton = !essentialPresent && (hideButton

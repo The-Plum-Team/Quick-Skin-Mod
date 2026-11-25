@@ -265,7 +265,7 @@
   "quickskin.settings.compact_change_skin_button": "Зробити кнопку «Змінити скін» компактнішою",
   "quickskin.settings.compact_change_skin_button.tooltip": "Показувати кнопку «Змінити скін» на титульному екрані та в меню паузи маленькою іконкою.",
   "quickskin.settings.hide_change_skin_button": "Приховати кнопку «Змінити скін»",
-  "quickskin.settings.hide_change_skin_button.tooltip": "Прибирає кнопку «Змінити скін» з титульного екрана та з меню паузи. Меню скінів тоді відкривається лише своєю клавішею під час гри, тож спершу призначте клавішу.",
+  "quickskin.settings.hide_change_skin_button.tooltip": "Прибирає кнопку «Змінити скін» з титульного екрана та з меню паузи. Меню скінів і далі відкривається зі списку модів (Mod Menu на Fabric) і своєю клавішею, яку можна призначити в «Налаштування › Керування» і яка працює й на цих екранах.",
   "quickskin.settings.immersive_menu": "Імерсивне меню скінів",
   "quickskin.settings.immersive_menu.tooltip": "У світі камера відходить назад і показує вашого персонажа, а меню скінів ширяє навколо нього.",
   "quickskin.settings.disable_transparency_server": "Вимкнути прозорість Quick Skin для всіх гравців",
