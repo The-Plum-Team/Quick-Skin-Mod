@@ -265,7 +265,7 @@
   "quickskin.settings.compact_change_skin_button": "「スキンを変更」ボタンをコンパクトにして小さくする",
   "quickskin.settings.compact_change_skin_button.tooltip": "タイトル画面とポーズメニューのスキン変更ボタンを小さなアイコンで表示します。",
   "quickskin.settings.hide_change_skin_button": "「スキンを変更」ボタンを非表示にする",
-  "quickskin.settings.hide_change_skin_button.tooltip": "タイトル画面とポーズメニューからスキン変更ボタンを取り除きます。スキンメニューはプレイ中にキーでしか開けなくなるため、先にキーを割り当ててください。",
+  "quickskin.settings.hide_change_skin_button.tooltip": "タイトル画面とポーズメニューからスキン変更ボタンを取り除きます。スキンメニューは引き続きMod一覧（FabricではMod Menu）と専用キーで開けます。キーは設定 › 操作設定で割り当てられ、これらの画面でも使えます。",
   "quickskin.settings.immersive_menu": "没入型スキンメニュー",
   "quickskin.settings.immersive_menu.tooltip": "ワールド内ではカメラが引いてキャラクターを映し、スキンメニューがその周りに浮かびます。",
   "quickskin.settings.disable_transparency_server": "全プレイヤーのQuick Skin透明化システムをオフ",

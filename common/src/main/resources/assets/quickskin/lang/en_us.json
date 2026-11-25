@@ -259,7 +259,7 @@
   "quickskin.settings.compact_change_skin_button": "Compact the Change Skin button to make it smaller",
   "quickskin.settings.compact_change_skin_button.tooltip": "Show the Change Skin button on the title screen and pause menu as a small icon.",
   "quickskin.settings.hide_change_skin_button": "Hide the Change Skin button",
-  "quickskin.settings.hide_change_skin_button.tooltip": "Removes the Change Skin button from the title screen and pause menu. The skin menu then opens only with its key while you play, so assign a key first.",
+  "quickskin.settings.hide_change_skin_button.tooltip": "Removes the Change Skin button from the title screen and pause menu. The skin menu still opens from the mod list (Mod Menu on Fabric) and with its key, which you can set in Options › Controls and which also works on those screens.",
   "quickskin.settings.immersive_menu": "Immersive skin menu",
   "quickskin.settings.immersive_menu.tooltip": "In a world the camera steps back to look at your character, and the skin menu floats around them.",
   "quickskin.settings.hide_builtin_capes": "Hide the official Minecraft capes",

@@ -265,7 +265,7 @@
   "quickskin.settings.compact_change_skin_button": "Zmniejsz przycisk „Zmień skórkę”, by był bardziej kompaktowy",
   "quickskin.settings.compact_change_skin_button.tooltip": "Wyświetla przycisk Zmień skórkę na ekranie tytułowym i w menu pauzy jako małą ikonę.",
   "quickskin.settings.hide_change_skin_button": "Ukryj przycisk „Zmień skórkę”",
-  "quickskin.settings.hide_change_skin_button.tooltip": "Usuwa przycisk Zmień skórkę z ekranu tytułowego i menu pauzy. Menu skórek otwiera się wtedy tylko swoim klawiszem podczas gry, więc najpierw przypisz klawisz.",
+  "quickskin.settings.hide_change_skin_button.tooltip": "Usuwa przycisk Zmień skórkę z ekranu tytułowego i menu pauzy. Menu skórek nadal otwiera się z listy modów (Mod Menu na Fabric) i swoim klawiszem, który ustawisz w Opcje › Sterowanie i który działa też na tych ekranach.",
   "quickskin.settings.immersive_menu": "Immersyjne menu skórek",
   "quickskin.settings.immersive_menu.tooltip": "W świecie kamera odsuwa się, by pokazać twoją postać, a menu skórek unosi się wokół niej.",
   "quickskin.settings.disable_transparency_server": "Wyłącz system przezroczystości Quick Skin dla wszystkich graczy",

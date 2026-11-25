@@ -265,7 +265,7 @@
   "quickskin.settings.compact_change_skin_button": "\"स्किन बदलें\" बटन को छोटा और कॉम्पैक्ट करें",
   "quickskin.settings.compact_change_skin_button.tooltip": "टाइटल स्क्रीन और पॉज़ मेनू में स्किन बदलें बटन को एक छोटे आइकन के रूप में दिखाएँ।",
   "quickskin.settings.hide_change_skin_button": "\"स्किन बदलें\" बटन छिपाएँ",
-  "quickskin.settings.hide_change_skin_button.tooltip": "टाइटल स्क्रीन और पॉज़ मेनू से स्किन बदलें बटन हटा देता है। तब स्किन मेनू खेलते समय केवल अपनी कुंजी से खुलता है, इसलिए पहले एक कुंजी तय करें।",
+  "quickskin.settings.hide_change_skin_button.tooltip": "टाइटल स्क्रीन और पॉज़ मेनू से स्किन बदलें बटन हटा देता है। स्किन मेनू फिर भी मॉड सूची (Fabric पर Mod Menu) से और अपनी कुंजी से खुलता है, जिसे आप विकल्प › नियंत्रण में तय कर सकते हैं और जो इन स्क्रीन पर भी काम करती है।",
   "quickskin.settings.immersive_menu": "इमर्सिव स्किन मेनू",
   "quickskin.settings.immersive_menu.tooltip": "दुनिया में कैमरा पीछे हटकर आपका कैरेक्टर दिखाता है और स्किन मेनू उसके चारों ओर तैरता है।",
   "quickskin.settings.disable_transparency_server": "सभी खिलाड़ियों के लिए Quick Skin की पारदर्शिता बंद करें",

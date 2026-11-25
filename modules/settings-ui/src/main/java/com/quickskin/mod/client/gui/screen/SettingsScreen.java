@@ -401,13 +401,10 @@ public class SettingsScreen extends Screen {
         clientSettingWidgets.add(compactChangeSkinButtonCheckbox);
         currentRightY += spacing;
 
-        // Without the button only the key opens the skin menu, and these settings with it, so
-        // the box takes a change only while a key is assigned; the menus keep the same rule
         hideChangeSkinButtonCheckbox = checkbox(rightColumnX, currentRightY,
                 "quickskin.settings.hide_change_skin_button",
                 config.hideChangeSkinButton,
                 "quickskin.settings.hide_change_skin_button.tooltip", this::applyClientSettings);
-        hideChangeSkinButtonCheckbox.active = KeybindRegistry.skinMenuKeyAssigned();
         clientSettingWidgets.add(hideChangeSkinButtonCheckbox);
         currentRightY += spacing;
 
@@ -661,7 +658,6 @@ public class SettingsScreen extends Screen {
         // Update keybind button text before rendering
         this.keybindButton.setMessage(keybindButtonText(KeybindRegistry.OPEN_SKIN_MENU));
         this.fanKeybindButton.setMessage(keybindButtonText(KeybindRegistry.FAVOURITES_FAN));
-        this.hideChangeSkinButtonCheckbox.active = KeybindRegistry.skinMenuKeyAssigned();
         //? if <1.21.6 {
         graphics.pose().pushPose();
         graphics.pose().translate(0, 0, 100); // Move modal forward in Z

@@ -133,8 +133,7 @@ public class ClientEvents {
         }));
 
         com.quickskin.mod.client.gui.integration.MenuIntegration.init(parent ->
-                com.quickskin.mod.client.gui.GuiCompat.openScreen(new PlayerSkinMenuScreen(parent)),
-                com.quickskin.mod.client.input.KeybindRegistry::skinMenuKeyAssigned);
+                com.quickskin.mod.client.gui.GuiCompat.openScreen(new PlayerSkinMenuScreen(parent)));
 
         com.quickskin.mod.client.gui.overlay.HudPreviewIntegration.init();
         com.quickskin.mod.client.gui.fan.FavouritesFanIntegration.init();

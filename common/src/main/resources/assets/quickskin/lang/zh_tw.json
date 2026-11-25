@@ -265,7 +265,7 @@
   "quickskin.settings.compact_change_skin_button": "縮小「更換皮膚」按鈕，讓它更精簡",
   "quickskin.settings.compact_change_skin_button.tooltip": "在標題畫面與暫停選單中以小圖示顯示「更換皮膚」按鈕。",
   "quickskin.settings.hide_change_skin_button": "隱藏「更換皮膚」按鈕",
-  "quickskin.settings.hide_change_skin_button.tooltip": "從標題畫面與暫停選單移除「更換皮膚」按鈕。之後只能在遊戲中用按鍵開啟皮膚選單，所以請先設定按鍵。",
+  "quickskin.settings.hide_change_skin_button.tooltip": "從標題畫面與暫停選單移除「更換皮膚」按鈕。皮膚選單仍可從模組列表（Fabric 上為 Mod Menu）開啟，也可用其按鍵開啟；按鍵可在「選項 › 控制」中設定，在這兩個畫面上同樣有效。",
   "quickskin.settings.immersive_menu": "沉浸式皮膚選單",
   "quickskin.settings.immersive_menu.tooltip": "在世界中，鏡頭會後退以顯示你的角色，皮膚選單則懸浮在角色周圍。",
   "quickskin.settings.disable_transparency_server": "為所有玩家關閉 Quick Skin 的透明系統",
