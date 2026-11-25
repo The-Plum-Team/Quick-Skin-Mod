@@ -75,8 +75,18 @@ sourceSets {
     }
 }
 
-tasks.named("compileJava") {
+// Mod Menu's API, only what Quick Skin's Mod Menu entry implements, for compilation alone: it is
+// on no configuration and never enters a JAR. At runtime Mod Menu brings the real interfaces, and
+// without Mod Menu nothing loads the entry point, so Quick Skin does not depend on Mod Menu.
+val modMenuApi = sourceSets.create("modMenuApi") {
+    java.setSrcDirs(listOf(rootProject.file("fabric/src/modmenuApi/java")))
+    resources.setSrcDirs(emptyList<Any>())
+    compileClasspath = configurations["compileClasspath"]
+}
+
+tasks.named<JavaCompile>("compileJava") {
     dependsOn(prepareConsolidatedJava)
+    classpath += modMenuApi.output
 }
 tasks.matching { it.name == "sourcesJar" }.configureEach {
     dependsOn(prepareConsolidatedJava)

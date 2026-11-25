@@ -26,6 +26,17 @@ public class QuickSkinForgeClient {
         com.quickskin.mod.client.input.KeybindRegistry.registerKeys();
     }
 
+    /**
+     * Gives the Mods list's Config button the skin menu, where the skin is changed and from which
+     * the settings open, so that list reaches the menu even with the Change Skin button hidden.
+     */
+    static void registerConfigScreen() {
+        net.neoforged.fml.ModLoadingContext.get().getActiveContainer().registerExtensionPoint(
+                net.neoforged.neoforge.client.gui.IConfigScreenFactory.class,
+                (net.neoforged.neoforge.client.gui.IConfigScreenFactory) (owner, parent) ->
+                        QuickSkinClient.skinMenu(parent));
+    }
+
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
         // Initialize client code on the main thread

@@ -22,6 +22,17 @@ public class QuickSkinForgeClient {
         com.quickskin.mod.client.input.KeybindRegistry.registerKeys();
     }
 
+    /**
+     * Gives the Mods list's Config button the skin menu, where the skin is changed and from which
+     * the settings open, so that list reaches the menu even with the Change Skin button hidden.
+     */
+    static void registerConfigScreen() {
+        net.minecraftforge.fml.ModLoadingContext.get().registerExtensionPoint(
+                net.minecraftforge.client.ConfigScreenHandler.ConfigScreenFactory.class,
+                () -> new net.minecraftforge.client.ConfigScreenHandler.ConfigScreenFactory(
+                        (minecraft, parent) -> QuickSkinClient.skinMenu(parent)));
+    }
+
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
         // Initialize client code on the main thread
